@@ -1,0 +1,397 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Food Assistant - Planificador de Comidas & IA</title>
+  <meta name="description" content="Guarda recetas de webs y redes sociales, planifica tu menú semanal con Gemini y compra por pasillos de supermercado.">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#c2410c">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%23c2410c'/><text y='.9em' font-size='70' x='15'>🍳</text></svg>">
+</head>
+<body>
+
+<div class="app-container">
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="brand-wrapper">
+      <span class="brand-logo">🍳</span>
+      <h1 class="brand-name">Food Assistant</h1>
+      <span class="brand-badge">Gemini AI</span>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-primary btn-sm" id="btn-quick-import" title="Importar receta">
+        <span>📥</span> Importar
+      </button>
+      <button class="btn btn-secondary btn-icon" id="btn-header-settings" title="Ajustes">
+        ⚙️
+      </button>
+    </div>
+  </header>
+
+  <!-- VIEW 1: TODAY / DASHBOARD -->
+  <main class="view-panel active" id="view-today">
+    <div class="today-hero">
+      <div class="today-hero-title">
+        <span>☀️</span>
+        <span id="today-date-text">Comidas de Hoy</span>
+      </div>
+      <p class="section-subtitle">Tu plan de alimentación organizado para hoy.</p>
+      
+      <div class="quick-stats-grid">
+        <div class="stat-box">
+          <div class="stat-value" id="stat-total-recipes">0</div>
+          <div class="stat-label">Recetas</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="stat-planned-meals">0</div>
+          <div class="stat-label">Planificadas</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="stat-shopping-items">0</div>
+          <div class="stat-label">En la lista</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Menú de Hoy</h2>
+        <p class="section-subtitle">Toca cualquier plato para ver la receta o cocinar.</p>
+      </div>
+      <button class="btn btn-secondary btn-sm" id="btn-goto-planner">Ver Semana ➔</button>
+    </div>
+
+    <div class="slots-grid" id="today-slots-container">
+      <!-- Generated via JS -->
+    </div>
+
+    <div style="margin-top: var(--space-6);">
+      <div class="section-header">
+        <h2 class="section-title">Acciones Rápidas</h2>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+        <button class="card btn" id="btn-quick-ai-plan" style="text-align: left; padding: var(--space-4); display: flex; flex-direction: column; align-items: flex-start; gap: 6px;">
+          <span style="font-size: 28px;">✨</span>
+          <strong style="font-size: 14px; color: var(--color-text);">Planificar con Gemini</strong>
+          <span style="font-size: 12px; color: var(--color-text-muted);">Organiza toda la semana en 1 clic</span>
+        </button>
+        <button class="card btn" id="btn-quick-shopping" style="text-align: left; padding: var(--space-4); display: flex; flex-direction: column; align-items: flex-start; gap: 6px;">
+          <span style="font-size: 28px;">🛒</span>
+          <strong style="font-size: 14px; color: var(--color-text);">Ir al Supermercado</strong>
+          <span style="font-size: 12px; color: var(--color-text-muted);">Lista ordenada por pasillos</span>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- VIEW 2: RECIPES / RECIPE BOX -->
+  <section class="view-panel" id="view-recipes">
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Mis Recetas</h2>
+        <p class="section-subtitle">Tu recetario digital guardado y listo para cocinar.</p>
+      </div>
+      <button class="btn btn-primary btn-sm" id="btn-open-create-recipe">
+        <span>+</span> Nueva Receta
+      </button>
+    </div>
+
+    <!-- Search & Filter Chips -->
+    <div style="margin-bottom: var(--space-4);">
+      <input type="text" class="chat-input" id="recipes-search-input" placeholder="🔍 Buscar por nombre, ingrediente o etiqueta..." style="margin-bottom: var(--space-2);">
+      
+      <div class="prompt-chips-wrapper" id="recipes-tag-filters">
+        <button class="prompt-chip-btn active" data-tag="all">Todas</button>
+        <button class="prompt-chip-btn" data-tag="Rápida">⚡ Rápidas</button>
+        <button class="prompt-chip-btn" data-tag="Cena">🌙 Cenas</button>
+        <button class="prompt-chip-btn" data-tag="Almuerzo">☀️ Almuerzos</button>
+        <button class="prompt-chip-btn" data-tag="Saludable">🥗 Saludable</button>
+        <button class="prompt-chip-btn" data-tag="Pasta">🍝 Pasta</button>
+        <button class="prompt-chip-btn" data-tag="Pollo">🍗 Pollo</button>
+      </div>
+    </div>
+
+    <div class="recipes-grid" id="recipes-cards-grid">
+      <!-- Generated via JS -->
+    </div>
+  </section>
+
+  <!-- VIEW 3: WEEKLY PLANNER -->
+  <section class="view-panel" id="view-planner">
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Planificador Semanal</h2>
+        <p class="section-subtitle">Organiza tus menús de Lunes a Domingo.</p>
+      </div>
+      <button class="btn btn-primary btn-sm" id="btn-send-plan-to-shopping">
+        <span>🛒</span> Generar Lista
+      </button>
+    </div>
+
+    <!-- AI Suggestion Banner in Planner -->
+    <div class="card" style="background: linear-gradient(135deg, rgba(194,65,12,0.1), rgba(245,158,11,0.08)); border-color: rgba(194,65,12,0.3); margin-bottom: var(--space-4); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2);">
+      <div>
+        <strong style="color: var(--color-accent); display: flex; align-items: center; gap: 6px;">
+          <span>✨</span> ¿Sin tiempo para pensar qué cocinar?
+        </strong>
+        <p style="font-size: 12px; color: var(--color-text-muted); margin-top: 2px;">
+          Deja que Gemini elija recetas equilibradas de tu recetario para los 7 días.
+        </p>
+      </div>
+      <button class="btn btn-primary btn-sm" id="btn-planner-ai-auto">
+        Autoplanificar Semana
+      </button>
+    </div>
+
+    <!-- Days List -->
+    <div class="days-scroll-container" id="planner-days-container">
+      <!-- Generated via JS -->
+    </div>
+  </section>
+
+  <!-- VIEW 4: SMART SHOPPING LIST -->
+  <section class="view-panel" id="view-shopping">
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Lista de la Compra</h2>
+        <p class="section-subtitle" id="shopping-summary-text">0 artículos pendientes</p>
+      </div>
+      <div style="display: flex; gap: var(--space-2);">
+        <button class="btn btn-secondary btn-sm" id="btn-copy-shopping" title="Copiar lista">
+          📋 Copiar
+        </button>
+        <button class="btn btn-ghost btn-sm" id="btn-clear-completed" title="Eliminar tachados">
+          🧹 Limpiar
+        </button>
+      </div>
+    </div>
+
+    <!-- Quick Add Item Bar -->
+    <div style="display: flex; gap: var(--space-2); margin-bottom: var(--space-4);">
+      <input type="text" class="chat-input" id="input-quick-grocery" placeholder="Añadir artículo (ej. Leche 1L, Manzanas 1kg, Pan...)" style="margin: 0;">
+      <button class="btn btn-primary" id="btn-add-grocery">Añadir</button>
+    </div>
+
+    <!-- Aisles Container -->
+    <div id="shopping-aisles-container">
+      <!-- Generated via JS: Produce, Meat, Dairy, Bakery, Pantry, Spices, Frozen, Other -->
+    </div>
+  </section>
+
+  <!-- VIEW 5: GEMINI AI COPILOT -->
+  <section class="view-panel" id="view-ai">
+    <div class="ai-hero-card">
+      <div class="ai-hero-title">✨ Gemini Chef Copilot</div>
+      <p class="ai-hero-desc">
+        Tu asistente culinario personal. Pregúntale por un plan semanal equilibrado, pídele inventar una receta con las sobras de tu nevera o sustituir ingredientes.
+      </p>
+    </div>
+
+    <div class="prompt-chips-wrapper">
+      <button class="prompt-chip-btn" data-prompt="Planifica mi menú semanal de comidas y cenas con mis recetas guardadas.">
+        📅 Planificar mi semana
+      </button>
+      <button class="prompt-chip-btn" data-prompt="Tengo pollo, calabacín y patatas en la nevera. ¿Qué cena rica y rápida puedo preparar?">
+        🥦 Receta con lo que tengo
+      </button>
+      <button class="prompt-chip-btn" data-prompt="Crea una receta de cena saludable, alta en proteínas y lista en 15 minutos.">
+        ⚡ Cena rápida 15 min
+      </button>
+      <button class="prompt-chip-btn" data-prompt="Recomiéndame una receta vegetariana para este fin de semana.">
+        🥗 Receta vegetariana
+      </button>
+    </div>
+
+    <div class="chat-history" id="chat-history-container">
+      <div class="chat-bubble ai">
+        ¡Hola! Soy tu asistente de cocina con Gemini. Puedo consultar tus recetas guardadas para armarte un plan semanal balanceado o crear recetas nuevas al instante con los ingredientes que tengas en casa. ¿En qué te ayudo hoy?
+      </div>
+    </div>
+
+    <div class="chat-input-bar">
+      <input type="text" class="chat-input" id="ai-chat-input" placeholder="Pregunta a Gemini sobre tus comidas, recetas o ingredientes...">
+      <button class="btn btn-primary" id="btn-send-ai-chat">Enviar</button>
+    </div>
+  </section>
+
+  <!-- VIEW 6: SETTINGS -->
+  <section class="view-panel" id="view-settings">
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Ajustes & Preferencias</h2>
+        <p class="section-subtitle">Configura tu clave de Gemini y preferencias culinarias.</p>
+      </div>
+    </div>
+
+    <!-- Gemini API Key Card -->
+    <div class="card" style="margin-bottom: var(--space-4);">
+      <h3 style="font-size: var(--text-base); font-weight: 700; margin-bottom: var(--space-2); display: flex; align-items: center; gap: 8px;">
+        <span>🔑</span> Clave de API de Google Gemini
+      </h3>
+      <p style="font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: var(--space-3); line-height: 1.4;">
+        Para conectar la inteligencia artificial directamente. Puedes conseguir una clave 100% gratuita en <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--color-accent); font-weight: 600;">Google AI Studio</a>.
+      </p>
+      <div style="display: flex; gap: var(--space-2); margin-bottom: var(--space-2);">
+        <input type="password" class="chat-input" id="input-gemini-key" placeholder="AIzaSy..." style="margin: 0;">
+        <button class="btn btn-primary btn-sm" id="btn-save-gemini-key">Guardar</button>
+      </div>
+      <div id="gemini-key-status" style="font-size: 12px; color: var(--color-text-muted);">
+        <!-- Status shown here -->
+      </div>
+    </div>
+
+    <!-- Dietary Preferences Card -->
+    <div class="card" style="margin-bottom: var(--space-4);">
+      <h3 style="font-size: var(--text-base); font-weight: 700; margin-bottom: var(--space-3);">
+        🍽️ Preferencias Familiares
+      </h3>
+      <div style="margin-bottom: var(--space-3);">
+        <label style="font-size: var(--text-xs); font-weight: 600; color: var(--color-text-muted); display: block; margin-bottom: 6px;">Porciones por defecto</label>
+        <select class="chat-input" id="select-default-servings">
+          <option value="1">1 persona</option>
+          <option value="2" selected>2 personas</option>
+          <option value="3">3 personas</option>
+          <option value="4">4 personas</option>
+          <option value="6">6 personas (Familia grande)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Backup & Restore -->
+    <div class="card">
+      <h3 style="font-size: var(--text-base); font-weight: 700; margin-bottom: var(--space-2);">
+        💾 Copia de Seguridad & Datos
+      </h3>
+      <p style="font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: var(--space-3);">
+        Tus recetas, planes y listas se guardan 100% en tu navegador. Puedes exportar o restaurar tu copia cuando quieras.
+      </p>
+      <div style="display: flex; gap: var(--space-2);">
+        <button class="btn btn-secondary btn-sm" id="btn-export-backup">⬇️ Exportar JSON</button>
+        <label class="btn btn-secondary btn-sm" style="cursor: pointer; margin: 0;">
+          ⬆️ Importar JSON
+          <input type="file" id="input-import-backup" accept=".json" style="display: none;">
+        </label>
+        <button class="btn btn-ghost btn-sm" id="btn-reset-demo" style="color: var(--color-danger); margin-left: auto;">Restablecer Demo</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Bottom Navigation Bar -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-view="view-today">
+      <span class="nav-icon">☀️</span>
+      <span>Hoy</span>
+    </button>
+    <button class="nav-item" data-view="view-recipes">
+      <span class="nav-icon">📖</span>
+      <span>Recetas</span>
+    </button>
+    <button class="nav-item" data-view="view-planner">
+      <span class="nav-icon">📅</span>
+      <span>Plan</span>
+    </button>
+    <button class="nav-item" data-view="view-shopping">
+      <span class="nav-icon">🛒</span>
+      <span>Compra</span>
+    </button>
+    <button class="nav-item" data-view="view-ai">
+      <span class="nav-icon">✨</span>
+      <span>Chef IA</span>
+    </button>
+  </nav>
+
+</div>
+
+<!-- MODAL: RECIPE DETAIL -->
+<div class="modal-overlay" id="modal-recipe-detail">
+  <div class="modal-content">
+    <button class="modal-close-btn" id="btn-close-recipe-modal">✕</button>
+    <div id="recipe-modal-body">
+      <!-- Dynamic via JS -->
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: UNIVERSAL RECIPE IMPORTER -->
+<div class="modal-overlay" id="modal-recipe-import">
+  <div class="modal-content" style="padding: var(--space-5);">
+    <button class="modal-close-btn" id="btn-close-import-modal">✕</button>
+    <h2 style="font-size: var(--text-lg); font-weight: 800; margin-bottom: var(--space-2);">📥 Importador Universal de Recetas</h2>
+    <p style="font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: var(--space-4);">
+      Pega un enlace de cualquier web de recetas o el texto de una publicación de Instagram / TikTok / blog. Gemini lo convertirá automáticamente en una receta limpia.
+    </p>
+
+    <div style="margin-bottom: var(--space-3);">
+      <label style="font-size: var(--text-xs); font-weight: 700; display: block; margin-bottom: 4px;">Enlace Web o Red Social</label>
+      <input type="url" class="chat-input" id="import-url-input" placeholder="https://www.directoalpaladar.com/... o instagram.com/...">
+    </div>
+
+    <div style="margin-bottom: var(--space-4);">
+      <label style="font-size: var(--text-xs); font-weight: 700; display: block; margin-bottom: 4px;">O pega aquí el texto o descripción de la receta</label>
+      <textarea class="chat-input" id="import-text-input" rows="4" placeholder="Ej: Pollo al horno con patatas: 4 pechugas de pollo, 2 patatas, romero y aceite de oliva..."></textarea>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
+      <button class="btn btn-secondary" id="btn-cancel-import">Cancelar</button>
+      <button class="btn btn-primary" id="btn-execute-import">
+        <span>✨</span> Extraer con Gemini
+      </button>
+    </div>
+    
+    <div id="import-status-indicator" style="margin-top: var(--space-3); font-size: 13px; display: none;"></div>
+  </div>
+</div>
+
+<!-- MODAL: RECIPE PICKER FOR PLANNER SLOT -->
+<div class="modal-overlay" id="modal-recipe-picker">
+  <div class="modal-content" style="padding: var(--space-4);">
+    <button class="modal-close-btn" id="btn-close-picker-modal">✕</button>
+    <h3 style="font-size: var(--text-base); font-weight: 800; margin-bottom: var(--space-2);" id="picker-modal-title">Elegir Receta</h3>
+    <p style="font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: var(--space-3);">Selecciona qué receta cocinar en esta ranura:</p>
+    
+    <div style="max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-2);" id="picker-recipes-list">
+      <!-- Recipes rendered via JS -->
+    </div>
+  </div>
+</div>
+
+<!-- COOK MODE FULLSCREEN -->
+<div class="cook-mode-overlay" id="cook-mode-overlay">
+  <div style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <span style="font-size: 12px; font-weight: 700; color: var(--color-accent); text-transform: uppercase;">Modo Cocina</span>
+      <h3 style="font-size: var(--text-lg); font-weight: 800;" id="cook-recipe-title">Nombre de la Receta</h3>
+    </div>
+    <button class="btn btn-secondary btn-sm" id="btn-exit-cook-mode">Salir (✕)</button>
+  </div>
+
+  <div style="margin: auto 0; text-align: center;">
+    <div style="font-size: var(--text-sm); font-weight: 600; color: var(--color-text-muted); margin-bottom: var(--space-2);" id="cook-step-indicator">
+      Paso 1 de 4
+    </div>
+    <div class="cook-step-giant" id="cook-step-text">
+      Corta las pechugas de pollo en dados medianos y salpimienta al gusto.
+    </div>
+
+    <div class="cook-timer-box" id="cook-timer-box" style="display: none;">
+      <div style="font-size: 12px; font-weight: 700; color: var(--color-accent); text-transform: uppercase;">Temporizador</div>
+      <div class="timer-digits" id="cook-timer-digits">15:00</div>
+      <div style="display: flex; justify-content: center; gap: var(--space-2); margin-top: var(--space-2);">
+        <button class="btn btn-primary btn-sm" id="btn-timer-start">Iniciar</button>
+        <button class="btn btn-secondary btn-sm" id="btn-timer-reset">Reiniciar</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-4);">
+    <button class="btn btn-secondary" id="btn-cook-prev-step" style="flex: 1;">⬅️ Anterior</button>
+    <button class="btn btn-primary" id="btn-cook-next-step" style="flex: 1;">Siguiente ➡️</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
