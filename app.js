@@ -202,6 +202,7 @@ class FoodAssistantApp {
     document.getElementById('btn-header-settings')?.addEventListener('click', () => this.switchView('view-settings'));
 
     document.getElementById('btn-quick-import')?.addEventListener('click', () => this.openImportModal());
+    document.getElementById('btn-open-create-recipe')?.addEventListener('click', () => this.openImportModal());
     document.getElementById('btn-close-import-modal')?.addEventListener('click', () => this.closeImportModal());
     document.getElementById('btn-cancel-import')?.addEventListener('click', () => this.closeImportModal());
     document.getElementById('btn-execute-import')?.addEventListener('click', () => this.handleRecipeImport());
@@ -489,6 +490,16 @@ class FoodAssistantApp {
     `;
   }
 
+  deleteCurrentRecipe() {
+    if (!this.activeRecipe) return;
+    if (confirm('¿Eliminar la receta "' + this.activeRecipe.title + '"?')) {
+      state.recipes = state.recipes.filter(r => r.id !== this.activeRecipe.id);
+      state.save('fa_recipes', state.recipes);
+      this.closeRecipeModal();
+      this.render();
+    }
+  }
+
   startCookMode() {
     this.closeRecipeModal();
     this.cookStepIndex = 0;
@@ -682,7 +693,8 @@ class FoodAssistantApp {
   }
 
   selectRecipeForSlot(recipeId) {
-    if (this.pickerTarget && state.mealPlan[this.pickerTarget.dateStr]) {
+    if (this.pickerTarget) {
+      if (!state.mealPlan[this.pickerTarget.dateStr]) state.mealPlan[this.pickerTarget.dateStr] = { lunch: null, dinner: null };
       state.mealPlan[this.pickerTarget.dateStr][this.pickerTarget.slotType] = recipeId;
       state.save('fa_mealplan', state.mealPlan);
       this.closePickerModal();
@@ -1203,3 +1215,4 @@ window.addEventListener('DOMContentLoaded', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 });
+
