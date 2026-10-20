@@ -37,7 +37,7 @@
       </button>
 
       <!-- Cloud User Account Pill -->
-      <button class="user-pill" id="btn-header-account" title="Cuenta en la nube y sincronización">
+      <button class="user-pill" id="btn-header-account" title="Mi Cuenta">
         <span class="material-symbols-outlined icon-sm" id="header-account-icon">account_circle</span>
         <span class="user-pill-text" id="header-account-text">Iniciar sesión</span>
       </button>
@@ -251,11 +251,32 @@
     <div class="section-header">
       <div>
         <h2 class="section-title">Ajustes</h2>
-        <p class="section-subtitle">Configuración general, aspecto y almacenamiento en la nube.</p>
+        <p class="section-subtitle">Configuración general y personalización.</p>
       </div>
     </div>
 
-    <!-- ITEM 3: 3-WAY THEME SELECTOR -->
+    <!-- 1: USER ACCOUNT & CLOUD -->
+    <div class="card">
+      <h3 style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+        <span class="material-symbols-outlined" style="color: var(--m3-primary);">account_circle</span> Cuenta de Usuario
+      </h3>
+      <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;">
+        Inicia sesión para tener tus recetas, planes semanales y listas de la compra sincronizados automáticamente en cualquier dispositivo.
+      </p>
+      
+      <div id="cloud-account-box" style="background: var(--m3-surface-container); border-radius: var(--radius-md); padding: 14px; display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span class="material-symbols-outlined" style="font-size: 32px; color: var(--m3-primary);" id="settings-user-icon">account_circle</span>
+          <div>
+            <div style="font-size: 14px; font-weight: 700;" id="settings-user-name">Modo Local (Invitado)</div>
+            <div style="font-size: 12px; color: var(--m3-on-surface-variant);" id="settings-user-status">Datos guardados en este dispositivo</div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btn-settings-auth-action">Iniciar Sesión</button>
+      </div>
+    </div>
+
+    <!-- 2: 3-WAY THEME SELECTOR -->
     <div class="card">
       <h3 style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
         <span class="material-symbols-outlined" style="color: var(--m3-primary);">palette</span> Aspecto
@@ -279,40 +300,7 @@
       </div>
     </div>
 
-    <!-- ITEM 2: CLOUD ACCOUNT & STORAGE -->
-    <div class="card">
-      <h3 style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-        <span class="material-symbols-outlined" style="color: var(--m3-primary);">cloud_sync</span> Cuenta y Sincronización en la Nube
-      </h3>
-      <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;" id="cloud-status-description">
-        Inicia sesión con Google o crea una cuenta para almacenar tus recetas, planes semanales y listas de la compra en la nube.
-      </p>
-      
-      <div id="cloud-account-box" style="background: var(--m3-surface-container); border-radius: var(--radius-md); padding: 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <span class="material-symbols-outlined" style="font-size: 28px; color: var(--m3-primary);" id="settings-user-icon">account_circle</span>
-          <div>
-            <div style="font-size: 13px; font-weight: 700;" id="settings-user-name">Modo Local (Invitado)</div>
-            <div style="font-size: 11px; color: var(--m3-on-surface-variant);" id="settings-user-status">Datos almacenados solo en este dispositivo</div>
-          </div>
-        </div>
-        <button class="btn btn-primary btn-sm" id="btn-settings-auth-action">Iniciar Sesión</button>
-      </div>
-
-      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button class="btn btn-secondary btn-sm" id="btn-manual-sync">
-          <span class="material-symbols-outlined icon-sm">sync</span>
-          <span>Sincronizar ahora</span>
-        </button>
-        <button class="btn btn-ghost btn-sm" id="btn-open-supabase-config" style="color: var(--m3-primary);">
-          <span class="material-symbols-outlined icon-sm">database</span>
-          <span>Configurar Supabase</span>
-        </button>
-      </div>
-      <div id="sync-status-indicator" style="margin-top: 8px; font-size: 11px; color: var(--m3-on-surface-variant);"></div>
-    </div>
-
-    <!-- AI KEY -->
+    <!-- 3: AI KEY -->
     <div class="card">
       <h3 style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
         <span class="material-symbols-outlined" style="color: var(--m3-primary);">key</span> Clave de Google Gemini API (Opcional)
@@ -327,7 +315,7 @@
       <div id="gemini-key-status" style="font-size: 11px;"></div>
     </div>
 
-    <!-- SERVINGS -->
+    <!-- 4: SERVINGS -->
     <div class="card">
       <h3 style="font-size: 14px; font-weight: 500; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
         <span class="material-symbols-outlined" style="color: var(--m3-primary);">group</span> Porciones por defecto
@@ -341,7 +329,7 @@
       </select>
     </div>
 
-    <!-- BACKUP -->
+    <!-- 5: BACKUP -->
     <div class="card">
       <h3 style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
         <span class="material-symbols-outlined" style="color: var(--m3-primary);">save</span> Copia de Seguridad Local
@@ -405,8 +393,8 @@
   <div class="modal-content" style="padding: 24px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
       <div style="display: flex; align-items: center; gap: 8px;">
-        <span class="material-symbols-outlined" style="color: var(--m3-primary); font-size: 24px;">cloud</span>
-        <h3 style="font-size: 18px; font-weight: 500;" id="auth-modal-title">Cuenta en la Nube</h3>
+        <span class="material-symbols-outlined" style="color: var(--m3-primary); font-size: 24px;">account_circle</span>
+        <h3 style="font-size: 18px; font-weight: 500;" id="auth-modal-title">Iniciar Sesión</h3>
       </div>
       <button class="btn btn-ghost btn-icon" id="btn-close-auth-modal">
         <span class="material-symbols-outlined">close</span>
@@ -462,7 +450,7 @@
       </form>
 
       <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--m3-outline-variant); font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
-        <p><strong>Almacenamiento en la nube:</strong> Tus recetas, ingredientes y plan de comidas se sincronizan automáticamente para que puedas acceder desde cualquier dispositivo.</p>
+        <p>Tus recetas y planes se guardan en la nube para que nunca los pierdas y puedas usarlos en cualquier dispositivo.</p>
       </div>
     </div>
 
@@ -473,48 +461,15 @@
         <h4 style="font-size: 16px; font-weight: 500; margin-top: 8px;" id="auth-profile-name">Usuario</h4>
         <p style="font-size: 13px; color: var(--m3-on-surface-variant);" id="auth-profile-email">usuario@correo.com</p>
         <div style="display: inline-flex; align-items: center; gap: 4px; background: var(--color-brand-container); color: var(--color-brand-on-container); font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: var(--radius-full); margin-top: 10px;">
-          <span class="material-symbols-outlined icon-sm">cloud_done</span> Conectado a la Nube
+          <span class="material-symbols-outlined icon-sm">cloud_done</span> Conectado y Sincronizado
         </div>
       </div>
 
       <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 14px;">
-        <button class="btn btn-primary" id="btn-auth-sync-now">
-          <span class="material-symbols-outlined icon-sm">sync</span> Sincronizar Datos Ahora
-        </button>
-        <button class="btn btn-secondary" id="btn-auth-logout" style="color: var(--m3-error);">
+        <button class="btn btn-secondary" id="btn-auth-logout" style="color: var(--m3-error); width: 100%; padding: 12px;">
           <span class="material-symbols-outlined icon-sm">logout</span> Cerrar Sesión
         </button>
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL: CUSTOM SUPABASE CONFIG -->
-<div class="modal-overlay" id="modal-supabase-config">
-  <div class="modal-content" style="padding: 24px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-      <h3 style="font-size: 16px; font-weight: 500;">Configurar Proyecto Supabase</h3>
-      <button class="btn btn-ghost btn-icon" id="btn-close-supabase-modal">
-        <span class="material-symbols-outlined">close</span>
-      </button>
-    </div>
-    <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 14px;">
-      Puedes conectar Food Assistant a tu propio proyecto de Supabase para tener control total de tus datos en PostgreSQL.
-    </p>
-
-    <div class="form-group">
-      <label class="form-label">Supabase Project URL</label>
-      <input type="text" class="form-input" id="cfg-supabase-url" placeholder="https://tu-proyecto.supabase.co">
-    </div>
-
-    <div class="form-group">
-      <label class="form-label">Supabase Anon Key</label>
-      <input type="password" class="form-input" id="cfg-supabase-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6...">
-    </div>
-
-    <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
-      <button class="btn btn-secondary" id="btn-cancel-supabase-config">Cancelar</button>
-      <button class="btn btn-primary" id="btn-save-supabase-config">Guardar Configuración</button>
     </div>
   </div>
 </div>
@@ -542,7 +497,7 @@
 <!-- MODAL: RECIPE EDITOR (CREATE & EDIT) -->
 <div class="modal-overlay" id="modal-recipe-edit">
   <div class="modal-content" style="padding: 20px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+    <div style="display: justify-content: space-between; align-items: center; margin-bottom: 14px;">
       <h3 style="font-size: 17px; font-weight: 500;" id="recipe-edit-modal-title">Editar Receta</h3>
       <button class="btn btn-ghost btn-icon" id="btn-close-recipe-edit">
         <span class="material-symbols-outlined">close</span>
@@ -702,6 +657,7 @@
   </div>
 </div>
 
+<script src="config.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

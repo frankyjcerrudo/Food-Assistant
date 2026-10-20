@@ -125,10 +125,10 @@ class StateStore {
     });
     this.theme = localStorage.getItem('fa_theme_mode') || 'system';
     this.cloudUser = this.load('fa_cloud_user', null);
-    this.supabaseConfig = this.load('fa_supabase_cfg', {
-      url: '',
-      anonKey: ''
-    });
+    this.supabaseConfig = {
+      url: window.APP_CONFIG?.supabaseUrl || localStorage.getItem('fa_sb_url') || '',
+      anonKey: window.APP_CONFIG?.supabaseAnonKey || localStorage.getItem('fa_sb_key') || ''
+    };
     this.lastSyncedAt = localStorage.getItem('fa_last_sync') || null;
   }
 
@@ -204,7 +204,6 @@ class FoodAssistantApp {
     this.modalRecipeImport = document.getElementById('modal-recipe-import');
     this.modalRecipeEdit = document.getElementById('modal-recipe-edit');
     this.modalAuth = document.getElementById('modal-auth');
-    this.modalSupabaseConfig = document.getElementById('modal-supabase-config');
     this.cookModeOverlay = document.getElementById('cook-mode-overlay');
   }
 
@@ -537,26 +536,6 @@ class FoodAssistantApp {
     }
   }
 
-  openSupabaseConfigModal() {
-    document.getElementById('cfg-supabase-url').value = state.supabaseConfig.url || '';
-    document.getElementById('cfg-supabase-key').value = state.supabaseConfig.anonKey || '';
-    this.modalSupabaseConfig.classList.add('active');
-  }
-
-  closeSupabaseConfigModal() {
-    this.modalSupabaseConfig.classList.remove('active');
-  }
-
-  saveSupabaseConfig() {
-    const url = document.getElementById('cfg-supabase-url').value.trim();
-    const anonKey = document.getElementById('cfg-supabase-key').value.trim();
-    state.supabaseConfig = { url, anonKey };
-    state.save('fa_supabase_cfg', state.supabaseConfig);
-    this.initSupabaseClient();
-    this.closeSupabaseConfigModal();
-    alert("Configuración de Supabase guardada.");
-  }
-
   // ==========================================================================
   // EVENT LISTENERS & NAVIGATION
   // ==========================================================================
@@ -594,14 +573,6 @@ class FoodAssistantApp {
     });
     document.getElementById('btn-submit-auth')?.addEventListener('click', () => this.handleAuthSubmit());
     document.getElementById('btn-auth-logout')?.addEventListener('click', () => this.logoutCloudUser());
-    document.getElementById('btn-auth-sync-now')?.addEventListener('click', () => this.syncDataWithCloud());
-    document.getElementById('btn-manual-sync')?.addEventListener('click', () => this.syncDataWithCloud());
-
-    // Supabase Config events
-    document.getElementById('btn-open-supabase-config')?.addEventListener('click', () => this.openSupabaseConfigModal());
-    document.getElementById('btn-close-supabase-modal')?.addEventListener('click', () => this.closeSupabaseConfigModal());
-    document.getElementById('btn-cancel-supabase-config')?.addEventListener('click', () => this.closeSupabaseConfigModal());
-    document.getElementById('btn-save-supabase-config')?.addEventListener('click', () => this.saveSupabaseConfig());
 
     // Importer
     document.getElementById('btn-quick-import')?.addEventListener('click', () => this.openImportModal());
