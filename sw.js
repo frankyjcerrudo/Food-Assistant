@@ -1,11 +1,11 @@
-﻿const CACHE_NAME = 'food-assistant-v1';
+const CACHE_NAME = 'food-assistant-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './styles.css',
-  './app.js',
-  './manifest.json',
-  './replica/design/tokens.css'
+  './styles.css?v=2',
+  './config.js',
+  './app.js?v=2',
+  './manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
@@ -31,8 +31,12 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests and exclude external Gemini API calls from cache-first
-  if (event.request.method !== 'GET' || event.request.url.includes('generativelanguage.googleapis.com')) {
+  // Only handle GET requests and exclude external APIs (Gemini, Supabase, Google Fonts)
+  if (
+    event.request.method !== 'GET' || 
+    event.request.url.includes('generativelanguage.googleapis.com') ||
+    event.request.url.includes('supabase.co')
+  ) {
     return;
   }
 
