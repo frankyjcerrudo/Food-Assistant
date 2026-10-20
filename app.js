@@ -260,10 +260,13 @@ class FoodAssistantApp {
   // ITEM 2: CLOUD AUTH & SUPABASE DATABASE SYNC
   // ==========================================================================
   initSupabaseClient() {
-    const cfg = state.supabaseConfig;
-    if (window.supabase && cfg.url && cfg.anonKey) {
+    const rawUrl = state.supabaseConfig.url || '';
+    const cleanUrl = rawUrl.trim().replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+    const cleanKey = (state.supabaseConfig.anonKey || '').trim();
+
+    if (window.supabase && cleanUrl && cleanKey) {
       try {
-        this.supabaseClient = window.supabase.createClient(cfg.url, cfg.anonKey);
+        this.supabaseClient = window.supabase.createClient(cleanUrl, cleanKey);
 
         // Check active session (including after Google OAuth redirect)
         this.supabaseClient.auth.getSession().then(({ data: { session } }) => {

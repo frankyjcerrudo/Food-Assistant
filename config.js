@@ -6,11 +6,9 @@
  * invisible para los usuarios finales.
  */
 window.APP_CONFIG = {
-  // Pega aquí la URL de tu proyecto Supabase (Project Settings -> API -> Project URL)
-  // Ejemplo: "https://abcdefghijklmnopqrst.supabase.co"
-  supabaseUrl: "",
+  // URL base de tu proyecto Supabase (sin la terminación /rest/v1/)
+  supabaseUrl: "https://lkexyuvjphuzokgkkyka.supabase.co",
 
-  // Pega aquí la clave pública anónima (Project Settings -> API -> Project API keys -> anon / public)
-  // Ejemplo: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-  supabaseAnonKey: ""
+  // Clave pública publishable / anon de tu proyecto
+  supabaseAnonKey: "sb_publishable_86rJtukawYEzpmdE0CQC4A_8PMn0IaR"
 };
