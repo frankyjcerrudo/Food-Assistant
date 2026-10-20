@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#ffffff">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=7">
+  <link rel="stylesheet" href="styles.css?v=8">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%231a73e8'/><path d='M30 30h40v40H30z' fill='%23ffffff'/></svg>">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -128,9 +128,11 @@
     
     <div class="chips-scroll-container" id="recipes-tag-filters">
       <button class="m3-filter-chip active" data-tag="all">Todas</button>
-      <button class="m3-filter-chip" data-tag="Rápida">Rápidas</button>
-      <button class="m3-filter-chip" data-tag="Cena">Cenas</button>
+      <button class="m3-filter-chip" data-tag="Desayuno">Desayunos</button>
       <button class="m3-filter-chip" data-tag="Almuerzo">Almuerzos</button>
+      <button class="m3-filter-chip" data-tag="Merienda">Meriendas</button>
+      <button class="m3-filter-chip" data-tag="Cena">Cenas</button>
+      <button class="m3-filter-chip" data-tag="Rápida">Rápidas</button>
       <button class="m3-filter-chip" data-tag="Saludable">Saludable</button>
       <button class="m3-filter-chip" data-tag="Pasta">Pasta</button>
       <button class="m3-filter-chip" data-tag="Pollo">Pollo</button>
@@ -685,6 +687,60 @@
   </div>
 </div>
 
+<!-- MODAL: ADD CUSTOM MEAL SLOT (MEDIA MAÑANA, POST-ENTRENO, MERIENDA, ETC.) -->
+<div class="modal-overlay" id="modal-add-custom-slot">
+  <div class="modal-content" style="padding: 20px; max-width: 480px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--m3-outline-variant); padding-bottom: 10px;">
+      <h3 style="font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span class="material-symbols-outlined" style="color: var(--m3-primary);">restaurant</span> Añadir Momento de Comida
+      </h3>
+      <button class="btn btn-ghost btn-icon" onclick="app.closeAddCustomSlotModal()">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+
+    <input type="hidden" id="custom-slot-date">
+
+    <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;">
+      Elige una sugerencia o escribe un momento personalizado para tu plan del día (ej. media mañana, post-entreno, merienda extra...).
+    </p>
+
+    <!-- Quick suggestions -->
+    <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px;" id="custom-slot-suggestions">
+      <button type="button" class="m3-filter-chip" onclick="app.selectCustomSlotPreset('Media Mañana', 'lunch_dining')">🥪 Media Mañana</button>
+      <button type="button" class="m3-filter-chip" onclick="app.selectCustomSlotPreset('Post-Entreno', 'fitness_center')">🏋️ Post-Entreno</button>
+      <button type="button" class="m3-filter-chip" onclick="app.selectCustomSlotPreset('Pre-Entreno', 'bolt')">⚡ Pre-Entreno</button>
+      <button type="button" class="m3-filter-chip" onclick="app.selectCustomSlotPreset('Snack Saludable', 'nutrition')">🍎 Snack Saludable</button>
+      <button type="button" class="m3-filter-chip" onclick="app.selectCustomSlotPreset('Recena / Noche', 'bedtime')">🌙 Recena</button>
+      <button type="button" class="m3-filter-chip" onclick="app.selectCustomSlotPreset('Brunch', 'brunch_dining')">🥞 Brunch</button>
+    </div>
+
+    <div style="margin-bottom: 16px;">
+      <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 6px; color: var(--m3-on-surface);">Nombre de la comida:</label>
+      <div style="display: flex; gap: 8px;">
+        <select class="form-select" id="custom-slot-icon" style="width: 110px; padding: 8px;">
+          <option value="lunch_dining">🥪 Snack</option>
+          <option value="fitness_center">🏋️ Deporte</option>
+          <option value="bolt">⚡ Energía</option>
+          <option value="nutrition">🍎 Fruta</option>
+          <option value="local_cafe">☕ Café</option>
+          <option value="cookie">🍪 Dulce</option>
+          <option value="restaurant">🍽️ Plato</option>
+          <option value="bedtime">🌙 Noche</option>
+        </select>
+        <input type="text" class="form-input" id="custom-slot-name" placeholder="Ej. Media mañana, Batido..." style="flex: 1;">
+      </div>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: 8px;">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="app.closeAddCustomSlotModal()">Cancelar</button>
+      <button type="button" class="btn btn-primary btn-sm" onclick="app.confirmAddCustomSlot()">
+        <span class="material-symbols-outlined icon-sm">add</span> Crear Momento
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- COOK MODE FULLSCREEN -->
 <div class="cook-mode-overlay" id="cook-mode-overlay">
   <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -721,7 +777,7 @@
   </div>
 </div>
 
-<script src="config.js?v=7"></script>
-<script src="app.js?v=7"></script>
+<script src="config.js?v=8"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>

@@ -97,7 +97,104 @@ const SEED_RECIPES = [
       { step: 3, text: "Mezcla todo en un bol amplio junto con el queso feta desmenuzado.", timerMinutes: 0 },
       { step: 4, text: "Aliña con aceite de oliva virgen extra, zumo de limón, sal y orégano.", timerMinutes: 0 }
     ]
+  },
+  {
+    id: "rec-avocado-toast",
+    title: "Tostadas de Aguacate, Huevo Poché y Semillas",
+    description: "Rebanadas de pan de masa madre crujiente con crema de aguacate fresco, huevos poché jugosos y semillas de chía y sésamo.",
+    imageUrl: "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&auto=format&fit=crop&q=80",
+    prepTimeMinutes: 5,
+    cookTimeMinutes: 6,
+    servings: 2,
+    tags: ["Desayuno", "Rápida", "Saludable"],
+    ingredients: [
+      { id: "i22", name: "Pan integral de masa madre", amount: 2, unit: "rebanadas", aisle: "bakery" },
+      { id: "i23", name: "Aguacate maduro", amount: 1, unit: "ud", aisle: "produce" },
+      { id: "i24", name: "Huevos camperos", amount: 2, unit: "ud", aisle: "dairy" },
+      { id: "i25", name: "Semillas de chía y sésamo", amount: 10, unit: "g", aisle: "pantry" },
+      { id: "i26", name: "Aceite de oliva virgen extra", amount: 10, unit: "ml", aisle: "pantry" }
+    ],
+    instructions: [
+      { step: 1, text: "Tuesta las rebanadas de pan hasta que estén doradas y crujientes.", timerMinutes: 3 },
+      { step: 2, text: "En un plato, machaca el aguacate con sal, pimienta y unas gotas de limón.", timerMinutes: 1 },
+      { step: 3, text: "Cocina los huevos poché en agua hirviendo con vinagre o a la plancha.", timerMinutes: 3 },
+      { step: 4, text: "Monta el aguacate sobre las tostadas, pon el huevo encima y corona con las semillas.", timerMinutes: 0 }
+    ]
+  },
+  {
+    id: "rec-porridge-bowl",
+    title: "Porridge Cremoso de Avena con Frutos Rojos",
+    description: "Gachas de avena templadas cocinadas a fuego lento, con arándanos, plátano, nueces picadas y un toque de canela y miel.",
+    imageUrl: "https://images.unsplash.com/photo-1584776296944-ab6fb57b0bdd?w=800&auto=format&fit=crop&q=80",
+    prepTimeMinutes: 3,
+    cookTimeMinutes: 7,
+    servings: 2,
+    tags: ["Desayuno", "Saludable"],
+    ingredients: [
+      { id: "i27", name: "Copos de avena integral", amount: 100, unit: "g", aisle: "pantry" },
+      { id: "i28", name: "Leche o bebida vegetal", amount: 400, unit: "ml", aisle: "dairy" },
+      { id: "i29", name: "Frutos rojos frescos (arándanos/frambuesas)", amount: 80, unit: "g", aisle: "produce" },
+      { id: "i30", name: "Plátano maduro", amount: 1, unit: "ud", aisle: "produce" },
+      { id: "i31", name: "Nueces peladas", amount: 25, unit: "g", aisle: "pantry" },
+      { id: "i32", name: "Miel pura y canela", amount: 15, unit: "g", aisle: "pantry" }
+    ],
+    instructions: [
+      { step: 1, text: "Calienta la leche en un cazo con una pizca de canela.", timerMinutes: 2 },
+      { step: 2, text: "Añade los copos de avena y remueve suavemente a fuego medio 5 minutos hasta que espese.", timerMinutes: 5 },
+      { step: 3, text: "Sirve en boles y añade el plátano en rodajas, los frutos rojos, nueces y miel.", timerMinutes: 0 }
+    ]
+  },
+  {
+    id: "rec-healthy-snack",
+    title: "Tostas de Hummus con Tomates Cherry y Chía",
+    description: "Snack saciante y nutritivo ideal para media mañana o merienda, listo en 5 minutos sin cocinar.",
+    imageUrl: "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=800&auto=format&fit=crop&q=80",
+    prepTimeMinutes: 5,
+    cookTimeMinutes: 0,
+    servings: 2,
+    tags: ["Merienda", "Saludable", "Rápida"],
+    ingredients: [
+      { id: "i33", name: "Tostadas de espelta o centeno", amount: 4, unit: "ud", aisle: "bakery" },
+      { id: "i34", name: "Hummus de garbanzos", amount: 120, unit: "g", aisle: "pantry" },
+      { id: "i35", name: "Tomates cherry", amount: 8, unit: "ud", aisle: "produce" },
+      { id: "i36", name: "Semillas de chía o calabaza", amount: 15, unit: "g", aisle: "pantry" },
+      { id: "i37", name: "Aceite de oliva virgen extra", amount: 10, unit: "ml", aisle: "pantry" }
+    ],
+    instructions: [
+      { step: 1, text: "Unta generosamente el hummus sobre cada una de las tostas crujientes.", timerMinutes: 2 },
+      { step: 2, text: "Corta los tomates cherry por la mitad y colócalos encima.", timerMinutes: 2 },
+      { step: 3, text: "Espolvorea las semillas y añade un hilo de aceite de oliva con sal en escamas.", timerMinutes: 0 }
+    ]
+  },
+  {
+    id: "rec-smoothie-bowl",
+    title: "Bowl de Yogur Griego, Frutas Frescas y Granola",
+    description: "Desayuno o merienda equilibrada y llena de energía con base láctea fresca, kiwi, fresas y crujiente de granola.",
+    imageUrl: "https://images.unsplash.com/photo-1511690656952-34342bb7c2f2?w=800&auto=format&fit=crop&q=80",
+    prepTimeMinutes: 5,
+    cookTimeMinutes: 0,
+    servings: 2,
+    tags: ["Desayuno", "Merienda", "Saludable", "Rápida"],
+    ingredients: [
+      { id: "i38", name: "Yogur griego natural sin azúcar", amount: 300, unit: "g", aisle: "dairy" },
+      { id: "i39", name: "Fresas", amount: 100, unit: "g", aisle: "produce" },
+      { id: "i40", name: "Kiwi", amount: 1, unit: "ud", aisle: "produce" },
+      { id: "i41", name: "Granola tostada", amount: 60, unit: "g", aisle: "pantry" },
+      { id: "i42", name: "Miel o sirope de agave", amount: 15, unit: "ml", aisle: "pantry" }
+    ],
+    instructions: [
+      { step: 1, text: "Vierte el yogur griego en dos boles hondos.", timerMinutes: 1 },
+      { step: 2, text: "Lava y corta las fresas y el kiwi en rodajas finas.", timerMinutes: 3 },
+      { step: 3, text: "Dispón la fruta y la granola en la superficie y endulza con un toque de miel.", timerMinutes: 0 }
+    ]
   }
+];
+
+const STANDARD_SLOTS = [
+  { key: 'breakfast', label: 'Desayuno', icon: 'wb_twilight' },
+  { key: 'lunch', label: 'Almuerzo', icon: 'wb_sunny' },
+  { key: 'snack', label: 'Merienda', icon: 'cookie' },
+  { key: 'dinner', label: 'Cena', icon: 'dark_mode' }
 ];
 
 const AISLE_METADATA = {
@@ -115,8 +212,35 @@ const AISLE_METADATA = {
 // Application State Store (Local First + Cloud Sync)
 class StateStore {
   constructor() {
-    this.recipes = this.load('fa_recipes', SEED_RECIPES);
-    this.mealPlan = this.load('fa_mealplan', this.generateInitialMealPlan());
+    let savedRecipes = this.load('fa_recipes', SEED_RECIPES);
+    // Merge any new seed recipes so users get breakfasts and snacks immediately
+    if (Array.isArray(savedRecipes)) {
+      SEED_RECIPES.forEach(seed => {
+        if (!savedRecipes.some(r => r.id === seed.id)) {
+          savedRecipes.push(seed);
+        }
+      });
+    } else {
+      savedRecipes = SEED_RECIPES;
+    }
+    this.recipes = savedRecipes;
+
+    const loadedPlan = this.load('fa_mealplan', null);
+    if (loadedPlan && typeof loadedPlan === 'object') {
+      // Normalize each day for backward compatibility with 4 standard slots + customSlots
+      Object.keys(loadedPlan).forEach(dateKey => {
+        const day = loadedPlan[dateKey];
+        if (!('breakfast' in day)) day.breakfast = null;
+        if (!('lunch' in day)) day.lunch = null;
+        if (!('snack' in day)) day.snack = null;
+        if (!('dinner' in day)) day.dinner = null;
+        if (!Array.isArray(day.customSlots)) day.customSlots = [];
+      });
+      this.mealPlan = loadedPlan;
+    } else {
+      this.mealPlan = this.generateInitialMealPlan();
+    }
+
     this.shoppingList = this.load('fa_shopping', []);
     this.settings = this.load('fa_settings', {
       geminiApiKey: '',
@@ -160,8 +284,11 @@ class StateStore {
       const dateKey = d.toISOString().split('T')[0];
       plan[dateKey] = {
         dayName: days[(d.getDay() + 6) % 7],
+        breakfast: i === 0 ? "rec-avocado-toast" : (i === 1 ? "rec-porridge-bowl" : null),
         lunch: i === 0 ? "rec-pesto-pasta" : (i === 1 ? "rec-lemon-chicken" : null),
-        dinner: i === 0 ? "rec-salmon-bowl" : (i === 1 ? "rec-chickpea-salad" : null)
+        snack: i === 0 ? "rec-healthy-snack" : null,
+        dinner: i === 0 ? "rec-salmon-bowl" : (i === 1 ? "rec-chickpea-salad" : null),
+        customSlots: []
       };
     }
     return plan;
@@ -682,8 +809,11 @@ class FoodAssistantApp {
   renderTodayView() {
     const todayStr = new Date().toISOString().split('T')[0];
     const todayPlan = state.mealPlan[todayStr] || {
+      breakfast: null,
       lunch: state.recipes[0]?.id || null,
-      dinner: state.recipes[1]?.id || null
+      snack: null,
+      dinner: state.recipes[1]?.id || null,
+      customSlots: []
     };
 
     const totalRecipesElem = document.getElementById('stat-total-recipes');
@@ -691,8 +821,14 @@ class FoodAssistantApp {
     
     let plannedCount = 0;
     Object.values(state.mealPlan).forEach(day => {
-      if (day.lunch) plannedCount++;
-      if (day.dinner) plannedCount++;
+      ['breakfast', 'lunch', 'snack', 'dinner'].forEach(k => {
+        if (day[k]) plannedCount++;
+      });
+      if (Array.isArray(day.customSlots)) {
+        day.customSlots.forEach(cs => {
+          if (cs.recipeId) plannedCount++;
+        });
+      }
     });
     const plannedElem = document.getElementById('stat-planned-meals');
     if (plannedElem) plannedElem.textContent = plannedCount;
@@ -704,12 +840,7 @@ class FoodAssistantApp {
     const container = document.getElementById('today-slots-container');
     if (!container) return;
 
-    const slots = [
-      { key: 'lunch', label: 'Almuerzo', icon: 'wb_sunny' },
-      { key: 'dinner', label: 'Cena', icon: 'dark_mode' }
-    ];
-
-    container.innerHTML = slots.map(s => {
+    const standardHtml = STANDARD_SLOTS.map(s => {
       const recId = todayPlan[s.key];
       const recipe = state.recipes.find(r => r.id === recId);
 
@@ -743,6 +874,20 @@ class FoodAssistantApp {
         `;
       }
     }).join('');
+
+    const customSlots = Array.isArray(todayPlan.customSlots) ? todayPlan.customSlots : [];
+    const customHtml = customSlots.map(cs => this.renderCustomSlotCard(todayStr, cs)).join('');
+
+    const addExtraHtml = `
+      <div style="grid-column: 1 / -1; margin-top: 4px;">
+        <button type="button" class="btn btn-tonal btn-sm" style="width: 100%; justify-content: center; border-radius: var(--radius-md); padding: 10px;" onclick="app.openAddCustomSlotModal('${todayStr}')">
+          <span class="material-symbols-outlined icon-sm">add_circle</span>
+          <span>Añadir otra comida para hoy (media mañana, post-entreno, merienda...)</span>
+        </button>
+      </div>
+    `;
+
+    container.innerHTML = standardHtml + customHtml + addExtraHtml;
   }
 
   renderRecipesGrid(recipesList) {
@@ -1210,6 +1355,7 @@ class FoodAssistantApp {
 
     container.innerHTML = daysEntries.map(([dateStr, dayData]) => {
       const isToday = new Date().toISOString().split('T')[0] === dateStr;
+      const customSlots = Array.isArray(dayData.customSlots) ? dayData.customSlots : [];
 
       return `
         <div class="day-card">
@@ -1219,11 +1365,20 @@ class FoodAssistantApp {
               <span style="font-size: 13px; font-weight: 500; color: var(--m3-on-surface-variant);">${dateStr}</span>
               ${isToday ? `<span class="day-badge-today">HOY</span>` : ''}
             </div>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="app.openAddCustomSlotModal('${dateStr}')" style="font-size: 11px; padding: 4px 8px; color: var(--m3-primary);" title="Añadir momento de comida">
+              <span class="material-symbols-outlined icon-sm">add</span> Añadir Comida
+            </button>
           </div>
 
           <div class="slots-grid">
-            ${this.renderSlotCard(dateStr, 'lunch', 'Almuerzo', 'wb_sunny', dayData.lunch)}
-            ${this.renderSlotCard(dateStr, 'dinner', 'Cena', 'dark_mode', dayData.dinner)}
+            ${STANDARD_SLOTS.map(slot => this.renderSlotCard(dateStr, slot.key, slot.label, slot.icon, dayData[slot.key])).join('')}
+            ${customSlots.map(cs => this.renderCustomSlotCard(dateStr, cs)).join('')}
+          </div>
+
+          <div style="margin-top: 8px; display: flex; justify-content: flex-end;">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="app.openAddCustomSlotModal('${dateStr}')" style="font-size: 12px; color: var(--m3-primary); gap: 4px;">
+              <span class="material-symbols-outlined icon-sm">add_circle</span> Añadir momento (snack, merienda, batido...)
+            </button>
           </div>
         </div>
       `;
@@ -1240,7 +1395,7 @@ class FoodAssistantApp {
             <span class="slot-label">
               <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
             </span>
-            <button class="btn-ghost btn-sm" onclick="event.stopPropagation(); app.clearSlot('${dateStr}', '${slotType}')" title="Quitar">
+            <button class="btn-ghost btn-sm" onclick="event.stopPropagation(); app.clearSlot('${dateStr}', '${slotType}')" title="Quitar receta" style="padding: 2px 4px;">
               <span class="material-symbols-outlined icon-sm">close</span>
             </button>
           </div>
@@ -1254,10 +1409,58 @@ class FoodAssistantApp {
       `;
     } else {
       return `
-        <div class="meal-slot" onclick="app.openPickerModal('${dateStr}', '${slotType}')">
+        <div class="meal-slot" onclick="app.openPickerModal('${dateStr}', '${slotType}', false)">
           <span class="slot-label">
             <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
           </span>
+          <div class="slot-action-text">
+            <span class="material-symbols-outlined icon-sm">add</span> Asignar plato
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  renderCustomSlotCard(dateStr, customSlot) {
+    const recipe = customSlot.recipeId ? state.recipes.find(r => r.id === customSlot.recipeId) : null;
+    const iconName = customSlot.icon || 'lunch_dining';
+    const slotLabel = customSlot.name || 'Momento Extra';
+
+    if (recipe) {
+      return `
+        <div class="meal-slot has-meal" onclick="app.openRecipeDetail('${recipe.id}')" style="border-left: 3px solid var(--m3-primary);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="slot-label" style="color: var(--m3-primary); font-weight: 700;">
+              <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
+            </span>
+            <div style="display: flex; gap: 2px;">
+              <button class="btn-ghost btn-sm" onclick="event.stopPropagation(); app.clearCustomSlotRecipe('${dateStr}', '${customSlot.id}')" title="Quitar receta" style="padding: 2px 4px;">
+                <span class="material-symbols-outlined icon-sm">remove_circle_outline</span>
+              </button>
+              <button class="btn-ghost btn-sm" onclick="event.stopPropagation(); app.deleteCustomSlot('${dateStr}', '${customSlot.id}')" title="Eliminar este momento" style="padding: 2px 4px; color: var(--m3-error);">
+                <span class="material-symbols-outlined icon-sm">delete</span>
+              </button>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; min-width: 0;">
+            <img src="${recipe.imageUrl}" alt="" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0;">
+            <div style="flex: 1; min-width: 0; overflow: hidden;">
+              <div class="slot-recipe-name" title="${recipe.title}">${recipe.title}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    } else {
+      return `
+        <div class="meal-slot" onclick="app.openPickerModal('${dateStr}', '${customSlot.id}', true)" style="border-left: 3px solid var(--m3-primary);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="slot-label" style="color: var(--m3-primary); font-weight: 700;">
+              <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
+            </span>
+            <button class="btn-ghost btn-sm" onclick="event.stopPropagation(); app.deleteCustomSlot('${dateStr}', '${customSlot.id}')" title="Eliminar este momento" style="padding: 2px 4px; color: var(--m3-error);">
+              <span class="material-symbols-outlined icon-sm">delete</span>
+            </button>
+          </div>
           <div class="slot-action-text">
             <span class="material-symbols-outlined icon-sm">add</span> Asignar plato
           </div>
@@ -1275,24 +1478,125 @@ class FoodAssistantApp {
     }
   }
 
-  openPickerModal(dateStr, slotType) {
-    this.pickerTarget = { dateStr, slotType };
+  clearCustomSlotRecipe(dateStr, customSlotId) {
+    if (state.mealPlan[dateStr] && Array.isArray(state.mealPlan[dateStr].customSlots)) {
+      const cs = state.mealPlan[dateStr].customSlots.find(c => c.id === customSlotId);
+      if (cs) {
+        cs.recipeId = null;
+        state.save('fa_mealplan', state.mealPlan);
+        this.syncDataWithCloud(true);
+        this.render();
+      }
+    }
+  }
+
+  deleteCustomSlot(dateStr, customSlotId) {
+    if (state.mealPlan[dateStr] && Array.isArray(state.mealPlan[dateStr].customSlots)) {
+      state.mealPlan[dateStr].customSlots = state.mealPlan[dateStr].customSlots.filter(c => c.id !== customSlotId);
+      state.save('fa_mealplan', state.mealPlan);
+      this.syncDataWithCloud(true);
+      this.render();
+    }
+  }
+
+  // CUSTOM SLOT MODAL METHODS
+  openAddCustomSlotModal(dateStr) {
+    const modal = document.getElementById('modal-add-custom-slot');
+    const dateInput = document.getElementById('custom-slot-date');
+    const nameInput = document.getElementById('custom-slot-name');
+    const iconSelect = document.getElementById('custom-slot-icon');
+
+    if (dateInput) dateInput.value = dateStr;
+    if (nameInput) nameInput.value = '';
+    if (iconSelect) iconSelect.value = 'lunch_dining';
+
+    if (modal) modal.classList.add('active');
+    setTimeout(() => { if (nameInput) nameInput.focus(); }, 100);
+  }
+
+  closeAddCustomSlotModal() {
+    const modal = document.getElementById('modal-add-custom-slot');
+    if (modal) modal.classList.remove('active');
+  }
+
+  selectCustomSlotPreset(name, icon) {
+    const nameInput = document.getElementById('custom-slot-name');
+    const iconSelect = document.getElementById('custom-slot-icon');
+    if (nameInput) nameInput.value = name;
+    if (iconSelect && icon) iconSelect.value = icon;
+  }
+
+  confirmAddCustomSlot() {
+    const dateInput = document.getElementById('custom-slot-date');
+    const nameInput = document.getElementById('custom-slot-name');
+    const iconSelect = document.getElementById('custom-slot-icon');
+
+    const dateStr = dateInput?.value || new Date().toISOString().split('T')[0];
+    const name = (nameInput?.value || '').trim();
+    const icon = iconSelect?.value || 'lunch_dining';
+
+    if (!name) {
+      alert("Por favor, introduce el nombre del momento de comida (ej. Media Mañana, Post-Entreno...).");
+      return;
+    }
+
+    if (!state.mealPlan[dateStr]) {
+      state.mealPlan[dateStr] = {
+        dayName: '',
+        breakfast: null,
+        lunch: null,
+        snack: null,
+        dinner: null,
+        customSlots: []
+      };
+    }
+
+    if (!Array.isArray(state.mealPlan[dateStr].customSlots)) {
+      state.mealPlan[dateStr].customSlots = [];
+    }
+
+    const newSlot = {
+      id: 'cslot-' + Date.now(),
+      name: name,
+      icon: icon,
+      recipeId: null
+    };
+
+    state.mealPlan[dateStr].customSlots.push(newSlot);
+    state.save('fa_mealplan', state.mealPlan);
+    this.syncDataWithCloud(true);
+    this.closeAddCustomSlotModal();
+    this.render();
+  }
+
+  openPickerModal(dateStr, slotKey, isCustom = false) {
+    this.pickerTarget = { dateStr, slotKey, isCustom };
     const list = document.getElementById('picker-recipes-list');
-    document.getElementById('picker-modal-title').textContent = `Elegir plato para ${slotType.toUpperCase()}`;
+
+    let slotTitle = slotKey;
+    if (isCustom) {
+      const cs = (state.mealPlan[dateStr]?.customSlots || []).find(c => c.id === slotKey);
+      slotTitle = cs ? cs.name : 'Momento Extra';
+    } else {
+      const std = STANDARD_SLOTS.find(s => s.key === slotKey);
+      slotTitle = std ? std.label : slotKey;
+    }
+
+    document.getElementById('picker-modal-title').textContent = `Elegir plato para ${slotTitle.toUpperCase()}`;
     
     list.innerHTML = state.recipes.map(r => `
       <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--m3-surface-container-low); border: 1px solid var(--m3-outline-variant); border-radius: var(--radius-md); cursor: pointer;"
            onclick="app.selectRecipeForSlot('${r.id}')">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <img src="${r.imageUrl}" alt="" style="width: 40px; height: 40px; border-radius: 6px; object-fit: cover;">
-          <div>
-            <strong style="font-size: 13px; color: var(--m3-on-surface);">${r.title}</strong>
+        <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; padding-right: 8px;">
+          <img src="${r.imageUrl}" alt="" style="width: 40px; height: 40px; border-radius: 6px; object-fit: cover; flex-shrink: 0;">
+          <div style="min-width: 0;">
+            <strong style="font-size: 13px; color: var(--m3-on-surface); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${r.title}</strong>
             <div style="font-size: 11px; color: var(--m3-on-surface-variant); display: flex; align-items: center; gap: 4px;">
               <span class="material-symbols-outlined icon-sm">schedule</span> ${r.prepTimeMinutes + r.cookTimeMinutes} min
             </div>
           </div>
         </div>
-        <button class="btn btn-primary btn-sm">Elegir</button>
+        <button class="btn btn-primary btn-sm" style="flex-shrink: 0;">Elegir</button>
       </div>
     `).join('');
 
@@ -1305,8 +1609,30 @@ class FoodAssistantApp {
 
   selectRecipeForSlot(recipeId) {
     if (this.pickerTarget) {
-      if (!state.mealPlan[this.pickerTarget.dateStr]) state.mealPlan[this.pickerTarget.dateStr] = { lunch: null, dinner: null };
-      state.mealPlan[this.pickerTarget.dateStr][this.pickerTarget.slotType] = recipeId;
+      const { dateStr, slotKey, isCustom } = this.pickerTarget;
+      if (!state.mealPlan[dateStr]) {
+        state.mealPlan[dateStr] = {
+          dayName: '',
+          breakfast: null,
+          lunch: null,
+          snack: null,
+          dinner: null,
+          customSlots: []
+        };
+      }
+
+      if (isCustom) {
+        if (!Array.isArray(state.mealPlan[dateStr].customSlots)) {
+          state.mealPlan[dateStr].customSlots = [];
+        }
+        const cs = state.mealPlan[dateStr].customSlots.find(c => c.id === slotKey);
+        if (cs) {
+          cs.recipeId = recipeId;
+        }
+      } else {
+        state.mealPlan[dateStr][slotKey] = recipeId;
+      }
+
       state.save('fa_mealplan', state.mealPlan);
       this.closePickerModal();
       this.syncDataWithCloud(true);
@@ -1534,13 +1860,22 @@ class FoodAssistantApp {
     let plannedCount = 0;
 
     Object.values(state.mealPlan).forEach(day => {
-      ['lunch', 'dinner'].forEach(slot => {
+      ['breakfast', 'lunch', 'snack', 'dinner'].forEach(slot => {
         const rId = day[slot];
         if (rId) {
           recipeOccurrences.set(rId, (recipeOccurrences.get(rId) || 0) + 1);
           plannedCount++;
         }
       });
+
+      if (Array.isArray(day.customSlots)) {
+        day.customSlots.forEach(cs => {
+          if (cs.recipeId) {
+            recipeOccurrences.set(cs.recipeId, (recipeOccurrences.get(cs.recipeId) || 0) + 1);
+            plannedCount++;
+          }
+        });
+      }
     });
 
     if (recipeOccurrences.size === 0) {
@@ -1941,17 +2276,24 @@ class FoodAssistantApp {
   }
 
   applySampleAiPlan() {
-    const sampleKeys = state.recipes.map(r => r.id);
+    const breakfastRecipes = state.recipes.filter(r => r.tags.includes('Desayuno'));
+    const lunchRecipes = state.recipes.filter(r => r.tags.includes('Almuerzo') || !r.tags.includes('Desayuno'));
+    const snackRecipes = state.recipes.filter(r => r.tags.includes('Merienda'));
+    const dinnerRecipes = state.recipes.filter(r => r.tags.includes('Cena') || !r.tags.includes('Desayuno'));
+    const all = state.recipes;
+
     let i = 0;
     Object.keys(state.mealPlan).forEach(dateKey => {
-      state.mealPlan[dateKey].lunch = sampleKeys[i % sampleKeys.length];
-      state.mealPlan[dateKey].dinner = sampleKeys[(i + 1) % sampleKeys.length];
+      state.mealPlan[dateKey].breakfast = (breakfastRecipes[i % breakfastRecipes.length] || all[i % all.length])?.id || null;
+      state.mealPlan[dateKey].lunch = (lunchRecipes[i % lunchRecipes.length] || all[(i + 1) % all.length])?.id || null;
+      state.mealPlan[dateKey].snack = (snackRecipes[i % snackRecipes.length] || all[(i + 2) % all.length])?.id || null;
+      state.mealPlan[dateKey].dinner = (dinnerRecipes[i % dinnerRecipes.length] || all[(i + 3) % all.length])?.id || null;
       i++;
     });
     state.save('fa_mealplan', state.mealPlan);
     this.syncDataWithCloud(true);
     this.render();
-    alert("¡Menú asignado con éxito a tu calendario!");
+    alert("¡Menú completo (desayunos, almuerzos, meriendas y cenas) organizado con éxito en tu calendario!");
     this.switchView('view-planner');
   }
 
