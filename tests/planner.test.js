@@ -4,26 +4,15 @@ import path from 'path';
 
 const appPath = path.resolve(process.cwd(), 'app.js');
 const appCode = fs.readFileSync(appPath, 'utf-8');
-const fn = new Function('window', 'localStorage', 'document', appCode + '; return { StateStore };');
+new Function(appCode)();
+
+const { StateStore } = window;
 
 describe('Planner & Custom Meal Moments', () => {
   let store;
-  let mockStorage = {};
 
   beforeEach(() => {
-    mockStorage = {};
-    const localStorageMock = {
-      getItem: (k) => mockStorage[k] || null,
-      setItem: (k, v) => { mockStorage[k] = String(v); },
-      removeItem: (k) => { delete mockStorage[k]; },
-      clear: () => { mockStorage = {}; }
-    };
-    const docMock = {
-      addEventListener: () => {},
-      documentElement: { setAttribute: () => {} }
-    };
-
-    const { StateStore } = fn({}, localStorageMock, docMock);
+    localStorage.clear();
     store = new StateStore();
   });
 

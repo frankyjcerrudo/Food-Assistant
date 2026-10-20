@@ -4,8 +4,9 @@ import path from 'path';
 
 const appPath = path.resolve(process.cwd(), 'app.js');
 const appCode = fs.readFileSync(appPath, 'utf-8');
-const fn = new Function('window', 'localStorage', 'document', appCode + '; return { AISLE_METADATA };');
-const { AISLE_METADATA } = fn({}, { getItem: () => null, setItem: () => {} }, { addEventListener: () => {}, documentElement: { setAttribute: () => {} } });
+new Function(appCode)();
+
+const { AISLE_METADATA } = window;
 
 describe('Shopping Engine & Ingredient Calculations', () => {
   it('debe contener metadatos completos para todos los pasillos estándar', () => {

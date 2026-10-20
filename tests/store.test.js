@@ -2,35 +2,16 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 
-// Evaluate app.js in test environment
+// Evaluate app.js in happy-dom browser environment
 const appPath = path.resolve(process.cwd(), 'app.js');
 const appCode = fs.readFileSync(appPath, 'utf-8');
-const context = {};
-const fn = new Function('window', 'localStorage', 'document', appCode + '; return { StateStore, SEED_RECIPES, STANDARD_SLOTS };');
+new Function(appCode)();
+
+const { StateStore, SEED_RECIPES, STANDARD_SLOTS } = window;
 
 describe('StateStore & Data Model Normalization', () => {
-  let mockStorage = {};
-  let localStorageMock;
-  let StateStore, SEED_RECIPES, STANDARD_SLOTS;
-
   beforeEach(() => {
-    mockStorage = {};
-    localStorageMock = {
-      getItem: (k) => mockStorage[k] || null,
-      setItem: (k, v) => { mockStorage[k] = String(v); },
-      removeItem: (k) => { delete mockStorage[k]; },
-      clear: () => { mockStorage = {}; }
-    };
-
-    const docMock = {
-      addEventListener: () => {},
-      documentElement: { setAttribute: () => {} }
-    };
-
-    const res = fn({}, localStorageMock, docMock);
-    StateStore = res.StateStore;
-    SEED_RECIPES = res.SEED_RECIPES;
-    STANDARD_SLOTS = res.STANDARD_SLOTS;
+    localStorage.clear();
   });
 
   it('debe definir exactamente los 4 momentos de comida estándar', () => {
@@ -64,7 +45,7 @@ describe('StateStore & Data Model Normalization', () => {
         dinner: "rec-lemon-chicken"
       }
     };
-    mockStorage['fa_mealplan'] = JSON.stringify(legacyPlan);
+    localStorage.setItem('fa_mealplan', JSON.stringify(legacyPlan));
 
     const store = new StateStore();
     const day = store.mealPlan["2026-10-20"];
