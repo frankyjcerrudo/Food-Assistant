@@ -1,0 +1,34 @@
+name: CI & Quality Gate
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Run Automated Tests & Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Check out repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 📦 Install dependencies
+        run: npm install
+
+      - name: 🧪 Run Unit & Integration Tests (Vitest)
+        run: npm test
+
+      - name: 📊 Check PWA Manifest & Assets Integrity
+        run: |
+          test -f index.html || exit 1
+          test -f manifest.json || exit 1
+          test -f sw.js || exit 1
+          echo "All production PWA assets are present and verified."
