@@ -204,6 +204,7 @@ class FoodAssistantApp {
     this.modalRecipeImport = document.getElementById('modal-recipe-import');
     this.modalRecipeEdit = document.getElementById('modal-recipe-edit');
     this.modalAuth = document.getElementById('modal-auth');
+    this.modalShoppingPreview = document.getElementById('modal-shopping-preview');
     this.cookModeOverlay = document.getElementById('cook-mode-overlay');
   }
 
@@ -1468,33 +1469,62 @@ class FoodAssistantApp {
   }
 
   addRecipeIngredientsToShopping(recipeId) {
-    const recipe = state.recipes.find(r => r.id === recipeId);
-    if (!recipe) return;
-
-    const scale = this.activeServings / recipe.servings;
-    let addedCount = 0;
-
-    recipe.ingredients.forEach(ing => {
-      const amountVal = ing.amount ? Math.round((ing.amount * scale) * 10) / 10 : null;
-      state.shoppingList.push({
-        name: ing.name,
-        amount: amountVal,
-        unit: ing.unit || '',
-        aisle: ing.aisle || 'other',
-        isChecked: false,
-        recipeOrigin: recipe.title
-      });
-      addedCount++;
-    });
-
-    state.save('fa_shopping', state.shoppingList);
-    this.syncDataWithCloud(true);
-    alert(`Se han añadido ${addedCount} ingredientes a tu lista de la compra.`);
+    this.openShoppingPreviewForRecipe(recipeId);
   }
 
   generateShoppingFromPlan() {
-    const addedMap = new Map();
-    let count = 0;
+    this.openShoppingPreviewForPlan();
+  }
+
+  // ==========================================================================
+  // PREVIEW & CUSTOMIZE INGREDIENTS BEFORE ADDING TO SHOPPING LIST
+  // ==========================================================================
+  openShoppingPreviewForRecipe(recipeId) {
+    const recipe = state.recipes.find(r => r.id === recipeId);
+    if (!recipe || !recipe.ingredients || recipe.ingredients.length === 0) {
+      alert("Esta receta no tiene ingredientes definidos.");
+      return;
+    }
+
+    const baseServings = recipe.servings || 2;
+    const currentServings = this.activeServings || baseServings;
+    const ratio = currentServings / baseServings;
+
+    this.shoppingPreviewState = {
+      sourceType: 'recipe',
+      sourceTitle: recipe.title,
+      baseServings: baseServings,
+      currentServings: currentServings,
+      items: recipe.ingredients.map(ing => ({
+        name: ing.name,
+        baseAmount: ing.amount !== null && ing.amount !== undefined ? ing.amount : null,
+        amount: ing.amount !== null && ing.amount !== undefined ? Math.round((ing.amount * ratio) * 10) / 10 : null,
+        unit: ing.unit || '',
+        aisle: ing.aisle || 'other',
+        recipeOrigin: recipe.title,
+        checked: true
+      }))
+    };
+
+    const titleEl = document.getElementById('shopping-preview-title');
+    const subtitleEl = document.getElementById('shopping-preview-subtitle');
+    const servingsVal = document.getElementById('shopping-preview-servings-val');
+    const clearFirst = document.getElementById('shopping-preview-clear-first');
+
+    if (titleEl) titleEl.textContent = "Añadir a la Compra";
+    if (subtitleEl) subtitleEl.textContent = `Receta: ${recipe.title}`;
+    if (servingsVal) servingsVal.textContent = currentServings;
+    if (clearFirst) clearFirst.checked = false;
+
+    this.renderShoppingPreview();
+    if (this.modalShoppingPreview) {
+      this.modalShoppingPreview.classList.add('active');
+    }
+  }
+
+  openShoppingPreviewForPlan() {
+    const recipeMap = new Map();
+    let plannedRecipesCount = 0;
 
     Object.values(state.mealPlan).forEach(day => {
       ['lunch', 'dinner'].forEach(slot => {
@@ -1502,23 +1532,28 @@ class FoodAssistantApp {
         if (rId) {
           const recipe = state.recipes.find(r => r.id === rId);
           if (recipe) {
+            plannedRecipesCount++;
             recipe.ingredients.forEach(ing => {
-              const key = `${ing.name.toLowerCase()}_${ing.unit || ''}`;
-              if (addedMap.has(key)) {
-                const item = addedMap.get(key);
-                if (item.amount && ing.amount) {
-                  item.amount = Math.round((item.amount + ing.amount) * 10) / 10;
+              const key = `${ing.name.toLowerCase().trim()}_${(ing.unit || '').toLowerCase().trim()}`;
+              if (recipeMap.has(key)) {
+                const item = recipeMap.get(key);
+                if (item.baseAmount !== null && ing.amount !== null && ing.amount !== undefined) {
+                  item.baseAmount = Math.round((item.baseAmount + ing.amount) * 10) / 10;
+                  item.amount = item.baseAmount;
+                }
+                if (!item.origins.includes(recipe.title)) {
+                  item.origins.push(recipe.title);
                 }
               } else {
-                addedMap.set(key, {
+                recipeMap.set(key, {
                   name: ing.name,
-                  amount: ing.amount,
+                  baseAmount: ing.amount !== null && ing.amount !== undefined ? ing.amount : null,
+                  amount: ing.amount !== null && ing.amount !== undefined ? ing.amount : null,
                   unit: ing.unit || '',
                   aisle: ing.aisle || 'other',
-                  isChecked: false,
-                  recipeOrigin: recipe.title
+                  origins: [recipe.title],
+                  checked: true
                 });
-                count++;
               }
             });
           }
@@ -1526,16 +1561,181 @@ class FoodAssistantApp {
       });
     });
 
-    if (count === 0) {
+    if (recipeMap.size === 0) {
       alert("No hay recetas asignadas en el plan semanal para generar la lista.");
       return;
     }
 
-    state.shoppingList = Array.from(addedMap.values());
+    const baseServings = state.settings.defaultServings || 2;
+    const currentServings = baseServings;
+
+    const items = Array.from(recipeMap.values()).map(item => ({
+      name: item.name,
+      baseAmount: item.baseAmount,
+      amount: item.amount,
+      unit: item.unit,
+      aisle: item.aisle,
+      recipeOrigin: item.origins.slice(0, 2).join(', ') + (item.origins.length > 2 ? ` (+${item.origins.length - 2})` : ''),
+      checked: true
+    }));
+
+    this.shoppingPreviewState = {
+      sourceType: 'plan',
+      sourceTitle: 'Plan Semanal',
+      baseServings: baseServings,
+      currentServings: currentServings,
+      items: items
+    };
+
+    const titleEl = document.getElementById('shopping-preview-title');
+    const subtitleEl = document.getElementById('shopping-preview-subtitle');
+    const servingsVal = document.getElementById('shopping-preview-servings-val');
+    const clearFirst = document.getElementById('shopping-preview-clear-first');
+
+    if (titleEl) titleEl.textContent = "Añadir a la Compra";
+    if (subtitleEl) subtitleEl.textContent = `Menú Semanal (${plannedRecipesCount} comidas planificadas)`;
+    if (servingsVal) servingsVal.textContent = currentServings;
+    if (clearFirst) clearFirst.checked = false;
+
+    this.renderShoppingPreview();
+    if (this.modalShoppingPreview) {
+      this.modalShoppingPreview.classList.add('active');
+    }
+  }
+
+  renderShoppingPreview() {
+    if (!this.shoppingPreviewState) return;
+
+    const container = document.getElementById('shopping-preview-items-list');
+    if (!container) return;
+
+    const checkedCount = this.shoppingPreviewState.items.filter(i => i.checked).length;
+    const btnText = document.getElementById('btn-confirm-add-shopping-text');
+    if (btnText) {
+      btnText.textContent = `Añadir a la Compra (${checkedCount})`;
+    }
+
+    container.innerHTML = this.shoppingPreviewState.items.map((ing, idx) => {
+      const meta = AISLE_METADATA[ing.aisle] || AISLE_METADATA.other;
+      const isChecked = ing.checked !== false;
+
+      return `
+        <div class="card" style="padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 0; background-color: ${isChecked ? 'var(--m3-surface)' : 'var(--m3-surface-container-low)'}; border: 1px solid var(--m3-outline-variant); transition: background-color 0.15s ease;">
+          <label style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; cursor: pointer; margin: 0;">
+            <input type="checkbox" class="grocery-checkbox" data-idx="${idx}" ${isChecked ? 'checked' : ''} onchange="app.handleShoppingPreviewItemCheck(${idx}, this.checked)" style="flex-shrink: 0;">
+            <div style="flex: 1; min-width: 0; overflow: hidden;">
+              <div style="font-size: 14px; font-weight: 500; color: var(--m3-on-surface); word-break: break-word; line-height: 1.3; ${isChecked ? '' : 'text-decoration: line-through; opacity: 0.55;'}">
+                ${ing.name}
+              </div>
+              <div style="font-size: 11px; color: var(--m3-on-surface-variant); display: flex; align-items: center; gap: 4px; margin-top: 2px;">
+                <span class="material-symbols-outlined icon-sm" style="font-size: 13px;">${meta.icon}</span> ${meta.label}
+                ${ing.recipeOrigin ? `<span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">• Para: ${ing.recipeOrigin}</span>` : ''}
+              </div>
+            </div>
+          </label>
+          
+          <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+            <input type="number" step="any" min="0" value="${ing.amount !== null && ing.amount !== undefined ? ing.amount : ''}" 
+              placeholder="Cant." 
+              class="form-input" 
+              style="width: 72px; padding: 6px 8px; text-align: center; font-size: 13px; font-weight: 500; ${isChecked ? '' : 'opacity: 0.5;'}"
+              onchange="app.handleShoppingPreviewAmountChange(${idx}, this.value)"
+              ${isChecked ? '' : 'disabled'}>
+            <span style="font-size: 12px; color: var(--m3-on-surface-variant); min-width: 24px;">${ing.unit || ''}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  stepShoppingPreviewServings(delta) {
+    if (!this.shoppingPreviewState) return;
+    const newServings = Math.max(1, this.shoppingPreviewState.currentServings + delta);
+    if (newServings === this.shoppingPreviewState.currentServings) return;
+
+    const scale = newServings / this.shoppingPreviewState.baseServings;
+    this.shoppingPreviewState.currentServings = newServings;
+    const servingsVal = document.getElementById('shopping-preview-servings-val');
+    if (servingsVal) servingsVal.textContent = newServings;
+
+    this.shoppingPreviewState.items.forEach(item => {
+      if (item.baseAmount !== null && item.baseAmount !== undefined) {
+        item.amount = Math.round((item.baseAmount * scale) * 10) / 10;
+      }
+    });
+
+    this.renderShoppingPreview();
+  }
+
+  toggleAllShoppingPreview(checked) {
+    if (!this.shoppingPreviewState) return;
+    this.shoppingPreviewState.items.forEach(item => {
+      item.checked = checked;
+    });
+    this.renderShoppingPreview();
+  }
+
+  handleShoppingPreviewItemCheck(idx, checked) {
+    if (!this.shoppingPreviewState || !this.shoppingPreviewState.items[idx]) return;
+    this.shoppingPreviewState.items[idx].checked = checked;
+    this.renderShoppingPreview();
+  }
+
+  handleShoppingPreviewAmountChange(idx, val) {
+    if (!this.shoppingPreviewState || !this.shoppingPreviewState.items[idx]) return;
+    const num = parseFloat(val);
+    const item = this.shoppingPreviewState.items[idx];
+    item.amount = isNaN(num) ? null : num;
+    const scale = this.shoppingPreviewState.currentServings / this.shoppingPreviewState.baseServings;
+    item.baseAmount = item.amount !== null ? item.amount / scale : null;
+  }
+
+  closeShoppingPreviewModal() {
+    if (this.modalShoppingPreview) {
+      this.modalShoppingPreview.classList.remove('active');
+    }
+    this.shoppingPreviewState = null;
+  }
+
+  confirmShoppingPreviewAdd() {
+    if (!this.shoppingPreviewState) return;
+    const selected = this.shoppingPreviewState.items.filter(i => i.checked);
+    if (selected.length === 0) {
+      alert("Por favor, selecciona al menos un ingrediente para añadir.");
+      return;
+    }
+
+    const clearFirst = document.getElementById('shopping-preview-clear-first')?.checked;
+    if (clearFirst) {
+      state.shoppingList = [];
+    }
+
+    let addedCount = 0;
+    selected.forEach(item => {
+      const key = `${item.name.toLowerCase().trim()}_${(item.unit || '').toLowerCase().trim()}`;
+      const existing = state.shoppingList.find(i => `${i.name.toLowerCase().trim()}_${(i.unit || '').toLowerCase().trim()}` === key && !i.isChecked);
+
+      if (existing && existing.amount !== null && item.amount !== null) {
+        existing.amount = Math.round((existing.amount + item.amount) * 10) / 10;
+      } else {
+        state.shoppingList.push({
+          name: item.name,
+          amount: item.amount,
+          unit: item.unit || '',
+          aisle: item.aisle || 'other',
+          isChecked: false,
+          recipeOrigin: item.recipeOrigin || ''
+        });
+      }
+      addedCount++;
+    });
+
     state.save('fa_shopping', state.shoppingList);
     this.syncDataWithCloud(true);
+    this.closeShoppingPreviewModal();
+    this.render();
     this.switchView('view-shopping');
-    alert(`¡Lista generada con éxito con ${state.shoppingList.length} artículos organizados por pasillos!`);
+    alert(`¡Se han añadido ${addedCount} ingredientes a tu lista de la compra!`);
   }
 
   copyShoppingList() {
