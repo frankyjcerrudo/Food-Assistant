@@ -1364,12 +1364,12 @@ class FoodAssistantApp {
               <div class="grocery-item-row ${item.isChecked ? 'checked' : ''}">
                 <div class="grocery-left" onclick="app.toggleGroceryCheck(${item.originalIndex})">
                   <input type="checkbox" class="grocery-checkbox" ${item.isChecked ? 'checked' : ''} onclick="event.stopPropagation(); app.toggleGroceryCheck(${item.originalIndex})">
-                  <div>
+                  <div style="flex: 1; min-width: 0; overflow: hidden;">
                     <div class="grocery-name">${item.name}</div>
-                    ${item.recipeOrigin ? `<div style="font-size: 11px; color: var(--m3-on-surface-variant);">Para: ${item.recipeOrigin}</div>` : ''}
+                    ${item.recipeOrigin ? `<div style="font-size: 11px; color: var(--m3-on-surface-variant); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Para: ${item.recipeOrigin}</div>` : ''}
                   </div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
                   ${item.amount ? `<span class="grocery-amount">${item.amount} ${item.unit || ''}</span>` : ''}
                   <button class="btn-ghost btn-sm" onclick="app.deleteGroceryItem(${item.originalIndex})" title="Eliminar">
                     <span class="material-symbols-outlined icon-sm">close</span>
