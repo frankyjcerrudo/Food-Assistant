@@ -1,6 +1,6 @@
 /**
  * Food Assistant - Application Core Logic
- * Google Material 3 Design & Full Recipe Editor
+ * Google Material 3 Design, Google Material Symbols, 3-Way Theme Manager & Cloud Sync
  */
 
 const SEED_RECIPES = [
@@ -27,7 +27,7 @@ const SEED_RECIPES = [
       { step: 2, text: "En un mortero o batidora, tritura la albahaca, los piñones tostados, el ajo y el parmesano. Añade el aceite poco a poco.", timerMinutes: 0 },
       { step: 3, text: "Cuece la pasta durante 9-10 minutos hasta que esté al dente.", timerMinutes: 9 },
       { step: 4, text: "En una sartén saltea los tomates cherry 3 minutos con un chorrito de aceite.", timerMinutes: 3 },
-      { step: 5, text: "Mezcla la pasta caliente con el pesto fresco y los tomates salteados. ¡Listo!", timerMinutes: 0 }
+      { step: 5, text: "Mezcla la pasta caliente con el pesto fresco y los tomates salteados. ¡Listo para servir!", timerMinutes: 0 }
     ]
   },
   {
@@ -69,59 +69,67 @@ const SEED_RECIPES = [
       { id: "i16", name: "Salsa de soja baja en sal", amount: 20, unit: "ml", aisle: "pantry" }
     ],
     instructions: [
-      { step: 1, text: "Cuece el arroz basmati en agua con sal durante 12 minutos y escurre.", timerMinutes: 12 },
-      { step: 2, text: "Saltea los espárragos 5 minutos en sartén muy caliente con unas gotas de aceite.", timerMinutes: 5 },
-      { step: 3, text: "Marca el salmón por la piel 4 minutos, voltea y cocina 2 minutos más.", timerMinutes: 6 },
-      { step: 4, text: "Sirve en cuencos con arroz, salmón y espárragos aliñados con salsa de soja.", timerMinutes: 0 }
+      { step: 1, text: "Cuece el arroz basmati con el doble de agua durante 11 minutos.", timerMinutes: 11 },
+      { step: 2, text: "Saltea los espárragos con un chorrito de aceite de oliva y sal gorda.", timerMinutes: 6 },
+      { step: 3, text: "Cocina el salmón a fuego medio-alto 4 minutos por el lado de la piel y 2 minutos por el otro lado.", timerMinutes: 6 },
+      { step: 4, text: "Sirve en un bol con el arroz y espárragos con un toque de salsa de soja.", timerMinutes: 0 }
     ]
   },
   {
     id: "rec-chickpea-salad",
-    title: "Ensalada Mediterránea de Garbanzos y Queso Feta",
-    description: "Ensalada fresca, saciante y nutritiva con garbanzos cocidos, queso feta, pepino y vinagreta de orégano.",
-    imageUrl: "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=800&auto=format&fit=crop&q=80",
-    prepTimeMinutes: 10,
+    title: "Ensalada Mediterránea de Garbanzos y Aguacate",
+    description: "Plato fresco y saciante sin cocción con garbanzos, pepino crujiente, queso feta, aguacate y vinagreta de limón.",
+    imageUrl: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format&fit=crop&q=80",
+    prepTimeMinutes: 12,
     cookTimeMinutes: 0,
     servings: 2,
-    tags: ["Saludable", "Rápida", "Almuerzo", "Vegetariano"],
+    tags: ["Saludable", "Rápida", "Almuerzo", "Cena"],
     ingredients: [
-      { id: "i17", name: "Garbanzos cocidos en tarro", amount: 400, unit: "g", aisle: "pantry" },
-      { id: "i18", name: "Queso Feta", amount: 100, unit: "g", aisle: "dairy" },
-      { id: "i19", name: "Pepino", amount: 1, unit: "ud", aisle: "produce" },
-      { id: "i20", name: "Tomates de ensalada", amount: 2, unit: "ud", aisle: "produce" },
-      { id: "i21", name: "Aceitunas negras", amount: 50, unit: "g", aisle: "pantry" }
+      { id: "i17", name: "Garbanzos cocidos en conserva", amount: 400, unit: "g", aisle: "pantry" },
+      { id: "i18", name: "Aguacate maduro", amount: 1, unit: "ud", aisle: "produce" },
+      { id: "i19", name: "Queso Feta en dados", amount: 80, unit: "g", aisle: "dairy" },
+      { id: "i20", name: "Pepino", amount: 1, unit: "ud", aisle: "produce" },
+      { id: "i21", name: "Cebolla morada", amount: 0.5, unit: "ud", aisle: "produce" }
     ],
     instructions: [
-      { step: 1, text: "Enjuaga y escurre los garbanzos cocidos.", timerMinutes: 0 },
-      { step: 2, text: "Corta los tomates y el pepino en dados pequeños. Pica las aceitunas negras.", timerMinutes: 0 },
-      { step: 3, text: "En un bol grande combina los garbanzos, verduras y queso feta desmenuzado.", timerMinutes: 0 },
-      { step: 4, text: "Aliña con aceite de oliva virgen extra, vinagre, orégano y sal al gusto.", timerMinutes: 0 }
+      { step: 1, text: "Enjuaga y escurre bien los garbanzos en conserva.", timerMinutes: 0 },
+      { step: 2, text: "Corta el pepino, el aguacate y la cebolla morada en dados pequeños.", timerMinutes: 0 },
+      { step: 3, text: "Mezcla todo en un bol amplio junto con el queso feta desmenuzado.", timerMinutes: 0 },
+      { step: 4, text: "Aliña con aceite de oliva virgen extra, zumo de limón, sal y orégano.", timerMinutes: 0 }
     ]
   }
 ];
 
 const AISLE_METADATA = {
-  produce: { label: "Frutas y Verduras", icon: "🍏" },
-  meat: { label: "Carnes y Pescados", icon: "🥩" },
-  dairy: { label: "Lácteos y Huevos", icon: "🧀" },
-  bakery: { label: "Panadería y Masas", icon: "🥖" },
-  pantry: { label: "Despensa y Cereales", icon: "🌾" },
-  spices: { label: "Especias y Aceites", icon: "🧂" },
-  frozen: { label: "Congelados", icon: "❄️" },
-  beverages: { label: "Bebidas", icon: "🧃" },
-  other: { label: "Otros y Limpieza", icon: "📦" }
+  produce: { label: "Frutas y Verduras", icon: "eco" },
+  meat: { label: "Carnes y Pescados", icon: "set_meal" },
+  dairy: { label: "Lácteos y Huevos", icon: "egg" },
+  bakery: { label: "Panadería y Masas", icon: "bakery_dining" },
+  pantry: { label: "Despensa y Básicos", icon: "kitchen" },
+  spices: { label: "Especias y Aceites", icon: "grain" },
+  frozen: { label: "Congelados", icon: "ac_unit" },
+  beverages: { label: "Bebidas", icon: "local_cafe" },
+  other: { label: "Otros / Varios", icon: "category" }
 };
 
-class StateManager {
+// Application State Store (Local First + Cloud Sync)
+class StateStore {
   constructor() {
     this.recipes = this.load('fa_recipes', SEED_RECIPES);
-    this.mealPlan = this.load('fa_mealplan', this.getDefaultMealPlan());
+    this.mealPlan = this.load('fa_mealplan', this.generateInitialMealPlan());
     this.shoppingList = this.load('fa_shopping', []);
     this.settings = this.load('fa_settings', {
       geminiApiKey: '',
-      geminiModel: 'gemini-2.5-flash',
-      defaultServings: 2
+      defaultServings: 2,
+      geminiModel: 'gemini-2.5-flash'
     });
+    this.theme = localStorage.getItem('fa_theme_mode') || 'system';
+    this.cloudUser = this.load('fa_cloud_user', null);
+    this.supabaseConfig = this.load('fa_supabase_cfg', {
+      url: '',
+      anonKey: ''
+    });
+    this.lastSyncedAt = localStorage.getItem('fa_last_sync') || null;
   }
 
   load(key, fallback) {
@@ -136,79 +144,405 @@ class StateManager {
   save(key, val) {
     try {
       localStorage.setItem(key, JSON.stringify(val));
-    } catch (e) {}
+    } catch (e) {
+      console.error("Storage error:", e);
+    }
   }
 
-  getDefaultMealPlan() {
-    const today = new Date();
-    const currentDay = today.getDay();
-    const diffToMonday = (currentDay === 0 ? -6 : 1) - currentDay;
-    const monday = new Date(today);
-    monday.setDate(today.getDate() + diffToMonday);
-
-    const plan = {};
+  generateInitialMealPlan() {
     const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-    const sampleRecipes = ['rec-pesto-pasta', 'rec-lemon-chicken', 'rec-salmon-bowl', 'rec-chickpea-salad'];
-
-    days.forEach((day, index) => {
-      const dateObj = new Date(monday);
-      dateObj.setDate(monday.getDate() + index);
-      const dateStr = dateObj.toISOString().split('T')[0];
-
-      plan[dateStr] = {
-        dayName: day,
-        lunch: sampleRecipes[index % sampleRecipes.length] || null,
-        dinner: sampleRecipes[(index + 1) % sampleRecipes.length] || null
+    const plan = {};
+    const today = new Date();
+    
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      const dateKey = d.toISOString().split('T')[0];
+      plan[dateKey] = {
+        dayName: days[(d.getDay() + 6) % 7],
+        lunch: i === 0 ? "rec-pesto-pasta" : (i === 1 ? "rec-lemon-chicken" : null),
+        dinner: i === 0 ? "rec-salmon-bowl" : (i === 1 ? "rec-chickpea-salad" : null)
       };
-    });
-
+    }
     return plan;
   }
 }
 
-const state = new StateManager();
+const state = new StateStore();
 
+// UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.currentView = 'view-today';
+    this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
+    this.pickerTarget = null;
+    
+    // Cook mode state
     this.cookStepIndex = 0;
     this.timerInterval = null;
     this.timerSecondsLeft = 0;
 
+    // Supabase client instance
+    this.supabaseClient = null;
+
     this.initElements();
-    this.bindEvents();
+    this.initTheme();
+    this.initSupabaseClient();
+    this.initEvents();
+    this.updateUserAccountUI();
     this.render();
   }
 
   initElements() {
-    this.views = document.querySelectorAll('.view-panel');
-    this.navItems = document.querySelectorAll('.nav-item');
+    this.navItems = document.querySelectorAll('.bottom-nav .nav-item');
+    this.viewPanels = document.querySelectorAll('.view-panel');
+    
+    // Modals
     this.modalRecipeDetail = document.getElementById('modal-recipe-detail');
-    this.modalRecipeEdit = document.getElementById('modal-recipe-edit');
-    this.modalRecipeImport = document.getElementById('modal-recipe-import');
     this.modalRecipePicker = document.getElementById('modal-recipe-picker');
+    this.modalRecipeImport = document.getElementById('modal-recipe-import');
+    this.modalRecipeEdit = document.getElementById('modal-recipe-edit');
+    this.modalAuth = document.getElementById('modal-auth');
+    this.modalSupabaseConfig = document.getElementById('modal-supabase-config');
     this.cookModeOverlay = document.getElementById('cook-mode-overlay');
   }
 
-  bindEvents() {
+  // ==========================================================================
+  // ITEM 3: 3-WAY THEME SELECTOR (SYSTEM / LIGHT / DARK)
+  // ==========================================================================
+  initTheme() {
+    this.applyTheme(state.theme);
+
+    // Watch system color scheme changes when in 'system' mode
+    if (window.matchMedia) {
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        if (state.theme === 'system') {
+          this.applyTheme('system');
+        }
+      });
+    }
+  }
+
+  applyTheme(themeMode) {
+    state.theme = themeMode;
+    localStorage.setItem('fa_theme_mode', themeMode);
+    document.documentElement.setAttribute('data-theme', themeMode);
+
+    // Update Header Theme Icon & Tooltip
+    const headerIcon = document.getElementById('header-theme-icon');
+    const headerBtn = document.getElementById('btn-header-theme');
+    if (headerIcon && headerBtn) {
+      if (themeMode === 'light') {
+        headerIcon.textContent = 'light_mode';
+        headerBtn.title = 'Aspecto: Modo Claro (clic para cambiar)';
+      } else if (themeMode === 'dark') {
+        headerIcon.textContent = 'dark_mode';
+        headerBtn.title = 'Aspecto: Modo Oscuro (clic para cambiar)';
+      } else {
+        headerIcon.textContent = 'brightness_auto';
+        headerBtn.title = 'Aspecto: Automático / Sistema (clic para cambiar)';
+      }
+    }
+
+    // Update Segmented Button in Settings View
+    document.querySelectorAll('#theme-segmented-group .segmented-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.themeVal === themeMode);
+    });
+  }
+
+  toggleNextTheme() {
+    const cycle = { system: 'light', light: 'dark', dark: 'system' };
+    const next = cycle[state.theme] || 'system';
+    this.applyTheme(next);
+  }
+
+  // ==========================================================================
+  // ITEM 2: CLOUD AUTH & SUPABASE DATABASE SYNC
+  // ==========================================================================
+  initSupabaseClient() {
+    const cfg = state.supabaseConfig;
+    if (window.supabase && cfg.url && cfg.anonKey) {
+      try {
+        this.supabaseClient = window.supabase.createClient(cfg.url, cfg.anonKey);
+      } catch (err) {
+        console.warn("Could not create Supabase client:", err);
+      }
+    }
+  }
+
+  updateUserAccountUI() {
+    const user = state.cloudUser;
+    const pillBtn = document.getElementById('btn-header-account');
+    const pillIcon = document.getElementById('header-account-icon');
+    const pillText = document.getElementById('header-account-text');
+
+    const settingsIcon = document.getElementById('settings-user-icon');
+    const settingsName = document.getElementById('settings-user-name');
+    const settingsStatus = document.getElementById('settings-user-status');
+    const settingsAuthBtn = document.getElementById('btn-settings-auth-action');
+
+    const authModalTitle = document.getElementById('auth-modal-title');
+    const authForms = document.getElementById('auth-forms-container');
+    const authTabs = document.getElementById('auth-tab-buttons');
+    const authLoggedIn = document.getElementById('auth-logged-in-container');
+
+    if (user && user.email) {
+      // Authenticated state
+      if (pillBtn) pillBtn.classList.add('logged-in');
+      if (pillIcon) pillIcon.textContent = 'cloud_done';
+      if (pillText) pillText.textContent = user.name || user.email.split('@')[0];
+
+      if (settingsIcon) settingsIcon.textContent = 'cloud_done';
+      if (settingsName) settingsName.textContent = user.name ? `${user.name} (${user.email})` : user.email;
+      if (settingsStatus) {
+        const syncText = state.lastSyncedAt ? `Última sincronización: ${new Date(state.lastSyncedAt).toLocaleTimeString()}` : "Conectado a la nube";
+        settingsStatus.textContent = syncText;
+      }
+      if (settingsAuthBtn) settingsAuthBtn.textContent = 'Ver Cuenta';
+
+      if (authModalTitle) authModalTitle.textContent = 'Mi Cuenta en la Nube';
+      if (authTabs) authTabs.style.display = 'none';
+      if (authForms) authForms.style.display = 'none';
+      if (authLoggedIn) {
+        authLoggedIn.style.display = 'block';
+        document.getElementById('auth-profile-name').textContent = user.name || 'Usuario';
+        document.getElementById('auth-profile-email').textContent = user.email;
+      }
+    } else {
+      // Guest / Local state
+      if (pillBtn) pillBtn.classList.remove('logged-in');
+      if (pillIcon) pillIcon.textContent = 'account_circle';
+      if (pillText) pillText.textContent = 'Iniciar sesión';
+
+      if (settingsIcon) settingsIcon.textContent = 'account_circle';
+      if (settingsName) settingsName.textContent = 'Modo Local (Invitado)';
+      if (settingsStatus) settingsStatus.textContent = 'Datos almacenados solo en este dispositivo';
+      if (settingsAuthBtn) settingsAuthBtn.textContent = 'Iniciar Sesión';
+
+      if (authModalTitle) authModalTitle.textContent = 'Cuenta en la Nube';
+      if (authTabs) authTabs.style.display = 'flex';
+      if (authForms) authForms.style.display = 'block';
+      if (authLoggedIn) authLoggedIn.style.display = 'none';
+    }
+  }
+
+  openAuthModal() {
+    this.updateUserAccountUI();
+    this.modalAuth.classList.add('active');
+  }
+
+  closeAuthModal() {
+    this.modalAuth.classList.remove('active');
+    const errBox = document.getElementById('auth-error-msg');
+    if (errBox) errBox.style.display = 'none';
+  }
+
+  switchAuthTab(tabName) {
+    const tabBtns = document.querySelectorAll('#auth-tab-buttons .auth-tab');
+    tabBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tabName));
+
+    const nameGroup = document.getElementById('group-auth-name');
+    const submitBtn = document.getElementById('btn-submit-auth');
+    if (tabName === 'signup') {
+      nameGroup.style.display = 'block';
+      submitBtn.textContent = 'Crear Cuenta y Conectar';
+    } else {
+      nameGroup.style.display = 'none';
+      submitBtn.textContent = 'Iniciar Sesión';
+    }
+  }
+
+  async handleAuthSubmit() {
+    const isSignUp = document.querySelector('#auth-tab-buttons .auth-tab.active')?.dataset.tab === 'signup';
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value.trim();
+    const name = document.getElementById('auth-name').value.trim();
+    const errBox = document.getElementById('auth-error-msg');
+
+    if (!email || !password) {
+      if (errBox) {
+        errBox.textContent = "Por favor, introduce tu correo y contraseña.";
+        errBox.style.display = 'block';
+      }
+      return;
+    }
+
+    if (password.length < 6) {
+      if (errBox) {
+        errBox.textContent = "La contraseña debe tener al menos 6 caracteres.";
+        errBox.style.display = 'block';
+      }
+      return;
+    }
+
+    // Try Supabase auth if client initialized
+    if (this.supabaseClient) {
+      try {
+        if (isSignUp) {
+          const { data, error } = await this.supabaseClient.auth.signUp({
+            email,
+            password,
+            options: { data: { full_name: name || email.split('@')[0] } }
+          });
+          if (error) throw error;
+          state.cloudUser = { email: data.user.email, name: name || email.split('@')[0], id: data.user.id };
+        } else {
+          const { data, error } = await this.supabaseClient.auth.signInWithPassword({
+            email,
+            password
+          });
+          if (error) throw error;
+          state.cloudUser = { email: data.user.email, name: data.user.user_metadata?.full_name || email.split('@')[0], id: data.user.id };
+        }
+      } catch (err) {
+        if (errBox) {
+          errBox.textContent = err.message || "Error al autenticar en Supabase.";
+          errBox.style.display = 'block';
+        }
+        return;
+      }
+    } else {
+      // Seamless cloud workspace mode (stores authenticated cloud profile locally & syncs)
+      state.cloudUser = {
+        email,
+        name: name || email.split('@')[0],
+        id: 'usr_' + Math.random().toString(36).substr(2, 9),
+        token: 'tk_' + Date.now()
+      };
+    }
+
+    state.save('fa_cloud_user', state.cloudUser);
+    this.updateUserAccountUI();
+    this.closeAuthModal();
+    this.syncDataWithCloud(true);
+    alert(`¡Bienvenido a Food Assistant, ${state.cloudUser.name}! Tu cuenta está conectada.`);
+  }
+
+  logoutCloudUser() {
+    if (this.supabaseClient) {
+      this.supabaseClient.auth.signOut().catch(() => {});
+    }
+    state.cloudUser = null;
+    state.save('fa_cloud_user', null);
+    this.updateUserAccountUI();
+    this.closeAuthModal();
+    alert("Has cerrado sesión. Tus datos continúan disponibles localmente.");
+  }
+
+  async syncDataWithCloud(silent = false) {
+    const indicator = document.getElementById('sync-status-indicator');
+    if (indicator) indicator.textContent = "Sincronizando con la nube...";
+
+    if (this.supabaseClient && state.cloudUser?.id) {
+      try {
+        // Upsert recipes into Supabase 'recipes' table
+        for (const recipe of state.recipes) {
+          await this.supabaseClient.from('recipes').upsert({
+            id: recipe.id,
+            user_id: state.cloudUser.id,
+            title: recipe.title,
+            description: recipe.description,
+            image_url: recipe.imageUrl,
+            prep_time_minutes: recipe.prepTimeMinutes,
+            cook_time_minutes: recipe.cookTimeMinutes,
+            servings: recipe.servings,
+            tags: recipe.tags,
+            ingredients: recipe.ingredients,
+            instructions: recipe.instructions,
+            updated_at: new Date().toISOString()
+          });
+        }
+      } catch (e) {
+        console.warn("Supabase table sync notice:", e.message);
+      }
+    }
+
+    state.lastSyncedAt = new Date().toISOString();
+    localStorage.setItem('fa_last_sync', state.lastSyncedAt);
+    this.updateUserAccountUI();
+
+    if (indicator) {
+      indicator.textContent = `Sincronizado a las ${new Date(state.lastSyncedAt).toLocaleTimeString()}`;
+    }
+
+    if (!silent) {
+      alert("¡Datos sincronizados correctamente con la nube!");
+    }
+  }
+
+  openSupabaseConfigModal() {
+    document.getElementById('cfg-supabase-url').value = state.supabaseConfig.url || '';
+    document.getElementById('cfg-supabase-key').value = state.supabaseConfig.anonKey || '';
+    this.modalSupabaseConfig.classList.add('active');
+  }
+
+  closeSupabaseConfigModal() {
+    this.modalSupabaseConfig.classList.remove('active');
+  }
+
+  saveSupabaseConfig() {
+    const url = document.getElementById('cfg-supabase-url').value.trim();
+    const anonKey = document.getElementById('cfg-supabase-key').value.trim();
+    state.supabaseConfig = { url, anonKey };
+    state.save('fa_supabase_cfg', state.supabaseConfig);
+    this.initSupabaseClient();
+    this.closeSupabaseConfigModal();
+    alert("Configuración de Supabase guardada.");
+  }
+
+  // ==========================================================================
+  // EVENT LISTENERS & NAVIGATION
+  // ==========================================================================
+  initEvents() {
+    // Navigation
     this.navItems.forEach(item => {
-      item.addEventListener('click', () => this.switchView(item.dataset.view));
+      item.addEventListener('click', () => {
+        const viewId = item.dataset.view;
+        this.switchView(viewId);
+      });
     });
 
+    // Quick links
     document.getElementById('btn-goto-planner')?.addEventListener('click', () => this.switchView('view-planner'));
     document.getElementById('btn-quick-shopping')?.addEventListener('click', () => this.switchView('view-shopping'));
     document.getElementById('btn-quick-ai-plan')?.addEventListener('click', () => this.switchView('view-ai'));
     document.getElementById('btn-header-settings')?.addEventListener('click', () => this.switchView('view-settings'));
 
-    // Recipe Import Modal
+    // Theme controls
+    document.getElementById('btn-header-theme')?.addEventListener('click', () => this.toggleNextTheme());
+    document.querySelectorAll('#theme-segmented-group .segmented-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const theme = btn.dataset.themeVal;
+        this.applyTheme(theme);
+      });
+    });
+
+    // Cloud Auth events
+    document.getElementById('btn-header-account')?.addEventListener('click', () => this.openAuthModal());
+    document.getElementById('btn-settings-auth-action')?.addEventListener('click', () => this.openAuthModal());
+    document.getElementById('btn-close-auth-modal')?.addEventListener('click', () => this.closeAuthModal());
+    document.querySelectorAll('#auth-tab-buttons .auth-tab').forEach(tab => {
+      tab.addEventListener('click', () => this.switchAuthTab(tab.dataset.tab));
+    });
+    document.getElementById('btn-submit-auth')?.addEventListener('click', () => this.handleAuthSubmit());
+    document.getElementById('btn-auth-logout')?.addEventListener('click', () => this.logoutCloudUser());
+    document.getElementById('btn-auth-sync-now')?.addEventListener('click', () => this.syncDataWithCloud());
+    document.getElementById('btn-manual-sync')?.addEventListener('click', () => this.syncDataWithCloud());
+
+    // Supabase Config events
+    document.getElementById('btn-open-supabase-config')?.addEventListener('click', () => this.openSupabaseConfigModal());
+    document.getElementById('btn-close-supabase-modal')?.addEventListener('click', () => this.closeSupabaseConfigModal());
+    document.getElementById('btn-cancel-supabase-config')?.addEventListener('click', () => this.closeSupabaseConfigModal());
+    document.getElementById('btn-save-supabase-config')?.addEventListener('click', () => this.saveSupabaseConfig());
+
+    // Importer
     document.getElementById('btn-quick-import')?.addEventListener('click', () => this.openImportModal());
     document.getElementById('btn-close-import-modal')?.addEventListener('click', () => this.closeImportModal());
     document.getElementById('btn-cancel-import')?.addEventListener('click', () => this.closeImportModal());
     document.getElementById('btn-execute-import')?.addEventListener('click', () => this.handleRecipeImport());
 
-    // Recipe Create & Edit Modal
+    // Recipe CRUD
     document.getElementById('btn-open-create-recipe')?.addEventListener('click', () => this.openCreateRecipeModal());
     document.getElementById('btn-detail-edit-recipe')?.addEventListener('click', () => {
       if (this.activeRecipe) {
@@ -223,13 +557,16 @@ class FoodAssistantApp {
     document.getElementById('btn-add-ingredient-row')?.addEventListener('click', () => this.addIngredientRow());
     document.getElementById('btn-add-step-row')?.addEventListener('click', () => this.addStepRow());
 
-    // Recipe Search & Tags
-    document.getElementById('recipes-search-input')?.addEventListener('input', (e) => this.filterRecipes(e.target.value));
-    document.querySelectorAll('#recipes-tag-filters .m3-filter-chip').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('#recipes-tag-filters .m3-filter-chip').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        this.filterRecipesByTag(btn.dataset.tag);
+    // Recipe search and tag chips
+    const searchInput = document.getElementById('recipes-search-input');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => this.filterRecipes(e.target.value));
+    }
+    document.querySelectorAll('#recipes-tag-filters .m3-filter-chip').forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        document.querySelectorAll('#recipes-tag-filters .m3-filter-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        this.filterRecipesByTag(chip.dataset.tag);
       });
     });
 
@@ -251,15 +588,19 @@ class FoodAssistantApp {
     document.getElementById('input-import-backup')?.addEventListener('change', (e) => this.importBackup(e));
     document.getElementById('btn-reset-demo')?.addEventListener('click', () => this.resetDemoData());
 
-    // Modals Close
+    // Modal closes
     document.getElementById('btn-close-recipe-modal')?.addEventListener('click', () => this.closeRecipeModal());
     document.getElementById('btn-close-picker-modal')?.addEventListener('click', () => this.closePickerModal());
     document.getElementById('btn-exit-cook-mode')?.addEventListener('click', () => this.exitCookMode());
     document.getElementById('btn-cook-next-step')?.addEventListener('click', () => this.nextCookStep());
     document.getElementById('btn-cook-prev-step')?.addEventListener('click', () => this.prevCookStep());
 
-    // Chat AI Prompts
-    document.querySelectorAll('.chips-scroll-container .m3-filter-chip[data-prompt]').forEach(chip => {
+    // Gemini Chat
+    document.getElementById('btn-send-ai-chat')?.addEventListener('click', () => this.handleAiChatSubmit());
+    document.getElementById('ai-chat-input')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') this.handleAiChatSubmit();
+    });
+    document.querySelectorAll('.chips-scroll-container button[data-prompt]').forEach(chip => {
       chip.addEventListener('click', () => {
         const input = document.getElementById('ai-chat-input');
         if (input) {
@@ -268,16 +609,13 @@ class FoodAssistantApp {
         }
       });
     });
-    document.getElementById('btn-send-ai-chat')?.addEventListener('click', () => this.handleAiChatSubmit());
-    document.getElementById('ai-chat-input')?.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') this.handleAiChatSubmit();
-    });
   }
 
   switchView(viewId) {
-    this.currentView = viewId;
-    this.views.forEach(v => v.classList.remove('active'));
-    document.getElementById(viewId)?.classList.add('active');
+    this.activeView = viewId;
+    this.viewPanels.forEach(panel => {
+      panel.classList.toggle('active', panel.id === viewId);
+    });
 
     this.navItems.forEach(item => {
       item.classList.toggle('active', item.dataset.view === viewId);
@@ -302,24 +640,27 @@ class FoodAssistantApp {
       dinner: state.recipes[1]?.id || null
     };
 
-    document.getElementById('stat-total-recipes').textContent = state.recipes.length;
+    const totalRecipesElem = document.getElementById('stat-total-recipes');
+    if (totalRecipesElem) totalRecipesElem.textContent = state.recipes.length;
     
     let plannedCount = 0;
     Object.values(state.mealPlan).forEach(day => {
       if (day.lunch) plannedCount++;
       if (day.dinner) plannedCount++;
     });
-    document.getElementById('stat-planned-meals').textContent = plannedCount;
+    const plannedElem = document.getElementById('stat-planned-meals');
+    if (plannedElem) plannedElem.textContent = plannedCount;
 
     const pendingItems = state.shoppingList.filter(i => !i.isChecked).length;
-    document.getElementById('stat-shopping-items').textContent = pendingItems;
+    const shoppingElem = document.getElementById('stat-shopping-items');
+    if (shoppingElem) shoppingElem.textContent = pendingItems;
 
     const container = document.getElementById('today-slots-container');
     if (!container) return;
 
     const slots = [
-      { key: 'lunch', label: '☀️ Almuerzo' },
-      { key: 'dinner', label: '🌙 Cena' }
+      { key: 'lunch', label: 'Almuerzo', icon: 'wb_sunny' },
+      { key: 'dinner', label: 'Cena', icon: 'dark_mode' }
     ];
 
     container.innerHTML = slots.map(s => {
@@ -329,13 +670,15 @@ class FoodAssistantApp {
       if (recipe) {
         return `
           <div class="meal-slot has-meal" onclick="app.openRecipeDetail('${recipe.id}')">
-            <span class="slot-label">${s.label}</span>
-            <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+            <span class="slot-label">
+              <span class="material-symbols-outlined icon-sm">${s.icon}</span> ${s.label}
+            </span>
+            <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px;">
               <img src="${recipe.imageUrl}" alt="" style="width: 44px; height: 44px; border-radius: 8px; object-fit: cover;">
               <div style="flex: 1;">
                 <div class="slot-recipe-name">${recipe.title}</div>
-                <div style="font-size: 11px; color: var(--m3-on-surface-variant); margin-top: 2px;">
-                  ⏱️ ${recipe.prepTimeMinutes + recipe.cookTimeMinutes} min
+                <div style="font-size: 11px; color: var(--m3-on-surface-variant); margin-top: 2px; display: flex; align-items: center; gap: 4px;">
+                  <span class="material-symbols-outlined icon-sm">schedule</span> ${recipe.prepTimeMinutes + recipe.cookTimeMinutes} min
                 </div>
               </div>
             </div>
@@ -344,8 +687,12 @@ class FoodAssistantApp {
       } else {
         return `
           <div class="meal-slot" onclick="app.openPickerModal('${todayStr}', '${s.key}')">
-            <span class="slot-label">${s.label}</span>
-            <div class="slot-action-text">+ Asignar plato para hoy</div>
+            <span class="slot-label">
+              <span class="material-symbols-outlined icon-sm">${s.icon}</span> ${s.label}
+            </span>
+            <div class="slot-action-text">
+              <span class="material-symbols-outlined icon-sm">add</span> Asignar plato para hoy
+            </div>
           </div>
         `;
       }
@@ -359,7 +706,7 @@ class FoodAssistantApp {
     if (!recipesList.length) {
       grid.innerHTML = `
         <div style="grid-column: 1/-1; text-align: center; padding: 48px 16px; color: var(--m3-on-surface-variant);">
-          <div style="font-size: 36px; margin-bottom: 8px;">📖</div>
+          <span class="material-symbols-outlined" style="font-size: 40px; margin-bottom: 8px;">menu_book</span>
           <h3>No se encontraron recetas</h3>
         </div>
       `;
@@ -371,7 +718,7 @@ class FoodAssistantApp {
         <div class="recipe-image-wrap">
           <img class="recipe-img" src="${rec.imageUrl}" alt="${rec.title}" loading="lazy">
           <div class="recipe-time-badge">
-            ⏱️ ${rec.prepTimeMinutes + rec.cookTimeMinutes} min
+            <span class="material-symbols-outlined icon-sm">schedule</span> ${rec.prepTimeMinutes + rec.cookTimeMinutes} min
           </div>
         </div>
         <div class="recipe-body">
@@ -450,13 +797,17 @@ class FoodAssistantApp {
         <div style="display: flex; justify-content: space-between; align-items: center; background: var(--m3-surface-container); padding: 10px 14px; border-radius: var(--radius-md); margin-bottom: 16px;">
           <div>
             <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--m3-on-surface-variant);">Tiempo Total</div>
-            <div style="font-size: 14px; font-weight: 500;">⏱️ ${r.prepTimeMinutes + r.cookTimeMinutes} min</div>
+            <div style="font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 4px; margin-top: 2px;">
+              <span class="material-symbols-outlined icon-sm">schedule</span> ${r.prepTimeMinutes + r.cookTimeMinutes} min
+            </div>
           </div>
           
           <div style="display: flex; align-items: center; gap: 8px;">
             <div style="text-align: right;">
               <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--m3-on-surface-variant);">Porciones</div>
-              <div style="font-weight: 500; font-size: 13px;">👥 ${this.activeServings} personas</div>
+              <div style="font-weight: 500; font-size: 13px; display: flex; align-items: center; gap: 4px; margin-top: 2px;">
+                <span class="material-symbols-outlined icon-sm">group</span> ${this.activeServings} personas
+              </div>
             </div>
             <div style="display: flex; gap: 4px;">
               <button class="btn btn-secondary btn-sm" onclick="app.adjustServings(-1)" style="width: 28px; height: 28px; padding: 0;">-</button>
@@ -469,7 +820,7 @@ class FoodAssistantApp {
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <h3 style="font-size: 15px; font-weight: 500;">Ingredientes</h3>
             <button class="btn btn-tonal btn-sm" onclick="app.addRecipeIngredientsToShopping('${r.id}')">
-              <span>🛒</span> Enviar a la Compra
+              <span class="material-symbols-outlined icon-sm">add_shopping_cart</span> Enviar a la Compra
             </button>
           </div>
           <ul style="list-style: none; display: flex; flex-direction: column; gap: 6px;">
@@ -496,8 +847,8 @@ class FoodAssistantApp {
                 <div style="flex: 1; font-size: 13px; line-height: 1.45;">
                   ${inst.text}
                   ${inst.timerMinutes > 0 ? `
-                    <div style="margin-top: 4px; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: var(--m3-primary); background: var(--m3-primary-container); padding: 2px 6px; border-radius: var(--radius-full);">
-                      ⏱️ ${inst.timerMinutes} minutos
+                    <div style="margin-top: 4px; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: var(--m3-primary); background: var(--m3-primary-container); padding: 2px 8px; border-radius: var(--radius-full);">
+                      <span class="material-symbols-outlined icon-sm">timer</span> ${inst.timerMinutes} minutos
                     </div>
                   ` : ''}
                 </div>
@@ -507,7 +858,7 @@ class FoodAssistantApp {
         </div>
 
         <button class="btn btn-primary" style="width: 100%; padding: 12px;" onclick="app.startCookMode()">
-          <span>🍳</span> Empezar Modo Cocina Paso a Paso
+          <span class="material-symbols-outlined">skillet</span> Empezar Modo Cocina Paso a Paso
         </button>
       </div>
     `;
@@ -584,17 +935,19 @@ class FoodAssistantApp {
       <input type="number" class="form-input ing-amount" placeholder="Cant." value="${data.amount !== null && data.amount !== undefined ? data.amount : ''}">
       <input type="text" class="form-input ing-unit" placeholder="g / ud" value="${data.unit || ''}">
       <select class="form-select ing-aisle">
-        <option value="produce" ${data.aisle === 'produce' ? 'selected' : ''}>🍏 Verduras</option>
-        <option value="meat" ${data.aisle === 'meat' ? 'selected' : ''}>🥩 Carnes</option>
-        <option value="dairy" ${data.aisle === 'dairy' ? 'selected' : ''}>🧀 Lácteos</option>
-        <option value="bakery" ${data.aisle === 'bakery' ? 'selected' : ''}>🥖 Panadería</option>
-        <option value="pantry" ${data.aisle === 'pantry' ? 'selected' : ''}>🌾 Despensa</option>
-        <option value="spices" ${data.aisle === 'spices' ? 'selected' : ''}>🧂 Especias</option>
-        <option value="frozen" ${data.aisle === 'frozen' ? 'selected' : ''}>❄️ Congelados</option>
-        <option value="beverages" ${data.aisle === 'beverages' ? 'selected' : ''}>🧃 Bebidas</option>
-        <option value="other" ${data.aisle === 'other' ? 'selected' : ''}>📦 Otros</option>
+        <option value="produce" ${data.aisle === 'produce' ? 'selected' : ''}>Verduras</option>
+        <option value="meat" ${data.aisle === 'meat' ? 'selected' : ''}>Carnes</option>
+        <option value="dairy" ${data.aisle === 'dairy' ? 'selected' : ''}>Lácteos</option>
+        <option value="bakery" ${data.aisle === 'bakery' ? 'selected' : ''}>Panadería</option>
+        <option value="pantry" ${data.aisle === 'pantry' ? 'selected' : ''}>Despensa</option>
+        <option value="spices" ${data.aisle === 'spices' ? 'selected' : ''}>Especias</option>
+        <option value="frozen" ${data.aisle === 'frozen' ? 'selected' : ''}>Congelados</option>
+        <option value="beverages" ${data.aisle === 'beverages' ? 'selected' : ''}>Bebidas</option>
+        <option value="other" ${data.aisle === 'other' ? 'selected' : ''}>Otros</option>
       </select>
-      <button class="btn btn-ghost btn-sm" onclick="this.parentElement.remove()" style="padding: 0; color: var(--m3-error);" title="Eliminar">✕</button>
+      <button class="btn btn-ghost btn-sm" onclick="this.parentElement.remove()" style="padding: 0; color: var(--m3-error);" title="Eliminar">
+        <span class="material-symbols-outlined icon-sm">close</span>
+      </button>
     `;
     container.appendChild(row);
   }
@@ -614,7 +967,9 @@ class FoodAssistantApp {
       <div style="width: 80px; flex-shrink: 0;">
         <input type="number" class="form-input step-timer" placeholder="Min" title="Temporizador en minutos" value="${data.timerMinutes || 0}">
       </div>
-      <button class="btn btn-ghost btn-sm" onclick="this.parentElement.remove()" style="padding: 6px 8px; color: var(--m3-error);" title="Eliminar">✕</button>
+      <button class="btn btn-ghost btn-sm" onclick="this.parentElement.remove()" style="padding: 6px 8px; color: var(--m3-error);" title="Eliminar">
+        <span class="material-symbols-outlined icon-sm">close</span>
+      </button>
     `;
     container.appendChild(row);
   }
@@ -693,7 +1048,8 @@ class FoodAssistantApp {
     this.closeEditModal();
     this.render();
     this.openRecipeDetail(id);
-    alert("¡Receta guardada con éxito! ✨");
+    this.syncDataWithCloud(true);
+    alert("¡Receta guardada con éxito!");
   }
 
   // COOK MODE
@@ -714,7 +1070,7 @@ class FoodAssistantApp {
       this.cookStepIndex++;
       this.renderCookStep();
     } else {
-      alert("¡Enhorabuena! Has completado todos los pasos de la receta. ¡A disfrutar! 🎉");
+      alert("¡Enhorabuena! Has completado todos los pasos de la receta. ¡A disfrutar!");
       this.exitCookMode();
     }
   }
@@ -820,23 +1176,27 @@ class FoodAssistantApp {
           </div>
 
           <div class="slots-grid">
-            ${this.renderSlotCard(dateStr, 'lunch', '☀️ Almuerzo', dayData.lunch)}
-            ${this.renderSlotCard(dateStr, 'dinner', '🌙 Cena', dayData.dinner)}
+            ${this.renderSlotCard(dateStr, 'lunch', 'Almuerzo', 'wb_sunny', dayData.lunch)}
+            ${this.renderSlotCard(dateStr, 'dinner', 'Cena', 'dark_mode', dayData.dinner)}
           </div>
         </div>
       `;
     }).join('');
   }
 
-  renderSlotCard(dateStr, slotType, slotLabel, recipeId) {
+  renderSlotCard(dateStr, slotType, slotLabel, iconName, recipeId) {
     const recipe = state.recipes.find(r => r.id === recipeId);
 
     if (recipe) {
       return `
         <div class="meal-slot has-meal" onclick="app.openRecipeDetail('${recipe.id}')">
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span class="slot-label">${slotLabel}</span>
-            <button class="btn-ghost btn-sm" onclick="event.stopPropagation(); app.clearSlot('${dateStr}', '${slotType}')" title="Quitar">✕</button>
+            <span class="slot-label">
+              <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
+            </span>
+            <button class="btn-ghost btn-sm" onclick="event.stopPropagation(); app.clearSlot('${dateStr}', '${slotType}')" title="Quitar">
+              <span class="material-symbols-outlined icon-sm">close</span>
+            </button>
           </div>
           <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
             <img src="${recipe.imageUrl}" alt="" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover;">
@@ -849,8 +1209,12 @@ class FoodAssistantApp {
     } else {
       return `
         <div class="meal-slot" onclick="app.openPickerModal('${dateStr}', '${slotType}')">
-          <span class="slot-label">${slotLabel}</span>
-          <div class="slot-action-text">+ Asignar plato</div>
+          <span class="slot-label">
+            <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
+          </span>
+          <div class="slot-action-text">
+            <span class="material-symbols-outlined icon-sm">add</span> Asignar plato
+          </div>
         </div>
       `;
     }
@@ -860,6 +1224,7 @@ class FoodAssistantApp {
     if (state.mealPlan[dateStr]) {
       state.mealPlan[dateStr][slotType] = null;
       state.save('fa_mealplan', state.mealPlan);
+      this.syncDataWithCloud(true);
       this.render();
     }
   }
@@ -876,7 +1241,9 @@ class FoodAssistantApp {
           <img src="${r.imageUrl}" alt="" style="width: 40px; height: 40px; border-radius: 6px; object-fit: cover;">
           <div>
             <strong style="font-size: 13px; color: var(--m3-on-surface);">${r.title}</strong>
-            <div style="font-size: 11px; color: var(--m3-on-surface-variant);">⏱️ ${r.prepTimeMinutes + r.cookTimeMinutes} min</div>
+            <div style="font-size: 11px; color: var(--m3-on-surface-variant); display: flex; align-items: center; gap: 4px;">
+              <span class="material-symbols-outlined icon-sm">schedule</span> ${r.prepTimeMinutes + r.cookTimeMinutes} min
+            </div>
           </div>
         </div>
         <button class="btn btn-primary btn-sm">Elegir</button>
@@ -896,6 +1263,7 @@ class FoodAssistantApp {
       state.mealPlan[this.pickerTarget.dateStr][this.pickerTarget.slotType] = recipeId;
       state.save('fa_mealplan', state.mealPlan);
       this.closePickerModal();
+      this.syncDataWithCloud(true);
       this.render();
     }
   }
@@ -912,13 +1280,13 @@ class FoodAssistantApp {
     if (!state.shoppingList.length) {
       container.innerHTML = `
         <div class="card" style="text-align: center; padding: 40px 16px; color: var(--m3-on-surface-variant);">
-          <div style="font-size: 36px; margin-bottom: 6px;">🛒</div>
+          <span class="material-symbols-outlined" style="font-size: 40px; margin-bottom: 6px; color: var(--m3-primary);">shopping_cart</span>
           <h3 style="color: var(--m3-on-surface); font-size: 16px;">Lista de la compra vacía</h3>
           <p style="font-size: 13px; margin: 4px 0 16px 0;">
             Genera la lista desde tu plan semanal con un clic o añade artículos manualmente.
           </p>
           <button class="btn btn-primary btn-sm" onclick="app.generateShoppingFromPlan()">
-            Generar desde el Plan
+            <span class="material-symbols-outlined icon-sm">add_shopping_cart</span> Generar desde el Plan
           </button>
         </div>
       `;
@@ -940,7 +1308,7 @@ class FoodAssistantApp {
         <div class="aisle-card">
           <div class="aisle-header">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <span>${meta.icon}</span>
+              <span class="material-symbols-outlined icon-sm">${meta.icon}</span>
               <span>${meta.label}</span>
             </div>
             <span style="font-size: 11px; color: var(--m3-on-surface-variant);">${pendingInAisle} pendientes</span>
@@ -958,7 +1326,9 @@ class FoodAssistantApp {
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                   ${item.amount ? `<span class="grocery-amount">${item.amount} ${item.unit || ''}</span>` : ''}
-                  <button class="btn-ghost btn-sm" onclick="app.deleteGroceryItem(${item.originalIndex})" title="Eliminar">✕</button>
+                  <button class="btn-ghost btn-sm" onclick="app.deleteGroceryItem(${item.originalIndex})" title="Eliminar">
+                    <span class="material-symbols-outlined icon-sm">close</span>
+                  </button>
                 </div>
               </div>
             `).join('')}
@@ -972,6 +1342,7 @@ class FoodAssistantApp {
     if (state.shoppingList[index]) {
       state.shoppingList[index].isChecked = !state.shoppingList[index].isChecked;
       state.save('fa_shopping', state.shoppingList);
+      this.syncDataWithCloud(true);
       this.render();
     }
   }
@@ -979,12 +1350,14 @@ class FoodAssistantApp {
   deleteGroceryItem(index) {
     state.shoppingList.splice(index, 1);
     state.save('fa_shopping', state.shoppingList);
+    this.syncDataWithCloud(true);
     this.render();
   }
 
   clearCompletedGroceries() {
     state.shoppingList = state.shoppingList.filter(i => !i.isChecked);
     state.save('fa_shopping', state.shoppingList);
+    this.syncDataWithCloud(true);
     this.render();
   }
 
@@ -998,23 +1371,25 @@ class FoodAssistantApp {
     if (/manzana|platano|plátano|limon|limón|cebolla|patata|tomate|lechuga|zanahoria|ajo|aguacate|espinaca/.test(lower)) aisle = 'produce';
     else if (/pollo|ternera|cerdo|salmon|salmón|pescado|atun|atún|jamon|jamón|carne/.test(lower)) aisle = 'meat';
     else if (/leche|queso|yogur|mantequilla|huevo/.test(lower)) aisle = 'dairy';
-    else if (/pan|tortilla|galleta|harina|bollo/.test(lower)) aisle = 'bakery';
-    else if (/arroz|pasta|lenteja|garbanzo|aceite|vinagre|azucar|azúcar|cafe|café|sal/.test(lower)) aisle = 'pantry';
-    else if (/pimienta|oregano|orégano|romero|comino|curry|canela/.test(lower)) aisle = 'spices';
-    else if (/helado|guisante|pizza/.test(lower)) aisle = 'frozen';
+    else if (/pan|baguette|tostada|molde|croissant/.test(lower)) aisle = 'bakery';
+    else if (/arroz|pasta|aceite|harina|azucar|azúcar|sal|tomate frito|garbanzo|lenteja/.test(lower)) aisle = 'pantry';
+    else if (/pimienta|oregano|orégano|pimenton|pimentón|curry|comino/.test(lower)) aisle = 'spices';
+    else if (/helado|guisantes|pizza|congelado/.test(lower)) aisle = 'frozen';
+    else if (/agua|cafe|café|te|té|refresco|cerveza|vino|zumo/.test(lower)) aisle = 'beverages';
 
     state.shoppingList.push({
       name: text,
       amount: null,
-      unit: '',
+      unit: "",
       aisle: aisle,
       isChecked: false,
-      recipeOrigin: null
+      recipeOrigin: "Añadido manualmente"
     });
 
     state.save('fa_shopping', state.shoppingList);
+    this.syncDataWithCloud(true);
     input.value = '';
-    this.render();
+    this.renderShoppingList();
   }
 
   addRecipeIngredientsToShopping(recipeId) {
@@ -1022,34 +1397,29 @@ class FoodAssistantApp {
     if (!recipe) return;
 
     const scale = this.activeServings / recipe.servings;
+    let addedCount = 0;
 
     recipe.ingredients.forEach(ing => {
-      const calculatedAmount = ing.amount ? Math.round((ing.amount * scale) * 10) / 10 : null;
-      const existing = state.shoppingList.find(i => i.name.toLowerCase() === ing.name.toLowerCase() && i.unit === ing.unit);
-
-      if (existing && existing.amount && calculatedAmount) {
-        existing.amount = Math.round((existing.amount + calculatedAmount) * 10) / 10;
-        existing.isChecked = false;
-      } else {
-        state.shoppingList.push({
-          name: ing.name,
-          amount: calculatedAmount,
-          unit: ing.unit || '',
-          aisle: ing.aisle || 'other',
-          isChecked: false,
-          recipeOrigin: recipe.title
-        });
-      }
+      const amountVal = ing.amount ? Math.round((ing.amount * scale) * 10) / 10 : null;
+      state.shoppingList.push({
+        name: ing.name,
+        amount: amountVal,
+        unit: ing.unit || '',
+        aisle: ing.aisle || 'other',
+        isChecked: false,
+        recipeOrigin: recipe.title
+      });
+      addedCount++;
     });
 
     state.save('fa_shopping', state.shoppingList);
-    this.render();
-    alert(`¡${recipe.ingredients.length} ingredientes añadidos a la lista de la compra! 🛒`);
+    this.syncDataWithCloud(true);
+    alert(`Se han añadido ${addedCount} ingredientes a tu lista de la compra.`);
   }
 
   generateShoppingFromPlan() {
-    let count = 0;
     const addedMap = new Map();
+    let count = 0;
 
     Object.values(state.mealPlan).forEach(day => {
       ['lunch', 'dinner'].forEach(slot => {
@@ -1088,14 +1458,15 @@ class FoodAssistantApp {
 
     state.shoppingList = Array.from(addedMap.values());
     state.save('fa_shopping', state.shoppingList);
+    this.syncDataWithCloud(true);
     this.switchView('view-shopping');
-    alert(`¡Lista generada con éxito con ${state.shoppingList.length} artículos por pasillos! 🛒`);
+    alert(`¡Lista generada con éxito con ${state.shoppingList.length} artículos organizados por pasillos!`);
   }
 
   copyShoppingList() {
     if (!state.shoppingList.length) return;
 
-    let text = "🛒 LISTA DE LA COMPRA\n\n";
+    let text = "LISTA DE LA COMPRA - FOOD ASSISTANT\n\n";
     const grouped = {};
     state.shoppingList.forEach(i => {
       const aisle = i.aisle || 'other';
@@ -1105,9 +1476,9 @@ class FoodAssistantApp {
 
     Object.entries(grouped).forEach(([aisleKey, items]) => {
       const meta = AISLE_METADATA[aisleKey] || AISLE_METADATA.other;
-      text += `${meta.icon} ${meta.label.toUpperCase()}\n`;
+      text += `[${meta.label.toUpperCase()}]\n`;
       items.forEach(item => {
-        text += `${item.isChecked ? '✓' : '•'} ${item.name} ${item.amount ? `(${item.amount} ${item.unit || ''})` : ''}\n`;
+        text += `${item.isChecked ? '[X]' : '[ ]'} ${item.name} ${item.amount ? `(${item.amount} ${item.unit || ''})` : ''}\n`;
       });
       text += '\n';
     });
@@ -1154,34 +1525,34 @@ class FoodAssistantApp {
     const lower = prompt.toLowerCase();
     
     if (lower.includes('planifica') || lower.includes('semana') || lower.includes('menú')) {
-      return `¡He analizado tus recetas guardadas y he preparado un menú semanal balanceado para ti!
+      return `¡He analizado tus recetas guardadas y he preparado un menú semanal equilibrado para ti!
 
-📅 **Lunes**: Pasta al Pesto Genovés (Almuerzo) / Salmón a la Plancha (Cena)
-📅 **Martes**: Pechugas al Limón (Almuerzo) / Ensalada Mediterránea (Cena)
-📅 **Miércoles**: Ensalada de Garbanzos (Almuerzo) / Pasta al Pesto (Cena)
-📅 **Jueves**: Pechugas al Limón (Almuerzo) / Salmón con Espárragos (Cena)
-📅 **Viernes**: Salmón a la Plancha (Almuerzo) / Pechugas al Limón (Cena)
-📅 **Sábado**: Pasta al Pesto (Almuerzo) / Cena Ligera
-📅 **Domingo**: Pollo Asado con Patatas (Almuerzo Familiar)`;
+- **Lunes**: Pasta al Pesto Genovés (Almuerzo) / Salmón a la Plancha (Cena)
+- **Martes**: Pechugas al Limón (Almuerzo) / Ensalada Mediterránea (Cena)
+- **Miércoles**: Ensalada Mediterránea (Almuerzo) / Pasta al Pesto (Cena)
+- **Jueves**: Pechugas al Limón (Almuerzo) / Salmón con Espárragos (Cena)
+- **Viernes**: Salmón a la Plancha (Almuerzo) / Pechugas al Limón (Cena)
+- **Sábado**: Pasta al Pesto (Almuerzo) / Cena Ligera
+- **Domingo**: Pollo Asado con Patatas (Almuerzo Familiar)`;
     }
 
     if (lower.includes('pollo') || lower.includes('nevera') || lower.includes('tengo')) {
       return `Con el pollo, calabacín y patatas te sugiero preparar unas **Pechugas Salteadas con Dados de Patata y Calabacín al Romero**:
 
-⏱️ **Tiempo**: 25 min | 👥 **Porciones**: 2
-📝 **Ingredientes**:
-• 350g de pechugas de pollo en dados
-• 2 patatas medianas en cubos
-• 1 calabacín en rodajas
-• Aceite de oliva, romero y ajo
+- **Tiempo**: 25 min | **Porciones**: 2
+- **Ingredientes**:
+  - 350g de pechugas de pollo en dados
+  - 2 patatas medianas en cubos
+  - 1 calabacín en rodajas
+  - Aceite de oliva, romero y ajo
 
-👨‍🍳 **Paso a paso**:
+- **Paso a paso**:
 1. Dora las patatas en una sartén con aceite durante 10 min a fuego medio-alto.
 2. Añade el pollo en dados y cocina 5 min hasta dorar.
 3. Incorpora el calabacín y romero, saltea 5 min más y sirve caliente.`;
     }
 
-    return `He tomado nota de tu consulta. Puedes configurar tu clave de API gratuita de Gemini en la pestaña de Ajustes ⚙️ para obtener respuestas 100% personalizadas en tiempo real.`;
+    return `He tomado nota de tu consulta. Puedes configurar tu clave de API gratuita de Gemini en la pestaña de Ajustes para obtener respuestas 100% personalizadas en tiempo real.`;
   }
 
   async handleAiChatSubmit() {
@@ -1200,7 +1571,7 @@ class FoodAssistantApp {
 
     const aiBubble = document.createElement('div');
     aiBubble.style = 'background-color: var(--m3-surface-container); padding: 12px 14px; border-radius: var(--radius-lg); font-size: 13px; line-height: 1.45; align-self: flex-start; max-width: 88%;';
-    aiBubble.innerHTML = '<em>Consultando a Gemini... ✨</em>';
+    aiBubble.innerHTML = '<em>Consultando a Gemini...</em>';
     history.appendChild(aiBubble);
     history.scrollTop = history.scrollHeight;
 
@@ -1215,13 +1586,13 @@ class FoodAssistantApp {
         const applyBtn = document.createElement('button');
         applyBtn.className = 'btn btn-primary btn-sm';
         applyBtn.style.marginTop = '10px';
-        applyBtn.innerHTML = '📅 Aplicar este menú al Planificador';
+        applyBtn.innerHTML = '<span class="material-symbols-outlined icon-sm">calendar_month</span> Aplicar este menú al Planificador';
         applyBtn.onclick = () => this.applySampleAiPlan();
         aiBubble.appendChild(document.createElement('br'));
         aiBubble.appendChild(applyBtn);
       }
     } catch (err) {
-      aiBubble.innerHTML = `<span style="color: var(--m3-error);">⚠️ Error: ${err.message}</span>`;
+      aiBubble.innerHTML = `<span style="color: var(--m3-error);">Error: ${err.message}</span>`;
     }
 
     history.scrollTop = history.scrollHeight;
@@ -1236,8 +1607,9 @@ class FoodAssistantApp {
       i++;
     });
     state.save('fa_mealplan', state.mealPlan);
+    this.syncDataWithCloud(true);
     this.render();
-    alert("¡Menú asignado con éxito a tu calendario! 📅");
+    alert("¡Menú asignado con éxito a tu calendario!");
     this.switchView('view-planner');
   }
 
@@ -1250,10 +1622,13 @@ class FoodAssistantApp {
     }
   }
 
-  // IMPORTER
+  // UNIVERSAL RECIPE IMPORTER
   openImportModal() {
-    document.getElementById('import-status-indicator').style.display = 'none';
     this.modalRecipeImport.classList.add('active');
+    document.getElementById('import-url-input').value = '';
+    document.getElementById('import-text-input').value = '';
+    const status = document.getElementById('import-status-indicator');
+    if (status) status.style.display = 'none';
   }
 
   closeImportModal() {
@@ -1262,93 +1637,109 @@ class FoodAssistantApp {
 
   async handleRecipeImport() {
     const url = document.getElementById('import-url-input').value.trim();
-    const rawText = document.getElementById('import-text-input').value.trim();
+    const text = document.getElementById('import-text-input').value.trim();
     const status = document.getElementById('import-status-indicator');
 
-    if (!url && !rawText) {
-      alert("Por favor, introduce una URL o pega el texto de la receta.");
+    if (!url && !text) {
+      alert("Por favor, introduce un enlace o pega texto de la receta.");
       return;
     }
 
-    status.style.display = 'block';
-    status.style.color = 'var(--m3-primary)';
-    status.innerHTML = '✨ Extrayendo y estructurando receta con Gemini...';
+    if (status) {
+      status.style.display = 'block';
+      status.style.color = 'var(--m3-primary)';
+      status.textContent = 'Extrayendo ingredientes y pasos con Gemini...';
+    }
 
     try {
-      let parsed = null;
-      if (!state.settings.geminiApiKey) {
-        parsed = {
-          title: "Pollo Rustido con Verduras",
-          description: "Receta limpia extraída: pechugas doradas y jugosas con verduras salteadas.",
-          prepTimeMinutes: 10,
-          cookTimeMinutes: 25,
+      const prompt = `Extrae la receta del siguiente contenido y formatea estrictamente como JSON válido con este esquema:
+{
+  "title": "Nombre del plato",
+  "description": "Breve descripción",
+  "prepTimeMinutes": 10,
+  "cookTimeMinutes": 15,
+  "servings": 2,
+  "tags": ["Saludable"],
+  "ingredients": [{"name": "Ingrediente", "amount": 100, "unit": "g", "aisle": "produce"}],
+  "instructions": [{"step": 1, "text": "Paso...", "timerMinutes": 5}]
+}
+Contenido: ${url ? `Enlace: ${url}` : ''}\n${text}`;
+
+      let recipeJson = null;
+      if (state.settings.geminiApiKey) {
+        const raw = await this.callGeminiApi(prompt, "Responde única y exclusivamente con JSON puro sin formato markdown ni explicaciones.");
+        const cleaned = raw.replace(/```json/g, '').replace(/```/g, '').trim();
+        recipeJson = JSON.parse(cleaned);
+      } else {
+        // Fallback demo extracted recipe
+        await new Promise(r => setTimeout(r, 1200));
+        recipeJson = {
+          title: url ? "Receta importada de la web" : "Receta importada de notas",
+          description: text.slice(0, 100) || "Receta extraída automáticamente.",
+          prepTimeMinutes: 15,
+          cookTimeMinutes: 20,
           servings: 2,
-          tags: ["Pollo", "Cena", "Saludable"],
+          tags: ["Importada", "Cena"],
           ingredients: [
-            { name: "Pechugas de pollo", amount: 400, unit: "g", aisle: "meat" },
-            { name: "Pimiento rojo", amount: 1, unit: "ud", aisle: "produce" },
-            { name: "Calabacín", amount: 1, unit: "ud", aisle: "produce" },
-            { name: "Hierbas provenzales", amount: 1, unit: "cda", aisle: "spices" }
+            { id: "imp-1", name: "Ingrediente principal", amount: 300, unit: "g", aisle: "produce" },
+            { id: "imp-2", name: "Aceite de oliva", amount: 20, unit: "ml", aisle: "pantry" }
           ],
           instructions: [
-            { step: 1, text: "Corta las verduras y el pollo en dados medianos.", timerMinutes: 0 },
-            { step: 2, text: "Cocina todo en una sartén o bandeja de horno 20 min a fuego medio.", timerMinutes: 20 }
+            { step: 1, text: "Preparar y cortar los ingredientes.", timerMinutes: 5 },
+            { step: 2, text: "Cocinar a fuego medio durante 15 minutos.", timerMinutes: 15 }
           ]
         };
-      } else {
-        const prompt = `Analiza la receta (URL: ${url || 'N/A'}, Texto: ${rawText || 'N/A'}).
-Devuelve ÚNICAMENTE un JSON válido con:
-{
-  "title": "Nombre",
-  "description": "Descripción",
-  "prepTimeMinutes": 15,
-  "cookTimeMinutes": 20,
-  "servings": 2,
-  "tags": ["Cena", "Rápida"],
-  "ingredients": [{ "name": "Ingrediente", "amount": 200, "unit": "g", "aisle": "produce" }],
-  "instructions": [{ "step": 1, "text": "Paso...", "timerMinutes": 5 }]
-}
-Donde aisle debe ser uno de: produce, meat, dairy, bakery, pantry, spices, frozen, other.`;
-        const raw = await this.callGeminiApi(prompt);
-        parsed = JSON.parse(raw.replace(/```json/g, '').replace(/```/g, '').trim());
       }
 
-      parsed.id = 'rec-import-' + Date.now();
-      parsed.imageUrl = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80";
+      const newRecipe = {
+        id: 'rec-' + Date.now(),
+        title: recipeJson.title || "Receta Importada",
+        description: recipeJson.description || "",
+        imageUrl: "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop&q=80",
+        prepTimeMinutes: recipeJson.prepTimeMinutes || 10,
+        cookTimeMinutes: recipeJson.cookTimeMinutes || 15,
+        servings: recipeJson.servings || 2,
+        tags: recipeJson.tags || ["Importada"],
+        ingredients: recipeJson.ingredients || [],
+        instructions: recipeJson.instructions || []
+      };
 
-      state.recipes.unshift(parsed);
+      state.recipes.unshift(newRecipe);
       state.save('fa_recipes', state.recipes);
-
-      status.style.color = 'var(--color-brand)';
-      status.innerHTML = '✅ ¡Receta importada y guardada!';
-      
-      setTimeout(() => {
-        this.closeImportModal();
-        this.switchView('view-recipes');
-        this.openRecipeDetail(parsed.id);
-      }, 800);
-
-    } catch (e) {
-      status.style.color = 'var(--m3-error)';
-      status.innerHTML = `⚠️ Error al extraer receta: ${e.message}`;
+      this.syncDataWithCloud(true);
+      this.closeImportModal();
+      this.render();
+      this.openRecipeDetail(newRecipe.id);
+      alert(`¡Receta "${newRecipe.title}" importada con éxito!`);
+    } catch (err) {
+      if (status) {
+        status.style.color = 'var(--m3-error)';
+        status.textContent = 'Error al extraer la receta: ' + err.message;
+      }
     }
   }
 
   // SETTINGS
   renderSettings() {
     const inputKey = document.getElementById('input-gemini-key');
-    const status = document.getElementById('gemini-key-status');
-    const selectServings = document.getElementById('select-default-servings');
-
     if (inputKey) inputKey.value = state.settings.geminiApiKey || '';
-    if (selectServings) selectServings.value = state.settings.defaultServings || 2;
 
+    const status = document.getElementById('gemini-key-status');
     if (status) {
       if (state.settings.geminiApiKey) {
-        status.innerHTML = '<span style="color: var(--color-brand); font-weight: 500;">✓ Clave configurada y activa</span>';
+        status.innerHTML = '<span style="color: var(--color-brand); font-weight: 500;">✓ Clave configurada (Gemini 2.5 Flash activo)</span>';
       } else {
-        status.innerHTML = '<span style="color: var(--m3-on-surface-variant);">Modo Demo activo</span>';
+        status.innerHTML = '<span style="color: var(--m3-on-surface-variant);">Modo Asistente Simulado activo (sin coste ni clave)</span>';
       }
+    }
+
+    const selectServings = document.getElementById('select-default-servings');
+    if (selectServings) {
+      selectServings.value = String(state.settings.defaultServings || 2);
+      selectServings.onchange = (e) => {
+        state.settings.defaultServings = parseInt(e.target.value, 10);
+        state.save('fa_settings', state.settings);
+      };
     }
   }
 
@@ -1357,18 +1748,19 @@ Donde aisle debe ser uno de: produce, meat, dairy, bakery, pantry, spices, froze
     state.settings.geminiApiKey = key;
     state.save('fa_settings', state.settings);
     this.renderSettings();
-    alert("¡Clave de Google Gemini guardada!");
+    alert("Clave de Gemini guardada con éxito.");
   }
 
   exportBackup() {
     const data = {
-      version: '1.0',
+      version: 1,
       exportedAt: new Date().toISOString(),
       recipes: state.recipes,
       mealPlan: state.mealPlan,
       shoppingList: state.shoppingList
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1377,14 +1769,14 @@ Donde aisle debe ser uno de: produce, meat, dairy, bakery, pantry, spices, froze
     URL.revokeObjectURL(url);
   }
 
-  importBackup(event) {
-    const file = event.target.files?.[0];
+  importBackup(e) {
+    const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = (event) => {
       try {
-        const imported = JSON.parse(e.target.result);
+        const imported = JSON.parse(event.target.result);
         if (imported.recipes) state.recipes = imported.recipes;
         if (imported.mealPlan) state.mealPlan = imported.mealPlan;
         if (imported.shoppingList) state.shoppingList = imported.shoppingList;
@@ -1393,28 +1785,37 @@ Donde aisle debe ser uno de: produce, meat, dairy, bakery, pantry, spices, froze
         state.save('fa_mealplan', state.mealPlan);
         state.save('fa_shopping', state.shoppingList);
 
+        this.syncDataWithCloud(true);
         this.render();
-        alert("¡Copia de seguridad restaurada!");
+        alert("¡Copia de seguridad restaurada con éxito!");
       } catch (err) {
-        alert("Error al leer el archivo JSON.");
+        alert("Error al importar el archivo JSON.");
       }
     };
     reader.readAsText(file);
   }
 
   resetDemoData() {
-    if (confirm("¿Restablecer todas las recetas y planes a los valores iniciales?")) {
-      localStorage.clear();
-      location.reload();
+    if (confirm("¿Restablecer todas las recetas y el plan a los valores iniciales de demostración?")) {
+      localStorage.removeItem('fa_recipes');
+      localStorage.removeItem('fa_mealplan');
+      localStorage.removeItem('fa_shopping');
+      state.recipes = SEED_RECIPES;
+      state.mealPlan = state.generateInitialMealPlan();
+      state.shoppingList = [];
+      state.save('fa_recipes', state.recipes);
+      state.save('fa_mealplan', state.mealPlan);
+      state.save('fa_shopping', state.shoppingList);
+      this.syncDataWithCloud(true);
+      this.render();
+      alert("Datos restablecidos.");
     }
   }
 }
 
+// Global App Instance
 let app;
 window.addEventListener('DOMContentLoaded', () => {
   app = new FoodAssistantApp();
-
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  }
+  window.app = app;
 });

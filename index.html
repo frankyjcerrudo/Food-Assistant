@@ -1,5 +1,5 @@
-﻿<!DOCTYPE html>
-<html lang="es">
+<!DOCTYPE html>
+<html lang="es" data-theme="system">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -7,8 +7,11 @@
   <meta name="description" content="Planificador de comidas y recetas minimalista estilo Google.">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#ffffff">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
   <link rel="stylesheet" href="styles.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%231a73e8'/><text y='.9em' font-size='70' x='15'>🍳</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%231a73e8'/><path d='M30 30h40v40H30z' fill='%23ffffff'/></svg>">
+  <!-- Supabase Client for Cloud Auth and Sync -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -17,15 +20,30 @@
   <!-- Top App Bar (Google Style) -->
   <header class="app-header">
     <div class="brand-wrapper">
-      <div class="brand-logo-icon">🍳</div>
+      <div class="brand-logo-icon">
+        <span class="material-symbols-outlined">restaurant_menu</span>
+      </div>
       <h1 class="brand-name">Food Assistant</h1>
     </div>
     <div class="header-actions">
       <button class="btn btn-secondary btn-sm" id="btn-quick-import" title="Importar receta">
-        📥 Importar
+        <span class="material-symbols-outlined icon-sm">add_link</span>
+        <span>Importar</span>
       </button>
+
+      <!-- Theme quick toggle -->
+      <button class="btn btn-ghost btn-icon" id="btn-header-theme" title="Aspecto del tema">
+        <span class="material-symbols-outlined" id="header-theme-icon">brightness_auto</span>
+      </button>
+
+      <!-- Cloud User Account Pill -->
+      <button class="user-pill" id="btn-header-account" title="Cuenta en la nube y sincronización">
+        <span class="material-symbols-outlined icon-sm" id="header-account-icon">account_circle</span>
+        <span class="user-pill-text" id="header-account-text">Iniciar sesión</span>
+      </button>
+
       <button class="btn btn-ghost btn-icon" id="btn-header-settings" title="Ajustes">
-        ⚙️
+        <span class="material-symbols-outlined">settings</span>
       </button>
     </div>
   </header>
@@ -34,7 +52,7 @@
   <main class="view-panel active" id="view-today">
     <div class="today-hero">
       <div class="today-hero-title">
-        <span>📅</span>
+        <span class="material-symbols-outlined" style="color: var(--m3-primary);">today</span>
         <span id="today-date-text">Hoy</span>
       </div>
       <p class="section-subtitle">Tus comidas organizadas para el día.</p>
@@ -60,7 +78,10 @@
         <h2 class="section-title">Comidas de Hoy</h2>
         <p class="section-subtitle">Toca un plato para ver la receta o cocinar.</p>
       </div>
-      <button class="btn btn-ghost btn-sm" id="btn-goto-planner" style="color: var(--m3-primary);">Ver semana ➔</button>
+      <button class="btn btn-ghost btn-sm" id="btn-goto-planner" style="color: var(--m3-primary);">
+        <span>Ver semana</span>
+        <span class="material-symbols-outlined icon-sm">arrow_forward</span>
+      </button>
     </div>
 
     <div class="slots-grid" id="today-slots-container">
@@ -72,13 +93,13 @@
         <h2 class="section-title">Acciones Frecuentes</h2>
       </div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-        <button class="card btn" id="btn-quick-shopping" style="text-align: left; padding: 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
-          <span style="font-size: 24px;">🛒</span>
+        <button class="card btn" id="btn-quick-shopping" style="text-align: left; padding: 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px;">
+          <span class="material-symbols-outlined icon-lg" style="color: var(--m3-primary);">shopping_cart</span>
           <strong style="font-size: 14px; color: var(--m3-on-surface);">Lista de la Compra</strong>
           <span style="font-size: 12px; color: var(--m3-on-surface-variant);">Artículos por pasillos</span>
         </button>
-        <button class="card btn" id="btn-quick-ai-plan" style="text-align: left; padding: 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
-          <span style="font-size: 24px;">✨</span>
+        <button class="card btn" id="btn-quick-ai-plan" style="text-align: left; padding: 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px;">
+          <span class="material-symbols-outlined icon-lg" style="color: var(--m3-primary);">auto_awesome</span>
           <strong style="font-size: 14px; color: var(--m3-on-surface);">Asistente Gemini</strong>
           <span style="font-size: 12px; color: var(--m3-on-surface-variant);">Revisar o cambiar menú</span>
         </button>
@@ -94,13 +115,14 @@
         <p class="section-subtitle">Tu recetario personal guardado.</p>
       </div>
       <button class="btn btn-primary btn-sm" id="btn-open-create-recipe">
-        + Nueva Receta
+        <span class="material-symbols-outlined icon-sm">add</span>
+        <span>Nueva Receta</span>
       </button>
     </div>
 
     <!-- Google Pill Search Bar -->
     <div class="m3-search-bar">
-      <span>🔍</span>
+      <span class="material-symbols-outlined">search</span>
       <input type="text" class="m3-search-input" id="recipes-search-input" placeholder="Buscar recetas o ingredientes...">
     </div>
     
@@ -127,7 +149,8 @@
         <p class="section-subtitle">Organiza tus menús de Lunes a Domingo.</p>
       </div>
       <button class="btn btn-tonal btn-sm" id="btn-send-plan-to-shopping">
-        🛒 Enviar a la Compra
+        <span class="material-symbols-outlined icon-sm">add_shopping_cart</span>
+        <span>Enviar a la Compra</span>
       </button>
     </div>
 
@@ -135,7 +158,7 @@
     <div class="card" style="background-color: var(--m3-surface-container-low); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
       <div>
         <strong style="color: var(--m3-primary); font-size: 13px; display: flex; align-items: center; gap: 6px;">
-          <span>✨</span> Autoplanificar con Gemini
+          <span class="material-symbols-outlined icon-sm">auto_awesome</span> Autoplanificar con Gemini
         </strong>
         <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-top: 2px;">
           Distribuye tus recetas guardadas en los 7 días automáticamente.
@@ -159,15 +182,24 @@
         <p class="section-subtitle" id="shopping-summary-text">0 artículos pendientes</p>
       </div>
       <div style="display: flex; gap: 6px;">
-        <button class="btn btn-secondary btn-sm" id="btn-copy-shopping">📋 Copiar</button>
-        <button class="btn btn-ghost btn-sm" id="btn-clear-completed">Limpiar</button>
+        <button class="btn btn-secondary btn-sm" id="btn-copy-shopping">
+          <span class="material-symbols-outlined icon-sm">content_copy</span>
+          <span>Copiar</span>
+        </button>
+        <button class="btn btn-ghost btn-sm" id="btn-clear-completed">
+          <span class="material-symbols-outlined icon-sm">delete_sweep</span>
+          <span>Limpiar</span>
+        </button>
       </div>
     </div>
 
     <!-- Quick Add Input -->
     <div style="display: flex; gap: 8px; margin-bottom: 16px;">
       <input type="text" class="form-input" id="input-quick-grocery" placeholder="Añadir artículo (ej. Plátanos, 1L Leche, Huevos...)">
-      <button class="btn btn-primary" id="btn-add-grocery">Añadir</button>
+      <button class="btn btn-primary" id="btn-add-grocery">
+        <span class="material-symbols-outlined icon-sm">add</span>
+        <span>Añadir</span>
+      </button>
     </div>
 
     <!-- Aisles -->
@@ -180,7 +212,7 @@
   <section class="view-panel" id="view-ai">
     <div class="card" style="background-color: var(--m3-surface-container-low); margin-bottom: 16px;">
       <h2 style="font-size: 16px; font-weight: 500; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-        <span>✨</span> Asistente Gemini
+        <span class="material-symbols-outlined" style="color: var(--m3-primary);">auto_awesome</span> Asistente Gemini
       </h2>
       <p style="font-size: 13px; color: var(--m3-on-surface-variant); line-height: 1.4;">
         Pídele a Gemini que revise tu plan de comidas, te proponga cenas según lo que tengas en la despensa o te cree una receta a medida.
@@ -189,13 +221,13 @@
 
     <div class="chips-scroll-container">
       <button class="m3-filter-chip" data-prompt="Planifica mi menú semanal equilibrado de lunes a domingo con mis recetas guardadas.">
-        📅 Planificar mi semana
+        <span class="material-symbols-outlined icon-sm">calendar_month</span> Planificar mi semana
       </button>
       <button class="m3-filter-chip" data-prompt="Tengo pollo, calabacín y patatas en la nevera. ¿Qué cena rica y rápida puedo preparar?">
-        🥦 Cocinar con lo que tengo
+        <span class="material-symbols-outlined icon-sm">kitchen</span> Cocinar con lo que tengo
       </button>
       <button class="m3-filter-chip" data-prompt="Crea una receta de cena saludable, alta en proteínas y lista en 15 minutos.">
-        ⚡ Cena en 15 min
+        <span class="material-symbols-outlined icon-sm">timer</span> Cena en 15 min
       </button>
     </div>
 
@@ -207,7 +239,10 @@
 
     <div style="display: flex; gap: 8px;">
       <input type="text" class="form-input" id="ai-chat-input" placeholder="Escribe a Gemini...">
-      <button class="btn btn-primary" id="btn-send-ai-chat">Enviar</button>
+      <button class="btn btn-primary" id="btn-send-ai-chat">
+        <span class="material-symbols-outlined icon-sm">send</span>
+        <span>Enviar</span>
+      </button>
     </div>
   </section>
 
@@ -216,12 +251,72 @@
     <div class="section-header">
       <div>
         <h2 class="section-title">Ajustes</h2>
-        <p class="section-subtitle">Configuración general y datos locales.</p>
+        <p class="section-subtitle">Configuración general, aspecto y almacenamiento en la nube.</p>
       </div>
     </div>
 
+    <!-- ITEM 3: 3-WAY THEME SELECTOR -->
     <div class="card">
-      <h3 style="font-size: 14px; font-weight: 500; margin-bottom: 6px;">Clave de Google Gemini API (Opcional)</h3>
+      <h3 style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+        <span class="material-symbols-outlined" style="color: var(--m3-primary);">palette</span> Aspecto
+      </h3>
+      <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;">
+        Elige cómo prefieres ver Food Assistant en tu dispositivo.
+      </p>
+      <div class="m3-segmented-button" id="theme-segmented-group">
+        <button class="segmented-btn" data-theme-val="system">
+          <span class="material-symbols-outlined icon-sm">brightness_auto</span>
+          <span>Sistema</span>
+        </button>
+        <button class="segmented-btn" data-theme-val="light">
+          <span class="material-symbols-outlined icon-sm">light_mode</span>
+          <span>Claro</span>
+        </button>
+        <button class="segmented-btn" data-theme-val="dark">
+          <span class="material-symbols-outlined icon-sm">dark_mode</span>
+          <span>Oscuro</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ITEM 2: CLOUD ACCOUNT & STORAGE -->
+    <div class="card">
+      <h3 style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+        <span class="material-symbols-outlined" style="color: var(--m3-primary);">cloud_sync</span> Cuenta y Sincronización en la Nube
+      </h3>
+      <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;" id="cloud-status-description">
+        Inicia sesión o crea una cuenta para almacenar tus recetas, planes semanales y listas de la compra en la nube.
+      </p>
+      
+      <div id="cloud-account-box" style="background: var(--m3-surface-container); border-radius: var(--radius-md); padding: 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span class="material-symbols-outlined" style="font-size: 28px; color: var(--m3-primary);" id="settings-user-icon">account_circle</span>
+          <div>
+            <div style="font-size: 13px; font-weight: 700;" id="settings-user-name">Modo Local (Invitado)</div>
+            <div style="font-size: 11px; color: var(--m3-on-surface-variant);" id="settings-user-status">Datos almacenados solo en este dispositivo</div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btn-settings-auth-action">Iniciar Sesión</button>
+      </div>
+
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="btn btn-secondary btn-sm" id="btn-manual-sync">
+          <span class="material-symbols-outlined icon-sm">sync</span>
+          <span>Sincronizar ahora</span>
+        </button>
+        <button class="btn btn-ghost btn-sm" id="btn-open-supabase-config" style="color: var(--m3-primary);">
+          <span class="material-symbols-outlined icon-sm">database</span>
+          <span>Configurar Supabase</span>
+        </button>
+      </div>
+      <div id="sync-status-indicator" style="margin-top: 8px; font-size: 11px; color: var(--m3-on-surface-variant);"></div>
+    </div>
+
+    <!-- AI KEY -->
+    <div class="card">
+      <h3 style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+        <span class="material-symbols-outlined" style="color: var(--m3-primary);">key</span> Clave de Google Gemini API (Opcional)
+      </h3>
       <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 10px;">
         Obtén una clave gratis en <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--m3-primary);">Google AI Studio</a>.
       </p>
@@ -232,8 +327,11 @@
       <div id="gemini-key-status" style="font-size: 11px;"></div>
     </div>
 
+    <!-- SERVINGS -->
     <div class="card">
-      <h3 style="font-size: 14px; font-weight: 500; margin-bottom: 10px;">Porciones por defecto</h3>
+      <h3 style="font-size: 14px; font-weight: 500; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+        <span class="material-symbols-outlined" style="color: var(--m3-primary);">group</span> Porciones por defecto
+      </h3>
       <select class="form-select" id="select-default-servings">
         <option value="1">1 persona</option>
         <option value="2" selected>2 personas</option>
@@ -243,18 +341,25 @@
       </select>
     </div>
 
+    <!-- BACKUP -->
     <div class="card">
-      <h3 style="font-size: 14px; font-weight: 500; margin-bottom: 6px;">Copia de Seguridad</h3>
+      <h3 style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+        <span class="material-symbols-outlined" style="color: var(--m3-primary);">save</span> Copia de Seguridad Local
+      </h3>
       <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;">
-        Tus datos se guardan en tu dispositivo. Exporta o restaura en JSON.
+        Exporta o restaura tus recetas y planes en un archivo JSON local.
       </p>
       <div style="display: flex; gap: 8px;">
-        <button class="btn btn-secondary btn-sm" id="btn-export-backup">⬇️ Exportar</button>
+        <button class="btn btn-secondary btn-sm" id="btn-export-backup">
+          <span class="material-symbols-outlined icon-sm">download</span> Exportar
+        </button>
         <label class="btn btn-secondary btn-sm" style="cursor: pointer; margin: 0;">
-          ⬆️ Importar
+          <span class="material-symbols-outlined icon-sm">upload</span> Importar
           <input type="file" id="input-import-backup" accept=".json" style="display: none;">
         </label>
-        <button class="btn btn-ghost btn-sm" id="btn-reset-demo" style="color: var(--m3-error); margin-left: auto;">Restablecer</button>
+        <button class="btn btn-ghost btn-sm" id="btn-reset-demo" style="color: var(--m3-error); margin-left: auto;">
+          <span class="material-symbols-outlined icon-sm">restart_alt</span> Restablecer
+        </button>
       </div>
     </div>
   </section>
@@ -262,27 +367,139 @@
   <!-- M3 Bottom Navigation Bar with Pill Indicators -->
   <nav class="bottom-nav">
     <button class="nav-item active" data-view="view-today">
-      <div class="nav-icon-wrapper">☀️</div>
+      <div class="nav-icon-wrapper">
+        <span class="material-symbols-outlined">today</span>
+      </div>
       <span>Hoy</span>
     </button>
     <button class="nav-item" data-view="view-recipes">
-      <div class="nav-icon-wrapper">📖</div>
+      <div class="nav-icon-wrapper">
+        <span class="material-symbols-outlined">menu_book</span>
+      </div>
       <span>Recetas</span>
     </button>
     <button class="nav-item" data-view="view-planner">
-      <div class="nav-icon-wrapper">📅</div>
+      <div class="nav-icon-wrapper">
+        <span class="material-symbols-outlined">calendar_month</span>
+      </div>
       <span>Plan</span>
     </button>
     <button class="nav-item" data-view="view-shopping">
-      <div class="nav-icon-wrapper">🛒</div>
+      <div class="nav-icon-wrapper">
+        <span class="material-symbols-outlined">shopping_cart</span>
+      </div>
       <span>Compra</span>
     </button>
     <button class="nav-item" data-view="view-ai">
-      <div class="nav-icon-wrapper">✨</div>
+      <div class="nav-icon-wrapper">
+        <span class="material-symbols-outlined">auto_awesome</span>
+      </div>
       <span>Gemini</span>
     </button>
   </nav>
 
+</div>
+
+<!-- MODAL: CLOUD AUTH (LOGIN & REGISTER) -->
+<div class="modal-overlay" id="modal-auth">
+  <div class="modal-content" style="padding: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="material-symbols-outlined" style="color: var(--m3-primary); font-size: 24px;">cloud</span>
+        <h3 style="font-size: 18px; font-weight: 500;" id="auth-modal-title">Cuenta en la Nube</h3>
+      </div>
+      <button class="btn btn-ghost btn-icon" id="btn-close-auth-modal">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+
+    <!-- Auth Tabs -->
+    <div class="auth-tabs" id="auth-tab-buttons">
+      <button class="auth-tab active" data-tab="login">Iniciar Sesión</button>
+      <button class="auth-tab" data-tab="signup">Crear Cuenta</button>
+    </div>
+
+    <!-- Logged Out View -->
+    <div id="auth-forms-container">
+      <form id="auth-form" onsubmit="return false;">
+        <div class="form-group" id="group-auth-name" style="display: none;">
+          <label class="form-label">Tu Nombre</label>
+          <input type="text" class="form-input" id="auth-name" placeholder="Ej. Franky">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Correo Electrónico</label>
+          <input type="email" class="form-input" id="auth-email" placeholder="nombre@correo.com" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Contraseña</label>
+          <input type="password" class="form-input" id="auth-password" placeholder="Mínimo 6 caracteres" required>
+        </div>
+
+        <div id="auth-error-msg" style="color: var(--m3-error); font-size: 12px; margin-bottom: 12px; display: none;"></div>
+
+        <button class="btn btn-primary" id="btn-submit-auth" style="width: 100%; padding: 12px;">
+          Iniciar Sesión
+        </button>
+      </form>
+
+      <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--m3-outline-variant); font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
+        <p><strong>Almacenamiento en la nube:</strong> Tus recetas, ingredientes y plan de comidas se sincronizan automáticamente para que puedas acceder desde cualquier dispositivo.</p>
+      </div>
+    </div>
+
+    <!-- Logged In View -->
+    <div id="auth-logged-in-container" style="display: none;">
+      <div style="text-align: center; padding: 16px 0;">
+        <span class="material-symbols-outlined" style="font-size: 48px; color: var(--color-brand);">check_circle</span>
+        <h4 style="font-size: 16px; font-weight: 500; margin-top: 8px;" id="auth-profile-name">Usuario</h4>
+        <p style="font-size: 13px; color: var(--m3-on-surface-variant);" id="auth-profile-email">usuario@correo.com</p>
+        <div style="display: inline-flex; align-items: center; gap: 4px; background: var(--color-brand-container); color: var(--color-brand-on-container); font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: var(--radius-full); margin-top: 10px;">
+          <span class="material-symbols-outlined icon-sm">cloud_done</span> Conectado a la Nube
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 14px;">
+        <button class="btn btn-primary" id="btn-auth-sync-now">
+          <span class="material-symbols-outlined icon-sm">sync</span> Sincronizar Datos Ahora
+        </button>
+        <button class="btn btn-secondary" id="btn-auth-logout" style="color: var(--m3-error);">
+          <span class="material-symbols-outlined icon-sm">logout</span> Cerrar Sesión
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: CUSTOM SUPABASE CONFIG -->
+<div class="modal-overlay" id="modal-supabase-config">
+  <div class="modal-content" style="padding: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+      <h3 style="font-size: 16px; font-weight: 500;">Configurar Proyecto Supabase</h3>
+      <button class="btn btn-ghost btn-icon" id="btn-close-supabase-modal">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 14px;">
+      Puedes conectar Food Assistant a tu propio proyecto de Supabase para tener control total de tus datos en PostgreSQL.
+    </p>
+
+    <div class="form-group">
+      <label class="form-label">Supabase Project URL</label>
+      <input type="text" class="form-input" id="cfg-supabase-url" placeholder="https://tu-proyecto.supabase.co">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Supabase Anon Key</label>
+      <input type="password" class="form-input" id="cfg-supabase-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6...">
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+      <button class="btn btn-secondary" id="btn-cancel-supabase-config">Cancelar</button>
+      <button class="btn btn-primary" id="btn-save-supabase-config">Guardar Configuración</button>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL: RECIPE DETAIL -->
@@ -290,10 +507,16 @@
   <div class="modal-content">
     <div class="modal-header-bar">
       <div style="display: flex; align-items: center; gap: 8px;">
-        <button class="btn btn-secondary btn-sm" id="btn-detail-edit-recipe">✏️ Editar</button>
-        <button class="btn btn-ghost btn-sm" id="btn-detail-delete-recipe" style="color: var(--m3-error);">🗑️ Eliminar</button>
+        <button class="btn btn-secondary btn-sm" id="btn-detail-edit-recipe">
+          <span class="material-symbols-outlined icon-sm">edit</span> Editar
+        </button>
+        <button class="btn btn-ghost btn-sm" id="btn-detail-delete-recipe" style="color: var(--m3-error);">
+          <span class="material-symbols-outlined icon-sm">delete</span> Eliminar
+        </button>
       </div>
-      <button class="btn btn-ghost btn-icon" id="btn-close-recipe-modal" style="font-size: 16px;">✕</button>
+      <button class="btn btn-ghost btn-icon" id="btn-close-recipe-modal">
+        <span class="material-symbols-outlined">close</span>
+      </button>
     </div>
     <div id="recipe-modal-body"></div>
   </div>
@@ -301,54 +524,59 @@
 
 <!-- MODAL: RECIPE EDITOR (CREATE & EDIT) -->
 <div class="modal-overlay" id="modal-recipe-edit">
-  <div class="modal-content" style="max-width: 680px;">
-    <div class="modal-header-bar">
-      <h3 style="font-size: 16px; font-weight: 500;" id="recipe-edit-modal-title">Editar Receta</h3>
-      <button class="btn btn-ghost btn-icon" id="btn-close-recipe-edit">✕</button>
+  <div class="modal-content" style="padding: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+      <h3 style="font-size: 17px; font-weight: 500;" id="recipe-edit-modal-title">Editar Receta</h3>
+      <button class="btn btn-ghost btn-icon" id="btn-close-recipe-edit">
+        <span class="material-symbols-outlined">close</span>
+      </button>
     </div>
-    <div style="padding: 18px;">
+
+    <div style="max-height: 72vh; overflow-y: auto; padding-right: 4px;">
       <input type="hidden" id="edit-recipe-id">
       
       <div class="form-group">
-        <label class="form-label">Título de la receta *</label>
-        <input type="text" class="form-input" id="edit-recipe-title" placeholder="Ej. Lasaña de verduras al horno">
+        <label class="form-label">Título de la Receta</label>
+        <input type="text" class="form-input" id="edit-recipe-title" placeholder="Ej. Salmón al Horno con Verduras" required>
       </div>
 
       <div class="form-group">
-        <label class="form-label">Descripción corta</label>
-        <textarea class="form-textarea" id="edit-recipe-desc" rows="2" placeholder="Breve descripción o notas sobre el plato"></textarea>
+        <label class="form-label">Descripción</label>
+        <textarea class="form-textarea" id="edit-recipe-desc" rows="2" placeholder="Breve descripción del plato..."></textarea>
       </div>
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;" class="form-group">
-        <div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+        <div class="form-group">
           <label class="form-label">Prep (min)</label>
-          <input type="number" class="form-input" id="edit-recipe-prep" value="15" min="0">
+          <input type="number" class="form-input" id="edit-recipe-prep" value="10">
         </div>
-        <div>
+        <div class="form-group">
           <label class="form-label">Cocción (min)</label>
-          <input type="number" class="form-input" id="edit-recipe-cook" value="20" min="0">
+          <input type="number" class="form-input" id="edit-recipe-cook" value="15">
         </div>
-        <div>
+        <div class="form-group">
           <label class="form-label">Porciones</label>
-          <input type="number" class="form-input" id="edit-recipe-servings" value="2" min="1">
+          <input type="number" class="form-input" id="edit-recipe-servings" value="2">
         </div>
       </div>
 
       <div class="form-group">
-        <label class="form-label">URL de la imagen</label>
+        <label class="form-label">URL de Imagen</label>
         <input type="url" class="form-input" id="edit-recipe-image" placeholder="https://images.unsplash.com/...">
       </div>
 
       <div class="form-group">
         <label class="form-label">Etiquetas (separadas por comas)</label>
-        <input type="text" class="form-input" id="edit-recipe-tags" placeholder="Cena, Rápida, Pasta, Saludable">
+        <input type="text" class="form-input" id="edit-recipe-tags" placeholder="Cena, Rápida, Saludable">
       </div>
 
       <!-- Ingredients Editor -->
       <div class="form-group" style="margin-top: 18px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
           <label class="form-label" style="margin: 0; font-weight: 700;">Ingredientes</label>
-          <button class="btn btn-secondary btn-sm" id="btn-add-ingredient-row">+ Añadir Ingrediente</button>
+          <button class="btn btn-secondary btn-sm" id="btn-add-ingredient-row">
+            <span class="material-symbols-outlined icon-sm">add</span> Añadir Ingrediente
+          </button>
         </div>
         <div id="edit-ingredients-container" style="display: flex; flex-direction: column; gap: 6px;"></div>
       </div>
@@ -357,7 +585,9 @@
       <div class="form-group" style="margin-top: 18px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
           <label class="form-label" style="margin: 0; font-weight: 700;">Pasos de Preparación</label>
-          <button class="btn btn-secondary btn-sm" id="btn-add-step-row">+ Añadir Paso</button>
+          <button class="btn btn-secondary btn-sm" id="btn-add-step-row">
+            <span class="material-symbols-outlined icon-sm">add</span> Añadir Paso
+          </button>
         </div>
         <div id="edit-steps-container" style="display: flex; flex-direction: column; gap: 8px;"></div>
       </div>
@@ -374,8 +604,12 @@
 <div class="modal-overlay" id="modal-recipe-import">
   <div class="modal-content" style="padding: 20px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-      <h3 style="font-size: 16px; font-weight: 500;">📥 Importar Receta</h3>
-      <button class="btn btn-ghost btn-icon" id="btn-close-import-modal">✕</button>
+      <h3 style="font-size: 16px; font-weight: 500; display: flex; align-items: center; gap: 6px;">
+        <span class="material-symbols-outlined" style="color: var(--m3-primary);">add_link</span> Importar Receta
+      </h3>
+      <button class="btn btn-ghost btn-icon" id="btn-close-import-modal">
+        <span class="material-symbols-outlined">close</span>
+      </button>
     </div>
     <p style="font-size: 13px; color: var(--m3-on-surface-variant); margin-bottom: 14px;">
       Pega un enlace de cualquier web de recetas o el texto de una publicación de Instagram / TikTok / blog.
@@ -393,7 +627,9 @@
 
     <div style="display: flex; justify-content: flex-end; gap: 8px;">
       <button class="btn btn-secondary" id="btn-cancel-import">Cancelar</button>
-      <button class="btn btn-primary" id="btn-execute-import">Extraer con Gemini</button>
+      <button class="btn btn-primary" id="btn-execute-import">
+        <span class="material-symbols-outlined icon-sm">auto_awesome</span> Extraer con Gemini
+      </button>
     </div>
     
     <div id="import-status-indicator" style="margin-top: 10px; font-size: 12px; display: none;"></div>
@@ -405,7 +641,9 @@
   <div class="modal-content" style="padding: 16px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
       <h3 style="font-size: 15px; font-weight: 500;" id="picker-modal-title">Elegir Plato</h3>
-      <button class="btn btn-ghost btn-icon" id="btn-close-picker-modal">✕</button>
+      <button class="btn btn-ghost btn-icon" id="btn-close-picker-modal">
+        <span class="material-symbols-outlined">close</span>
+      </button>
     </div>
     <div style="max-height: 56vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;" id="picker-recipes-list"></div>
   </div>
@@ -418,7 +656,9 @@
       <span style="font-size: 11px; font-weight: 700; color: var(--m3-primary); text-transform: uppercase;">Modo Cocina</span>
       <h3 style="font-size: 17px; font-weight: 500;" id="cook-recipe-title">Receta</h3>
     </div>
-    <button class="btn btn-secondary btn-sm" id="btn-exit-cook-mode">Salir (✕)</button>
+    <button class="btn btn-secondary btn-sm" id="btn-exit-cook-mode">
+      <span class="material-symbols-outlined icon-sm">close</span> Salir
+    </button>
   </div>
 
   <div style="margin: auto 0; text-align: center;">
@@ -436,8 +676,12 @@
   </div>
 
   <div style="display: flex; justify-content: space-between; gap: 10px; padding-top: 14px;">
-    <button class="btn btn-secondary" id="btn-cook-prev-step" style="flex: 1;">⬅️ Anterior</button>
-    <button class="btn btn-primary" id="btn-cook-next-step" style="flex: 1;">Siguiente ➡️</button>
+    <button class="btn btn-secondary" id="btn-cook-prev-step" style="flex: 1;">
+      <span class="material-symbols-outlined icon-sm">arrow_back</span> Anterior
+    </button>
+    <button class="btn btn-primary" id="btn-cook-next-step" style="flex: 1;">
+      Siguiente <span class="material-symbols-outlined icon-sm">arrow_forward</span>
+    </button>
   </div>
 </div>
 
