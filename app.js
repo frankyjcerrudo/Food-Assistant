@@ -1400,10 +1400,40 @@ class FoodAssistantApp {
   }
 
   clearCompletedGroceries() {
-    state.shoppingList = state.shoppingList.filter(i => !i.isChecked);
-    state.save('fa_shopping', state.shoppingList);
-    this.syncDataWithCloud(true);
-    this.render();
+    if (!state.shoppingList || state.shoppingList.length === 0) {
+      alert("La lista de la compra ya está vacía.");
+      return;
+    }
+
+    const completed = state.shoppingList.filter(i => i.isChecked);
+    
+    if (completed.length > 0) {
+      const count = completed.length;
+      const total = state.shoppingList.length;
+      if (count === total) {
+        if (confirm(`¿Eliminar los ${count} artículos comprados y vaciar la lista?`)) {
+          state.shoppingList = [];
+          state.save('fa_shopping', state.shoppingList);
+          this.syncDataWithCloud(true);
+          this.render();
+        }
+      } else {
+        if (confirm(`¿Eliminar los ${count} artículos marcados como comprados?`)) {
+          state.shoppingList = state.shoppingList.filter(i => !i.isChecked);
+          state.save('fa_shopping', state.shoppingList);
+          this.syncDataWithCloud(true);
+          this.render();
+        }
+      }
+    } else {
+      // Ningún artículo está marcado con el checkbox
+      if (confirm("No hay artículos marcados como comprados.\n\n¿Deseas vaciar toda la lista de la compra?")) {
+        state.shoppingList = [];
+        state.save('fa_shopping', state.shoppingList);
+        this.syncDataWithCloud(true);
+        this.render();
+      }
+    }
   }
 
   handleManualAddGrocery() {
@@ -1509,7 +1539,10 @@ class FoodAssistantApp {
   }
 
   copyShoppingList() {
-    if (!state.shoppingList.length) return;
+    if (!state.shoppingList || !state.shoppingList.length) {
+      alert("No hay artículos en la lista de la compra para copiar.");
+      return;
+    }
 
     let text = "LISTA DE LA COMPRA - FOOD ASSISTANT\n\n";
     const grouped = {};
