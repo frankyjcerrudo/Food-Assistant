@@ -324,9 +324,13 @@ class FoodAssistantApp {
 
     if (user && user.email) {
       // Authenticated state
-      if (pillBtn) pillBtn.classList.add('logged-in');
+      if (pillBtn) {
+        pillBtn.classList.add('logged-in');
+        pillBtn.title = user.name ? `${user.name} (${user.email})` : user.email;
+      }
       if (pillIcon) pillIcon.textContent = 'cloud_done';
-      if (pillText) pillText.textContent = user.name || user.email.split('@')[0];
+      const firstName = user.name ? user.name.trim().split(' ')[0] : user.email.split('@')[0];
+      if (pillText) pillText.textContent = firstName;
 
       if (settingsIcon) settingsIcon.textContent = 'cloud_done';
       if (settingsName) settingsName.textContent = user.name ? `${user.name} (${user.email})` : user.email;

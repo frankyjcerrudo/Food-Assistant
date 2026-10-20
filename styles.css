@@ -264,7 +264,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 6px 12px;
   border-radius: var(--radius-full);
   background: var(--m3-surface-container);
   color: var(--m3-on-surface);
@@ -273,7 +273,8 @@ body {
   border: 1px solid transparent;
   cursor: pointer;
   transition: all 0.2s ease;
-  max-width: 170px;
+  max-width: 140px;
+  flex-shrink: 0;
 }
 
 .user-pill:hover {
@@ -289,6 +290,43 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 85px;
+}
+
+/* Responsive Top Bar for Mobile */
+@media (max-width: 540px) {
+  .app-header {
+    padding: 8px 12px;
+  }
+  .brand-name {
+    font-size: 15px;
+  }
+  .brand-logo-icon {
+    width: 28px;
+    height: 28px;
+  }
+  .header-actions {
+    gap: 4px;
+  }
+  .btn-import-label {
+    display: none;
+  }
+  #btn-quick-import {
+    padding: 6px;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-full);
+  }
+  .user-pill {
+    padding: 6px;
+    width: 34px;
+    height: 34px;
+    justify-content: center;
+    border-radius: var(--radius-full);
+  }
+  .user-pill-text {
+    display: none;
+  }
 }
 
 /* Typography & Layout Elements */
