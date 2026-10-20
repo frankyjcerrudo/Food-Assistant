@@ -1,0 +1,24 @@
+feature,area,priority,original,clone,notes
+Importar receta desde URL web (schema JSON-LD),importer,must,yes,no,Extracción limpia de ingredientes pasos e imagen
+Importar receta desde redes sociales con Gemini fallback,importer,must,yes,no,Parsing inteligente con IA si no hay microdatos
+Biblioteca de recetas guardadas con búsqueda y filtros por etiquetas,recipes,must,yes,no,Visualización en grid/lista con fotos y tiempos
+Detalle de receta con escalador de porciones,recipes,must,yes,no,Recálculo automático de cantidades de ingredientes
+Modo cocina paso a paso con temporizadores,recipes,should,yes,no,Vista optimizada para cocinar sin tocar la pantalla
+Planificador semanal de comidas (Lunes a Domingo),planner,must,yes,no,Desayuno almuerzo cena y snack por día
+Asignación manual de recetas al calendario,planner,must,yes,no,Arrastrar o seleccionar de recetas guardadas
+Planificación automática semanal con Gemini AI,ai_gemini,must,no,no,Gemini analiza recetas guardadas y monta el menú de la semana
+Generación de recetas nuevas con Gemini según despensa o antojo,ai_gemini,must,no,no,Crea recetas a medida y permite guardarlas con 1 clic
+Chat interactivo con Chef Gemini Copilot,ai_gemini,should,no,no,Sugerencias nutricionales sustitución de ingredientes y dudas
+Generar lista de la compra desde el planificador semanal,shopping_list,must,yes,no,Añadir todos o días seleccionados
+Clasificación automática de ingredientes por pasillos,shopping_list,must,yes,no,Frutas/Verduras Carnicería Lácteos Despensa Especias Congelados
+Marcado interactivo de artículos comprados,shopping_list,must,yes,no,Tachado en tiempo real en el supermercado
+Añadir artículos manuales a la lista de la compra,shopping_list,must,yes,no,Para cosas habituales como papel higiénico o leche
+Unificación de cantidades de ingredientes repetidos,shopping_list,should,yes,no,Suma gramos o unidades del mismo producto
+Almacenamiento local persistente offline (PWA),architecture,must,yes,no,Funciona en el supermercado o cocina sin cobertura
+Exportar e importar copia de seguridad en JSON,settings,should,no,no,Privacidad total sin depender de servidores externos
+Soporte para clave propia de Google Gemini API,settings,must,no,no,Uso directo con Gemini 2.5 Flash / Flash Lite rápido y económico
+Temporizador flotante de cocina en pasos,recipes,could,yes,no,Avisador sonoro al terminar cocciones
+Compartir lista de la compra por WhatsApp o texto,shopping_list,could,yes,no,Exportar lista rápida en texto plano
+Feed social comunitario de usuarios,social,could,yes,skip,Fuera de alcance: añade ruido y distrae de la utilidad
+Comentarios y likes en recetas públicas,social,could,yes,skip,Fuera de alcance: innecesario para uso personal y familiar
+Sincronización con hornos y neveras Samsung SmartThings,iot,could,yes,skip,Fuera de alcance: atadura a hardware propietario
