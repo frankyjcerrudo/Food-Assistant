@@ -6,13 +6,13 @@
 
 ---
 
-## 🚦 Leyenda de Prioridades y Estados
+## 🧭 Leyenda de Prioridades y Estados
 * **Prioridad**: 🔴 `Alta / Must Have` | 🟡 `Media / Should Have` | 🟢 `Baja / Could Have`
 * **Estado**: `Backlog` | `Ready for Dev` | `In Progress` | `QA / Review` | `Done`
 
 ---
 
-## 🎯 Épica 1: Gestión Nutricional y Macro-Nutrientes
+## 🥗 Épica 1: Gestión Nutricional y Macro-Nutrientes
 
 | ID | Historia de Usuario / Feature | Prioridad | Estado | Criterios de Aceptación (DoD) |
 | :--- | :--- | :---: | :---: | :--- |
@@ -22,33 +22,50 @@
 
 ---
 
-## 🎯 Épica 2: Planificador Inteligente y Automatización
+## 📅 Épica 2: Planificador Semanal y Organización
 
 | ID | Historia de Usuario / Feature | Prioridad | Estado | Criterios de Aceptación (DoD) |
 | :--- | :--- | :---: | :---: | :--- |
 | **US-04** | Duplicar o copiar plan de semana anterior | 🔴 Alta | `Backlog` | • Botón "Copiar semana anterior" en el planificador.<br>• Confirmación de sobreescritura con modal seguro.<br>• Respeto de los momentos de comida personalizados. |
 | **US-05** | Planificación mensual / Calendario expandido | 🟡 Media | `Backlog` | • Vista mensual o navegación entre semanas (+1 / -1 semana).<br>• Persistencia por claves de fecha ISO `YYYY-MM-DD`. |
 | **US-06** | Generador de Batch Cooking | 🟢 Baja | `Backlog` | • Gemini sugiere cómo cocinar 3 platos simultáneamente el domingo para toda la semana ahorrando tiempo y energía. |
+| **US-14** | Comidas flexibles en planificador (Desayunos, meriendas, snacks) | 🔴 Alta | `Backlog` | • Soporte configurable para personas que comen >3 veces al día.<br>• Habilitar/deshabilitar Desayuno, Media Mañana, Almuerzo, Merienda, Cena, Post-entreno.<br>• Interfaz responsiva que acomode las nuevas filas sin scroll horizontal roto. |
+| **US-19** | Mover recetas por la semana y cambiar momentos | 🟡 Media | `Backlog` | • Drag & drop táctil o menú contextual "Mover a..." en cada tarjeta.<br>• Permitir mover de un día a otro o de almuerzo a cena sin tener que borrar y buscar de nuevo. |
+| **US-22** | Semana estandarizada de Lunes a Domingo | 🔴 Alta | `Backlog` | • El calendario semanal empieza siempre en Lunes (ISO 8601).<br>• Fin de semana (Sábado y Domingo) claramente agrupado al final. |
 
 ---
 
-## 🎯 Épica 3: Lista de la Compra y Despensa Inteligente
+## 🛒 Épica 3: Lista de la Compra y Despensa Inteligente
 
 | ID | Historia de Usuario / Feature | Prioridad | Estado | Criterios de Aceptación (DoD) |
 | :--- | :--- | :---: | :---: | :--- |
-| **US-07** | Control de Despensa / Stock doméstico | 🔴 Alta | `Backlog` | • Pestaña o sección de "Mi Despensa".<br>• Al enviar ingredientes a la compra, desmarcar automáticamente los que ya tengamos en casa.<br>• Alerta de ingredientes próximos a caducar. |
-| **US-08** | Compartir lista en tiempo real por enlace o WhatsApp | 🟡 Media | `Backlog` | • Formateo enriquecido para WhatsApp o mensajería.<br>• Sincronización colaborativa compartida en Supabase con familiares/pareja. |
+| **US-07** | Control de Despensa / Stock doméstico | 🟡 Media | `Backlog` | • Pestaña o sección de "Mi Despensa".<br>• Al enviar ingredientes a la compra, desmarcar automáticamente los que ya tengamos en casa.<br>• Alerta de ingredientes próximos a caducar. |
+| **US-08** | Compartir lista en tiempo real por enlace o WhatsApp | 🔴 Alta | `Backlog` | • Formateo enriquecido para WhatsApp o mensajería agrupado por categorías.<br>• Sincronización colaborativa compartida en Supabase con familiares/pareja. |
 | **US-09** | Estimación aproximada de coste de la compra | 🟢 Baja | `Backlog` | • Campo opcional de precio aproximado por ingrediente.<br>• Totalizador estimado en la cabecera de la lista. |
+| **US-13** | Previsualización y edición de ingredientes antes de añadir a la compra | 🔴 Alta | `Backlog` | • Al pulsar "Añadir a lista de la compra" (desde el planificador o receta), abrir un modal previo.<br>• Desglose visual separado por receta.<br>• Checkbox por ingrediente para desmarcar lo que no se quiera añadir.<br>• Ajuste de porciones y cantidades antes de confirmar el volcado final. |
+| **US-20** | Autocompletado inteligente de ingredientes y categoría automática | 🟡 Media | `Backlog` | • Sugerencias predictivas al tipear el nombre del ingrediente.<br>• Clasificación automática en pasillo/categoría (Verdulería, Carnicería, Lácteos, Despensa).<br>• Icono visual distintivo por ingrediente o grupo. |
 
 ---
 
-## 🎯 Épica 4: Experiencia de Usuario, PWA y Offline
+## 🍳 Épica 4: Catálogo de Recetas, UX y Experiencia de Usuario
 
 | ID | Historia de Usuario / Feature | Prioridad | Estado | Criterios de Aceptación (DoD) |
 | :--- | :--- | :---: | :---: | :--- |
-| **US-10** | Instalación PWA guiada (Botón de instalar en app) | 🟡 Media | `Backlog` | • Capturar evento `beforeinstallprompt`.<br>• Botón nativo "Instalar App en tu pantalla de inicio" en Ajustes. |
+| **US-10** | Instalación PWA guiada (Botón de instalar en app) | 🔴 Alta | `Backlog` | • Capturar evento `beforeinstallprompt`.<br>• Botón nativo "Instalar App en tu pantalla de inicio" en Ajustes. |
 | **US-11** | Modo Cocina con reconocimiento de voz (manos libres) | 🟢 Baja | `Backlog` | • Web Speech API para decir "Siguiente" o "Pausar" sin tocar la pantalla con las manos manchadas. |
-| **US-12** | Soporte Multilenguaje (i18n ES / EN) | 🟢 Baja | `Backlog` | • Diccionario de cadenas para alternar entre Español e Inglés. |
+| **US-12** | Soporte Multilenguaje (i18n ES / EN) | 🟡 Media | `Backlog` | • Diccionario de cadenas para alternar entre Español e Inglés en Ajustes. |
+| **US-15** | Importador de recetas dual: Parser Schema.org (Sin IA) + Fallback IA | 🔴 Alta | `Backlog` | • Modo estándar cero-coste: Scraper de JSON-LD (`schema.org/Recipe`) desde cualquier URL de cocina (título, foto, ingredientes, tiempo, pasos).<br>• Modo texto: Pegado estructurado de texto.<br>• Modo IA opcional: Asistido con Gemini para webs sin estructura o texto libre. |
+| **US-16** | Gestión flexible de imágenes de recetas | 🟡 Media | `Backlog` | • Imagen opcional: Si no se añade, mostrar avatar/patrón gráfico elegante de comida.<br>• Soporte para subir foto propia desde archivo o cámara.<br>• Campo para pegar URL externa limpia.<br>• Botón opcional de generar foto con IA. |
+| **US-18** | Sistema de diálogos y popups propios (Material 3) | 🔴 Alta | `Backlog` | • Reemplazar los feos `alert()`, `confirm()` y `prompt()` del navegador.<br>• Componente modal accesible con backdrop blur, botones de acción claros y animaciones suaves. |
+| **US-21** | Selector de etiquetas por Chips interactivos | 🟢 Baja | `Backlog` | • Sustituir el input de texto libre por chips seleccionables.<br>• Categorías predefinidas (Keto, Rápida, Horno, Tupper, etc.).<br>• Capacidad de crear y guardar nuevas etiquetas personalizadas. |
+
+---
+
+## 🤖 Épica 5: Ecosistema de Inteligencia Artificial & Control Total
+
+| ID | Historia de Usuario / Feature | Prioridad | Estado | Criterios de Aceptación (DoD) |
+| :--- | :--- | :---: | :---: | :--- |
+| **US-17** | Asistente IA Conversacional con Function Calling (Control total) | 🟡 Media | `Backlog` | • Interfaz conversacional (Chat/Voz accesible globalmente en la app).<br>• Capacidad de ejecutar acciones reales en la app mediante Function Calling:<br>  - Crear, editar o borrar recetas.<br>  - Reorganizar el plan semanal ("ponme ensalada el martes y mueve el pollo al jueves").<br>  - Añadir o tachar ingredientes de la lista de la compra.<br>  - Consultar inventario de despensa.<br>• Arquitectura desacoplada: Iniciar con Gemini (`@google/genai`) y permitir conectar otros proveedores (OpenAI, Claude, Ollama) a petición del usuario. |
 
 ---
 
@@ -64,7 +81,7 @@
 
 ---
 
-## 📌 Guía para añadir nuevas tareas al Backlog
+## 📝 Guía para añadir nuevas tareas al Backlog
 1. Asigna un identificador consecutivo (`US-XX` para features o `BUG-XX` para incidencias).
 2. Define claramente los **Criterios de Aceptación** bajo el formato *Given / When / Then* o puntos de verificación.
 3. Asigna la prioridad inicial (**Alta / Media / Baja**).
