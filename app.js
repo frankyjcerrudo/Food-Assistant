@@ -2499,7 +2499,20 @@ Contenido: ${url ? `Enlace: ${url}` : ''}\n${text}`;
 
 // Global App Instance
 let app;
-window.addEventListener('DOMContentLoaded', () => {
-  app = new FoodAssistantApp();
-  window.app = app;
-});
+if (typeof window !== 'undefined') {
+  window.addEventListener('DOMContentLoaded', () => {
+    if (!window.app) {
+      app = new FoodAssistantApp();
+      window.app = app;
+    }
+  });
+  window.SEED_RECIPES = SEED_RECIPES;
+  window.STANDARD_SLOTS = STANDARD_SLOTS;
+  window.AISLE_METADATA = AISLE_METADATA;
+  window.StateStore = StateStore;
+  window.FoodAssistantApp = FoodAssistantApp;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { SEED_RECIPES, STANDARD_SLOTS, AISLE_METADATA, StateStore, FoodAssistantApp };
+}

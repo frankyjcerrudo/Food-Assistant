@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="system">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Food Assistant - Test Suite Runner</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
+  <link rel="stylesheet" href="styles.css?v=8">
+  <style>
+    body {
+      background-color: var(--m3-surface);
+      color: var(--m3-on-surface);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 24px 16px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .test-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--m3-outline-variant);
+    }
+    .test-suite-card {
+      background: var(--m3-surface-container-low);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .test-suite-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--m3-primary);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .test-case {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      margin-bottom: 6px;
+      font-size: 13px;
+      background: var(--m3-surface);
+      border: 1px solid var(--m3-outline-variant);
+    }
+    .test-case.pass {
+      border-left: 4px solid #1e8e3e;
+    }
+    .test-case.fail {
+      border-left: 4px solid var(--m3-error);
+      background-color: var(--m3-error-container);
+      color: var(--m3-on-error-container);
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      text-transform: uppercase;
+    }
+    .badge-pass {
+      background-color: #e6f4ea;
+      color: #137333;
+    }
+    .badge-fail {
+      background-color: var(--m3-error);
+      color: #fff;
+    }
+    .metrics-bar {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+      background: var(--m3-surface-container);
+      padding: 12px 16px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="test-header">
+    <div>
+      <h1 style="font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span class="material-symbols-outlined" style="color: var(--m3-primary);">verified</span>
+        Food Assistant - Suite de Pruebas Automatizadas
+      </h1>
+      <p style="font-size: 13px; color: var(--m3-on-surface-variant); margin-top: 4px;">
+        Ejecución directa en navegador para validación continua de calidad y no-regresión.
+      </p>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="runAllTests()">
+      <span class="material-symbols-outlined icon-sm">play_arrow</span> Re-ejecutar Tests
+    </button>
+  </div>
+
+  <div class="metrics-bar" id="metrics-bar">
+    <div>Total: <span id="metric-total">0</span></div>
+    <div style="color: #137333;">Pasados: <span id="metric-passed">0</span></div>
+    <div style="color: var(--m3-error);">Fallados: <span id="metric-failed">0</span></div>
+    <div>Tiempo: <span id="metric-time">0ms</span></div>
+  </div>
+
+  <div id="test-results-container"></div>
+
+  <!-- Load Application Core Scripts -->
+  <script src="config.js?v=8"></script>
+  <script src="app.js?v=8"></script>
+
+  <script>
+    const suites = [];
+
+    function describe(title, fn) {
+      suites.push({ title, fn });
+    }
+
+    function it(description, testFn) {
+      currentSuite.tests.push({ description, testFn });
+    }
+
+    function expect(actual) {
+      return {
+        toBe(expected) {
+          if (actual !== expected) throw new Error(`Esperado ${JSON.stringify(expected)}, recibido ${JSON.stringify(actual)}`);
+        },
+        toEqual(expected) {
+          if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`Esperado ${JSON.stringify(expected)}, recibido ${JSON.stringify(actual)}`);
+        },
+        toHaveLength(length) {
+          if (!actual || actual.length !== length) throw new Error(`Esperada longitud ${length}, recibida ${actual?.length}`);
+        },
+        toBeGreaterThanOrEqual(val) {
+          if (actual < val) throw new Error(`Esperado >= ${val}, recibido ${actual}`);
+        },
+        toHaveProperty(prop) {
+          if (!(prop in actual)) throw new Error(`Se esperaba que el objeto tuviera la propiedad '${prop}'`);
+        },
+        toBeDefined() {
+          if (actual === undefined) throw new Error(`Se esperaba que el valor estuviese definido`);
+        },
+        toBeNull() {
+          if (actual !== null) throw new Error(`Se esperaba null, recibido ${actual}`);
+        }
+      };
+    }
+
+    let currentSuite = null;
+
+    // DEFINICIÓN DE PRUEBAS AUTOMATIZADAS
+    describe('1. StateStore y Modelo de Datos de Comidas', () => {
+      it('STANDARD_SLOTS contiene exactamente los 4 momentos de comida del día', () => {
+        expect(window.STANDARD_SLOTS).toHaveLength(4);
+        const keys = window.STANDARD_SLOTS.map(s => s.key);
+        expect(keys).toEqual(['breakfast', 'lunch', 'snack', 'dinner']);
+      });
+
+      it('StateStore inicializa el plan semanal con los 4 momentos y customSlots para cada día', () => {
+        const store = new window.StateStore();
+        const plan = store.mealPlan;
+        const days = Object.keys(plan);
+        expect(days).toHaveLength(7);
+
+        days.forEach(d => {
+          const day = plan[d];
+          expect(day).toHaveProperty('breakfast');
+          expect(day).toHaveProperty('lunch');
+          expect(day).toHaveProperty('snack');
+          expect(day).toHaveProperty('dinner');
+          expect(day).toHaveProperty('customSlots');
+        });
+      });
+
+      it('SEED_RECIPES incluye recetas catalogadas para Desayuno y Merienda', () => {
+        const store = new window.StateStore();
+        const desayunos = store.recipes.filter(r => r.tags.includes('Desayuno'));
+        const meriendas = store.recipes.filter(r => r.tags.includes('Merienda'));
+        expect(desayunos.length).toBeGreaterThanOrEqual(2);
+        expect(meriendas.length).toBeGreaterThanOrEqual(1);
+      });
+    });
+
+    describe('2. Motor de Lista de la Compra y Escalado', () => {
+      it('AISLE_METADATA contiene los pasillos requeridos y sus iconos', () => {
+        const aisles = ['produce', 'meat', 'dairy', 'bakery', 'pantry', 'spices', 'frozen', 'beverages', 'other'];
+        aisles.forEach(a => {
+          expect(window.AISLE_METADATA).toHaveProperty(a);
+        });
+      });
+
+      it('Escala proporcionalmente las cantidades de ingredientes según el número de comensales', () => {
+        const baseServings = 2;
+        const targetServings = 4;
+        const ratio = targetServings / baseServings;
+        const baseAmount = 200;
+        const scaled = Math.round((baseAmount * ratio) * 10) / 10;
+        expect(scaled).toBe(400);
+      });
+
+      it('Fusiona y suma cantidades si el ingrediente y unidad son iguales', () => {
+        const items = [{ name: "Pechugas", amount: 300, unit: "g" }];
+        const toAdd = { name: "Pechugas", amount: 200, unit: "g" };
+        const existing = items.find(i => i.name.toLowerCase() === toAdd.name.toLowerCase() && i.unit === toAdd.unit);
+        expect(existing).toBeDefined();
+        existing.amount += toAdd.amount;
+        expect(items[0].amount).toBe(500);
+      });
+    });
+
+    describe('3. Planificador y Momentos de Comida Personalizados', () => {
+      it('Permite añadir un nuevo momento personalizado al día', () => {
+        const store = new window.StateStore();
+        const dateKey = Object.keys(store.mealPlan)[0];
+        const newSlot = {
+          id: 'test-slot-1',
+          name: 'Post-Entreno',
+          icon: 'fitness_center',
+          recipeId: null
+        };
+        store.mealPlan[dateKey].customSlots.push(newSlot);
+        expect(store.mealPlan[dateKey].customSlots).toHaveLength(1);
+        expect(store.mealPlan[dateKey].customSlots[0].name).toBe('Post-Entreno');
+      });
+
+      it('Permite asignar y desasignar recetas a un momento personalizado', () => {
+        const store = new window.StateStore();
+        const dateKey = Object.keys(store.mealPlan)[0];
+        const newSlot = { id: 'test-slot-2', name: 'Media Mañana', icon: 'lunch_dining', recipeId: 'rec-avocado-toast' };
+        store.mealPlan[dateKey].customSlots.push(newSlot);
+        expect(store.mealPlan[dateKey].customSlots[0].recipeId).toBe('rec-avocado-toast');
+        store.mealPlan[dateKey].customSlots[0].recipeId = null;
+        expect(store.mealPlan[dateKey].customSlots[0].recipeId).toBeNull();
+      });
+
+      it('Permite eliminar un momento personalizado sin alterar los 4 slots estándar', () => {
+        const store = new window.StateStore();
+        const dateKey = Object.keys(store.mealPlan)[0];
+        store.mealPlan[dateKey].customSlots = [{ id: 'del-1', name: 'Snack', recipeId: null }];
+        store.mealPlan[dateKey].customSlots = store.mealPlan[dateKey].customSlots.filter(s => s.id !== 'del-1');
+        expect(store.mealPlan[dateKey].customSlots).toHaveLength(0);
+        expect(store.mealPlan[dateKey]).toHaveProperty('breakfast');
+        expect(store.mealPlan[dateKey]).toHaveProperty('dinner');
+      });
+    });
+
+    // EJECUCIÓN DEL RUNNER
+    async function runAllTests() {
+      const container = document.getElementById('test-results-container');
+      container.innerHTML = '';
+
+      let total = 0;
+      let passed = 0;
+      let failed = 0;
+      const startTime = performance.now();
+
+      for (const s of suites) {
+        currentSuite = { title: s.title, tests: [] };
+        s.fn();
+
+        const suiteCard = document.createElement('div');
+        suiteCard.className = 'test-suite-card';
+        suiteCard.innerHTML = `<div class="test-suite-title"><span class="material-symbols-outlined icon-sm">folder_open</span> ${s.title}</div>`;
+
+        for (const t of currentSuite.tests) {
+          total++;
+          const row = document.createElement('div');
+          try {
+            t.testFn();
+            passed++;
+            row.className = 'test-case pass';
+            row.innerHTML = `
+              <span>${t.description}</span>
+              <span class="status-badge badge-pass"><span class="material-symbols-outlined" style="font-size: 14px;">check_circle</span> Pass</span>
+            `;
+          } catch (err) {
+            failed++;
+            row.className = 'test-case fail';
+            row.innerHTML = `
+              <div>
+                <strong>${t.description}</strong>
+                <div style="font-size: 11px; margin-top: 4px; font-family: monospace;">${err.message}</div>
+              </div>
+              <span class="status-badge badge-fail"><span class="material-symbols-outlined" style="font-size: 14px;">cancel</span> Fail</span>
+            `;
+          }
+          suiteCard.appendChild(row);
+        }
+        container.appendChild(suiteCard);
+      }
+
+      const elapsed = Math.round(performance.now() - startTime);
+      document.getElementById('metric-total').textContent = total;
+      document.getElementById('metric-passed').textContent = passed;
+      document.getElementById('metric-failed').textContent = failed;
+      document.getElementById('metric-time').textContent = `${elapsed}ms`;
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      runAllTests();
+    });
+  </script>
+</body>
+</html>

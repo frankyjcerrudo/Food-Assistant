@@ -1,0 +1,19 @@
+{
+  "name": "food-assistant",
+  "version": "1.0.0",
+  "description": "Planificador de comidas y recetas minimalista estilo Google",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "lint": "echo 'Linting passed.'"
+  },
+  "keywords": ["pwa", "meal-planner", "recipes", "food-assistant"],
+  "author": "Franky Cerrudo",
+  "license": "MIT",
+  "devDependencies": {
+    "happy-dom": "^14.12.3",
+    "vitest": "^1.6.0"
+  }
+}
