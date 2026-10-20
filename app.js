@@ -265,6 +265,39 @@ class FoodAssistantApp {
     if (window.supabase && cfg.url && cfg.anonKey) {
       try {
         this.supabaseClient = window.supabase.createClient(cfg.url, cfg.anonKey);
+
+        // Check active session (including after Google OAuth redirect)
+        this.supabaseClient.auth.getSession().then(({ data: { session } }) => {
+          if (session?.user) {
+            state.cloudUser = {
+              email: session.user.email,
+              name: session.user.user_metadata?.full_name || session.user.email.split('@')[0],
+              id: session.user.id,
+              provider: session.user.app_metadata?.provider || 'email'
+            };
+            state.save('fa_cloud_user', state.cloudUser);
+            this.updateUserAccountUI();
+          }
+        });
+
+        // Listen for real-time auth changes
+        this.supabaseClient.auth.onAuthStateChange((event, session) => {
+          if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user) {
+            state.cloudUser = {
+              email: session.user.email,
+              name: session.user.user_metadata?.full_name || session.user.email.split('@')[0],
+              id: session.user.id,
+              provider: session.user.app_metadata?.provider || 'email'
+            };
+            state.save('fa_cloud_user', state.cloudUser);
+            this.updateUserAccountUI();
+            this.syncDataWithCloud(true);
+          } else if (event === 'SIGNED_OUT') {
+            state.cloudUser = null;
+            state.save('fa_cloud_user', null);
+            this.updateUserAccountUI();
+          }
+        });
       } catch (err) {
         console.warn("Could not create Supabase client:", err);
       }
@@ -419,6 +452,39 @@ class FoodAssistantApp {
     alert(`¡Bienvenido a Food Assistant, ${state.cloudUser.name}! Tu cuenta está conectada.`);
   }
 
+  async handleGoogleAuth() {
+    if (this.supabaseClient) {
+      try {
+        const { data, error } = await this.supabaseClient.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: window.location.origin + window.location.pathname
+          }
+        });
+        if (error) throw error;
+      } catch (err) {
+        alert("Error al conectar con Google OAuth: " + err.message);
+      }
+    } else {
+      // Local/Simulated Google OAuth sign-in flow
+      const demoEmail = prompt("Acceso con cuenta de Google. Introduce tu correo de Google:", "frankyjcerrudo@gmail.com");
+      if (!demoEmail) return;
+
+      const userName = demoEmail.split('@')[0];
+      state.cloudUser = {
+        email: demoEmail,
+        name: userName.charAt(0).toUpperCase() + userName.slice(1),
+        id: 'usr_g_' + Math.random().toString(36).substr(2, 9),
+        provider: 'google'
+      };
+      state.save('fa_cloud_user', state.cloudUser);
+      this.updateUserAccountUI();
+      this.closeAuthModal();
+      this.syncDataWithCloud(true);
+      alert(`¡Sesión iniciada con Google (${state.cloudUser.email})! Tu cuenta está conectada.`);
+    }
+  }
+
   logoutCloudUser() {
     if (this.supabaseClient) {
       this.supabaseClient.auth.signOut().catch(() => {});
@@ -522,6 +588,7 @@ class FoodAssistantApp {
     document.getElementById('btn-header-account')?.addEventListener('click', () => this.openAuthModal());
     document.getElementById('btn-settings-auth-action')?.addEventListener('click', () => this.openAuthModal());
     document.getElementById('btn-close-auth-modal')?.addEventListener('click', () => this.closeAuthModal());
+    document.getElementById('btn-auth-google')?.addEventListener('click', () => this.handleGoogleAuth());
     document.querySelectorAll('#auth-tab-buttons .auth-tab').forEach(tab => {
       tab.addEventListener('click', () => this.switchAuthTab(tab.dataset.tab));
     });
