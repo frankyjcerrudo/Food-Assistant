@@ -718,10 +718,10 @@ class FoodAssistantApp {
             <span class="slot-label">
               <span class="material-symbols-outlined icon-sm">${s.icon}</span> ${s.label}
             </span>
-            <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px;">
-              <img src="${recipe.imageUrl}" alt="" style="width: 44px; height: 44px; border-radius: 8px; object-fit: cover;">
-              <div style="flex: 1;">
-                <div class="slot-recipe-name">${recipe.title}</div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px; min-width: 0;">
+              <img src="${recipe.imageUrl}" alt="" style="width: 44px; height: 44px; border-radius: 8px; object-fit: cover; flex-shrink: 0;">
+              <div style="flex: 1; min-width: 0; overflow: hidden;">
+                <div class="slot-recipe-name" title="${recipe.title}">${recipe.title}</div>
                 <div style="font-size: 11px; color: var(--m3-on-surface-variant); margin-top: 2px; display: flex; align-items: center; gap: 4px;">
                   <span class="material-symbols-outlined icon-sm">schedule</span> ${recipe.prepTimeMinutes + recipe.cookTimeMinutes} min
                 </div>
@@ -1243,10 +1243,10 @@ class FoodAssistantApp {
               <span class="material-symbols-outlined icon-sm">close</span>
             </button>
           </div>
-          <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
-            <img src="${recipe.imageUrl}" alt="" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover;">
-            <div style="flex: 1; overflow: hidden;">
-              <div class="slot-recipe-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${recipe.title}</div>
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; min-width: 0;">
+            <img src="${recipe.imageUrl}" alt="" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0;">
+            <div style="flex: 1; min-width: 0; overflow: hidden;">
+              <div class="slot-recipe-name" title="${recipe.title}">${recipe.title}</div>
             </div>
           </div>
         </div>
