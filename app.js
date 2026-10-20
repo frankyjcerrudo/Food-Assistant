@@ -1495,15 +1495,22 @@ class FoodAssistantApp {
       sourceTitle: recipe.title,
       baseServings: baseServings,
       currentServings: currentServings,
-      items: recipe.ingredients.map(ing => ({
-        name: ing.name,
-        baseAmount: ing.amount !== null && ing.amount !== undefined ? ing.amount : null,
-        amount: ing.amount !== null && ing.amount !== undefined ? Math.round((ing.amount * ratio) * 10) / 10 : null,
-        unit: ing.unit || '',
-        aisle: ing.aisle || 'other',
-        recipeOrigin: recipe.title,
-        checked: true
-      }))
+      groups: [
+        {
+          recipeId: recipe.id,
+          recipeTitle: recipe.title,
+          recipeImage: recipe.imageUrl,
+          baseServings: baseServings,
+          items: recipe.ingredients.map(ing => ({
+            name: ing.name,
+            baseAmount: ing.amount !== null && ing.amount !== undefined ? ing.amount : null,
+            amount: ing.amount !== null && ing.amount !== undefined ? Math.round((ing.amount * ratio) * 10) / 10 : null,
+            unit: ing.unit || '',
+            aisle: ing.aisle || 'other',
+            checked: true
+          }))
+        }
+      ]
     };
 
     const titleEl = document.getElementById('shopping-preview-title');
@@ -1523,45 +1530,20 @@ class FoodAssistantApp {
   }
 
   openShoppingPreviewForPlan() {
-    const recipeMap = new Map();
-    let plannedRecipesCount = 0;
+    const recipeOccurrences = new Map();
+    let plannedCount = 0;
 
     Object.values(state.mealPlan).forEach(day => {
       ['lunch', 'dinner'].forEach(slot => {
         const rId = day[slot];
         if (rId) {
-          const recipe = state.recipes.find(r => r.id === rId);
-          if (recipe) {
-            plannedRecipesCount++;
-            recipe.ingredients.forEach(ing => {
-              const key = `${ing.name.toLowerCase().trim()}_${(ing.unit || '').toLowerCase().trim()}`;
-              if (recipeMap.has(key)) {
-                const item = recipeMap.get(key);
-                if (item.baseAmount !== null && ing.amount !== null && ing.amount !== undefined) {
-                  item.baseAmount = Math.round((item.baseAmount + ing.amount) * 10) / 10;
-                  item.amount = item.baseAmount;
-                }
-                if (!item.origins.includes(recipe.title)) {
-                  item.origins.push(recipe.title);
-                }
-              } else {
-                recipeMap.set(key, {
-                  name: ing.name,
-                  baseAmount: ing.amount !== null && ing.amount !== undefined ? ing.amount : null,
-                  amount: ing.amount !== null && ing.amount !== undefined ? ing.amount : null,
-                  unit: ing.unit || '',
-                  aisle: ing.aisle || 'other',
-                  origins: [recipe.title],
-                  checked: true
-                });
-              }
-            });
-          }
+          recipeOccurrences.set(rId, (recipeOccurrences.get(rId) || 0) + 1);
+          plannedCount++;
         }
       });
     });
 
-    if (recipeMap.size === 0) {
+    if (recipeOccurrences.size === 0) {
       alert("No hay recetas asignadas en el plan semanal para generar la lista.");
       return;
     }
@@ -1569,22 +1551,42 @@ class FoodAssistantApp {
     const baseServings = state.settings.defaultServings || 2;
     const currentServings = baseServings;
 
-    const items = Array.from(recipeMap.values()).map(item => ({
-      name: item.name,
-      baseAmount: item.baseAmount,
-      amount: item.amount,
-      unit: item.unit,
-      aisle: item.aisle,
-      recipeOrigin: item.origins.slice(0, 2).join(', ') + (item.origins.length > 2 ? ` (+${item.origins.length - 2})` : ''),
-      checked: true
-    }));
+    const groups = [];
+    recipeOccurrences.forEach((count, recipeId) => {
+      const recipe = state.recipes.find(r => r.id === recipeId);
+      if (recipe && recipe.ingredients && recipe.ingredients.length > 0) {
+        const recipeBaseServings = recipe.servings || 2;
+        const scale = (currentServings / recipeBaseServings) * count;
+
+        groups.push({
+          recipeId: recipe.id,
+          recipeTitle: count > 1 ? `${recipe.title} (${count} comidas)` : recipe.title,
+          recipeImage: recipe.imageUrl,
+          baseServings: recipeBaseServings,
+          occurrenceCount: count,
+          items: recipe.ingredients.map(ing => ({
+            name: ing.name,
+            baseAmount: ing.amount !== null && ing.amount !== undefined ? ing.amount * count : null,
+            amount: ing.amount !== null && ing.amount !== undefined ? Math.round((ing.amount * scale) * 10) / 10 : null,
+            unit: ing.unit || '',
+            aisle: ing.aisle || 'other',
+            checked: true
+          }))
+        });
+      }
+    });
+
+    if (groups.length === 0) {
+      alert("Las recetas del plan no tienen ingredientes configurados.");
+      return;
+    }
 
     this.shoppingPreviewState = {
       sourceType: 'plan',
       sourceTitle: 'Plan Semanal',
       baseServings: baseServings,
       currentServings: currentServings,
-      items: items
+      groups: groups
     };
 
     const titleEl = document.getElementById('shopping-preview-title');
@@ -1593,7 +1595,7 @@ class FoodAssistantApp {
     const clearFirst = document.getElementById('shopping-preview-clear-first');
 
     if (titleEl) titleEl.textContent = "Añadir a la Compra";
-    if (subtitleEl) subtitleEl.textContent = `Menú Semanal (${plannedRecipesCount} comidas planificadas)`;
+    if (subtitleEl) subtitleEl.textContent = `Menú Semanal (${groups.length} recetas, ${plannedCount} comidas)`;
     if (servingsVal) servingsVal.textContent = currentServings;
     if (clearFirst) clearFirst.checked = false;
 
@@ -1609,39 +1611,69 @@ class FoodAssistantApp {
     const container = document.getElementById('shopping-preview-items-list');
     if (!container) return;
 
-    const checkedCount = this.shoppingPreviewState.items.filter(i => i.checked).length;
+    let totalChecked = 0;
+    this.shoppingPreviewState.groups.forEach(group => {
+      totalChecked += group.items.filter(i => i.checked).length;
+    });
+
     const btnText = document.getElementById('btn-confirm-add-shopping-text');
     if (btnText) {
-      btnText.textContent = `Añadir a la Compra (${checkedCount})`;
+      btnText.textContent = `Añadir a la Compra (${totalChecked})`;
     }
 
-    container.innerHTML = this.shoppingPreviewState.items.map((ing, idx) => {
-      const meta = AISLE_METADATA[ing.aisle] || AISLE_METADATA.other;
-      const isChecked = ing.checked !== false;
+    container.innerHTML = this.shoppingPreviewState.groups.map((group, groupIdx) => {
+      const allChecked = group.items.length > 0 && group.items.every(i => i.checked);
+      const checkedInGroup = group.items.filter(i => i.checked).length;
 
       return `
-        <div class="card" style="padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 0; background-color: ${isChecked ? 'var(--m3-surface)' : 'var(--m3-surface-container-low)'}; border: 1px solid var(--m3-outline-variant); transition: background-color 0.15s ease;">
-          <label style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; cursor: pointer; margin: 0;">
-            <input type="checkbox" class="grocery-checkbox" data-idx="${idx}" ${isChecked ? 'checked' : ''} onchange="app.handleShoppingPreviewItemCheck(${idx}, this.checked)" style="flex-shrink: 0;">
-            <div style="flex: 1; min-width: 0; overflow: hidden;">
-              <div style="font-size: 14px; font-weight: 500; color: var(--m3-on-surface); word-break: break-word; line-height: 1.3; ${isChecked ? '' : 'text-decoration: line-through; opacity: 0.55;'}">
-                ${ing.name}
-              </div>
-              <div style="font-size: 11px; color: var(--m3-on-surface-variant); display: flex; align-items: center; gap: 4px; margin-top: 2px;">
-                <span class="material-symbols-outlined icon-sm" style="font-size: 13px;">${meta.icon}</span> ${meta.label}
-                ${ing.recipeOrigin ? `<span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">• Para: ${ing.recipeOrigin}</span>` : ''}
+        <div class="card" style="margin-bottom: 12px; padding: 12px; background-color: var(--m3-surface); border: 1px solid var(--m3-outline-variant); border-radius: var(--radius-lg);">
+          <!-- Recipe Section Header -->
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--m3-outline-variant); gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">
+              ${group.recipeImage ? `<img src="${group.recipeImage}" alt="" style="width: 34px; height: 34px; border-radius: 6px; object-fit: cover; flex-shrink: 0;">` : `<span class="material-symbols-outlined" style="color: var(--m3-primary);">restaurant</span>`}
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 14px; font-weight: 700; color: var(--m3-on-surface); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${group.recipeTitle}</div>
+                <div style="font-size: 11px; color: var(--m3-on-surface-variant);">${checkedInGroup} de ${group.items.length} ingredientes seleccionados</div>
               </div>
             </div>
-          </label>
-          
-          <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
-            <input type="number" step="any" min="0" value="${ing.amount !== null && ing.amount !== undefined ? ing.amount : ''}" 
-              placeholder="Cant." 
-              class="form-input" 
-              style="width: 72px; padding: 6px 8px; text-align: center; font-size: 13px; font-weight: 500; ${isChecked ? '' : 'opacity: 0.5;'}"
-              onchange="app.handleShoppingPreviewAmountChange(${idx}, this.value)"
-              ${isChecked ? '' : 'disabled'}>
-            <span style="font-size: 12px; color: var(--m3-on-surface-variant); min-width: 24px;">${ing.unit || ''}</span>
+            
+            <button type="button" class="btn btn-ghost btn-sm" style="font-size: 11px; padding: 4px 8px; white-space: nowrap;" onclick="app.toggleGroupShoppingPreview(${groupIdx}, ${!allChecked})">
+              ${allChecked ? 'Desmarcar receta' : 'Marcar receta'}
+            </button>
+          </div>
+
+          <!-- Recipe Ingredients List -->
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            ${group.items.map((ing, itemIdx) => {
+              const meta = AISLE_METADATA[ing.aisle] || AISLE_METADATA.other;
+              const isChecked = ing.checked !== false;
+
+              return `
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border-radius: var(--radius-sm); background-color: ${isChecked ? 'var(--m3-surface-container-low)' : 'transparent'}; transition: background-color 0.15s ease;">
+                  <label style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; cursor: pointer; margin: 0;">
+                    <input type="checkbox" class="grocery-checkbox" ${isChecked ? 'checked' : ''} onchange="app.handleShoppingPreviewItemCheck(${groupIdx}, ${itemIdx}, this.checked)" style="flex-shrink: 0;">
+                    <div style="flex: 1; min-width: 0; overflow: hidden;">
+                      <span style="font-size: 13px; font-weight: 500; color: var(--m3-on-surface); word-break: break-word; ${isChecked ? '' : 'text-decoration: line-through; opacity: 0.55;'}">
+                        ${ing.name}
+                      </span>
+                      <span style="font-size: 10px; color: var(--m3-on-surface-variant); margin-left: 4px; display: inline-flex; align-items: center; gap: 2px;">
+                        <span class="material-symbols-outlined icon-sm" style="font-size: 12px;">${meta.icon}</span> ${meta.label}
+                      </span>
+                    </div>
+                  </label>
+
+                  <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                    <input type="number" step="any" min="0" value="${ing.amount !== null && ing.amount !== undefined ? ing.amount : ''}" 
+                      placeholder="Cant." 
+                      class="form-input" 
+                      style="width: 64px; padding: 4px 6px; text-align: center; font-size: 12px; font-weight: 500; height: 30px; ${isChecked ? '' : 'opacity: 0.5;'}"
+                      onchange="app.handleShoppingPreviewAmountChange(${groupIdx}, ${itemIdx}, this.value)"
+                      ${isChecked ? '' : 'disabled'}>
+                    <span style="font-size: 11px; color: var(--m3-on-surface-variant); min-width: 22px;">${ing.unit || ''}</span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
           </div>
         </div>
       `;
@@ -1653,15 +1685,16 @@ class FoodAssistantApp {
     const newServings = Math.max(1, this.shoppingPreviewState.currentServings + delta);
     if (newServings === this.shoppingPreviewState.currentServings) return;
 
-    const scale = newServings / this.shoppingPreviewState.baseServings;
     this.shoppingPreviewState.currentServings = newServings;
     const servingsVal = document.getElementById('shopping-preview-servings-val');
     if (servingsVal) servingsVal.textContent = newServings;
 
-    this.shoppingPreviewState.items.forEach(item => {
-      if (item.baseAmount !== null && item.baseAmount !== undefined) {
-        item.amount = Math.round((item.baseAmount * scale) * 10) / 10;
-      }
+    this.shoppingPreviewState.groups.forEach(group => {
+      group.items.forEach(item => {
+        if (item.baseAmount !== null && item.baseAmount !== undefined) {
+          item.amount = Math.round((item.baseAmount * (newServings / this.shoppingPreviewState.baseServings)) * 10) / 10;
+        }
+      });
     });
 
     this.renderShoppingPreview();
@@ -1669,25 +1702,37 @@ class FoodAssistantApp {
 
   toggleAllShoppingPreview(checked) {
     if (!this.shoppingPreviewState) return;
-    this.shoppingPreviewState.items.forEach(item => {
+    this.shoppingPreviewState.groups.forEach(group => {
+      group.items.forEach(item => {
+        item.checked = checked;
+      });
+    });
+    this.renderShoppingPreview();
+  }
+
+  toggleGroupShoppingPreview(groupIdx, checked) {
+    if (!this.shoppingPreviewState || !this.shoppingPreviewState.groups[groupIdx]) return;
+    this.shoppingPreviewState.groups[groupIdx].items.forEach(item => {
       item.checked = checked;
     });
     this.renderShoppingPreview();
   }
 
-  handleShoppingPreviewItemCheck(idx, checked) {
-    if (!this.shoppingPreviewState || !this.shoppingPreviewState.items[idx]) return;
-    this.shoppingPreviewState.items[idx].checked = checked;
+  handleShoppingPreviewItemCheck(groupIdx, itemIdx, checked) {
+    if (!this.shoppingPreviewState || !this.shoppingPreviewState.groups[groupIdx]) return;
+    const item = this.shoppingPreviewState.groups[groupIdx].items[itemIdx];
+    if (item) item.checked = checked;
     this.renderShoppingPreview();
   }
 
-  handleShoppingPreviewAmountChange(idx, val) {
-    if (!this.shoppingPreviewState || !this.shoppingPreviewState.items[idx]) return;
+  handleShoppingPreviewAmountChange(groupIdx, itemIdx, val) {
+    if (!this.shoppingPreviewState || !this.shoppingPreviewState.groups[groupIdx]) return;
+    const item = this.shoppingPreviewState.groups[groupIdx].items[itemIdx];
+    if (!item) return;
     const num = parseFloat(val);
-    const item = this.shoppingPreviewState.items[idx];
     item.amount = isNaN(num) ? null : num;
-    const scale = this.shoppingPreviewState.currentServings / this.shoppingPreviewState.baseServings;
-    item.baseAmount = item.amount !== null ? item.amount / scale : null;
+    const ratio = (this.shoppingPreviewState.currentServings / this.shoppingPreviewState.baseServings);
+    item.baseAmount = item.amount !== null ? item.amount / ratio : null;
   }
 
   closeShoppingPreviewModal() {
@@ -1699,8 +1744,24 @@ class FoodAssistantApp {
 
   confirmShoppingPreviewAdd() {
     if (!this.shoppingPreviewState) return;
-    const selected = this.shoppingPreviewState.items.filter(i => i.checked);
-    if (selected.length === 0) {
+    
+    const selectedItems = [];
+    this.shoppingPreviewState.groups.forEach(group => {
+      group.items.forEach(item => {
+        if (item.checked) {
+          selectedItems.push({
+            name: item.name,
+            amount: item.amount,
+            unit: item.unit || '',
+            aisle: item.aisle || 'other',
+            isChecked: false,
+            recipeOrigin: group.recipeTitle
+          });
+        }
+      });
+    });
+
+    if (selectedItems.length === 0) {
       alert("Por favor, selecciona al menos un ingrediente para añadir.");
       return;
     }
@@ -1711,12 +1772,15 @@ class FoodAssistantApp {
     }
 
     let addedCount = 0;
-    selected.forEach(item => {
+    selectedItems.forEach(item => {
       const key = `${item.name.toLowerCase().trim()}_${(item.unit || '').toLowerCase().trim()}`;
       const existing = state.shoppingList.find(i => `${i.name.toLowerCase().trim()}_${(i.unit || '').toLowerCase().trim()}` === key && !i.isChecked);
 
       if (existing && existing.amount !== null && item.amount !== null) {
         existing.amount = Math.round((existing.amount + item.amount) * 10) / 10;
+        if (item.recipeOrigin && !existing.recipeOrigin.includes(item.recipeOrigin)) {
+          existing.recipeOrigin += `, ${item.recipeOrigin}`;
+        }
       } else {
         state.shoppingList.push({
           name: item.name,
