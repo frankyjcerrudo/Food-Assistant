@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 
-const appCode = fs.readFileSync(path.resolve(__dirname, '../app.js'), 'utf-8');
+const appPath = path.resolve(process.cwd(), 'app.js');
+const appCode = fs.readFileSync(appPath, 'utf-8');
 const fn = new Function('window', 'localStorage', 'document', appCode + '; return { AISLE_METADATA };');
 const { AISLE_METADATA } = fn({}, { getItem: () => null, setItem: () => {} }, { addEventListener: () => {}, documentElement: { setAttribute: () => {} } });
 

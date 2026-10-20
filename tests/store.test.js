@@ -3,7 +3,8 @@ import fs from 'fs';
 import path from 'path';
 
 // Evaluate app.js in test environment
-const appCode = fs.readFileSync(path.resolve(__dirname, '../app.js'), 'utf-8');
+const appPath = path.resolve(process.cwd(), 'app.js');
+const appCode = fs.readFileSync(appPath, 'utf-8');
 const context = {};
 const fn = new Function('window', 'localStorage', 'document', appCode + '; return { StateStore, SEED_RECIPES, STANDARD_SLOTS };');
 
