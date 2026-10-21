@@ -605,23 +605,48 @@
     <div style="overflow-y: auto; flex: 1; padding-right: 2px;">
       <!-- Section URL -->
       <div id="section-import-url">
-        <div class="form-group" style="margin-bottom: 10px;">
-          <label class="form-label" style="font-size: 12px;">URL de la receta (Directo al Paladar, Cookpad, AllRecipes...)</label>
+        <div class="form-group" style="margin-bottom: 8px;">
+          <label class="form-label" style="font-size: 12px;">URL de la receta (Directo al Paladar, Cookpad, AllRecipes, blogs...)</label>
           <input type="url" class="form-input" id="import-url-input" placeholder="https://www.directoalpaladar.com/recetas/..." style="font-size: 13px;">
         </div>
-        <p style="font-size: 11px; color: var(--m3-on-surface-variant); margin-bottom: 12px; line-height: 1.35;">
-          💡 <em>Tip: Si la página web bloquea peticiones de terceros por políticas CORS, puedes copiar su texto o código y pegarlo en la pestaña 'Texto / Notas'.</em>
+        <p style="font-size: 11px; color: var(--m3-on-surface-variant); margin-bottom: 8px; line-height: 1.35;">
+          ðŸ’¡ <em>Tip: Si la pÃ¡gina web bloquea peticiones automÃ¡ticas por seguridad (CORS / Cloudflare), puedes pegar su texto en la pestaÃ±a 'Texto / Notas' en 1 clic.</em>
         </p>
+
+        <!-- Dynamic CORS Assistance Banner -->
+        <div id="import-cors-banner" style="display: none; background: var(--m3-surface-container); border: 1px solid var(--color-brand); border-radius: var(--radius-md); padding: 12px; margin-top: 8px; margin-bottom: 8px;">
+          <div style="display: flex; gap: 8px; align-items: flex-start;">
+            <span class="material-symbols-outlined" style="color: var(--color-brand); font-size: 20px;">shield</span>
+            <div style="font-size: 12px; line-height: 1.4; color: var(--m3-on-surface);">
+              <strong>Esta pÃ¡gina web bloquea descargas directas (CORS / Cloudflare).</strong><br>
+              Â¡Puedes importar la receta en 2 segundos sin reescribir nada!
+              <ol style="margin: 6px 0 8px 16px; padding: 0; color: var(--m3-on-surface-variant);">
+                <li>Copia los ingredientes o texto de la receta en tu navegador.</li>
+                <li>Pulsa el botÃ³n de abajo para pegarlo aquÃ­.</li>
+              </ol>
+              <button type="button" id="btn-cors-goto-text" class="btn btn-sm btn-primary" style="font-size: 11px; padding: 4px 10px;">
+                <span class="material-symbols-outlined icon-sm">content_paste</span> Pegar receta en 'Texto / Notas'
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Section Text -->
       <div id="section-import-text" style="display: none;">
-        <div class="form-group" style="margin-bottom: 10px;">
-          <label class="form-label" style="font-size: 12px;">Texto estructurado o bloque JSON-LD</label>
-          <textarea class="form-textarea" id="import-text-input" rows="5" placeholder="Título de la receta&#10;Raciones: 4&#10;Tiempo: 20 min&#10;&#10;Ingredientes:&#10;- 200g de pasta&#10;- 2 tomates cherry&#10;&#10;Instrucciones:&#10;1. Hervir agua..." style="font-size: 12px; font-family: inherit;"></textarea>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label class="form-label" style="font-size: 12px; margin: 0;">Texto, notas o bloque JSON-LD</label>
+          <button type="button" id="btn-paste-clipboard" class="btn btn-sm btn-secondary" style="font-size: 11px; padding: 3px 8px; border-radius: var(--radius-sm);">
+            <span class="material-symbols-outlined icon-sm">content_paste</span> Pegar del portapapeles
+          </button>
         </div>
+        <div class="form-group" style="margin-bottom: 8px;">
+          <textarea class="form-textarea" id="import-text-input" rows="6" placeholder="Pega aquÃ­ el texto copiado de cualquier web (Directo al Paladar, Cookpad, blogs, notas de WhatsApp...).&#10;&#10;Ejemplo:&#10;LasaÃ±a de verduras&#10;Para 4 personas&#10;Ingredientes:&#10;Placas de lasaÃ±a 12&#10;Berenjena 1&#10;Tomate triturado 400 g&#10;Sal al gusto&#10;&#10;Instrucciones:&#10;1. Cortar las verduras..." style="font-size: 12px; font-family: inherit;"></textarea>
+        </div>
+        <p style="font-size: 11px; color: var(--m3-on-surface-variant); margin-bottom: 8px;">
+          âœ¨ <em>El analizador inteligente detecta automÃ¡ticamente ingredientes (en cualquier orden: 'Tomate 200g' o '200g tomate'), raciones, tiempos y pasos.</em>
+        </p>
       </div>
-
       <!-- Live Preview Container (shows extracted recipe before saving) -->
       <div id="import-preview-box" style="display: none; margin-top: 10px; padding: 12px; background: var(--m3-surface-container-low); border: 1px solid var(--m3-outline-variant); border-radius: var(--radius-md);">
         <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">

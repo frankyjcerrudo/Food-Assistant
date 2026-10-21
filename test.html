@@ -843,6 +843,108 @@
           expect(recipe.instructions[1].text).toBe('Cocinar el salmón a la plancha 4 minutos por lado.');
         }
       );
+
+      it(
+        'parseIngredientLine soporta formato inverso de webs espaÃ±olas (Directo al Paladar, Cookpad)',
+        {
+          purpose: 'Permitir analizar ingredientes donde el nombre del producto va antes que la cantidad y unidad (ej. "Placas de lasaÃ±a 12", "Tomate triturado 400 g", "Berenjena 1") habitual en webs gastronÃ³micas espaÃ±olas.',
+          assertions: 'Verifica que extrae 12 ud para Placas de lasaÃ±a en bakery, 400 g para Tomate triturado en produce, y 1 ud para Berenjena.'
+        },
+        () => {
+          const r1 = window.RecipeParser.parseIngredientLine('Placas de lasaÃ±a 12');
+          expect(r1.amount).toBe(12);
+          expect(r1.unit).toBe('ud');
+          expect(r1.name).toBe('Placas de lasaÃ±a');
+          expect(r1.aisle).toBe('bakery');
+
+          const r2 = window.RecipeParser.parseIngredientLine('Tomate triturado 400 g');
+          expect(r2.amount).toBe(400);
+          expect(r2.unit).toBe('g');
+          expect(r2.name).toBe('Tomate triturado');
+          expect(r2.aisle).toBe('produce');
+
+          const r3 = window.RecipeParser.parseIngredientLine('Berenjena 1');
+          expect(r3.amount).toBe(1);
+          expect(r3.unit).toBe('ud');
+          expect(r3.name).toBe('Berenjena');
+
+          const r4 = window.RecipeParser.parseIngredientLine('Aceite de oliva virgen extra 40 ml');
+          expect(r4.amount).toBe(40);
+          expect(r4.unit).toBe('ml');
+        }
+      );
+
+      it(
+        'parseIngredientLine gestiona ingredientes "al gusto" y descarta cabeceras de secciÃ³n',
+        {
+          purpose: 'Gestionar ingredientes sin gramaje numÃ©rico exacto asignÃ¡ndoles unidad "pizca" y descartar subcabeceras decorativas como "Para la bechamel:" o "Para la salsa:" para no introducirlas falsamente como ingredientes.',
+          assertions: 'Comprueba que "Sal y pimienta al gusto" devuelve 1 pizca en spices, y "Para la bechamel:" o "Ingredientes:" devuelven null.'
+        },
+        () => {
+          const tt = window.RecipeParser.parseIngredientLine('Sal y pimienta al gusto');
+          expect(tt.amount).toBe(1);
+          expect(tt.unit).toBe('pizca');
+          expect(tt.name).toBe('Sal y pimienta');
+          expect(tt.aisle).toBe('spices');
+
+          const sh1 = window.RecipeParser.parseIngredientLine('Para la bechamel:');
+          expect(sh1).toBeNull();
+
+          const sh2 = window.RecipeParser.parseIngredientLine('Ingredientes:');
+          expect(sh2).toBeNull();
+        }
+      );
+
+      it(
+        'parseRecipeText procesa recetas completas reales de Directo al Paladar con tiempos y temporizadores',
+        {
+          purpose: 'Validar la importaciÃ³n integral de una receta copiada tal cual de Directo al Paladar con raciones, tiempos de cocciÃ³n/preparaciÃ³n y temporizadores inteligentes en los pasos.',
+          assertions: 'Verifica 4 raciones, 20 min prep, 40 min cocciÃ³n, 13 ingredientes limpios, y temporizadores de 10 min y 25 min en los pasos correspondientes.'
+        },
+        () => {
+          const rawDirecto = [
+            "LasaÃ±a de verduras fÃ¡cil y rÃ¡pida",
+            "Tiempo de preparaciÃ³n: 20 min",
+            "Tiempo de cocciÃ³n: 40 min",
+            "Para 4 personas",
+            "",
+            "Ingredientes",
+            "Placas de lasaÃ±a 12",
+            "Berenjena 1",
+            "CalabacÃ­n 1",
+            "Cebolla 1",
+            "Pimiento rojo 0.5",
+            "Tomate triturado 400 g",
+            "Queso rallado 100 g",
+            "Aceite de oliva virgen extra 40 ml",
+            "Sal y pimienta al gusto",
+            "Para la bechamel:",
+            "Mantequilla 50 g",
+            "Harina de trigo 50 g",
+            "Leche entera 500 ml",
+            "Nuez moscada 1 pizca",
+            "",
+            "Instrucciones",
+            "1. Cortar las verduras en dados pequeÃ±os.",
+            "2. En una sartÃ©n con aceite de oliva, pochar la cebolla y el pimiento durante 10 minutos.",
+            "3. AÃ±adir el calabacÃ­n y la berenjena y cocinar otros 10 minutos.",
+            "4. Agregar el tomate triturado, salpimentar y dejar reducir a fuego lento 15 minutos.",
+            "5. Preparar la bechamel derritiendo la mantequilla, aÃ±adiendo la harina y vertiendo la leche poco a poco.",
+            "6. Montar la lasaÃ±a alternando pasta, verduras y bechamel.",
+            "7. Terminar con queso rallado y hornear a 200ÂºC durante 25 minutos."
+          ].join("\n");
+
+          const recipe = window.RecipeParser.parseRecipeText(rawDirecto);
+          expect(recipe.title).toBe('LasaÃ±a de verduras fÃ¡cil y rÃ¡pida');
+          expect(recipe.servings).toBe(4);
+          expect(recipe.prepTimeMinutes).toBe(20);
+          expect(recipe.cookTimeMinutes).toBe(40);
+          expect(recipe.ingredients).toHaveLength(13);
+          expect(recipe.instructions).toHaveLength(7);
+          expect(recipe.instructions[1].timerMinutes).toBe(10);
+          expect(recipe.instructions[6].timerMinutes).toBe(25);
+        }
+      );
     });
 
     // =========================================================
