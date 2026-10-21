@@ -361,14 +361,15 @@ class FoodAssistantApp {
     const headerBtn = document.getElementById('btn-header-theme');
     if (headerIcon && headerBtn) {
       if (themeMode === 'light') {
-        headerIcon.textContent = 'light_mode';
-        headerBtn.title = 'Aspecto: Modo Claro (clic para cambiar)';
-      } else if (themeMode === 'dark') {
         headerIcon.textContent = 'dark_mode';
-        headerBtn.title = 'Aspecto: Modo Oscuro (clic para cambiar)';
+        headerBtn.title = 'Modo Claro activo (clic para cambiar a Modo Oscuro)';
+      } else if (themeMode === 'dark') {
+        headerIcon.textContent = 'light_mode';
+        headerBtn.title = 'Modo Oscuro activo (clic para cambiar a Modo Claro)';
       } else {
-        headerIcon.textContent = 'brightness_auto';
-        headerBtn.title = 'Aspecto: Automático / Sistema (clic para cambiar)';
+        const isSysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        headerIcon.textContent = isSysDark ? 'light_mode' : 'dark_mode';
+        headerBtn.title = isSysDark ? 'Modo Sistema Oscuro (clic para Modo Claro)' : 'Modo Sistema Claro (clic para Modo Oscuro)';
       }
     }
 
@@ -379,8 +380,17 @@ class FoodAssistantApp {
   }
 
   toggleNextTheme() {
-    const cycle = { system: 'light', light: 'dark', dark: 'system' };
-    const next = cycle[state.theme] || 'system';
+    // Alternancia directa e inequvoca entre Claro y Oscuro
+    let next = 'light';
+    if (state.theme === 'light') {
+      next = 'dark';
+    } else if (state.theme === 'dark') {
+      next = 'light';
+    } else {
+      // Modo system: alternar al opuesto del sistema actual
+      const isSysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      next = isSysDark ? 'light' : 'dark';
+    }
     this.applyTheme(next);
   }
 
@@ -880,7 +890,7 @@ class FoodAssistantApp {
 
     const addExtraHtml = `
       <div style="grid-column: 1 / -1; margin-top: 4px;">
-        <button type="button" class="btn btn-tonal btn-sm" style="width: 100%; justify-content: center; border-radius: var(--radius-md); padding: 10px;" onclick="app.openAddCustomSlotModal('${todayStr}')">
+        <button type="button" class="btn btn-tonal btn-sm" style="width: 100%; justify-content: center; border-radius: var(--radius-md); padding: 10px; white-space: normal; line-height: 1.35; text-align: center;" onclick="app.openAddCustomSlotModal('${todayStr}')">
           <span class="material-symbols-outlined icon-sm">add_circle</span>
           <span>Añadir otra comida para hoy (media mañana, post-entreno, merienda...)</span>
         </button>

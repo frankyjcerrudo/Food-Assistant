@@ -8,6 +8,7 @@
 /* LIGHT THEME (Default & data-theme="light") */
 :root,
 :root[data-theme="light"] {
+  color-scheme: light;
   --m3-primary: #1a73e8;
   --m3-on-primary: #ffffff;
   --m3-primary-container: #d3e3fd;
@@ -58,6 +59,7 @@
 
 /* DARK THEME (Explicit data-theme="dark") */
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --m3-primary: #a8c7fa;
   --m3-on-primary: #042f66;
   --m3-primary-container: #0842a0;
@@ -94,6 +96,10 @@
 }
 
 /* SYSTEM THEME (Follows system when data-theme is system or not set to light) */
+:root[data-theme="system"] {
+  color-scheme: light dark;
+}
+
 @media (prefers-color-scheme: dark) {
   :root[data-theme="system"],
   :root:not([data-theme="light"]):not([data-theme="dark"]) {

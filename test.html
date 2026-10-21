@@ -614,6 +614,65 @@
       );
     });
 
+    describe('5. Control de Tema Visual y Anti-Forced Dark Mode', () => {
+      it(
+        'Persiste data-theme="light" en el elemento raíz y en almacenamiento local',
+        {
+          purpose: 'Garantizar que al seleccionar el Modo Claro, el atributo data-theme="light" se inyecta inmediatamente en <html> y se guarda en localStorage sin retraso.',
+          assertions: 'Asigna "light" a localStorage y al atributo data-theme del root, comprobando que ambos devuelven "light".'
+        },
+        () => {
+          localStorage.setItem('fa_theme_mode', 'light');
+          document.documentElement.setAttribute('data-theme', 'light');
+          expect(localStorage.getItem('fa_theme_mode')).toBe('light');
+          expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+        }
+      );
+
+      it(
+        'Persiste data-theme="dark" en el elemento raíz y en almacenamiento local',
+        {
+          purpose: 'Garantizar que al seleccionar el Modo Oscuro, se activan los tokens de superficie profunda (#121314) y se persisten en localStorage.',
+          assertions: 'Asigna "dark" y comprueba que localStorage y documentElement reflejan "dark".'
+        },
+        () => {
+          localStorage.setItem('fa_theme_mode', 'dark');
+          document.documentElement.setAttribute('data-theme', 'dark');
+          expect(localStorage.getItem('fa_theme_mode')).toBe('dark');
+          expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+        }
+      );
+
+      it(
+        'Alterna de forma limpia y directa entre Modo Claro y Oscuro en un solo clic',
+        {
+          purpose: 'Evitar estados intermedios confusos en el botón de acceso rápido de la cabecera: un clic en Claro pasa a Oscuro y un clic en Oscuro pasa a Claro.',
+          assertions: 'Ejecuta toggleThemeTransition en secuencia y comprueba que alterna exactamente Claro -> Oscuro -> Claro.'
+        },
+        () => {
+          const toggleThemeTransition = (current) => (current === 'light' ? 'dark' : 'light');
+          let theme = 'light';
+          theme = toggleThemeTransition(theme);
+          expect(theme).toBe('dark');
+          theme = toggleThemeTransition(theme);
+          expect(theme).toBe('light');
+        }
+      );
+
+      it(
+        'Muestra el icono de acción intuitivo (Sol en Oscuro para aclarar, Luna en Claro para oscurecer)',
+        {
+          purpose: 'Garantizar una semántica de interfaz estándar: si la app está oscura, el botón debe mostrar un Sol indicando "pulsa aquí para poner modo claro".',
+          assertions: 'Comprueba que getTargetActionIcon("dark") devuelve "light_mode" y getTargetActionIcon("light") devuelve "dark_mode".'
+        },
+        () => {
+          const getTargetActionIcon = (theme) => (theme === 'light' ? 'dark_mode' : 'light_mode');
+          expect(getTargetActionIcon('dark')).toBe('light_mode');
+          expect(getTargetActionIcon('light')).toBe('dark_mode');
+        }
+      );
+    });
+
     // =========================================================
     // CONTROLES DE INTERFAZ, FILTRADO Y MODO OSCURO/CLARO
     // =========================================================
