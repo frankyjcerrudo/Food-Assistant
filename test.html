@@ -339,7 +339,7 @@
     }
 
     function expect(actual) {
-      return {
+      const matchers = {
         toBe(expected) {
           if (actual !== expected) throw new Error(`Esperado ${JSON.stringify(expected)}, recibido ${JSON.stringify(actual)}`);
         },
@@ -362,6 +362,18 @@
           if (actual !== null) throw new Error(`Se esperaba null, recibido ${actual}`);
         }
       };
+      matchers.not = {
+        toBe(expected) {
+          if (actual === expected) throw new Error('No se esperaba ' + JSON.stringify(expected));
+        },
+        toBeNull() {
+          if (actual === null) throw new Error('No se esperaba null');
+        },
+        toBeDefined() {
+          if (actual !== undefined) throw new Error('No se esperaba que estuviese definido');
+        }
+      };
+      return matchers;
     }
 
     // =========================================================

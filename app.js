@@ -367,7 +367,7 @@ const RecipeParser = {
 
   parseIngredientLine(rawLine) {
     if (!rawLine || typeof rawLine !== 'string') return null;
-    let clean = rawLine.replace(/^[•\-\*\d+\.\)]\s*/, '').trim();
+    let clean = rawLine.replace(/^([\u2022\-\*]|\d+[\.\)])\s*/, '').trim();
     if (!clean) return null;
 
     let amount = 1;
