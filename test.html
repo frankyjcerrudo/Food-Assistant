@@ -735,32 +735,25 @@
           assertions: 'Valida que extrae "Tortilla de Patatas" con 10 min de prep, 20 min de cocción, 4 raciones, 3 ingredientes y 2 pasos de elaboración.'
         },
         () => {
-          const html = 
-            <!DOCTYPE html>
-            <html>
-              <head>
-                <script type="application/ld+json">
-                {
-                  "@context": "https://schema.org",
-                  "@type": "Recipe",
-                  "name": "Tortilla de Patatas",
-                  "prepTime": "PT10M",
-                  "cookTime": "PT20M",
-                  "recipeYield": "4 personas",
-                  "recipeIngredient": [
-                    "5 patatas medianas",
-                    "6 huevos",
-                    "1 cebolla"
-                  ],
-                  "recipeInstructions": [
-                    { "@type": "HowToStep", "text": "Pelar y cortar las patatas." },
-                    { "@type": "HowToStep", "text": "Freír a fuego medio y cuajar con los huevos." }
-                  ]
-                }
-                <\/script>
-              </head>
-            </html>
-          ;
+          const html = '<!DOCTYPE html><html><head><script type="application/ld+json">' +
+            JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Recipe",
+              "name": "Tortilla de Patatas",
+              "prepTime": "PT10M",
+              "cookTime": "PT20M",
+              "recipeYield": "4 personas",
+              "recipeIngredient": [
+                "5 patatas medianas",
+                "6 huevos",
+                "1 cebolla"
+              ],
+              "recipeInstructions": [
+                { "@type": "HowToStep", "text": "Pelar y cortar las patatas." },
+                { "@type": "HowToStep", "text": "Freír a fuego medio y cuajar con los huevos." }
+              ]
+            }) +
+            '<' + '/script></head></html>';
 
           const extracted = window.RecipeParser.extractJsonLdFromHtml(html);
           expect(extracted).not.toBeNull();
@@ -784,9 +777,8 @@
           assertions: 'Verifica que localiza el objeto de tipo Recipe dentro de @graph y extrae "Guacamole Casero".'
         },
         () => {
-          const html = 
-            <script type="application/ld+json">
-            {
+          const html = '<script type="application/ld+json">' +
+            JSON.stringify({
               "@context": "https://schema.org",
               "@graph": [
                 { "@type": "WebSite", "name": "Blog Gastronómico" },
@@ -797,9 +789,8 @@
                   "recipeIngredient": ["2 aguacates maduros", "1 lima"]
                 }
               ]
-            }
-            <\/script>
-          ;
+            }) +
+            '<' + '/script>';
 
           const extracted = window.RecipeParser.extractJsonLdFromHtml(html);
           expect(extracted).not.toBeNull();
@@ -814,21 +805,21 @@
           assertions: 'Valida que extrae "Salmón con Verduras", 3 raciones, 25 min, 3 ingredientes y 3 pasos de preparación.'
         },
         () => {
-          const text = 
-          Salmón con Verduras al Vapor
-          Raciones: 3
-          Tiempo: 25 min
-
-          Ingredientes:
-          - 3 lomos de salmón
-          - 200 g de brócoli
-          - 1 cucharada de aceite de oliva
-
-          Instrucciones:
-          1. Lavar y cortar el brócoli en ramilletes.
-          2. Cocinar el salmón a la plancha 4 minutos por lado.
-          3. Servir caliente.
-          ;
+          const text = [
+            "Salmón con Verduras al Vapor",
+            "Raciones: 3",
+            "Tiempo: 25 min",
+            "",
+            "Ingredientes:",
+            "- 3 lomos de salmón",
+            "- 200 g de brócoli",
+            "- 1 cucharada de aceite de oliva",
+            "",
+            "Instrucciones:",
+            "1. Lavar y cortar el brócoli en ramilletes.",
+            "2. Cocinar el salmón a la plancha 4 minutos por lado.",
+            "3. Servir caliente."
+          ].join("\n");
 
           const recipe = window.RecipeParser.parseRecipeText(text);
           expect(recipe).not.toBeNull();
