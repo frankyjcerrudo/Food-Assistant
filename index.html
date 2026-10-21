@@ -577,37 +577,85 @@
 
 <!-- MODAL: UNIVERSAL RECIPE IMPORTER -->
 <div class="modal-overlay" id="modal-recipe-import">
-  <div class="modal-content" style="padding: 20px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+  <div class="modal-content" style="padding: 20px; max-width: 520px; width: 92%; max-height: 88vh; display: flex; flex-direction: column;">
+    <!-- Modal Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
       <h3 style="font-size: 16px; font-weight: 500; display: flex; align-items: center; gap: 6px;">
-        <span class="material-symbols-outlined" style="color: var(--m3-primary);">add_link</span> Importar Receta
+        <span class="material-symbols-outlined" style="color: var(--m3-primary);">add_link</span> Importador de Recetas
       </h3>
       <button class="btn btn-ghost btn-icon" id="btn-close-import-modal">
         <span class="material-symbols-outlined">close</span>
       </button>
     </div>
-    <p style="font-size: 13px; color: var(--m3-on-surface-variant); margin-bottom: 14px;">
-      Pega un enlace de cualquier web de recetas o el texto de una publicación de Instagram / TikTok / blog.
+    <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px; line-height: 1.4;">
+      Extrae automáticamente recetas desde enlaces web (estándar <strong>Schema.org / JSON-LD</strong>) o texto estructurado sin coste ni necesidad de IA.
     </p>
 
-    <div class="form-group">
-      <label class="form-label">Enlace Web o Red Social</label>
-      <input type="url" class="form-input" id="import-url-input" placeholder="https://...">
-    </div>
-
-    <div class="form-group">
-      <label class="form-label">O pega el texto / descripción</label>
-      <textarea class="form-textarea" id="import-text-input" rows="3" placeholder="Pega ingredientes y pasos aquí..."></textarea>
-    </div>
-
-    <div style="display: flex; justify-content: flex-end; gap: 8px;">
-      <button class="btn btn-secondary" id="btn-cancel-import">Cancelar</button>
-      <button class="btn btn-primary" id="btn-execute-import">
-        <span class="material-symbols-outlined icon-sm">auto_awesome</span> Extraer con Gemini
+    <!-- Import Tabs: URL vs Texto -->
+    <div style="display: flex; gap: 8px; margin-bottom: 14px; background: var(--m3-surface-container); padding: 4px; border-radius: var(--radius-md);">
+      <button type="button" id="tab-import-url" class="btn btn-sm active" style="flex: 1; border-radius: var(--radius-sm); font-size: 12px; padding: 6px 10px; background: var(--m3-surface); color: var(--m3-on-surface); box-shadow: var(--elevation-1);">
+        <span class="material-symbols-outlined icon-sm">language</span> Enlace Web
+      </button>
+      <button type="button" id="tab-import-text" class="btn btn-sm btn-ghost" style="flex: 1; border-radius: var(--radius-sm); font-size: 12px; padding: 6px 10px; color: var(--m3-on-surface-variant);">
+        <span class="material-symbols-outlined icon-sm">description</span> Texto / Notas
       </button>
     </div>
-    
-    <div id="import-status-indicator" style="margin-top: 10px; font-size: 12px; display: none;"></div>
+
+    <!-- Scrollable Body -->
+    <div style="overflow-y: auto; flex: 1; padding-right: 2px;">
+      <!-- Section URL -->
+      <div id="section-import-url">
+        <div class="form-group" style="margin-bottom: 10px;">
+          <label class="form-label" style="font-size: 12px;">URL de la receta (Directo al Paladar, Cookpad, AllRecipes...)</label>
+          <input type="url" class="form-input" id="import-url-input" placeholder="https://www.directoalpaladar.com/recetas/..." style="font-size: 13px;">
+        </div>
+        <p style="font-size: 11px; color: var(--m3-on-surface-variant); margin-bottom: 12px; line-height: 1.35;">
+          💡 <em>Tip: Si la página web bloquea peticiones de terceros por políticas CORS, puedes copiar su texto o código y pegarlo en la pestaña 'Texto / Notas'.</em>
+        </p>
+      </div>
+
+      <!-- Section Text -->
+      <div id="section-import-text" style="display: none;">
+        <div class="form-group" style="margin-bottom: 10px;">
+          <label class="form-label" style="font-size: 12px;">Texto estructurado o bloque JSON-LD</label>
+          <textarea class="form-textarea" id="import-text-input" rows="5" placeholder="Título de la receta&#10;Raciones: 4&#10;Tiempo: 20 min&#10;&#10;Ingredientes:&#10;- 200g de pasta&#10;- 2 tomates cherry&#10;&#10;Instrucciones:&#10;1. Hervir agua..." style="font-size: 12px; font-family: inherit;"></textarea>
+        </div>
+      </div>
+
+      <!-- Live Preview Container (shows extracted recipe before saving) -->
+      <div id="import-preview-box" style="display: none; margin-top: 10px; padding: 12px; background: var(--m3-surface-container-low); border: 1px solid var(--m3-outline-variant); border-radius: var(--radius-md);">
+        <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+          <img id="import-preview-img" src="" alt="Foto" style="width: 54px; height: 54px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--m3-outline-variant); flex-shrink: 0;">
+          <div style="min-width: 0; flex: 1;">
+            <h4 id="import-preview-title" style="font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--m3-on-surface);">Título</h4>
+            <div style="display: flex; gap: 8px; font-size: 11px; color: var(--m3-on-surface-variant); margin-top: 3px; flex-wrap: wrap;">
+              <span id="import-preview-servings"><span class="material-symbols-outlined icon-sm">group</span> 2 raciones</span>
+              <span id="import-preview-time"><span class="material-symbols-outlined icon-sm">schedule</span> 25 min</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap;">
+          <span class="badge" id="import-preview-badge-ing" style="background: var(--color-brand-container); color: var(--color-brand-on-container); font-size: 11px; padding: 3px 8px; border-radius: var(--radius-full); font-weight: 500;">✓ 0 ingredientes</span>
+          <span class="badge" id="import-preview-badge-steps" style="background: var(--m3-secondary-container); color: var(--m3-on-secondary-container); font-size: 11px; padding: 3px 8px; border-radius: var(--radius-full); font-weight: 500;">✓ 0 pasos</span>
+        </div>
+
+        <div style="max-height: 120px; overflow-y: auto; font-size: 12px; color: var(--m3-on-surface); border-top: 1px dashed var(--m3-outline-variant); padding-top: 6px;" id="import-preview-summary-list"></div>
+      </div>
+
+      <div id="import-status-indicator" style="margin-top: 10px; font-size: 12px; display: none;"></div>
+    </div>
+
+    <!-- Modal Footer Actions -->
+    <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; border-top: 1px solid var(--m3-outline-variant); padding-top: 12px;">
+      <button type="button" class="btn btn-secondary btn-sm" id="btn-cancel-import">Cancelar</button>
+      <button type="button" class="btn btn-primary btn-sm" id="btn-execute-import">
+        <span class="material-symbols-outlined icon-sm">download</span> Analizar e Importar
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" id="btn-confirm-save-import" style="display: none; background-color: var(--color-brand); color: #ffffff;">
+        <span class="material-symbols-outlined icon-sm">check_circle</span> Guardar en Recetas
+      </button>
+    </div>
   </div>
 </div>
 
@@ -779,6 +827,6 @@
 </div>
 
 <script src="config.js?v=8"></script>
-<script src="app.js?v=8"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>

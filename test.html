@@ -313,7 +313,7 @@
 
   <!-- Entorno y dependencias de la app -->
   <script src="config.js?v=8"></script>
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=9"></script>
 
   <script>
     const suites = [];
@@ -669,6 +669,175 @@
           const getTargetActionIcon = (theme) => (theme === 'light' ? 'dark_mode' : 'light_mode');
           expect(getTargetActionIcon('dark')).toBe('light_mode');
           expect(getTargetActionIcon('light')).toBe('dark_mode');
+        }
+      );
+    });
+
+    describe('6. US-15: Importador de Recetas (Schema.org / JSON-LD & Texto)', () => {
+      it(
+        'parseIsoDuration convierte duraciones ISO 8601 a minutos correctamente',
+        {
+          purpose: 'Convertir duraciones en formato estándar ISO 8601 (PT15M, PT1H30M, PT2H) o expresiones legibles (25 min) a minutos enteros exactos para tiempo de cocinado y preparación.',
+          assertions: 'Verifica que PT15M devuelve 15, PT1H30M devuelve 90, PT2H devuelve 120, 25 min devuelve 25 y null devuelve el fallback 15.'
+        },
+        () => {
+          expect(window.RecipeParser.parseIsoDuration('PT15M')).toBe(15);
+          expect(window.RecipeParser.parseIsoDuration('PT1H30M')).toBe(90);
+          expect(window.RecipeParser.parseIsoDuration('PT2H')).toBe(120);
+          expect(window.RecipeParser.parseIsoDuration('25 min')).toBe(25);
+          expect(window.RecipeParser.parseIsoDuration(null)).toBe(15);
+        }
+      );
+
+      it(
+        'parseServings extrae el número de raciones o porciones',
+        {
+          purpose: 'Extraer el número de raciones a partir de cadenas libres de rendimiento (recipeYield) como "4 raciones", "Para 6 personas" o enteros puros.',
+          assertions: 'Verifica que 4, "4 raciones" y "Para 6 personas" devuelven 4, 4 y 6 respectivamente, con fallback a 2 si es nulo.'
+        },
+        () => {
+          expect(window.RecipeParser.parseServings(4)).toBe(4);
+          expect(window.RecipeParser.parseServings('4 raciones')).toBe(4);
+          expect(window.RecipeParser.parseServings('Para 6 personas')).toBe(6);
+          expect(window.RecipeParser.parseServings(null)).toBe(2);
+        }
+      );
+
+      it(
+        'parseIngredientLine desglosa cantidad, unidad y clasifica el pasillo del súper',
+        {
+          purpose: 'Analizar líneas de texto libre de ingredientes (ej. "200 g de pechuga", "3 huevos", "1/2 cucharada de sal") extrayendo cantidad numérica, unidad normalizada y clasificando automáticamente el pasillo de la compra (aisle).',
+          assertions: 'Verifica que la pechuga va a "meat" con 200g, los huevos a "dairy" con 3 ud, y la sal a "spices" con 0.5 cda.'
+        },
+        () => {
+          const ing1 = window.RecipeParser.parseIngredientLine('200 g de pechuga de pollo');
+          expect(ing1.amount).toBe(200);
+          expect(ing1.unit).toBe('g');
+          expect(ing1.name).toBe('Pechuga de pollo');
+          expect(ing1.aisle).toBe('meat');
+
+          const ing2 = window.RecipeParser.parseIngredientLine('3 huevos');
+          expect(ing2.amount).toBe(3);
+          expect(ing2.unit).toBe('ud');
+          expect(ing2.aisle).toBe('dairy');
+
+          const ing3 = window.RecipeParser.parseIngredientLine('1/2 cucharada de sal');
+          expect(ing3.amount).toBe(0.5);
+          expect(ing3.unit).toBe('cda');
+          expect(ing3.aisle).toBe('spices');
+        }
+      );
+
+      it(
+        'extractJsonLdFromHtml y parseSchemaRecipe estructuran la receta web completa',
+        {
+          purpose: 'Extraer y mapear un bloque <script type="application/ld+json"> con @type="Recipe" al formato interno de receta de Food Assistant con ingredientes, tiempos y pasos.',
+          assertions: 'Valida que extrae "Tortilla de Patatas" con 10 min de prep, 20 min de cocción, 4 raciones, 3 ingredientes y 2 pasos de elaboración.'
+        },
+        () => {
+          const html = 
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <script type="application/ld+json">
+                {
+                  "@context": "https://schema.org",
+                  "@type": "Recipe",
+                  "name": "Tortilla de Patatas",
+                  "prepTime": "PT10M",
+                  "cookTime": "PT20M",
+                  "recipeYield": "4 personas",
+                  "recipeIngredient": [
+                    "5 patatas medianas",
+                    "6 huevos",
+                    "1 cebolla"
+                  ],
+                  "recipeInstructions": [
+                    { "@type": "HowToStep", "text": "Pelar y cortar las patatas." },
+                    { "@type": "HowToStep", "text": "Freír a fuego medio y cuajar con los huevos." }
+                  ]
+                }
+                <\/script>
+              </head>
+            </html>
+          ;
+
+          const extracted = window.RecipeParser.extractJsonLdFromHtml(html);
+          expect(extracted).not.toBeNull();
+          expect(extracted.name).toBe('Tortilla de Patatas');
+
+          const recipe = window.RecipeParser.parseSchemaRecipe(extracted);
+          expect(recipe.title).toBe('Tortilla de Patatas');
+          expect(recipe.prepTimeMinutes).toBe(10);
+          expect(recipe.cookTimeMinutes).toBe(20);
+          expect(recipe.servings).toBe(4);
+          expect(recipe.ingredients).toHaveLength(3);
+          expect(recipe.instructions).toHaveLength(2);
+          expect(recipe.instructions[0].text).toBe('Pelar y cortar las patatas.');
+        }
+      );
+
+      it(
+        'extractJsonLdFromHtml soporta grafos Schema.org anidados (@graph)',
+        {
+          purpose: 'Garantizar compatibilidad con webs de recetas basadas en WordPress (Yoast, WPRM) donde la receta está encapsulada dentro de un grafo de entidades.',
+          assertions: 'Verifica que localiza el objeto de tipo Recipe dentro de @graph y extrae "Guacamole Casero".'
+        },
+        () => {
+          const html = 
+            <script type="application/ld+json">
+            {
+              "@context": "https://schema.org",
+              "@graph": [
+                { "@type": "WebSite", "name": "Blog Gastronómico" },
+                {
+                  "@type": "Recipe",
+                  "name": "Guacamole Casero",
+                  "recipeYield": 2,
+                  "recipeIngredient": ["2 aguacates maduros", "1 lima"]
+                }
+              ]
+            }
+            <\/script>
+          ;
+
+          const extracted = window.RecipeParser.extractJsonLdFromHtml(html);
+          expect(extracted).not.toBeNull();
+          expect(extracted.name).toBe('Guacamole Casero');
+        }
+      );
+
+      it(
+        'parseRecipeText extrae recetas desde notas o texto plano estructurado',
+        {
+          purpose: 'Permitir al usuario pegar texto sin formato ni etiquetas HTML (notas de móvil, WhatsApp o blogs) extrayendo título, raciones, tiempos, lista de ingredientes e instrucciones numeradas.',
+          assertions: 'Valida que extrae "Salmón con Verduras", 3 raciones, 25 min, 3 ingredientes y 3 pasos de preparación.'
+        },
+        () => {
+          const text = 
+          Salmón con Verduras al Vapor
+          Raciones: 3
+          Tiempo: 25 min
+
+          Ingredientes:
+          - 3 lomos de salmón
+          - 200 g de brócoli
+          - 1 cucharada de aceite de oliva
+
+          Instrucciones:
+          1. Lavar y cortar el brócoli en ramilletes.
+          2. Cocinar el salmón a la plancha 4 minutos por lado.
+          3. Servir caliente.
+          ;
+
+          const recipe = window.RecipeParser.parseRecipeText(text);
+          expect(recipe).not.toBeNull();
+          expect(recipe.title).toBe('Salmón con Verduras al Vapor');
+          expect(recipe.servings).toBe(3);
+          expect(recipe.cookTimeMinutes).toBe(25);
+          expect(recipe.ingredients).toHaveLength(3);
+          expect(recipe.instructions).toHaveLength(3);
+          expect(recipe.instructions[1].text).toBe('Cocinar el salmón a la plancha 4 minutos por lado.');
         }
       );
     });

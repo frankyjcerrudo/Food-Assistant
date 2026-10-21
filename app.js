@@ -297,6 +297,281 @@ class StateStore {
 
 const state = new StateStore();
 
+// ==========================================================================
+// US-15: RECIPE PARSER (SCHEMA.ORG / JSON-LD & STRUCTURED TEXT)
+// ==========================================================================
+const RecipeParser = {
+  parseIsoDuration(durationStr) {
+    if (!durationStr) return 15;
+    if (typeof durationStr === 'number') return durationStr;
+    const str = String(durationStr).trim();
+    const simpleMatch = str.match(/^(\d+)\s*(min|m|minutos)?$/i);
+    if (simpleMatch) return parseInt(simpleMatch[1], 10);
+
+    const isoRegex = /P(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?/;
+    const match = str.match(isoRegex);
+    if (match && (match[1] || match[2] || match[3])) {
+      const hours = parseInt(match[1] || '0', 10);
+      const minutes = parseInt(match[2] || '0', 10);
+      const seconds = parseInt(match[3] || '0', 10);
+      const total = hours * 60 + minutes + (seconds > 30 ? 1 : 0);
+      return total > 0 ? total : 15;
+    }
+    const anyNum = str.match(/\d+/);
+    return anyNum ? parseInt(anyNum[0], 10) : 15;
+  },
+
+  parseServings(yieldVal) {
+    if (!yieldVal) return 2;
+    if (typeof yieldVal === 'number') return yieldVal;
+    const str = Array.isArray(yieldVal) ? yieldVal.join(' ') : String(yieldVal);
+    const match = str.match(/\d+/);
+    return match ? parseInt(match[0], 10) : 2;
+  },
+
+  categorizeAisle(ingredientName) {
+    const text = ingredientName.toLowerCase();
+    if (/pollo|ternera|carne|cerdo|pavo|jamón|salmón|pescado|atún|merluza|gambas|langostinos|bacon|lomo|chorizo|hamburguesa|filete/i.test(text)) {
+      return 'meat';
+    }
+    if (/leche|queso|mantequilla|yogur|nata|huevo|huevos|parmesano|mozzarella|crema/i.test(text)) {
+      return 'dairy';
+    }
+    if (/tomate|cebolla|ajo|patata|aguacate|espinaca|lechuga|zanahoria|limón|manzana|plátano|champiñón|seta|pimiento|calabacín|pepino|fresa|arándano/i.test(text)) {
+      return 'produce';
+    }
+    if (/harina|pan|levadura|masa|hojaldre|tortilla|galleta/i.test(text)) {
+      return 'bakery';
+    }
+    if (/sal|pimienta|orégano|comino|pimentón|curry|canela|albahaca|perejil|romero|tomillo|nuez moscada|azafrán/i.test(text)) {
+      return 'spices';
+    }
+    return 'pantry';
+  },
+
+  normalizeUnit(rawUnit) {
+    const u = rawUnit.toLowerCase().trim();
+    if (/^(g|gramos|gr)$/.test(u)) return 'g';
+    if (/^(kg|kilos|kilo)$/.test(u)) return 'kg';
+    if (/^(ml|mililitros)$/.test(u)) return 'ml';
+    if (/^(l|litro|litros)$/.test(u)) return 'l';
+    if (/^(cda|cucharada|cucharadas)$/.test(u)) return 'cda';
+    if (/^(cdta|cucharadita|cucharaditas)$/.test(u)) return 'cdta';
+    if (/^(taza|tazas)$/.test(u)) return 'taza';
+    if (/^(vaso|vasos)$/.test(u)) return 'vaso';
+    if (/^(pizca|pizcas)$/.test(u)) return 'pizca';
+    if (/^(diente|dientes)$/.test(u)) return 'diente';
+    if (/^(rebanada|rebanadas)$/.test(u)) return 'rebanada';
+    return 'ud';
+  },
+
+  parseIngredientLine(rawLine) {
+    if (!rawLine || typeof rawLine !== 'string') return null;
+    let clean = rawLine.replace(/^[•\-\*\d+\.\)]\s*/, '').trim();
+    if (!clean) return null;
+
+    let amount = 1;
+    let unit = 'ud';
+    let name = clean;
+
+    const fractionRegex = /^(\d+)?\s*(\d+)\/(\d+)\s*(g|kg|ml|l|cda|cdta|cucharada|cucharadas|cucharadita|cucharaditas|taza|tazas|vaso|vasos|pizca|diente|dientes|rebanada|rebanadas)?\s*(?:de\s+)?(.*)$/i;
+    const fracMatch = clean.match(fractionRegex);
+
+    if (fracMatch) {
+      const whole = fracMatch[1] ? parseInt(fracMatch[1], 10) : 0;
+      const num = parseInt(fracMatch[2], 10);
+      const denom = parseInt(fracMatch[3], 10) || 1;
+      amount = Math.round((whole + num / denom) * 100) / 100;
+      unit = fracMatch[4] ? this.normalizeUnit(fracMatch[4]) : 'ud';
+      name = fracMatch[5].trim();
+    } else {
+      const numRegex = /^([\d\.,]+)\s*(g|kg|ml|l|litro|litros|gramos|kilos|cda|cdta|cucharada|cucharadas|cucharadita|cucharaditas|taza|tazas|vaso|vasos|pizca|pizcas|diente|dientes|rebanada|rebanadas|rama|ramas)?\s*(?:de\s+)?(.*)$/i;
+      const match = clean.match(numRegex);
+      if (match) {
+        amount = parseFloat(match[1].replace(',', '.'));
+        if (isNaN(amount)) amount = 1;
+        unit = match[2] ? this.normalizeUnit(match[2]) : 'ud';
+        name = match[3].trim() || match[2] || clean;
+      }
+    }
+
+    name = name.replace(/^de\s+/i, '').trim();
+    if (!name) name = clean;
+
+    return {
+      id: 'ing-' + Math.random().toString(36).substr(2, 9),
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      amount: amount,
+      unit: unit,
+      aisle: this.categorizeAisle(name)
+    };
+  },
+
+  extractJsonLdFromHtml(html) {
+    if (!html) return null;
+    const scriptRegex = /<script\s+[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+    let match;
+    const jsonObjects = [];
+
+    while ((match = scriptRegex.exec(html)) !== null) {
+      try {
+        const rawJson = match[1].trim();
+        const parsed = JSON.parse(rawJson);
+        if (Array.isArray(parsed)) {
+          jsonObjects.push(...parsed);
+        } else {
+          jsonObjects.push(parsed);
+        }
+      } catch (e) {}
+    }
+
+    for (const item of jsonObjects) {
+      if (item['@graph'] && Array.isArray(item['@graph'])) {
+        const recipeInGraph = item['@graph'].find(obj => this.isRecipeType(obj['@type']));
+        if (recipeInGraph) return recipeInGraph;
+      }
+      if (this.isRecipeType(item['@type'])) {
+        return item;
+      }
+    }
+    return null;
+  },
+
+  isRecipeType(typeVal) {
+    if (!typeVal) return false;
+    if (typeof typeVal === 'string') return typeVal.toLowerCase().includes('recipe');
+    if (Array.isArray(typeVal)) return typeVal.some(t => String(t).toLowerCase().includes('recipe'));
+    return false;
+  },
+
+  parseSchemaRecipe(schema) {
+    if (!schema) return null;
+    let imageUrl = '';
+    if (schema.image) {
+      if (typeof schema.image === 'string') imageUrl = schema.image;
+      else if (Array.isArray(schema.image) && schema.image.length > 0) imageUrl = typeof schema.image[0] === 'string' ? schema.image[0] : (schema.image[0]?.url || '');
+      else if (schema.image.url) imageUrl = schema.image.url;
+    }
+    if (!imageUrl) imageUrl = "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop&q=80";
+
+    const rawIngredients = schema.recipeIngredient || schema.ingredients || [];
+    const ingredients = [];
+    if (Array.isArray(rawIngredients)) {
+      rawIngredients.forEach(line => {
+        const parsed = this.parseIngredientLine(String(line));
+        if (parsed) ingredients.push(parsed);
+      });
+    }
+
+    const rawInstructions = schema.recipeInstructions || schema.instructions || [];
+    const instructions = [];
+    const processItem = (item) => {
+      if (!item) return;
+      if (typeof item === 'string') {
+        const cleaned = item.trim();
+        if (cleaned) instructions.push({ step: instructions.length + 1, text: cleaned, timerMinutes: null });
+      } else if (item.text) {
+        instructions.push({ step: instructions.length + 1, text: item.text.trim(), timerMinutes: null });
+      } else if (item.itemListElement && Array.isArray(item.itemListElement)) {
+        item.itemListElement.forEach(sub => processItem(sub));
+      }
+    };
+
+    if (Array.isArray(rawInstructions)) rawInstructions.forEach(inst => processItem(inst));
+    else if (typeof rawInstructions === 'string') rawInstructions.split(/\r?\n/).forEach(l => processItem(l));
+
+    const tags = ['Importada'];
+    if (schema.recipeCategory) {
+      const cats = Array.isArray(schema.recipeCategory) ? schema.recipeCategory : [schema.recipeCategory];
+      cats.forEach(c => {
+        const catStr = String(c).trim();
+        if (catStr && !tags.includes(catStr)) tags.push(catStr);
+      });
+    }
+
+    return {
+      id: 'rec-' + Date.now(),
+      title: schema.name ? String(schema.name).trim() : 'Receta Web Importada',
+      description: schema.description ? String(schema.description).trim() : '',
+      imageUrl: imageUrl,
+      prepTimeMinutes: this.parseIsoDuration(schema.prepTime),
+      cookTimeMinutes: this.parseIsoDuration(schema.cookTime || schema.totalTime),
+      servings: this.parseServings(schema.recipeYield),
+      tags: tags.slice(0, 4),
+      ingredients: ingredients,
+      instructions: instructions
+    };
+  },
+
+  parseRecipeText(rawText) {
+    if (!rawText || typeof rawText !== 'string') return null;
+    const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) return null;
+
+    let title = lines[0].replace(/^#+\s*|^Título:\s*/i, '');
+    let servings = 2;
+    let prepTimeMinutes = 15;
+    let cookTimeMinutes = 20;
+
+    const ingredients = [];
+    const instructions = [];
+    let currentSection = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const servingsMatch = line.match(/(?:raciones|personas|comensales|porciones|servings)[:\s]+(\d+)/i);
+      if (servingsMatch) {
+        servings = parseInt(servingsMatch[1], 10);
+        continue;
+      }
+      const timeMatch = line.match(/(?:tiempo|preparación|cocción)[:\s]+(\d+)\s*(?:min|minutos)?/i);
+      if (timeMatch) {
+        cookTimeMinutes = parseInt(timeMatch[1], 10);
+        continue;
+      }
+      if (/^ingredientes:?$/i.test(line) || /^#+\s*ingredientes/i.test(line)) {
+        currentSection = 'ingredients';
+        continue;
+      }
+      if (/^(?:instrucciones|preparación|pasos|elaboración):?$/i.test(line) || /^#+\s*(?:instrucciones|pasos|preparación)/i.test(line)) {
+        currentSection = 'instructions';
+        continue;
+      }
+
+      if (currentSection === 'ingredients') {
+        const parsed = this.parseIngredientLine(line);
+        if (parsed) ingredients.push(parsed);
+      } else if (currentSection === 'instructions') {
+        const stepText = line.replace(/^\d+[\.\)]\s*/, '').trim();
+        if (stepText) {
+          instructions.push({ step: instructions.length + 1, text: stepText, timerMinutes: null });
+        }
+      } else {
+        if (/^[\d\-\*•]/.test(line)) {
+          const parsed = this.parseIngredientLine(line);
+          if (parsed) ingredients.push(parsed);
+        }
+      }
+    }
+
+    return {
+      id: 'rec-' + Date.now(),
+      title: title || 'Receta de Notas',
+      description: 'Receta importada desde texto estructurado.',
+      imageUrl: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop&q=80',
+      prepTimeMinutes: prepTimeMinutes,
+      cookTimeMinutes: cookTimeMinutes,
+      servings: servings,
+      tags: ['Importada', 'Notas'],
+      ingredients: ingredients,
+      instructions: instructions
+    };
+  }
+};
+if (typeof window !== 'undefined') {
+  window.RecipeParser = RecipeParser;
+}
+
 // UI Controller
 class FoodAssistantApp {
   constructor() {
@@ -719,11 +994,14 @@ class FoodAssistantApp {
     document.getElementById('btn-submit-auth')?.addEventListener('click', () => this.handleAuthSubmit());
     document.getElementById('btn-auth-logout')?.addEventListener('click', () => this.logoutCloudUser());
 
-    // Importer
+    // Importer (US-15: Schema.org & Text Parser)
     document.getElementById('btn-quick-import')?.addEventListener('click', () => this.openImportModal());
     document.getElementById('btn-close-import-modal')?.addEventListener('click', () => this.closeImportModal());
     document.getElementById('btn-cancel-import')?.addEventListener('click', () => this.closeImportModal());
+    document.getElementById('tab-import-url')?.addEventListener('click', () => this.switchImportTab('url'));
+    document.getElementById('tab-import-text')?.addEventListener('click', () => this.switchImportTab('text'));
     document.getElementById('btn-execute-import')?.addEventListener('click', () => this.handleRecipeImport());
+    document.getElementById('btn-confirm-save-import')?.addEventListener('click', () => this.confirmSaveImportRecipe());
 
     // Recipe CRUD
     document.getElementById('btn-open-create-recipe')?.addEventListener('click', () => this.openCreateRecipeModal());
@@ -2316,101 +2594,201 @@ class FoodAssistantApp {
     }
   }
 
-  // UNIVERSAL RECIPE IMPORTER
+// ==========================================================================
+  // UNIVERSAL RECIPE IMPORTER (US-15: SCHEMA.ORG JSON-LD & TEXT PARSER)
+  // ==========================================================================
   openImportModal() {
     this.modalRecipeImport.classList.add('active');
     document.getElementById('import-url-input').value = '';
     document.getElementById('import-text-input').value = '';
     const status = document.getElementById('import-status-indicator');
     if (status) status.style.display = 'none';
+    const previewBox = document.getElementById('import-preview-box');
+    if (previewBox) previewBox.style.display = 'none';
+    const btnExecute = document.getElementById('btn-execute-import');
+    if (btnExecute) btnExecute.style.display = 'inline-flex';
+    const btnConfirm = document.getElementById('btn-confirm-save-import');
+    if (btnConfirm) btnConfirm.style.display = 'none';
+    this.pendingImportRecipe = null;
+    this.switchImportTab('url');
   }
 
   closeImportModal() {
     this.modalRecipeImport.classList.remove('active');
+    this.pendingImportRecipe = null;
+  }
+
+  switchImportTab(tab) {
+    const tabUrl = document.getElementById('tab-import-url');
+    const tabText = document.getElementById('tab-import-text');
+    const secUrl = document.getElementById('section-import-url');
+    const secText = document.getElementById('section-import-text');
+    const status = document.getElementById('import-status-indicator');
+    if (status) status.style.display = 'none';
+
+    if (tab === 'url') {
+      if (tabUrl) {
+        tabUrl.style.background = 'var(--m3-surface)';
+        tabUrl.style.color = 'var(--m3-on-surface)';
+        tabUrl.style.boxShadow = 'var(--elevation-1)';
+      }
+      if (tabText) {
+        tabText.style.background = 'transparent';
+        tabText.style.color = 'var(--m3-on-surface-variant)';
+        tabText.style.boxShadow = 'none';
+      }
+      if (secUrl) secUrl.style.display = 'block';
+      if (secText) secText.style.display = 'none';
+    } else {
+      if (tabText) {
+        tabText.style.background = 'var(--m3-surface)';
+        tabText.style.color = 'var(--m3-on-surface)';
+        tabText.style.boxShadow = 'var(--elevation-1)';
+      }
+      if (tabUrl) {
+        tabUrl.style.background = 'transparent';
+        tabUrl.style.color = 'var(--m3-on-surface-variant)';
+        tabUrl.style.boxShadow = 'none';
+      }
+      if (secText) secText.style.display = 'block';
+      if (secUrl) secUrl.style.display = 'none';
+    }
   }
 
   async handleRecipeImport() {
-    const url = document.getElementById('import-url-input').value.trim();
-    const text = document.getElementById('import-text-input').value.trim();
+    const url = document.getElementById('import-url-input')?.value.trim() || '';
+    const text = document.getElementById('import-text-input')?.value.trim() || '';
     const status = document.getElementById('import-status-indicator');
+    const previewBox = document.getElementById('import-preview-box');
+    const btnExecute = document.getElementById('btn-execute-import');
+    const btnConfirm = document.getElementById('btn-confirm-save-import');
 
-    if (!url && !text) {
-      alert("Por favor, introduce un enlace o pega texto de la receta.");
+    const isUrlActive = document.getElementById('section-import-url')?.style.display !== 'none';
+    const targetInput = isUrlActive ? url : text;
+
+    if (!targetInput) {
+      alert(isUrlActive ? "Por favor, introduce una URL de receta." : "Por favor, pega el texto de la receta.");
       return;
     }
 
     if (status) {
       status.style.display = 'block';
       status.style.color = 'var(--m3-primary)';
-      status.textContent = 'Extrayendo ingredientes y pasos con Gemini...';
+      status.innerHTML = '<span class="material-symbols-outlined icon-sm" style="animation: spin 1s linear infinite; vertical-align: middle;">sync</span> Analizando receta y extrayendo ingredientes...';
     }
 
     try {
-      const prompt = `Extrae la receta del siguiente contenido y formatea estrictamente como JSON válido con este esquema:
-{
-  "title": "Nombre del plato",
-  "description": "Breve descripción",
-  "prepTimeMinutes": 10,
-  "cookTimeMinutes": 15,
-  "servings": 2,
-  "tags": ["Saludable"],
-  "ingredients": [{"name": "Ingrediente", "amount": 100, "unit": "g", "aisle": "produce"}],
-  "instructions": [{"step": 1, "text": "Paso...", "timerMinutes": 5}]
-}
-Contenido: ${url ? `Enlace: ${url}` : ''}\n${text}`;
+      let extractedRecipe = null;
 
-      let recipeJson = null;
-      if (state.settings.geminiApiKey) {
-        const raw = await this.callGeminiApi(prompt, "Responde única y exclusivamente con JSON puro sin formato markdown ni explicaciones.");
-        const cleaned = raw.replace(/```json/g, '').replace(/```/g, '').trim();
-        recipeJson = JSON.parse(cleaned);
+      if (isUrlActive) {
+        // Mode 1: URL or Raw JSON-LD in URL field
+        if (url.startsWith('{') || url.includes('<script')) {
+          const jsonLd = RecipeParser.extractJsonLdFromHtml(url) || JSON.parse(url);
+          extractedRecipe = RecipeParser.parseSchemaRecipe(jsonLd);
+        } else {
+          // Fetch URL via CORS proxy
+          let html = null;
+          const proxies = [
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+            `https://corsproxy.io/?url=${encodeURIComponent(url)}`
+          ];
+
+          for (const proxyUrl of proxies) {
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 8000);
+              const resp = await fetch(proxyUrl, { signal: controller.signal });
+              clearTimeout(timeoutId);
+              if (resp.ok) {
+                html = await resp.text();
+                if (html && html.includes('application/ld+json')) break;
+              }
+            } catch (proxyErr) {
+              // Try next proxy
+            }
+          }
+
+          if (html) {
+            const schemaObj = RecipeParser.extractJsonLdFromHtml(html);
+            if (schemaObj) {
+              extractedRecipe = RecipeParser.parseSchemaRecipe(schemaObj);
+            }
+          }
+
+          if (!extractedRecipe) {
+            throw new Error("No se detectó un bloque Schema.org Recipe en la página o la web bloqueó el acceso (CORS). Puedes copiar el texto o el bloque JSON-LD y pegarlo en la pestaña 'Texto / Notas'.");
+          }
+        }
       } else {
-        // Fallback demo extracted recipe
-        await new Promise(r => setTimeout(r, 1200));
-        recipeJson = {
-          title: url ? "Receta importada de la web" : "Receta importada de notas",
-          description: text.slice(0, 100) || "Receta extraída automáticamente.",
-          prepTimeMinutes: 15,
-          cookTimeMinutes: 20,
-          servings: 2,
-          tags: ["Importada", "Cena"],
-          ingredients: [
-            { id: "imp-1", name: "Ingrediente principal", amount: 300, unit: "g", aisle: "produce" },
-            { id: "imp-2", name: "Aceite de oliva", amount: 20, unit: "ml", aisle: "pantry" }
-          ],
-          instructions: [
-            { step: 1, text: "Preparar y cortar los ingredientes.", timerMinutes: 5 },
-            { step: 2, text: "Cocinar a fuego medio durante 15 minutos.", timerMinutes: 15 }
-          ]
-        };
+        // Mode 2: Text / Raw Paste
+        if (text.includes('<script') || text.trim().startsWith('{')) {
+          const jsonLd = RecipeParser.extractJsonLdFromHtml(text) || JSON.parse(text);
+          extractedRecipe = RecipeParser.parseSchemaRecipe(jsonLd);
+        } else {
+          extractedRecipe = RecipeParser.parseRecipeText(text);
+        }
       }
 
-      const newRecipe = {
-        id: 'rec-' + Date.now(),
-        title: recipeJson.title || "Receta Importada",
-        description: recipeJson.description || "",
-        imageUrl: "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop&q=80",
-        prepTimeMinutes: recipeJson.prepTimeMinutes || 10,
-        cookTimeMinutes: recipeJson.cookTimeMinutes || 15,
-        servings: recipeJson.servings || 2,
-        tags: recipeJson.tags || ["Importada"],
-        ingredients: recipeJson.ingredients || [],
-        instructions: recipeJson.instructions || []
-      };
+      if (!extractedRecipe || !extractedRecipe.title) {
+        throw new Error("No se pudo estructurar la receta. Comprueba que contenga ingredientes legibles.");
+      }
 
-      state.recipes.unshift(newRecipe);
-      state.save('fa_recipes', state.recipes);
-      this.syncDataWithCloud(true);
-      this.closeImportModal();
-      this.render();
-      this.openRecipeDetail(newRecipe.id);
-      alert(`¡Receta "${newRecipe.title}" importada con éxito!`);
+      // Store in memory for confirmation
+      this.pendingImportRecipe = extractedRecipe;
+
+      // Populate Live Preview UI
+      if (previewBox) {
+        previewBox.style.display = 'block';
+        const img = document.getElementById('import-preview-img');
+        if (img) img.src = extractedRecipe.imageUrl;
+        const titleEl = document.getElementById('import-preview-title');
+        if (titleEl) titleEl.textContent = extractedRecipe.title;
+        const servingsEl = document.getElementById('import-preview-servings');
+        if (servingsEl) servingsEl.innerHTML = `<span class="material-symbols-outlined icon-sm">group</span> ${extractedRecipe.servings} raciones`;
+        const timeEl = document.getElementById('import-preview-time');
+        if (timeEl) timeEl.innerHTML = `<span class="material-symbols-outlined icon-sm">schedule</span> ${extractedRecipe.prepTimeMinutes + extractedRecipe.cookTimeMinutes} min`;
+        const badgeIng = document.getElementById('import-preview-badge-ing');
+        if (badgeIng) badgeIng.textContent = `✓ ${extractedRecipe.ingredients.length} ingredientes`;
+        const badgeSteps = document.getElementById('import-preview-badge-steps');
+        if (badgeSteps) badgeSteps.textContent = `✓ ${extractedRecipe.instructions.length} pasos`;
+
+        const summaryList = document.getElementById('import-preview-summary-list');
+        if (summaryList) {
+          summaryList.innerHTML = `
+            <strong>Ingredientes:</strong> ${extractedRecipe.ingredients.map(i => `${i.amount} ${i.unit} ${i.name}`).slice(0, 5).join(', ')}${extractedRecipe.ingredients.length > 5 ? '...' : ''}
+          `;
+        }
+      }
+
+      if (status) {
+        status.style.color = 'var(--color-brand)';
+        status.innerHTML = '✓ ¡Receta extraída con éxito! Revisa la previsualización y pulsa Guardar.';
+      }
+
+      if (btnExecute) btnExecute.style.display = 'none';
+      if (btnConfirm) btnConfirm.style.display = 'inline-flex';
+
     } catch (err) {
       if (status) {
         status.style.color = 'var(--m3-error)';
-        status.textContent = 'Error al extraer la receta: ' + err.message;
+        status.textContent = 'Aviso: ' + err.message;
       }
+      if (previewBox) previewBox.style.display = 'none';
+      if (btnExecute) btnExecute.style.display = 'inline-flex';
+      if (btnConfirm) btnConfirm.style.display = 'none';
     }
+  }
+
+  confirmSaveImportRecipe() {
+    if (!this.pendingImportRecipe) return;
+    const newRecipe = this.pendingImportRecipe;
+    state.recipes.unshift(newRecipe);
+    state.save('fa_recipes', state.recipes);
+    this.syncDataWithCloud(true);
+    this.closeImportModal();
+    this.render();
+    this.switchView('view-recipes');
+    this.openRecipeDetail(newRecipe.id);
   }
 
   // SETTINGS
