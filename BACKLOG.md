@@ -29,7 +29,7 @@
 | **US-04** | Duplicar o copiar plan de semana anterior | 🔴 Alta | `Backlog` | • Botón "Copiar semana anterior" en el planificador.<br>• Confirmación de sobreescritura con modal seguro.<br>• Respeto de los momentos de comida personalizados. |
 | **US-05** | Planificación mensual / Calendario expandido | 🟡 Media | `Backlog` | • Vista mensual o navegación entre semanas (+1 / -1 semana).<br>• Persistencia por claves de fecha ISO `YYYY-MM-DD`. |
 | **US-06** | Generador de Batch Cooking | 🟢 Baja | `Backlog` | • Gemini sugiere cómo cocinar 3 platos simultáneamente el domingo para toda la semana ahorrando tiempo y energía. |
-| **US-14** | Comidas flexibles en planificador (Desayunos, meriendas, snacks) | 🔴 Alta | `Backlog` | • Soporte configurable para personas que comen >3 veces al día.<br>• Habilitar/deshabilitar Desayuno, Media Mañana, Almuerzo, Merienda, Cena, Post-entreno.<br>• Interfaz responsiva que acomode las nuevas filas sin scroll horizontal roto. |
+| **US-14** | Comidas flexibles en planificador (Desayunos, meriendas, snacks) | 🔴 Alta | `Done` | • Soporte configurable para personas que comen >3 veces al día.<br>• Habilitar/deshabilitar Desayuno, Media Mañana, Almuerzo, Merienda, Cena, Post-entreno.<br>• Interfaz responsiva que acomode las nuevas filas sin scroll horizontal roto. |
 | **US-19** | Mover recetas por la semana y cambiar momentos | 🟡 Media | `Backlog` | • Drag & drop táctil o menú contextual "Mover a..." en cada tarjeta.<br>• Permitir mover de un día a otro o de almuerzo a cena sin tener que borrar y buscar de nuevo. |
 | **US-22** | Semana estandarizada de Lunes a Domingo | 🔴 Alta | `Backlog` | • El calendario semanal empieza siempre en Lunes (ISO 8601).<br>• Fin de semana (Sábado y Domingo) claramente agrupado al final. |
 
