@@ -69,6 +69,16 @@
 
 ---
 
+## ✨ Épica 6: Ingeniería de Diseño, Micro-interacciones & Motion
+
+| ID | Historia de Usuario / Feature | Prioridad | Estado | Criterios de Aceptación (DoD) |
+| :--- | :--- | :---: | :---: | :--- |
+| **US-23** | Sistema de Micro-interacciones y Feedback Táctil (Filosofía Emil Kowalski) | 🔴 Alta | `Backlog` | • Curvas de animación custom en CSS (`--ease-out: cubic-bezier(0.23, 1, 0.32, 1)`, `--ease-drawer: cubic-bezier(0.32, 0.72, 0, 1)`).<br>• Efecto táctil `:active { transform: scale(0.97); }` en todos los botones, tarjetas, tabs y chips.<br>• Eliminación de `transition: all` para evitar repaints innecesarios y asegurar 60/120fps fluido.<br>• Apertura de modales y drawers iniciados en `scale(0.95)` y opacidad progresiva (nunca `scale(0)`). |
+| **US-24** | Sistema de Tokens, Bordes Translúcidos y Sombras Multicapa (Estándar Web Design Eng / Linear) | 🟡 Media | `Backlog` | • Bordes sutiles alfa translúcidos (`border: 1px solid rgba(255, 255, 255, 0.08)`) para dar aspecto pulido.<br>• Sombras compuestas en 2 capas (luz ambiental + foco directo) para una elevación visual realista.<br>• Escala tipográfica con ratio 2.5× y `letter-spacing: -0.02em` en cabeceras editoriales.<br>• Espaciado en múltiplos estrictos de 8px (8pt grid). |
+| **US-25** | Placeholders artísticos y estados vacíos ilustrados (Meng To / Honest Assets) | 🟡 Media | `Backlog` | • Fallback elegante para recetas sin imagen (patrón visual SVG gastronómico con gradiente suave).<br>• Ilustraciones en SVG minimalista para estados vacíos de Despensa, Lista de compra y Plan semanal.<br>• Carga progresiva suave para evitar saltos de layout (*CLS - Cumulative Layout Shift*) al cargar fotos. |
+
+---
+
 ## 🐛 Historial y Registro de Defectos (Bugs)
 
 | ID | Defecto | Severidad | Estado | Resolución |
