@@ -79,6 +79,15 @@
 
 ---
 
+## 📱 Épica 7: Ecosistema Móvil Android & Distribución
+
+| ID | Historia de Usuario / Feature | Prioridad | Estado | Criterios de Aceptación (DoD) |
+| :--- | :--- | :---: | :---: | :--- |
+| **US-26** | Publicación en Google Play Store (TWA / Capacitor AAB) | 🟢 Baja | `Backlog` | • Configurar empaquetado nativo para Android (Trusted Web Activity / Bubblewrap o Capacitor).<br>• Generar paquete `.aab` (Android App Bundle) firmado con keystore de producción.<br>• Configurar `assetlinks.json` en el dominio para verificar propiedad y navegación a pantalla completa.<br>• Cumplir políticas de Google Play Store (icono adaptativo 512×512, capturas y política de privacidad). |
+| **US-27** | Widget de Android para Pantalla de Inicio (Plan del día y Lista rápida) | 🟢 Baja | `Backlog` | • Widget para el escritorio de Android con diseño nativo (Material You / Glance).<br>• Mostrar en tiempo real las comidas programadas para el día de hoy ("Hoy toca...").<br>• Botón de acceso directo para abrir la receta actual o añadir a la lista de la compra.<br>• Sincronización en segundo plano con el almacenamiento local / Supabase. |
+
+---
+
 ## 🐛 Historial y Registro de Defectos (Bugs)
 
 | ID | Defecto | Severidad | Estado | Resolución |
