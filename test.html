@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es" data-theme="system">
+<html lang="es" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,11 +8,20 @@
   <link rel="stylesheet" href="styles.css?v=8">
   <style>
     :root {
+      --qa-pass: #059669;
+      --qa-pass-bg: #ecfdf5;
+      --qa-pass-border: #a7f3d0;
+      --qa-fail: #dc2626;
+      --qa-fail-bg: #fef2f2;
+      --qa-fail-border: #fecaca;
+    }
+    html[data-theme="dark"] {
       --qa-pass: #10b981;
-      --qa-pass-bg: rgba(16, 185, 129, 0.08);
+      --qa-pass-bg: rgba(16, 185, 129, 0.12);
+      --qa-pass-border: rgba(16, 185, 129, 0.25);
       --qa-fail: #ef4444;
-      --qa-fail-bg: rgba(239, 68, 68, 0.08);
-      --qa-border: rgba(255, 255, 255, 0.08);
+      --qa-fail-bg: rgba(239, 68, 68, 0.12);
+      --qa-fail-border: rgba(239, 68, 68, 0.25);
     }
     body {
       background-color: var(--m3-surface);
@@ -46,24 +55,34 @@
     .test-header p {
       margin: 0;
       font-size: 14px;
-      color: var(--m3-outline);
+      color: var(--m3-on-surface-variant);
     }
-    .btn-rerun {
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .btn-action {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 10px 18px;
+      padding: 9px 16px;
       border-radius: var(--radius-md);
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      border: 1px solid var(--m3-outline-variant);
+      background: var(--m3-surface-container);
+      color: var(--m3-on-surface);
+      transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), background 150ms ease;
+    }
+    .btn-action:active {
+      transform: scale(0.96);
+    }
+    .btn-action.primary {
       background: var(--m3-primary);
       color: var(--m3-on-primary);
-      border: none;
-      font-weight: 600;
-      font-size: 14px;
-      cursor: pointer;
-      transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
-    }
-    .btn-rerun:active {
-      transform: scale(0.96);
+      border-color: var(--m3-primary);
     }
     .metrics-bar {
       display: grid;
@@ -78,6 +97,7 @@
       padding: 14px 18px;
       display: flex;
       flex-direction: column;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     }
     .metric-value {
       font-size: 28px;
@@ -104,17 +124,21 @@
       padding: 6px 14px;
       border-radius: 20px;
       border: 1px solid var(--m3-outline-variant);
-      background: transparent;
+      background: var(--m3-surface-container-lowest);
       color: var(--m3-on-surface);
       font-size: 13px;
+      font-weight: 500;
       cursor: pointer;
       transition: all 150ms ease-out;
+    }
+    .filter-btn:active {
+      transform: scale(0.96);
     }
     .filter-btn.active {
       background: var(--m3-primary-container);
       color: var(--m3-on-primary-container);
       border-color: var(--m3-primary);
-      font-weight: 600;
+      font-weight: 700;
     }
 
     .test-suite-card {
@@ -123,10 +147,10 @@
       border-radius: var(--radius-lg);
       padding: 20px;
       margin-bottom: 24px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.03);
     }
     .test-suite-title {
-      font-size: 17px;
+      font-size: 16px;
       font-weight: 700;
       color: var(--m3-primary);
       margin-bottom: 16px;
@@ -141,7 +165,8 @@
       border-radius: var(--radius-md);
       margin-bottom: 12px;
       overflow: hidden;
-      transition: transform 140ms ease-out;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+      transition: transform 140ms ease-out, box-shadow 140ms ease-out;
     }
     .test-case-header {
       padding: 12px 16px;
@@ -151,9 +176,11 @@
       cursor: pointer;
       user-select: none;
       gap: 12px;
+      background: var(--m3-surface);
+      transition: background 150ms ease;
     }
     .test-case-header:hover {
-      background: rgba(255, 255, 255, 0.02);
+      background: var(--m3-surface-container-high);
     }
     .test-case-title {
       font-weight: 600;
@@ -175,17 +202,18 @@
     .badge-pass {
       background: var(--qa-pass-bg);
       color: var(--qa-pass);
-      border: 1px solid rgba(16, 185, 129, 0.2);
+      border: 1px solid var(--qa-pass-border);
     }
     .badge-fail {
       background: var(--qa-fail-bg);
       color: var(--qa-fail);
-      border: 1px solid rgba(239, 68, 68, 0.2);
+      border: 1px solid var(--qa-fail-border);
     }
     .test-time {
       font-size: 12px;
       color: var(--m3-outline);
       margin-right: 8px;
+      font-variant-numeric: tabular-nums;
     }
 
     .test-details-box {
@@ -197,15 +225,15 @@
     .detail-row {
       margin-bottom: 8px;
       display: flex;
-      gap: 8px;
+      gap: 10px;
     }
     .detail-row:last-child {
       margin-bottom: 0;
     }
     .detail-tag {
       font-weight: 700;
-      min-width: 90px;
-      color: var(--m3-outline);
+      min-width: 95px;
+      color: var(--m3-on-surface-variant);
       display: inline-flex;
       align-items: center;
       gap: 4px;
@@ -220,10 +248,12 @@
     .code-snippet {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       font-size: 12px;
-      background: rgba(0,0,0,0.06);
-      padding: 2px 6px;
+      background: var(--m3-surface-container);
+      color: var(--m3-on-surface);
+      padding: 3px 8px;
       border-radius: 4px;
       display: inline-block;
+      border: 1px solid var(--m3-outline-variant);
     }
     .error-box {
       margin-top: 10px;
@@ -244,9 +274,14 @@
       <h1><span class="material-symbols-outlined" style="color: var(--m3-primary);">verified</span> Suite de Pruebas y Control de Calidad</h1>
       <p>Informe en vivo de verificación técnica y reglas de negocio de Food Assistant</p>
     </div>
-    <button class="btn-rerun" onclick="runAllTests()">
-      <span class="material-symbols-outlined icon-sm">play_arrow</span> Re-ejecutar Tests
-    </button>
+    <div class="header-actions">
+      <button class="btn-action" onclick="toggleTheme()" id="btn-theme-toggle">
+        <span class="material-symbols-outlined icon-sm">dark_mode</span> Modo Oscuro
+      </button>
+      <button class="btn-action primary" onclick="runAllTests()">
+        <span class="material-symbols-outlined icon-sm">play_arrow</span> Re-ejecutar Tests
+      </button>
+    </div>
   </div>
 
   <div class="metrics-bar">
@@ -269,9 +304,9 @@
   </div>
 
   <div class="filters-bar">
-    <button class="filter-btn active" onclick="setFilter('all')">Todos</button>
-    <button class="filter-btn" onclick="setFilter('pass')">Solo Éxitos</button>
-    <button class="filter-btn" onclick="setFilter('fail')">Solo Fallos</button>
+    <button class="filter-btn active" onclick="setFilter('all', this)">Todos</button>
+    <button class="filter-btn" onclick="setFilter('pass', this)">Solo Éxitos</button>
+    <button class="filter-btn" onclick="setFilter('fail', this)">Solo Fallos</button>
   </div>
 
   <div id="test-results-container"></div>
@@ -288,7 +323,6 @@
       suites.push({ title, fn });
     }
 
-    // it con soporte extendido para documentar qué prueba exactamente cada test
     function it(description, metaOrFn, testFn) {
       let meta = {};
       let fn = testFn;
@@ -493,22 +527,33 @@
     });
 
     // =========================================================
-    // RUNNER CON DETALLES VISUALES Y FILTRADO
+    // CONTROLES DE INTERFAZ, FILTRADO Y MODO OSCURO/CLARO
     // =========================================================
-    let currentFilter = 'all';
+    function toggleTheme() {
+      const html = document.documentElement;
+      const current = html.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      
+      const btn = document.getElementById('btn-theme-toggle');
+      if (next === 'dark') {
+        btn.innerHTML = '<span class="material-symbols-outlined icon-sm">light_mode</span> Modo Claro';
+      } else {
+        btn.innerHTML = '<span class="material-symbols-outlined icon-sm">dark_mode</span> Modo Oscuro';
+      }
+    }
 
-    function setFilter(filter) {
-      currentFilter = filter;
+    function setFilter(filter, el) {
       document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-      event.target.classList.add('active');
+      if (el) el.classList.add('active');
 
-      document.querySelectorAll('.test-case-item').forEach(el => {
+      document.querySelectorAll('.test-case-item').forEach(item => {
         if (filter === 'all') {
-          el.style.display = 'block';
+          item.style.display = 'block';
         } else if (filter === 'pass') {
-          el.style.display = el.dataset.status === 'pass' ? 'block' : 'none';
+          item.style.display = item.dataset.status === 'pass' ? 'block' : 'none';
         } else if (filter === 'fail') {
-          el.style.display = el.dataset.status === 'fail' ? 'block' : 'none';
+          item.style.display = item.dataset.status === 'fail' ? 'block' : 'none';
         }
       });
     }
