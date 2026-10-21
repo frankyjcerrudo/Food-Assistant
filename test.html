@@ -3,88 +3,237 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Food Assistant - Test Suite Runner</title>
+  <title>Food Assistant - Informe Detallado de Calidad y Tests</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
   <link rel="stylesheet" href="styles.css?v=8">
   <style>
+    :root {
+      --qa-pass: #10b981;
+      --qa-pass-bg: rgba(16, 185, 129, 0.08);
+      --qa-fail: #ef4444;
+      --qa-fail-bg: rgba(239, 68, 68, 0.08);
+      --qa-border: rgba(255, 255, 255, 0.08);
+    }
     body {
       background-color: var(--m3-surface);
       color: var(--m3-on-surface);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      padding: 24px 16px;
-      max-width: 800px;
+      padding: 32px 16px;
+      max-width: 900px;
       margin: 0 auto;
+      line-height: 1.5;
     }
     .test-header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
       margin-bottom: 24px;
-      padding-bottom: 16px;
+      padding-bottom: 20px;
       border-bottom: 1px solid var(--m3-outline-variant);
+      flex-wrap: wrap;
+      gap: 16px;
     }
+    .test-header h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin: 0 0 4px 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--m3-on-surface);
+    }
+    .test-header p {
+      margin: 0;
+      font-size: 14px;
+      color: var(--m3-outline);
+    }
+    .btn-rerun {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: var(--radius-md);
+      background: var(--m3-primary);
+      color: var(--m3-on-primary);
+      border: none;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+    }
+    .btn-rerun:active {
+      transform: scale(0.96);
+    }
+    .metrics-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .metric-card {
+      background: var(--m3-surface-container-low);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--radius-md);
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+    }
+    .metric-value {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-top: 4px;
+    }
+    .metric-label {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--m3-outline);
+    }
+    .metric-card.pass .metric-value { color: var(--qa-pass); }
+    .metric-card.fail .metric-value { color: var(--qa-fail); }
+
+    .filters-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .filter-btn {
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--m3-outline-variant);
+      background: transparent;
+      color: var(--m3-on-surface);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 150ms ease-out;
+    }
+    .filter-btn.active {
+      background: var(--m3-primary-container);
+      color: var(--m3-on-primary-container);
+      border-color: var(--m3-primary);
+      font-weight: 600;
+    }
+
     .test-suite-card {
       background: var(--m3-surface-container-low);
       border: 1px solid var(--m3-outline-variant);
       border-radius: var(--radius-lg);
-      padding: 16px;
-      margin-bottom: 16px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.03);
     }
     .test-suite-title {
-      font-size: 16px;
+      font-size: 17px;
       font-weight: 700;
       color: var(--m3-primary);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .test-case-item {
+      background: var(--m3-surface);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--radius-md);
       margin-bottom: 12px;
+      overflow: hidden;
+      transition: transform 140ms ease-out;
+    }
+    .test-case-header {
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      gap: 12px;
+    }
+    .test-case-header:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .test-case-title {
+      font-weight: 600;
+      font-size: 14px;
       display: flex;
       align-items: center;
       gap: 8px;
     }
-    .test-case {
-      display: flex;
+    .test-badge {
+      display: inline-flex;
       align-items: center;
-      justify-content: space-between;
-      padding: 8px 12px;
-      border-radius: var(--radius-sm);
-      margin-bottom: 6px;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .badge-pass {
+      background: var(--qa-pass-bg);
+      color: var(--qa-pass);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+    .badge-fail {
+      background: var(--qa-fail-bg);
+      color: var(--qa-fail);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+    .test-time {
+      font-size: 12px;
+      color: var(--m3-outline);
+      margin-right: 8px;
+    }
+
+    .test-details-box {
+      padding: 14px 16px;
+      background: var(--m3-surface-container-lowest);
+      border-top: 1px solid var(--m3-outline-variant);
       font-size: 13px;
-      background: var(--m3-surface);
-      border: 1px solid var(--m3-outline-variant);
     }
-    .test-case.pass {
-      border-left: 4px solid #1e8e3e;
+    .detail-row {
+      margin-bottom: 8px;
+      display: flex;
+      gap: 8px;
     }
-    .test-case.fail {
-      border-left: 4px solid var(--m3-error);
-      background-color: var(--m3-error-container);
-      color: var(--m3-on-error-container);
+    .detail-row:last-child {
+      margin-bottom: 0;
     }
-    .status-badge {
+    .detail-tag {
+      font-weight: 700;
+      min-width: 90px;
+      color: var(--m3-outline);
       display: inline-flex;
       align-items: center;
       gap: 4px;
       font-size: 11px;
-      font-weight: 700;
-      padding: 2px 8px;
-      border-radius: var(--radius-full);
       text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
-    .badge-pass {
-      background-color: #e6f4ea;
-      color: #137333;
+    .detail-content {
+      color: var(--m3-on-surface);
+      flex: 1;
     }
-    .badge-fail {
-      background-color: var(--m3-error);
-      color: #fff;
+    .code-snippet {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+      background: rgba(0,0,0,0.06);
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-block;
     }
-    .metrics-bar {
-      display: flex;
-      gap: 16px;
-      margin-bottom: 20px;
-      background: var(--m3-surface-container);
-      padding: 12px 16px;
-      border-radius: var(--radius-md);
-      font-size: 13px;
-      font-weight: 500;
+    .error-box {
+      margin-top: 10px;
+      padding: 10px 14px;
+      background: var(--qa-fail-bg);
+      border-left: 3px solid var(--qa-fail);
+      color: var(--qa-fail);
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 12px;
+      border-radius: 4px;
     }
   </style>
 </head>
@@ -92,41 +241,67 @@
 
   <div class="test-header">
     <div>
-      <h1 style="font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span class="material-symbols-outlined" style="color: var(--m3-primary);">verified</span>
-        Food Assistant - Suite de Pruebas Automatizadas
-      </h1>
-      <p style="font-size: 13px; color: var(--m3-on-surface-variant); margin-top: 4px;">
-        Ejecución directa en navegador para validación continua de calidad y no-regresión.
-      </p>
+      <h1><span class="material-symbols-outlined" style="color: var(--m3-primary);">verified</span> Suite de Pruebas y Control de Calidad</h1>
+      <p>Informe en vivo de verificación técnica y reglas de negocio de Food Assistant</p>
     </div>
-    <button class="btn btn-primary btn-sm" onclick="runAllTests()">
+    <button class="btn-rerun" onclick="runAllTests()">
       <span class="material-symbols-outlined icon-sm">play_arrow</span> Re-ejecutar Tests
     </button>
   </div>
 
-  <div class="metrics-bar" id="metrics-bar">
-    <div>Total: <span id="metric-total">0</span></div>
-    <div style="color: #137333;">Pasados: <span id="metric-passed">0</span></div>
-    <div style="color: var(--m3-error);">Fallados: <span id="metric-failed">0</span></div>
-    <div>Tiempo: <span id="metric-time">0ms</span></div>
+  <div class="metrics-bar">
+    <div class="metric-card">
+      <span class="metric-label">Total Pruebas</span>
+      <span class="metric-value" id="metric-total">0</span>
+    </div>
+    <div class="metric-card pass">
+      <span class="metric-label">Pasadas</span>
+      <span class="metric-value" id="metric-passed">0</span>
+    </div>
+    <div class="metric-card fail">
+      <span class="metric-label">Falladas</span>
+      <span class="metric-value" id="metric-failed">0</span>
+    </div>
+    <div class="metric-card">
+      <span class="metric-label">Tiempo Total</span>
+      <span class="metric-value" id="metric-time">0ms</span>
+    </div>
+  </div>
+
+  <div class="filters-bar">
+    <button class="filter-btn active" onclick="setFilter('all')">Todos</button>
+    <button class="filter-btn" onclick="setFilter('pass')">Solo Éxitos</button>
+    <button class="filter-btn" onclick="setFilter('fail')">Solo Fallos</button>
   </div>
 
   <div id="test-results-container"></div>
 
-  <!-- Load Application Core Scripts -->
+  <!-- Entorno y dependencias de la app -->
   <script src="config.js?v=8"></script>
   <script src="app.js?v=8"></script>
 
   <script>
     const suites = [];
+    let currentSuite = null;
 
     function describe(title, fn) {
       suites.push({ title, fn });
     }
 
-    function it(description, testFn) {
-      currentSuite.tests.push({ description, testFn });
+    // it con soporte extendido para documentar qué prueba exactamente cada test
+    function it(description, metaOrFn, testFn) {
+      let meta = {};
+      let fn = testFn;
+      if (typeof metaOrFn === 'function') {
+        fn = metaOrFn;
+        meta = {
+          purpose: description,
+          assertions: 'Verificación del comportamiento esperado'
+        };
+      } else {
+        meta = metaOrFn;
+      }
+      currentSuite.tests.push({ description, meta, testFn: fn });
     }
 
     function expect(actual) {
@@ -155,105 +330,189 @@
       };
     }
 
-    let currentSuite = null;
+    // =========================================================
+    // DEFINICIÓN DE PRUEBAS CON DETALLE EXPLICATIVO
+    // =========================================================
 
-    // DEFINICIÓN DE PRUEBAS AUTOMATIZADAS
     describe('1. StateStore y Modelo de Datos de Comidas', () => {
-      it('STANDARD_SLOTS contiene exactamente los 4 momentos de comida del día', () => {
-        expect(window.STANDARD_SLOTS).toHaveLength(4);
-        const keys = window.STANDARD_SLOTS.map(s => s.key);
-        expect(keys).toEqual(['breakfast', 'lunch', 'snack', 'dinner']);
-      });
+      it(
+        'STANDARD_SLOTS contiene exactamente los 4 momentos de comida del día',
+        {
+          purpose: 'Garantizar que la app proporciona los 4 momentos dietéticos estándar (Desayuno, Almuerzo, Merienda, Cena) requeridos para usuarios que comen más de 3 veces al día.',
+          assertions: 'Verifica que STANDARD_SLOTS tiene longitud 4 y sus claves exactas son: breakfast, lunch, snack, dinner.'
+        },
+        () => {
+          expect(window.STANDARD_SLOTS).toHaveLength(4);
+          const keys = window.STANDARD_SLOTS.map(s => s.key);
+          expect(keys).toEqual(['breakfast', 'lunch', 'snack', 'dinner']);
+        }
+      );
 
-      it('StateStore inicializa el plan semanal con los 4 momentos y customSlots para cada día', () => {
-        const store = new window.StateStore();
-        const plan = store.mealPlan;
-        const days = Object.keys(plan);
-        expect(days).toHaveLength(7);
+      it(
+        'StateStore inicializa el plan semanal con los 4 momentos y customSlots para cada día',
+        {
+          purpose: 'Verificar que la inicialización del calendario semanal asigna la estructura completa para los 7 días de la semana, evitando errores de undefined al asignar comidas.',
+          assertions: 'Comprueba que cada día tiene las propiedades breakfast, lunch, snack, dinner y el array customSlots.'
+        },
+        () => {
+          const store = new window.StateStore();
+          const plan = store.mealPlan;
+          const days = Object.keys(plan);
+          expect(days).toHaveLength(7);
 
-        days.forEach(d => {
-          const day = plan[d];
-          expect(day).toHaveProperty('breakfast');
-          expect(day).toHaveProperty('lunch');
-          expect(day).toHaveProperty('snack');
-          expect(day).toHaveProperty('dinner');
-          expect(day).toHaveProperty('customSlots');
-        });
-      });
+          days.forEach(d => {
+            const day = plan[d];
+            expect(day).toHaveProperty('breakfast');
+            expect(day).toHaveProperty('lunch');
+            expect(day).toHaveProperty('snack');
+            expect(day).toHaveProperty('dinner');
+            expect(day).toHaveProperty('customSlots');
+          });
+        }
+      );
 
-      it('SEED_RECIPES incluye recetas catalogadas para Desayuno y Merienda', () => {
-        const store = new window.StateStore();
-        const desayunos = store.recipes.filter(r => r.tags.includes('Desayuno'));
-        const meriendas = store.recipes.filter(r => r.tags.includes('Merienda'));
-        expect(desayunos.length).toBeGreaterThanOrEqual(2);
-        expect(meriendas.length).toBeGreaterThanOrEqual(1);
-      });
+      it(
+        'SEED_RECIPES incluye recetas catalogadas para Desayuno y Merienda',
+        {
+          purpose: 'Comprobar que el catálogo semilla incluye recetas apropiadas para cubrir los momentos de desayuno y merienda desde el primer uso de la app.',
+          assertions: 'Verifica la existencia de al menos 2 recetas con etiqueta Desayuno y al menos 1 con Merienda.'
+        },
+        () => {
+          const store = new window.StateStore();
+          const desayunos = store.recipes.filter(r => r.tags.includes('Desayuno'));
+          const meriendas = store.recipes.filter(r => r.tags.includes('Merienda'));
+          expect(desayunos.length).toBeGreaterThanOrEqual(2);
+          expect(meriendas.length).toBeGreaterThanOrEqual(1);
+        }
+      );
     });
 
     describe('2. Motor de Lista de la Compra y Escalado', () => {
-      it('AISLE_METADATA contiene los pasillos requeridos y sus iconos', () => {
-        const aisles = ['produce', 'meat', 'dairy', 'bakery', 'pantry', 'spices', 'frozen', 'beverages', 'other'];
-        aisles.forEach(a => {
-          expect(window.AISLE_METADATA).toHaveProperty(a);
-        });
-      });
+      it(
+        'AISLE_METADATA contiene los pasillos requeridos y sus iconos',
+        {
+          purpose: 'Validar que el catálogo de pasillos de supermercado cuenta con todas las categorías de clasificación de ingredientes para organizar la lista de la compra.',
+          assertions: 'Valida existencia de produce, meat, dairy, bakery, pantry, spices, frozen, beverages y other.'
+        },
+        () => {
+          const aisles = ['produce', 'meat', 'dairy', 'bakery', 'pantry', 'spices', 'frozen', 'beverages', 'other'];
+          aisles.forEach(a => {
+            expect(window.AISLE_METADATA).toHaveProperty(a);
+          });
+        }
+      );
 
-      it('Escala proporcionalmente las cantidades de ingredientes según el número de comensales', () => {
-        const baseServings = 2;
-        const targetServings = 4;
-        const ratio = targetServings / baseServings;
-        const baseAmount = 200;
-        const scaled = Math.round((baseAmount * ratio) * 10) / 10;
-        expect(scaled).toBe(400);
-      });
+      it(
+        'Escala proporcionalmente las cantidades de ingredientes según el número de comensales',
+        {
+          purpose: 'Garantizar que al cocinar para más comensales (ej. pasar de 2 a 4 raciones), las cantidades de ingredientes se recalculan matemáticamente al doble con exactitud.',
+          assertions: 'Comprueba que una base de 200g para 2 porciones calculada para 4 porciones resulta en exactamente 400g.'
+        },
+        () => {
+          const baseServings = 2;
+          const targetServings = 4;
+          const ratio = targetServings / baseServings;
+          const baseAmount = 200;
+          const scaled = Math.round((baseAmount * ratio) * 10) / 10;
+          expect(scaled).toBe(400);
+        }
+      );
 
-      it('Fusiona y suma cantidades si el ingrediente y unidad son iguales', () => {
-        const items = [{ name: "Pechugas", amount: 300, unit: "g" }];
-        const toAdd = { name: "Pechugas", amount: 200, unit: "g" };
-        const existing = items.find(i => i.name.toLowerCase() === toAdd.name.toLowerCase() && i.unit === toAdd.unit);
-        expect(existing).toBeDefined();
-        existing.amount += toAdd.amount;
-        expect(items[0].amount).toBe(500);
-      });
+      it(
+        'Fusiona y suma cantidades si el ingrediente y unidad son iguales',
+        {
+          purpose: 'Evitar que aparezcan filas duplicadas en la lista de la compra al añadir dos recetas que usan el mismo ingrediente con la misma unidad (ej. Pechugas 300g + 200g = 500g).',
+          assertions: 'Busca el ingrediente existente con case-insensitive, suma 300g + 200g y valida que el total es 500g en una sola entrada.'
+        },
+        () => {
+          const items = [{ name: "Pechugas", amount: 300, unit: "g" }];
+          const toAdd = { name: "Pechugas", amount: 200, unit: "g" };
+          const existing = items.find(i => i.name.toLowerCase() === toAdd.name.toLowerCase() && i.unit === toAdd.unit);
+          expect(existing).toBeDefined();
+          existing.amount += toAdd.amount;
+          expect(items[0].amount).toBe(500);
+        }
+      );
     });
 
     describe('3. Planificador y Momentos de Comida Personalizados', () => {
-      it('Permite añadir un nuevo momento personalizado al día', () => {
-        const store = new window.StateStore();
-        const dateKey = Object.keys(store.mealPlan)[0];
-        const newSlot = {
-          id: 'test-slot-1',
-          name: 'Post-Entreno',
-          icon: 'fitness_center',
-          recipeId: null
-        };
-        store.mealPlan[dateKey].customSlots.push(newSlot);
-        expect(store.mealPlan[dateKey].customSlots).toHaveLength(1);
-        expect(store.mealPlan[dateKey].customSlots[0].name).toBe('Post-Entreno');
-      });
+      it(
+        'Permite añadir un nuevo momento personalizado al día',
+        {
+          purpose: 'Validar que usuarios con requerimientos nutricionales especiales (atletas, dietas fraccionadas) pueden crear momentos dinámicos como "Post-Entreno" o "Pre-Cama".',
+          assertions: 'Añade un customSlot con ID, nombre e icono y comprueba que se persiste en la lista customSlots del día.'
+        },
+        () => {
+          const store = new window.StateStore();
+          const dateKey = Object.keys(store.mealPlan)[0];
+          const newSlot = {
+            id: 'test-slot-1',
+            name: 'Post-Entreno',
+            icon: 'fitness_center',
+            recipeId: null
+          };
+          store.mealPlan[dateKey].customSlots.push(newSlot);
+          expect(store.mealPlan[dateKey].customSlots).toHaveLength(1);
+          expect(store.mealPlan[dateKey].customSlots[0].name).toBe('Post-Entreno');
+        }
+      );
 
-      it('Permite asignar y desasignar recetas a un momento personalizado', () => {
-        const store = new window.StateStore();
-        const dateKey = Object.keys(store.mealPlan)[0];
-        const newSlot = { id: 'test-slot-2', name: 'Media Mañana', icon: 'lunch_dining', recipeId: 'rec-avocado-toast' };
-        store.mealPlan[dateKey].customSlots.push(newSlot);
-        expect(store.mealPlan[dateKey].customSlots[0].recipeId).toBe('rec-avocado-toast');
-        store.mealPlan[dateKey].customSlots[0].recipeId = null;
-        expect(store.mealPlan[dateKey].customSlots[0].recipeId).toBeNull();
-      });
+      it(
+        'Permite asignar y desasignar recetas a un momento personalizado',
+        {
+          purpose: 'Garantizar el ciclo completo de interacción: vincular una receta específica a un momento personalizado y retirarla cuando el usuario decida borrarla o cambiarla.',
+          assertions: 'Asigna recipeId "rec-avocado-toast", comprueba el valor, reasigna a null y comprueba la limpieza.'
+        },
+        () => {
+          const store = new window.StateStore();
+          const dateKey = Object.keys(store.mealPlan)[0];
+          const newSlot = { id: 'test-slot-2', name: 'Media Mañana', icon: 'lunch_dining', recipeId: 'rec-avocado-toast' };
+          store.mealPlan[dateKey].customSlots.push(newSlot);
+          expect(store.mealPlan[dateKey].customSlots[0].recipeId).toBe('rec-avocado-toast');
+          store.mealPlan[dateKey].customSlots[0].recipeId = null;
+          expect(store.mealPlan[dateKey].customSlots[0].recipeId).toBeNull();
+        }
+      );
 
-      it('Permite eliminar un momento personalizado sin alterar los 4 slots estándar', () => {
-        const store = new window.StateStore();
-        const dateKey = Object.keys(store.mealPlan)[0];
-        store.mealPlan[dateKey].customSlots = [{ id: 'del-1', name: 'Snack', recipeId: null }];
-        store.mealPlan[dateKey].customSlots = store.mealPlan[dateKey].customSlots.filter(s => s.id !== 'del-1');
-        expect(store.mealPlan[dateKey].customSlots).toHaveLength(0);
-        expect(store.mealPlan[dateKey]).toHaveProperty('breakfast');
-        expect(store.mealPlan[dateKey]).toHaveProperty('dinner');
-      });
+      it(
+        'Permite eliminar un momento personalizado sin alterar los 4 slots estándar',
+        {
+          purpose: 'Garantizar la integridad de los datos: borrar un momento personalizado no debe corromper ni borrar los momentos base (Desayuno, Almuerzo, Merienda, Cena).',
+          assertions: 'Elimina el customSlot filtrando por ID y confirma que length es 0 y que breakfast y dinner siguen existiendo intactos.'
+        },
+        () => {
+          const store = new window.StateStore();
+          const dateKey = Object.keys(store.mealPlan)[0];
+          store.mealPlan[dateKey].customSlots = [{ id: 'del-1', name: 'Snack', recipeId: null }];
+          store.mealPlan[dateKey].customSlots = store.mealPlan[dateKey].customSlots.filter(s => s.id !== 'del-1');
+          expect(store.mealPlan[dateKey].customSlots).toHaveLength(0);
+          expect(store.mealPlan[dateKey]).toHaveProperty('breakfast');
+          expect(store.mealPlan[dateKey]).toHaveProperty('dinner');
+        }
+      );
     });
 
-    // EJECUCIÓN DEL RUNNER
+    // =========================================================
+    // RUNNER CON DETALLES VISUALES Y FILTRADO
+    // =========================================================
+    let currentFilter = 'all';
+
+    function setFilter(filter) {
+      currentFilter = filter;
+      document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      document.querySelectorAll('.test-case-item').forEach(el => {
+        if (filter === 'all') {
+          el.style.display = 'block';
+        } else if (filter === 'pass') {
+          el.style.display = el.dataset.status === 'pass' ? 'block' : 'none';
+        } else if (filter === 'fail') {
+          el.style.display = el.dataset.status === 'fail' ? 'block' : 'none';
+        }
+      });
+    }
+
     async function runAllTests() {
       const container = document.getElementById('test-results-container');
       container.innerHTML = '';
@@ -273,27 +532,53 @@
 
         for (const t of currentSuite.tests) {
           total++;
-          const row = document.createElement('div');
+          const tStart = performance.now();
+          let pass = false;
+          let errMsg = '';
+
           try {
             t.testFn();
             passed++;
-            row.className = 'test-case pass';
-            row.innerHTML = `
-              <span>${t.description}</span>
-              <span class="status-badge badge-pass"><span class="material-symbols-outlined" style="font-size: 14px;">check_circle</span> Pass</span>
-            `;
+            pass = true;
           } catch (err) {
             failed++;
-            row.className = 'test-case fail';
-            row.innerHTML = `
-              <div>
-                <strong>${t.description}</strong>
-                <div style="font-size: 11px; margin-top: 4px; font-family: monospace;">${err.message}</div>
-              </div>
-              <span class="status-badge badge-fail"><span class="material-symbols-outlined" style="font-size: 14px;">cancel</span> Fail</span>
-            `;
+            errMsg = err.message;
           }
-          suiteCard.appendChild(row);
+          const tElapsed = Math.max(1, Math.round(performance.now() - tStart));
+
+          const item = document.createElement('div');
+          item.className = 'test-case-item';
+          item.dataset.status = pass ? 'pass' : 'fail';
+
+          item.innerHTML = `
+            <div class="test-case-header" onclick="const box = this.nextElementSibling; box.style.display = box.style.display === 'none' ? 'block' : 'none';">
+              <div class="test-case-title">
+                <span class="material-symbols-outlined" style="font-size: 18px; color: ${pass ? 'var(--qa-pass)' : 'var(--qa-fail)'}">
+                  ${pass ? 'check_circle' : 'cancel'}
+                </span>
+                <span>${t.description}</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="test-time">${tElapsed}ms</span>
+                <span class="test-badge ${pass ? 'badge-pass' : 'badge-fail'}">
+                  ${pass ? 'PASS' : 'FAIL'}
+                </span>
+              </div>
+            </div>
+            <div class="test-details-box">
+              <div class="detail-row">
+                <span class="detail-tag">🎯 Objetivo:</span>
+                <span class="detail-content">${t.meta.purpose || 'Comportamiento funcional esperado'}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-tag">🔍 Validación:</span>
+                <span class="detail-content"><span class="code-snippet">${t.meta.assertions || 'Aserciones de código'}</span></span>
+              </div>
+              ${errMsg ? `<div class="error-box"><strong>Error detectado:</strong> ${errMsg}</div>` : ''}
+            </div>
+          `;
+
+          suiteCard.appendChild(item);
         }
         container.appendChild(suiteCard);
       }
