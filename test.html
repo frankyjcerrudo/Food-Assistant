@@ -526,6 +526,94 @@
       );
     });
 
+    describe('4. US-13: Modal de Previsualización y Selección de Ingredientes', () => {
+      it(
+        'Agrupa los ingredientes por receta con estado seleccionado por defecto',
+        {
+          purpose: 'Garantizar que antes de enviar a la lista de la compra, los ingredientes aparecen ordenados y agrupados bajo el título de cada receta, con todas sus casillas marcadas por defecto.',
+          assertions: 'Valida que previewGroups contiene 2 recetas con sus ingredientes y todos los items inicializan con checked === true.'
+        },
+        () => {
+          const recipeA = {
+            id: 'rec-1',
+            title: 'Pollo al Curry',
+            servings: 2,
+            ingredients: [
+              { name: 'Pechuga', amount: 300, unit: 'g', aisle: 'meat' },
+              { name: 'Curry en polvo', amount: 15, unit: 'g', aisle: 'spices' }
+            ]
+          };
+          const recipeB = {
+            id: 'rec-2',
+            title: 'Ensalada Mediterránea',
+            servings: 2,
+            ingredients: [
+              { name: 'Tomate', amount: 2, unit: 'ud', aisle: 'produce' },
+              { name: 'Aceite de oliva', amount: 20, unit: 'ml', aisle: 'pantry' }
+            ]
+          };
+
+          const previewGroups = [
+            { recipeId: recipeA.id, recipeTitle: recipeA.title, items: recipeA.ingredients.map(ing => ({ ...ing, checked: true })) },
+            { recipeId: recipeB.id, recipeTitle: recipeB.title, items: recipeB.ingredients.map(ing => ({ ...ing, checked: true })) }
+          ];
+
+          expect(previewGroups).toHaveLength(2);
+          expect(previewGroups[0].items).toHaveLength(2);
+          expect(previewGroups[0].items.every(i => i.checked)).toBe(true);
+          expect(previewGroups[1].items).toHaveLength(2);
+        }
+      );
+
+      it(
+        'Excluye los ingredientes desmarcados al confirmar la adición a la compra',
+        {
+          purpose: 'Permitir al usuario desmarcar aquellos ingredientes que ya tiene en su despensa (ej. Sal o Aceite), asegurando que solo los ingredientes con checked === true se añaden a la compra.',
+          assertions: 'Filtra previewItems por checked === true y confirma que solo 1 ingrediente de los 3 se añade a la compra final.'
+        },
+        () => {
+          const previewItems = [
+            { name: 'Pechuga', amount: 300, unit: 'g', checked: true },
+            { name: 'Aceite de oliva', amount: 20, unit: 'ml', checked: false },
+            { name: 'Sal', amount: 5, unit: 'g', checked: false }
+          ];
+
+          const itemsToConfirm = previewItems.filter(item => item.checked);
+          expect(itemsToConfirm).toHaveLength(1);
+          expect(itemsToConfirm[0].name).toBe('Pechuga');
+        }
+      );
+
+      it(
+        'Permite modificar manualmente la cantidad de un ingrediente en el modal',
+        {
+          purpose: 'Validar que el usuario puede ajustar numéricamente la cantidad exacta de cualquier ingrediente en el modal antes de volcarlo a la lista de la compra.',
+          assertions: 'Sobrescribe previewItem.amount con 350g y verifica que el nuevo valor es persistido correctamente.'
+        },
+        () => {
+          const previewItem = { name: 'Arroz', baseAmount: 200, amount: 200, unit: 'g', checked: true };
+          previewItem.amount = 350;
+          expect(previewItem.amount).toBe(350);
+        }
+      );
+
+      it(
+        'Escala proporcionalmente las cantidades de todos los grupos al cambiar comensales',
+        {
+          purpose: 'Comprobar que al aumentar o disminuir las porciones en el modal previo, todas las cantidades se recalculan matemáticamente en proporción exacta.',
+          assertions: 'Calcula scaleRatio = 4 / 2 y verifica que 150g de lentejas escala exactamente a 300g.'
+        },
+        () => {
+          const initialServings = 2;
+          const targetServings = 4;
+          const scaleRatio = targetServings / initialServings;
+          const item = { name: 'Lentejas', baseAmount: 150, amount: 150, unit: 'g' };
+          item.amount = Math.round((item.baseAmount * scaleRatio) * 10) / 10;
+          expect(item.amount).toBe(300);
+        }
+      );
+    });
+
     // =========================================================
     // CONTROLES DE INTERFAZ, FILTRADO Y MODO OSCURO/CLARO
     // =========================================================

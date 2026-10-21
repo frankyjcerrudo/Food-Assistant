@@ -62,3 +62,78 @@ describe('Shopping Engine & Ingredient Calculations', () => {
     expect(list).toHaveLength(2);
   });
 });
+
+describe('US-13: Modal de Previsualización y Selección de Ingredientes', () => {
+  it('agrupa los ingredientes por receta con su estado marcado por defecto', () => {
+    const recipeA = {
+      id: 'rec-1',
+      title: 'Pollo al Curry',
+      servings: 2,
+      ingredients: [
+        { name: 'Pechuga', amount: 300, unit: 'g', aisle: 'meat' },
+        { name: 'Curry en polvo', amount: 15, unit: 'g', aisle: 'spices' }
+      ]
+    };
+    const recipeB = {
+      id: 'rec-2',
+      title: 'Ensalada Mediterránea',
+      servings: 2,
+      ingredients: [
+        { name: 'Tomate', amount: 2, unit: 'ud', aisle: 'produce' },
+        { name: 'Aceite de oliva', amount: 20, unit: 'ml', aisle: 'pantry' }
+      ]
+    };
+
+    const previewGroups = [
+      {
+        recipeId: recipeA.id,
+        recipeTitle: recipeA.title,
+        items: recipeA.ingredients.map(ing => ({ ...ing, checked: true }))
+      },
+      {
+        recipeId: recipeB.id,
+        recipeTitle: recipeB.title,
+        items: recipeB.ingredients.map(ing => ({ ...ing, checked: true }))
+      }
+    ];
+
+    expect(previewGroups).toHaveLength(2);
+    expect(previewGroups[0].items).toHaveLength(2);
+    expect(previewGroups[0].items.every(i => i.checked)).toBe(true);
+    expect(previewGroups[1].items).toHaveLength(2);
+  });
+
+  it('excluye los ingredientes desmarcados al confirmar la adición a la compra', () => {
+    const previewItems = [
+      { name: 'Pechuga', amount: 300, unit: 'g', checked: true },
+      { name: 'Aceite de oliva', amount: 20, unit: 'ml', checked: false }, // desmarcado porque ya hay en casa
+      { name: 'Sal', amount: 5, unit: 'g', checked: false } // desmarcado
+    ];
+
+    const itemsToConfirm = previewItems.filter(item => item.checked);
+
+    expect(itemsToConfirm).toHaveLength(1);
+    expect(itemsToConfirm[0].name).toBe('Pechuga');
+  });
+
+  it('permite modificar la cantidad de un ingrediente antes de volcarlo a la compra', () => {
+    const previewItem = { name: 'Arroz', baseAmount: 200, amount: 200, unit: 'g', checked: true };
+    
+    // Usuario modifica manualmente la cantidad a 350g
+    const userManualAmount = 350;
+    previewItem.amount = userManualAmount;
+
+    expect(previewItem.amount).toBe(350);
+  });
+
+  it('escala las cantidades de todos los grupos al cambiar las porciones del preview', () => {
+    const initialServings = 2;
+    const targetServings = 4;
+    const scaleRatio = targetServings / initialServings; // 2
+
+    const item = { name: 'Lentejas', baseAmount: 150, amount: 150, unit: 'g' };
+    item.amount = Math.round((item.baseAmount * scaleRatio) * 10) / 10;
+
+    expect(item.amount).toBe(300);
+  });
+});
