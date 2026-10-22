@@ -310,39 +310,40 @@ const RecipeParser = {
     if (/^(ml|mililitro|mililitros)$/.test(u)) return 'ml';
     if (/^(cl|centilitro|centilitros)$/.test(u)) return 'cl';
     if (/^(l|litro|litros)$/.test(u)) return 'l';
-    if (/^(cda|cdas|cucharada|cucharadas|tbsp)$/.test(u)) return 'cda';
-    if (/^(cdta|cdtas|cucharadita|cucharaditas|tsp)$/.test(u)) return 'cdta';
+    if (/^(cda|cdas|cucharada|cucharadas|tbsp|tablespoon|tablespoons)$/.test(u)) return 'cda';
+    if (/^(cdta|cdtas|cucharadita|cucharaditas|tsp|teaspoon|teaspoons)$/.test(u)) return 'cdta';
     if (/^(taza|tazas|cup|cups)$/.test(u)) return 'taza';
-    if (/^(vaso|vasos)$/.test(u)) return 'vaso';
-    if (/^(pizca|pizcas|pinch)$/.test(u)) return 'pizca';
-    if (/^(diente|dientes)$/.test(u)) return 'diente';
+    if (/^(vaso|vasos|glass|glasses)$/.test(u)) return 'vaso';
+    if (/^(pizca|pizcas|pinch|pinches|dash|dashes)$/.test(u)) return 'pizca';
+    if (/^(diente|dientes|clove|cloves)$/.test(u)) return 'diente';
     if (/^(rebanada|rebanadas|rodaja|rodajas)$/.test(u)) return 'rebanada';
-    if (/^(loncha|lonchas|filete|filetes)$/.test(u)) return 'loncha';
-    if (/^(rama|ramas|ramita|ramitas)$/.test(u)) return 'rama';
-    if (/^(hoja|hojas)$/.test(u)) return 'hoja';
-    if (/^(lata|latas|bote|botes)$/.test(u)) return 'lata';
-    if (/^(paquete|paquetes)$/.test(u)) return 'paquete';
-    if (/^(puñado|puñados)$/.test(u)) return 'puñado';
+    if (/^(loncha|lonchas|filete|filetes|slice|slices)$/.test(u)) return 'loncha';
+    if (/^(rama|ramas|ramita|ramitas|sprig|sprigs|stalk|stalks)$/.test(u)) return 'rama';
+    if (/^(hoja|hojas|leaf|leaves)$/.test(u)) return 'hoja';
+    if (/^(lata|latas|bote|botes|can|cans)$/.test(u)) return 'lata';
+    if (/^(paquete|paquetes|pack|packs|packet|packets)$/.test(u)) return 'paquete';
+    if (/^(pu\u00F1ado|pu\u00F1ados)$/.test(u)) return 'pu\u00F1ado';
     if (/^(chorro|chorrito|chorritos)$/.test(u)) return 'chorrito';
     if (/^(sobre|sobres)$/.test(u)) return 'sobre';
+    if (/^(ud|uds|unidad|unidades|unit|units|count|counts|item|items|piece|pieces|ea)$/.test(u)) return 'ud';
     return 'ud';
   },
 
   categorizeAisle(ingredientName) {
     const text = (ingredientName || '').toLowerCase();
-    if (/pollo|ternera|carne|cerdo|pavo|jamón|salmón|pescado|atún|merluza|gambas|langostinos|bacon|lomo|chorizo|hamburguesa|filete|salchicha|costilla|pato|cordero|bacalao|calamar|pulpo|mejillón|almeja/i.test(text)) {
+    if (/pollo|ternera|carne|cerdo|pavo|jam\u00F3n|salm\u00F3n|pescado|at\u00FAn|merluza|gambas|langostinos|bacon|lomo|chorizo|hamburguesa|filete|salchicha|costilla|pato|cordero|bacalao|calamar|pulpo|mejill\u00F3n|almeja/i.test(text)) {
       return 'meat';
     }
     if (/leche|queso|mantequilla|yogur|nata|huevo|huevos|parmesano|mozzarella|crema|ricotta|feta|mascarpone|gorgonzola|cheddar/i.test(text)) {
       return 'dairy';
     }
-    if (/tomate|cebolla|ajo|patata|aguacate|espinaca|lechuga|zanahoria|limón|manzana|plátano|champiñón|seta|pimiento|calabacín|pepino|fresa|arándano|pera|naranja|brócoli|coliflor|berenjena|judía|espárrago|apio|puerro|calabaza|perejil|albahaca|cilantro|hierbabuena|menta/i.test(text)) {
+    if (/tomate|cebolla|ajo|patata|aguacate|espinaca|lechuga|zanahoria|lim\u00F3n|manzana|pl\u00E1tano|champi\u00F1\u00F3n|seta|pimiento|calabac\u00EDn|pepino|fresa|ar\u00E1ndano|pera|naranja|br\u00F3coli|coliflor|berenjena|jud\u00EDa|esp\u00E1rrago|apio|puerro|calabaza|perejil|albahaca|cilantro|hierbabuena|menta/i.test(text)) {
       return 'produce';
     }
     if (/harina|pan|levadura|masa|hojaldre|tortilla|galleta|bizcocho|placas|pasta|espaguetis|macarrones|fideos|arroz|quinoa|avena/i.test(text)) {
       return 'bakery';
     }
-    if (/sal|pimienta|orégano|comino|pimentón|curry|canela|romero|tomillo|nuez moscada|azafrán|laurel|eneldo|vainilla|clavo|jengibre|aceite|vinagre|soja|mostaza|mayonesa|kétchup|tabasco/i.test(text)) {
+    if (/sal|pimienta|or\u00E9gano|comino|piment\u00F3n|curry|canela|romero|tomillo|nuez moscada|azafr\u00E1n|laurel|eneldo|vainilla|clavo|jengibre|aceite|vinagre|soja|mostaza|mayonesa|k\u00E9tchup|tabasco/i.test(text)) {
       return 'spices';
     }
     return 'pantry';
@@ -351,7 +352,17 @@ const RecipeParser = {
   parseNumber(str) {
     if (!str) return 1;
     const clean = str.trim().replace(',', '.');
-    const unicodeFractions = { '½': 0.5, '¼': 0.25, '¾': 0.75, '⅓': 0.33, '⅔': 0.67, '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875 };
+    const unicodeFractions = {
+      '\u00BD': 0.5,
+      '\u00BC': 0.25,
+      '\u00BE': 0.75,
+      '\u2153': 0.33,
+      '\u2154': 0.67,
+      '\u215B': 0.125,
+      '\u215C': 0.375,
+      '\u215D': 0.625,
+      '\u215E': 0.875
+    };
     for (const [char, val] of Object.entries(unicodeFractions)) {
       if (clean.includes(char)) {
         const parts = clean.split(char);
@@ -375,7 +386,7 @@ const RecipeParser = {
     if (!l) return true;
     if (l.endsWith(':')) return true;
     if (/^(para\s+(la|el|los|las|hacer|servir|decorar|marinar|el\s+sofrito|la\s+salsa|la\s+masa|el\s+relleno|la\s+bechamel))/i.test(l)) return true;
-    if (/^(ingredientes|ingredientes\s+para|instrucciones|paso\s+a\s+paso|preparación|elaboración)/i.test(l)) return true;
+    if (/^(ingredientes|ingredientes\s+para|instrucciones|paso\s+a\s+paso|preparaci[o\u00F3]n|elaboraci[o\u00F3]n)/i.test(l)) return true;
     return false;
   },
 
@@ -419,23 +430,25 @@ const RecipeParser = {
     let clean = rawLine.replace(/^([\u2022\-\*]|\d+[\.\)])\s*/, '').trim();
     if (!clean || this.isSectionHeader(clean)) return null;
 
-    const unitWords = 'g|gr|gramos|kg|kilo|kilos|ml|cl|l|litro|litros|cda|cdas|cucharada|cucharadas|cdta|cdtas|cucharadita|cucharaditas|taza|tazas|vaso|vasos|pizca|pizcas|diente|dientes|rebanada|rebanadas|rodaja|rodajas|loncha|lonchas|rama|ramas|hoja|hojas|lata|latas|bote|botes|paquete|paquetes|puñado|puñados|chorro|chorrito|chorritos|sobre|sobres|ud|uds|unidad|unidades';
+    const unitWords = 'g|gr|gramo|gramos|kg|kilo|kilos|kilogramo|kilogramos|ml|cl|l|litro|litros|cda|cdas|cucharada|cucharadas|tbsp|tablespoon|tablespoons|cdta|cdtas|cucharadita|cucharaditas|tsp|teaspoon|teaspoons|taza|tazas|cup|cups|vaso|vasos|pizca|pizcas|pinch|pinches|dash|dashes|diente|dientes|clove|cloves|rebanada|rebanadas|rodaja|rodajas|loncha|lonchas|filete|filetes|slice|slices|rama|ramas|ramita|ramitas|sprig|sprigs|stalk|stalks|hoja|hojas|leaf|leaves|lata|latas|bote|botes|can|cans|paquete|paquetes|pack|packs|packet|packets|pu\u00F1ado|pu\u00F1ados|chorro|chorrito|chorritos|sobre|sobres|ud|uds|unidad|unidades|unit|units|count|counts|item|items|piece|pieces|ea';
 
     let amount = 1;
     let unit = 'ud';
     let name = clean;
 
-    // Pattern 1: Standard quantity first: "200 g de pollo", "3 huevos", "1/2 cucharada de sal"
-    const startNumRegex = new RegExp(`^([\\d½¼¾⅓⅔⅛⅜⅝⅞\\.,]+(?:\\s*\\/\\s*\\d+)?)\\s*(${unitWords})?\\s*(?:de\\s+)?(.*)$`, 'i');
+    const fracChars = '\\u00BD\\u00BC\\u00BE\\u2153\\u2154\\u215B\\u215C\\u215D\\u215E';
+
+    // Pattern 1: Standard quantity first: "200 g de pollo", "4count Diente de ajo", "3 huevos", "1/2 cucharada de sal"
+    const startNumRegex = new RegExp(`^([\\d${fracChars}\\.,]+(?:\\s*\\/\\s*\\d+)?)\\s*(${unitWords})?\\s*(?:de\\s+)?(.*)$`, 'i');
     const startMatch = clean.match(startNumRegex);
 
-    if (startMatch && (isNaN(startMatch[1]) === false || /[\/½¼¾⅓⅔⅛⅜⅝⅞]/.test(startMatch[1]))) {
+    if (startMatch && (isNaN(startMatch[1]) === false || new RegExp(`[\\/${fracChars}]`).test(startMatch[1]))) {
       amount = this.parseNumber(startMatch[1]);
       unit = startMatch[2] ? this.normalizeUnit(startMatch[2]) : 'ud';
       name = (startMatch[3] || '').trim();
     } else {
-      // Pattern 2: Name first, quantity at end: "Tomate triturado 400 g", "Placas de lasaña 12", "Berenjena 1"
-      const endNumRegex = new RegExp(`^(.*?)(?::|,)?\\s+([\\d½¼¾⅓⅔⅛⅜⅝⅞\\.,]+(?:\\s*\\/\\s*\\d+)?)\\s*(${unitWords})?$`, 'i');
+      // Pattern 2: Name first, quantity at end: "Tomate triturado 400 g", "Placas de lasa\u00F1a 12", "Berenjena 1"
+      const endNumRegex = new RegExp(`^(.*?)(?::|,)?\\s+([\\d${fracChars}\\.,]+(?:\\s*\\/\\s*\\d+)?)\\s*(${unitWords})?$`, 'i');
       const endMatch = clean.match(endNumRegex);
 
       if (endMatch && endMatch[1] && endMatch[2]) {
@@ -456,7 +469,14 @@ const RecipeParser = {
       }
     }
 
-    name = name.replace(/^de\s+/i, '').replace(/:\s*$/, '').trim();
+    // Clean extraneous prefixes/suffixes from ingredient name
+    name = name
+      .replace(/^count\s+/i, '')
+      .replace(/\s+count$/i, '')
+      .replace(/^de\s+/i, '')
+      .replace(/:\s*$/, '')
+      .trim();
+
     if (!name) return null;
 
     return {
@@ -546,18 +566,18 @@ const RecipeParser = {
     if (Array.isArray(rawInstructions)) rawInstructions.forEach(inst => processItem(inst));
     else if (typeof rawInstructions === 'string') rawInstructions.split(/\r?\n/).forEach(l => processItem(l));
 
-    const tags = ['Importada'];
+    const tags = [];
     if (schema.recipeCategory) {
       const cats = Array.isArray(schema.recipeCategory) ? schema.recipeCategory : [schema.recipeCategory];
       cats.forEach(c => {
         const catStr = String(c).trim();
-        if (catStr && !tags.includes(catStr)) tags.push(catStr);
+        if (catStr && !tags.includes(catStr) && catStr.toLowerCase() !== 'importada') tags.push(catStr);
       });
     }
 
     return {
       id: 'rec-' + Date.now(),
-      title: schema.name ? String(schema.name).trim() : 'Receta Web Importada',
+      title: schema.name ? String(schema.name).trim() : 'Receta Web',
       description: schema.description ? String(schema.description).trim() : '',
       imageUrl: imageUrl,
       prepTimeMinutes: this.parseIsoDuration(schema.prepTime),
@@ -606,7 +626,7 @@ const RecipeParser = {
     while (titleIdx < lines.length && (lines[titleIdx].startsWith('http') || /^ingredientes/i.test(lines[titleIdx]))) {
       titleIdx++;
     }
-    let title = lines[titleIdx] ? lines[titleIdx].replace(/^#+\s*|^Título:\s*|^Receta\s+(?:de\s+)?/i, '').replace(/["']/g, '').trim() : 'Receta Importada';
+    let title = lines[titleIdx] ? lines[titleIdx].replace(/^#+\s*|^T[i\u00ED]tulo:\s*|^Receta\s+(?:de\s+)?/i, '').replace(/["']/g, '').trim() : 'Receta';
 
     let servings = 2;
     let prepTimeMinutes = 15;
@@ -641,13 +661,13 @@ const RecipeParser = {
           continue;
         }
 
-        const totalMatch = line.match(/(?:tiempo(?:\s*total)?|duraci[oÃ³]n).*?(\d+)\s*(?:min|m|minuto)/i);
+        const totalMatch = line.match(/(?:tiempo(?:\s*total)?|duraci[o\u00F3]n).*?(\d+)\s*(?:min|m|minuto)/i);
         if (totalMatch && cookTimeMinutes === 20) {
           cookTimeMinutes = parseInt(totalMatch[1], 10);
           continue;
         }
 
-        if (/^(?:dificultad|calor[íi]as|autor|categor[íi]a|valoraci[oó]n|coste|precio):/i.test(line)) {
+        if (/^(?:dificultad|calor[i\u00ED]as|autor|categor[i\u00ED]a|valoraci[o\u00F3]n|coste|precio):/i.test(line)) {
           continue;
         }
       }
@@ -658,7 +678,7 @@ const RecipeParser = {
         continue;
       }
 
-      if (/^(?:instrucciones|preparaci[oó]n|pasos|elaboraci[oó]n|c[oó]mo hacer(?:lo)?|modo de preparaci[oó]n|paso a paso):?$/i.test(line) || /^#+\s*(?:instrucciones|pasos|preparaci[oó]n|elaboraci[oó]n)/i.test(line)) {
+      if (/^(?:instrucciones|preparaci[o\u00F3]n|pasos|elaboraci[o\u00F3]n|c[o\u00F3]mo hacer(?:lo)?|modo de preparaci[o\u00F3]n|paso a paso):?$/i.test(line) || /^#+\s*(?:instrucciones|pasos|preparaci[o\u00F3]n|elaboraci[o\u00F3]n)/i.test(line)) {
         currentSection = 'instructions';
         continue;
       }
@@ -679,7 +699,7 @@ const RecipeParser = {
         }
       } else {
         // Line before any explicit section header
-        if (/^[\d\-\*•]/.test(line)) {
+        if (/^[\d\-\* ]/.test(line)) {
           const parsed = this.parseIngredientLine(line);
           if (parsed) ingredients.push(parsed);
         }
@@ -694,7 +714,7 @@ const RecipeParser = {
       prepTimeMinutes: prepTimeMinutes,
       cookTimeMinutes: cookTimeMinutes,
       servings: servings,
-      tags: ['Importada', 'Notas'],
+      tags: [],
       ingredients: ingredients,
       instructions: instructions
     };
@@ -2072,15 +2092,15 @@ class FoodAssistantApp {
 
     const pendingCount = state.shoppingList.filter(i => !i.isChecked).length;
     document.getElementById('shopping-summary-text').textContent = 
-      `${pendingCount} artículo${pendingCount === 1 ? '' : 's'} pendiente${pendingCount === 1 ? '' : 's'}`;
+      `${pendingCount} art\u00EDculo${pendingCount === 1 ? '' : 's'} pendiente${pendingCount === 1 ? '' : 's'}`;
 
     if (!state.shoppingList.length) {
       container.innerHTML = `
         <div class="card" style="text-align: center; padding: 40px 16px; color: var(--m3-on-surface-variant);">
           <span class="material-symbols-outlined" style="font-size: 40px; margin-bottom: 6px; color: var(--m3-primary);">shopping_cart</span>
-          <h3 style="color: var(--m3-on-surface); font-size: 16px;">Lista de la compra vacía</h3>
+          <h3 style="color: var(--m3-on-surface); font-size: 16px;">Lista de la compra vac\u00EDa</h3>
           <p style="font-size: 13px; margin: 4px 0 16px 0;">
-            Genera la lista desde tu plan semanal con un clic o añade artículos manualmente.
+            Genera la lista desde tu plan semanal con un clic o a\u00F1ade art\u00EDculos manualmente.
           </p>
           <button class="btn btn-primary btn-sm" onclick="app.generateShoppingFromPlan()">
             <span class="material-symbols-outlined icon-sm">add_shopping_cart</span> Generar desde el Plan
@@ -2163,14 +2183,14 @@ class FoodAssistantApp {
       const count = completed.length;
       const total = state.shoppingList.length;
       if (count === total) {
-        if (confirm(`¿Eliminar los ${count} artículos comprados y vaciar la lista?`)) {
+        if (confirm(`\u00BFEliminar los ${count} art\u00EDculos comprados y vaciar la lista?`)) {
           state.shoppingList = [];
           state.save('fa_shopping', state.shoppingList);
           this.syncDataWithCloud(true);
           this.render();
         }
       } else {
-        if (confirm(`¿Eliminar los ${count} artículos marcados como comprados?`)) {
+        if (confirm(`\u00BFEliminar los ${count} art\u00EDculos marcados como comprados?`)) {
           state.shoppingList = state.shoppingList.filter(i => !i.isChecked);
           state.save('fa_shopping', state.shoppingList);
           this.syncDataWithCloud(true);
@@ -2355,7 +2375,7 @@ class FoodAssistantApp {
     const clearFirst = document.getElementById('shopping-preview-clear-first');
 
     if (titleEl) titleEl.textContent = "Añadir a la Compra";
-    if (subtitleEl) subtitleEl.textContent = `Menú Semanal (${groups.length} recetas, ${plannedCount} comidas)`;
+    if (subtitleEl) subtitleEl.textContent = `Men\u00FA Semanal (${groups.length} recetas, ${plannedCount} comidas)`;
     if (servingsVal) servingsVal.textContent = currentServings;
     if (clearFirst) clearFirst.checked = false;
 
@@ -2559,7 +2579,7 @@ class FoodAssistantApp {
     this.closeShoppingPreviewModal();
     this.render();
     this.switchView('view-shopping');
-    alert(`¡Se han añadido ${addedCount} ingredientes a tu lista de la compra!`);
+    alert(`\u00A1Se han a\u00F1adido ${addedCount} ingredientes a tu lista de la compra!`);
   }
 
   copyShoppingList() {
@@ -2896,7 +2916,7 @@ class FoodAssistantApp {
 
           if (!extractedRecipe) {
             if (corsBanner) corsBanner.style.display = 'block';
-            throw new Error("Esta web bloquea descargas directas (CORS / Cloudflare). Pulsa el botÃ³n de abajo para pegarla desde 'Texto / Notas' en 1 clic.");
+            throw new Error("Esta web bloquea descargas directas (CORS / Cloudflare). Pulsa el bot\u00F3n de abajo para pegarla desde 'Texto / Notas' en 1 clic.");
           }
         }
       } else {
@@ -2905,7 +2925,7 @@ class FoodAssistantApp {
       }
 
       if (!extractedRecipe || !extractedRecipe.title || !extractedRecipe.ingredients || extractedRecipe.ingredients.length === 0) {
-        throw new Error("No se pudieron detectar ingredientes vÃ¡lidos en el texto introducido. Comprueba que contenga la lista de ingredientes.");
+        throw new Error("No se pudieron detectar ingredientes v\u00E1lidos en el texto introducido. Comprueba que contenga la lista de ingredientes.");
       }
 
       // Store in memory for confirmation
@@ -2923,9 +2943,9 @@ class FoodAssistantApp {
         const timeEl = document.getElementById('import-preview-time');
         if (timeEl) timeEl.innerHTML = `<span class="material-symbols-outlined icon-sm">schedule</span> ${extractedRecipe.prepTimeMinutes + extractedRecipe.cookTimeMinutes} min`;
         const badgeIng = document.getElementById('import-preview-badge-ing');
-        if (badgeIng) badgeIng.textContent = `âœ“ ${extractedRecipe.ingredients.length} ingredientes`;
+        if (badgeIng) badgeIng.textContent = `\u2713 ${extractedRecipe.ingredients.length} ingredientes`;
         const badgeSteps = document.getElementById('import-preview-badge-steps');
-        if (badgeSteps) badgeSteps.textContent = `âœ“ ${extractedRecipe.instructions.length} pasos`;
+        if (badgeSteps) badgeSteps.textContent = `\u2713 ${extractedRecipe.instructions.length} pasos`;
 
         const summaryList = document.getElementById('import-preview-summary-list');
         if (summaryList) {
@@ -2937,7 +2957,7 @@ class FoodAssistantApp {
 
       if (status) {
         status.style.color = 'var(--color-brand)';
-        status.innerHTML = 'âœ“ Â¡Receta extraÃ­da con Ã©xito! Revisa la previsualizaciÃ³n y pulsa Guardar.';
+        status.innerHTML = '\u2713 \u00A1Receta extra\u00EDda con \u00E9xito! Revisa la previsualizaci\u00F3n y pulsa Guardar.';
       }
 
       if (btnExecute) btnExecute.style.display = 'none';

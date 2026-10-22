@@ -272,7 +272,7 @@
   <div class="test-header">
     <div>
       <h1><span class="material-symbols-outlined" style="color: var(--m3-primary);">verified</span> Suite de Pruebas y Control de Calidad</h1>
-      <p>Informe en vivo de verificación técnica y reglas de negocio de Food Assistant</p>
+      <p>Informe en vivo de verificaci&oacute;n t&eacute;cnica y reglas de negocio de Food Assistant</p>
     </div>
     <div class="header-actions">
       <button class="btn-action" onclick="toggleTheme()" id="btn-theme-toggle">
@@ -305,7 +305,7 @@
 
   <div class="filters-bar">
     <button class="filter-btn active" onclick="setFilter('all', this)">Todos</button>
-    <button class="filter-btn" onclick="setFilter('pass', this)">Solo Éxitos</button>
+    <button class="filter-btn" onclick="setFilter('pass', this)">Solo &Eacute;xitos</button>
     <button class="filter-btn" onclick="setFilter('fail', this)">Solo Fallos</button>
   </div>
 
@@ -360,6 +360,10 @@
         },
         toBeNull() {
           if (actual !== null) throw new Error(`Se esperaba null, recibido ${actual}`);
+        },
+        toContain(expected) {
+          const hasIt = Array.isArray(actual) ? actual.includes(expected) : (typeof actual === 'string' ? actual.includes(expected) : false);
+          if (!hasIt) throw new Error(`Se esperaba que contuviera ${JSON.stringify(expected)}`);
         }
       };
       matchers.not = {
@@ -371,6 +375,10 @@
         },
         toBeDefined() {
           if (actual !== undefined) throw new Error('No se esperaba que estuviese definido');
+        },
+        toContain(expected) {
+          const hasIt = Array.isArray(actual) ? actual.includes(expected) : (typeof actual === 'string' ? actual.includes(expected) : false);
+          if (hasIt) throw new Error(`No se esperaba que contuviera ${JSON.stringify(expected)}`);
         }
       };
       return matchers;
@@ -845,16 +853,16 @@
       );
 
       it(
-        'parseIngredientLine soporta formato inverso de webs espaÃ±olas (Directo al Paladar, Cookpad)',
+        'parseIngredientLine soporta formato inverso de webs espa\u00F1olas (Directo al Paladar, Cookpad)',
         {
-          purpose: 'Permitir analizar ingredientes donde el nombre del producto va antes que la cantidad y unidad (ej. "Placas de lasaÃ±a 12", "Tomate triturado 400 g", "Berenjena 1") habitual en webs gastronÃ³micas espaÃ±olas.',
-          assertions: 'Verifica que extrae 12 ud para Placas de lasaÃ±a en bakery, 400 g para Tomate triturado en produce, y 1 ud para Berenjena.'
+          purpose: 'Permitir analizar ingredientes donde el nombre del producto va antes que la cantidad y unidad (ej. "Placas de lasa\u00F1a 12", "Tomate triturado 400 g", "Berenjena 1") habitual en webs gastron\u00F3micas espa\u00F1olas.',
+          assertions: 'Verifica que extrae 12 ud para Placas de lasa\u00F1a en bakery, 400 g para Tomate triturado en produce, y 1 ud para Berenjena.'
         },
         () => {
-          const r1 = window.RecipeParser.parseIngredientLine('Placas de lasaÃ±a 12');
+          const r1 = window.RecipeParser.parseIngredientLine('Placas de lasa\u00F1a 12');
           expect(r1.amount).toBe(12);
           expect(r1.unit).toBe('ud');
-          expect(r1.name).toBe('Placas de lasaÃ±a');
+          expect(r1.name).toBe('Placas de lasa\u00F1a');
           expect(r1.aisle).toBe('bakery');
 
           const r2 = window.RecipeParser.parseIngredientLine('Tomate triturado 400 g');
@@ -875,9 +883,9 @@
       );
 
       it(
-        'parseIngredientLine gestiona ingredientes "al gusto" y descarta cabeceras de secciÃ³n',
+        'parseIngredientLine gestiona ingredientes "al gusto" y descarta cabeceras de secci\u00F3n',
         {
-          purpose: 'Gestionar ingredientes sin gramaje numÃ©rico exacto asignÃ¡ndoles unidad "pizca" y descartar subcabeceras decorativas como "Para la bechamel:" o "Para la salsa:" para no introducirlas falsamente como ingredientes.',
+          purpose: 'Gestionar ingredientes sin gramaje num\u00E9rico exacto asign\u00E1ndoles unidad "pizca" y descartar subcabeceras decorativas como "Para la bechamel:" o "Para la salsa:" para no introducirlas falsamente como ingredientes.',
           assertions: 'Comprueba que "Sal y pimienta al gusto" devuelve 1 pizca en spices, y "Para la bechamel:" o "Ingredientes:" devuelven null.'
         },
         () => {
@@ -896,22 +904,81 @@
       );
 
       it(
+        'parseIngredientLine elimina prefijos/unidades "count" y normaliza unidades pegadas (Directo al Paladar)',
+        {
+          purpose: 'Limpiar prefijos t\u00E9cnicos de CMS gastron\u00F3micos como "4count Diente de ajo" o "1count Lim\u00F3n" evitando que la palabra "Count" acabe en el nombre del ingrediente.',
+          assertions: 'Verifica que "4count Diente de ajo" extrae 4 ud con nombre "Diente de ajo", "1count Lim\u00F3n" extrae 1 ud, y "400g Tofu firme" extrae 400 g.'
+        },
+        () => {
+          const c1 = window.RecipeParser.parseIngredientLine('4count Diente de ajo');
+          expect(c1.amount).toBe(4);
+          expect(c1.unit).toBe('ud');
+          expect(c1.name).toBe('Diente de ajo');
+
+          const c2 = window.RecipeParser.parseIngredientLine('1count Lim\u00F3n');
+          expect(c2.amount).toBe(1);
+          expect(c2.unit).toBe('ud');
+          expect(c2.name).toBe('Lim\u00F3n');
+
+          const c3 = window.RecipeParser.parseIngredientLine('2count Clavo de olor');
+          expect(c3.amount).toBe(2);
+          expect(c3.unit).toBe('ud');
+          expect(c3.name).toBe('Clavo de olor');
+
+          const c4 = window.RecipeParser.parseIngredientLine('400g Tofu firme');
+          expect(c4.amount).toBe(400);
+          expect(c4.unit).toBe('g');
+          expect(c4.name).toBe('Tofu firme');
+
+          const c5 = window.RecipeParser.parseIngredientLine('300ml Agua');
+          expect(c5.amount).toBe(300);
+          expect(c5.unit).toBe('ml');
+          expect(c5.name).toBe('Agua');
+        }
+      );
+
+      it(
+        'parseSchemaRecipe y parseRecipeText omiten etiqueta "Importada"',
+        {
+          purpose: 'Garantizar que las recetas importadas conserven \u00FAnicamente categor\u00EDas reales (como "Vegui") sin ensuciar la lista de tags con "Importada" o "Notas".',
+          assertions: 'Verifica que recipe.tags no incluye "Importada" ni en Schema.org ni en importaci\u00F3n de texto.'
+        },
+        () => {
+          const fakeSchema = {
+            '@type': 'Recipe',
+            name: 'Curry Vegano',
+            recipeCategory: ['Vegui', 'Curry'],
+            recipeIngredient: ['400g Tofu firme', '4count Diente de ajo'],
+            recipeInstructions: ['Cocinar todo junto.']
+          };
+          const rSchema = window.RecipeParser.parseSchemaRecipe(fakeSchema);
+          expect(rSchema.tags).toContain('Vegui');
+          expect(rSchema.tags).not.toContain('Importada');
+
+          const rawText = "Curry r\u00E1pido\nIngredientes:\n1 cebolla\nInstrucciones:\n1. Picar.";
+          const rText = window.RecipeParser.parseRecipeText(rawText);
+          expect(rText.tags).not.toContain('Importada');
+          expect(rText.tags).not.toContain('Notas');
+        }
+      );
+
+      it(
         'parseRecipeText procesa recetas completas reales de Directo al Paladar con tiempos y temporizadores',
         {
-          purpose: 'Validar la importaciÃ³n integral de una receta copiada tal cual de Directo al Paladar con raciones, tiempos de cocciÃ³n/preparaciÃ³n y temporizadores inteligentes en los pasos.',
-          assertions: 'Verifica 4 raciones, 20 min prep, 40 min cocciÃ³n, 13 ingredientes limpios, y temporizadores de 10 min y 25 min en los pasos correspondientes.'
+          purpose: 'Validar la importaci\u00F3n integral de una receta copiada tal cual de Directo al Paladar con raciones, tiempos de cocci\u00F3n/preparaci\u00F3n y temporizadores inteligentes en los pasos.',
+          assertions: 'Verifica 4 raciones, 20 min prep, 40 min cocci\u00F3n, 13 ingredientes limpios, y temporizadores de 10 min y 25 min en los pasos correspondientes.'
         },
         () => {
           const rawDirecto = [
-            "LasaÃ±a de verduras fÃ¡cil y rÃ¡pida",
-            "Tiempo de preparaciÃ³n: 20 min",
-            "Tiempo de cocciÃ³n: 40 min",
+            "Lasa\u00F1a de verduras f\u00E1cil y r\u00E1pida",
+            "Tiempo de preparaci\u00F3n: 20 min",
+            "Tiempo de cocci\u00F3n: 40 min",
             "Para 4 personas",
             "",
             "Ingredientes",
-            "Placas de lasaÃ±a 12",
+            "Placas de lasa\u00F1a 12",
             "Berenjena 1",
-            "CalabacÃ­n 1",
+            "Calabac\u00EDn 1",
             "Cebolla 1",
             "Pimiento rojo 0.5",
             "Tomate triturado 400 g",
@@ -925,17 +992,17 @@
             "Nuez moscada 1 pizca",
             "",
             "Instrucciones",
-            "1. Cortar las verduras en dados pequeÃ±os.",
-            "2. En una sartÃ©n con aceite de oliva, pochar la cebolla y el pimiento durante 10 minutos.",
-            "3. AÃ±adir el calabacÃ­n y la berenjena y cocinar otros 10 minutos.",
+            "1. Cortar las verduras en dados peque\u00F1os.",
+            "2. En una sart\u00E9n con aceite de oliva, pochar la cebolla y el pimiento durante 10 minutos.",
+            "3. A\u00F1adir el calabac\u00EDn y la berenjena y cocinar otros 10 minutos.",
             "4. Agregar el tomate triturado, salpimentar y dejar reducir a fuego lento 15 minutos.",
-            "5. Preparar la bechamel derritiendo la mantequilla, aÃ±adiendo la harina y vertiendo la leche poco a poco.",
-            "6. Montar la lasaÃ±a alternando pasta, verduras y bechamel.",
-            "7. Terminar con queso rallado y hornear a 200ÂºC durante 25 minutos."
+            "5. Preparar la bechamel derritiendo la mantequilla, a\u00F1adiendo la harina y vertiendo la leche poco a poco.",
+            "6. Montar la lasa\u00F1a alternando pasta, verduras y bechamel.",
+            "7. Terminar con queso rallado y hornear a 200\u00BAC durante 25 minutos."
           ].join("\n");
 
           const recipe = window.RecipeParser.parseRecipeText(rawDirecto);
-          expect(recipe.title).toBe('LasaÃ±a de verduras fÃ¡cil y rÃ¡pida');
+          expect(recipe.title).toBe('Lasa\u00F1a de verduras f\u00E1cil y r\u00E1pida');
           expect(recipe.servings).toBe(4);
           expect(recipe.prepTimeMinutes).toBe(20);
           expect(recipe.cookTimeMinutes).toBe(40);
@@ -1033,12 +1100,12 @@
             </div>
             <div class="test-details-box">
               <div class="detail-row">
-                <span class="detail-tag">🎯 Objetivo:</span>
+                <span class="detail-tag">&#127919; Objetivo:</span>
                 <span class="detail-content">${t.meta.purpose || 'Comportamiento funcional esperado'}</span>
               </div>
               <div class="detail-row">
-                <span class="detail-tag">🔍 Validación:</span>
-                <span class="detail-content"><span class="code-snippet">${t.meta.assertions || 'Aserciones de código'}</span></span>
+                <span class="detail-tag">&#128269; Validaci&oacute;n:</span>
+                <span class="detail-content"><span class="code-snippet">${t.meta.assertions || 'Aserciones de c&oacute;digo'}</span></span>
               </div>
               ${errMsg ? `<div class="error-box"><strong>Error detectado:</strong> ${errMsg}</div>` : ''}
             </div>

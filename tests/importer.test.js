@@ -11,39 +11,40 @@ const RecipeParser = {
     if (/^(ml|mililitro|mililitros)$/.test(u)) return 'ml';
     if (/^(cl|centilitro|centilitros)$/.test(u)) return 'cl';
     if (/^(l|litro|litros)$/.test(u)) return 'l';
-    if (/^(cda|cdas|cucharada|cucharadas|tbsp)$/.test(u)) return 'cda';
-    if (/^(cdta|cdtas|cucharadita|cucharaditas|tsp)$/.test(u)) return 'cdta';
+    if (/^(cda|cdas|cucharada|cucharadas|tbsp|tablespoon|tablespoons)$/.test(u)) return 'cda';
+    if (/^(cdta|cdtas|cucharadita|cucharaditas|tsp|teaspoon|teaspoons)$/.test(u)) return 'cdta';
     if (/^(taza|tazas|cup|cups)$/.test(u)) return 'taza';
-    if (/^(vaso|vasos)$/.test(u)) return 'vaso';
-    if (/^(pizca|pizcas|pinch)$/.test(u)) return 'pizca';
-    if (/^(diente|dientes)$/.test(u)) return 'diente';
+    if (/^(vaso|vasos|glass|glasses)$/.test(u)) return 'vaso';
+    if (/^(pizca|pizcas|pinch|pinches|dash|dashes)$/.test(u)) return 'pizca';
+    if (/^(diente|dientes|clove|cloves)$/.test(u)) return 'diente';
     if (/^(rebanada|rebanadas|rodaja|rodajas)$/.test(u)) return 'rebanada';
-    if (/^(loncha|lonchas|filete|filetes)$/.test(u)) return 'loncha';
-    if (/^(rama|ramas|ramita|ramitas)$/.test(u)) return 'rama';
-    if (/^(hoja|hojas)$/.test(u)) return 'hoja';
-    if (/^(lata|latas|bote|botes)$/.test(u)) return 'lata';
-    if (/^(paquete|paquetes)$/.test(u)) return 'paquete';
-    if (/^(puñado|puñados)$/.test(u)) return 'puñado';
+    if (/^(loncha|lonchas|filete|filetes|slice|slices)$/.test(u)) return 'loncha';
+    if (/^(rama|ramas|ramita|ramitas|sprig|sprigs|stalk|stalks)$/.test(u)) return 'rama';
+    if (/^(hoja|hojas|leaf|leaves)$/.test(u)) return 'hoja';
+    if (/^(lata|latas|bote|botes|can|cans)$/.test(u)) return 'lata';
+    if (/^(paquete|paquetes|pack|packs|packet|packets)$/.test(u)) return 'paquete';
+    if (/^(pu\u00F1ado|pu\u00F1ados)$/.test(u)) return 'pu\u00F1ado';
     if (/^(chorro|chorrito|chorritos)$/.test(u)) return 'chorrito';
     if (/^(sobre|sobres)$/.test(u)) return 'sobre';
+    if (/^(ud|uds|unidad|unidades|unit|units|count|counts|item|items|piece|pieces|ea)$/.test(u)) return 'ud';
     return 'ud';
   },
 
   categorizeAisle(ingredientName) {
     const text = (ingredientName || '').toLowerCase();
-    if (/pollo|ternera|carne|cerdo|pavo|jamón|salmón|pescado|atún|merluza|gambas|langostinos|bacon|lomo|chorizo|hamburguesa|filete|salchicha|costilla|pato|cordero|bacalao|calamar|pulpo|mejillón|almeja/i.test(text)) {
+    if (/pollo|ternera|carne|cerdo|pavo|jam\u00F3n|salm\u00F3n|pescado|at\u00FAn|merluza|gambas|langostinos|bacon|lomo|chorizo|hamburguesa|filete|salchicha|costilla|pato|cordero|bacalao|calamar|pulpo|mejill\u00F3n|almeja/i.test(text)) {
       return 'meat';
     }
     if (/leche|queso|mantequilla|yogur|nata|huevo|huevos|parmesano|mozzarella|crema|ricotta|feta|mascarpone|gorgonzola|cheddar/i.test(text)) {
       return 'dairy';
     }
-    if (/tomate|cebolla|ajo|patata|aguacate|espinaca|lechuga|zanahoria|limón|manzana|plátano|champiñón|seta|pimiento|calabacín|pepino|fresa|arándano|pera|naranja|brócoli|coliflor|berenjena|judía|espárrago|apio|puerro|calabaza|perejil|albahaca|cilantro|hierbabuena|menta/i.test(text)) {
+    if (/tomate|cebolla|ajo|patata|aguacate|espinaca|lechuga|zanahoria|lim\u00F3n|manzana|pl\u00E1tano|champi\u00F1\u00F3n|seta|pimiento|calabac\u00EDn|pepino|fresa|ar\u00E1ndano|pera|naranja|br\u00F3coli|coliflor|berenjena|jud\u00EDa|esp\u00E1rrago|apio|puerro|calabaza|perejil|albahaca|cilantro|hierbabuena|menta/i.test(text)) {
       return 'produce';
     }
     if (/harina|pan|levadura|masa|hojaldre|tortilla|galleta|bizcocho|placas|pasta|espaguetis|macarrones|fideos|arroz|quinoa|avena/i.test(text)) {
       return 'bakery';
     }
-    if (/sal|pimienta|orégano|comino|pimentón|curry|canela|romero|tomillo|nuez moscada|azafrán|laurel|eneldo|vainilla|clavo|jengibre|aceite|vinagre|soja|mostaza|mayonesa|kétchup|tabasco/i.test(text)) {
+    if (/sal|pimienta|or\u00E9gano|comino|piment\u00F3n|curry|canela|romero|tomillo|nuez moscada|azafr\u00E1n|laurel|eneldo|vainilla|clavo|jengibre|aceite|vinagre|soja|mostaza|mayonesa|k\u00E9tchup|tabasco/i.test(text)) {
       return 'spices';
     }
     return 'pantry';
@@ -52,7 +53,17 @@ const RecipeParser = {
   parseNumber(str) {
     if (!str) return 1;
     const clean = str.trim().replace(',', '.');
-    const unicodeFractions = { '½': 0.5, '¼': 0.25, '¾': 0.75, '⅓': 0.33, '⅔': 0.67, '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875 };
+    const unicodeFractions = {
+      '\u00BD': 0.5,
+      '\u00BC': 0.25,
+      '\u00BE': 0.75,
+      '\u2153': 0.33,
+      '\u2154': 0.67,
+      '\u215B': 0.125,
+      '\u215C': 0.375,
+      '\u215D': 0.625,
+      '\u215E': 0.875
+    };
     for (const [char, val] of Object.entries(unicodeFractions)) {
       if (clean.includes(char)) {
         const parts = clean.split(char);
@@ -76,7 +87,7 @@ const RecipeParser = {
     if (!l) return true;
     if (l.endsWith(':')) return true;
     if (/^(para\s+(la|el|los|las|hacer|servir|decorar|marinar|el\s+sofrito|la\s+salsa|la\s+masa|el\s+relleno|la\s+bechamel))/i.test(l)) return true;
-    if (/^(ingredientes|ingredientes\s+para|instrucciones|paso\s+a\s+paso|preparación|elaboración)/i.test(l)) return true;
+    if (/^(ingredientes|ingredientes\s+para|instrucciones|paso\s+a\s+paso|preparaci[o\u00F3]n|elaboraci[o\u00F3]n)/i.test(l)) return true;
     return false;
   },
 
@@ -120,23 +131,25 @@ const RecipeParser = {
     let clean = rawLine.replace(/^([\u2022\-\*]|\d+[\.\)])\s*/, '').trim();
     if (!clean || this.isSectionHeader(clean)) return null;
 
-    const unitWords = 'g|gr|gramos|kg|kilo|kilos|ml|cl|l|litro|litros|cda|cdas|cucharada|cucharadas|cdta|cdtas|cucharadita|cucharaditas|taza|tazas|vaso|vasos|pizca|pizcas|diente|dientes|rebanada|rebanadas|rodaja|rodajas|loncha|lonchas|rama|ramas|hoja|hojas|lata|latas|bote|botes|paquete|paquetes|puñado|puñados|chorro|chorrito|chorritos|sobre|sobres|ud|uds|unidad|unidades';
+    const unitWords = 'g|gr|gramo|gramos|kg|kilo|kilos|kilogramo|kilogramos|ml|cl|l|litro|litros|cda|cdas|cucharada|cucharadas|tbsp|tablespoon|tablespoons|cdta|cdtas|cucharadita|cucharaditas|tsp|teaspoon|teaspoons|taza|tazas|cup|cups|vaso|vasos|pizca|pizcas|pinch|pinches|dash|dashes|diente|dientes|clove|cloves|rebanada|rebanadas|rodaja|rodajas|loncha|lonchas|filete|filetes|slice|slices|rama|ramas|ramita|ramitas|sprig|sprigs|stalk|stalks|hoja|hojas|leaf|leaves|lata|latas|bote|botes|can|cans|paquete|paquetes|pack|packs|packet|packets|pu\u00F1ado|pu\u00F1ados|chorro|chorrito|chorritos|sobre|sobres|ud|uds|unidad|unidades|unit|units|count|counts|item|items|piece|pieces|ea';
 
     let amount = 1;
     let unit = 'ud';
     let name = clean;
 
-    // Pattern 1: Standard quantity first: "200 g de pollo", "3 huevos", "1/2 cucharada de sal"
-    const startNumRegex = new RegExp(`^([\\d½¼¾⅓⅔⅛⅜⅝⅞\\.,]+(?:\\s*\\/\\s*\\d+)?)\\s*(${unitWords})?\\s*(?:de\\s+)?(.*)$`, 'i');
+    const fracChars = '\\u00BD\\u00BC\\u00BE\\u2153\\u2154\\u215B\\u215C\\u215D\\u215E';
+
+    // Pattern 1: Standard quantity first: "200 g de pollo", "4count Diente de ajo", "3 huevos", "1/2 cucharada de sal"
+    const startNumRegex = new RegExp(`^([\\d${fracChars}\\.,]+(?:\\s*\\/\\s*\\d+)?)\\s*(${unitWords})?\\s*(?:de\\s+)?(.*)$`, 'i');
     const startMatch = clean.match(startNumRegex);
 
-    if (startMatch && (isNaN(startMatch[1]) === false || /[\/½¼¾⅓⅔⅛⅜⅝⅞]/.test(startMatch[1]))) {
+    if (startMatch && (isNaN(startMatch[1]) === false || new RegExp(`[\\/${fracChars}]`).test(startMatch[1]))) {
       amount = this.parseNumber(startMatch[1]);
       unit = startMatch[2] ? this.normalizeUnit(startMatch[2]) : 'ud';
       name = (startMatch[3] || '').trim();
     } else {
-      // Pattern 2: Name first, quantity at end: "Tomate triturado 400 g", "Placas de lasaña 12", "Berenjena 1"
-      const endNumRegex = new RegExp(`^(.*?)(?::|,)?\\s+([\\d½¼¾⅓⅔⅛⅜⅝⅞\\.,]+(?:\\s*\\/\\s*\\d+)?)\\s*(${unitWords})?$`, 'i');
+      // Pattern 2: Name first, quantity at end: "Tomate triturado 400 g", "Placas de lasa\u00F1a 12", "Berenjena 1"
+      const endNumRegex = new RegExp(`^(.*?)(?::|,)?\\s+([\\d${fracChars}\\.,]+(?:\\s*\\/\\s*\\d+)?)\\s*(${unitWords})?$`, 'i');
       const endMatch = clean.match(endNumRegex);
 
       if (endMatch && endMatch[1] && endMatch[2]) {
@@ -157,7 +170,14 @@ const RecipeParser = {
       }
     }
 
-    name = name.replace(/^de\s+/i, '').replace(/:\s*$/, '').trim();
+    // Clean extraneous prefixes/suffixes from ingredient name
+    name = name
+      .replace(/^count\s+/i, '')
+      .replace(/\s+count$/i, '')
+      .replace(/^de\s+/i, '')
+      .replace(/:\s*$/, '')
+      .trim();
+
     if (!name) return null;
 
     return {
@@ -247,18 +267,18 @@ const RecipeParser = {
     if (Array.isArray(rawInstructions)) rawInstructions.forEach(inst => processItem(inst));
     else if (typeof rawInstructions === 'string') rawInstructions.split(/\r?\n/).forEach(l => processItem(l));
 
-    const tags = ['Importada'];
+    const tags = [];
     if (schema.recipeCategory) {
       const cats = Array.isArray(schema.recipeCategory) ? schema.recipeCategory : [schema.recipeCategory];
       cats.forEach(c => {
         const catStr = String(c).trim();
-        if (catStr && !tags.includes(catStr)) tags.push(catStr);
+        if (catStr && !tags.includes(catStr) && catStr.toLowerCase() !== 'importada') tags.push(catStr);
       });
     }
 
     return {
       id: 'rec-' + Date.now(),
-      title: schema.name ? String(schema.name).trim() : 'Receta Web Importada',
+      title: schema.name ? String(schema.name).trim() : 'Receta Web',
       description: schema.description ? String(schema.description).trim() : '',
       imageUrl: imageUrl,
       prepTimeMinutes: this.parseIsoDuration(schema.prepTime),
@@ -307,7 +327,7 @@ const RecipeParser = {
     while (titleIdx < lines.length && (lines[titleIdx].startsWith('http') || /^ingredientes/i.test(lines[titleIdx]))) {
       titleIdx++;
     }
-    let title = lines[titleIdx] ? lines[titleIdx].replace(/^#+\s*|^Título:\s*|^Receta\s+(?:de\s+)?/i, '').replace(/["']/g, '').trim() : 'Receta Importada';
+    let title = lines[titleIdx] ? lines[titleIdx].replace(/^#+\s*|^T[i\u00ED]tulo:\s*|^Receta\s+(?:de\s+)?/i, '').replace(/["']/g, '').trim() : 'Receta';
 
     let servings = 2;
     let prepTimeMinutes = 15;
@@ -342,13 +362,13 @@ const RecipeParser = {
           continue;
         }
 
-        const totalMatch = line.match(/(?:tiempo(?:\s*total)?|duraci[oÃ³]n).*?(\d+)\s*(?:min|m|minuto)/i);
+        const totalMatch = line.match(/(?:tiempo(?:\s*total)?|duraci[o\u00F3]n).*?(\d+)\s*(?:min|m|minuto)/i);
         if (totalMatch && cookTimeMinutes === 20) {
           cookTimeMinutes = parseInt(totalMatch[1], 10);
           continue;
         }
 
-        if (/^(?:dificultad|calor[íi]as|autor|categor[íi]a|valoraci[oó]n|coste|precio):/i.test(line)) {
+        if (/^(?:dificultad|calor[i\u00ED]as|autor|categor[i\u00ED]a|valoraci[o\u00F3]n|coste|precio):/i.test(line)) {
           continue;
         }
       }
@@ -359,7 +379,7 @@ const RecipeParser = {
         continue;
       }
 
-      if (/^(?:instrucciones|preparaci[oó]n|pasos|elaboraci[oó]n|c[oó]mo hacer(?:lo)?|modo de preparaci[oó]n|paso a paso):?$/i.test(line) || /^#+\s*(?:instrucciones|pasos|preparaci[oó]n|elaboraci[oó]n)/i.test(line)) {
+      if (/^(?:instrucciones|preparaci[o\u00F3]n|pasos|elaboraci[o\u00F3]n|c[o\u00F3]mo hacer(?:lo)?|modo de preparaci[o\u00F3]n|paso a paso):?$/i.test(line) || /^#+\s*(?:instrucciones|pasos|preparaci[o\u00F3]n|elaboraci[o\u00F3]n)/i.test(line)) {
         currentSection = 'instructions';
         continue;
       }
@@ -380,7 +400,7 @@ const RecipeParser = {
         }
       } else {
         // Line before any explicit section header
-        if (/^[\d\-\*•]/.test(line)) {
+        if (/^[\d\-\* ]/.test(line)) {
           const parsed = this.parseIngredientLine(line);
           if (parsed) ingredients.push(parsed);
         }
@@ -395,12 +415,13 @@ const RecipeParser = {
       prepTimeMinutes: prepTimeMinutes,
       cookTimeMinutes: cookTimeMinutes,
       servings: servings,
-      tags: ['Importada', 'Notas'],
+      tags: [],
       ingredients: ingredients,
       instructions: instructions
     };
   }
 };
+
 describe('US-15: Importador de Recetas (Schema.org / JSON-LD & Texto Estructurado)', () => {
   it('parseIsoDuration convierte duraciones ISO 8601 a minutos correctamente', () => {
     expect(RecipeParser.parseIsoDuration('PT15M')).toBe(15);
@@ -410,7 +431,7 @@ describe('US-15: Importador de Recetas (Schema.org / JSON-LD & Texto Estructurad
     expect(RecipeParser.parseIsoDuration(null)).toBe(15);
   });
 
-  it('parseServings extrae el número de raciones o comensales', () => {
+  it('parseServings extrae el n\u00FAmero de raciones o comensales', () => {
     expect(RecipeParser.parseServings(4)).toBe(4);
     expect(RecipeParser.parseServings('4 raciones')).toBe(4);
     expect(RecipeParser.parseServings('Para 6 personas')).toBe(6);
@@ -452,22 +473,14 @@ describe('US-15: Importador de Recetas (Schema.org / JSON-LD & Texto Estructurad
             "name": "Tortilla de Patatas",
             "prepTime": "PT10M",
             "cookTime": "PT20M",
-            "recipeYield": "4 personas",
-            "recipeIngredient": [
-              "5 patatas medianas",
-              "6 huevos",
-              "1 cebolla"
-            ],
-            "recipeInstructions": [
-              { "@type": "HowToStep", "text": "Pelar y cortar las patatas." },
-              { "@type": "HowToStep", "text": "Freír a fuego medio." }
-            ]
+            "recipeYield": "4 raciones",
+            "recipeIngredient": ["5 patatas medianas", "6 huevos", "Aceite de oliva", "Sal"],
+            "recipeInstructions": ["Pelar y cortar las patatas.", "Fre\u00EDr a fuego medio.", "Batir los huevos y mezclar.", "Cuajar la tortilla."]
           }
           </script>
         </head>
       </html>
     `;
-
     const extracted = RecipeParser.extractJsonLdFromHtml(html);
     expect(extracted).not.toBeNull();
     expect(extracted.name).toBe('Tortilla de Patatas');
@@ -477,66 +490,65 @@ describe('US-15: Importador de Recetas (Schema.org / JSON-LD & Texto Estructurad
     expect(recipe.prepTimeMinutes).toBe(10);
     expect(recipe.cookTimeMinutes).toBe(20);
     expect(recipe.servings).toBe(4);
-    expect(recipe.ingredients).toHaveLength(3);
-    expect(recipe.instructions).toHaveLength(2);
-    expect(recipe.instructions[0].text).toBe('Pelar y cortar las patatas.');
+    expect(recipe.ingredients).toHaveLength(4);
+    expect(recipe.instructions).toHaveLength(4);
   });
 
-  it('extractJsonLdFromHtml maneja grafos Schema.org (@graph)', () => {
+  it('extractJsonLdFromHtml soporta schemas anidados en @graph', () => {
     const html = `
       <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@graph": [
-          { "@type": "WebSite", "name": "Blog de Cocina" },
+          { "@type": "WebSite", "name": "Cocina F\u00E1cil" },
           {
             "@type": "Recipe",
             "name": "Guacamole Casero",
-            "recipeYield": 2,
-            "recipeIngredient": ["2 aguacates maduros", "1 lima"]
+            "recipeIngredient": ["2 aguacates maduros", "1 lima", "1 tomate peque\u00F1o", "Cilantro fresco", "Sal al gusto"],
+            "recipeInstructions": ["Chafar los aguacates.", "A\u00F1adir el resto de ingredientes y mezclar."]
           }
         ]
       }
       </script>
     `;
-
     const extracted = RecipeParser.extractJsonLdFromHtml(html);
     expect(extracted).not.toBeNull();
     expect(extracted.name).toBe('Guacamole Casero');
   });
 
-  it('parseRecipeText extrae receta a partir de texto libre estructurado', () => {
+  it('parseRecipeText procesa notas o texto libre estructurado', () => {
     const text = `
-    Salmón con Verduras al Vapor
+    Salm\u00F3n con Verduras al Vapor
     Raciones: 3
-    Tiempo: 25 min
+    Tiempo de preparaci\u00F3n: 10 min
+    Tiempo de cocci\u00F3n: 25 min
 
     Ingredientes:
-    - 3 lomos de salmón
-    - 200 g de brócoli
-    - 1 cucharada de aceite de oliva
+    - 3 lomos de salm\u00F3n
+    - 200 g de br\u00F3coli
+    - 2 zanahorias
 
     Instrucciones:
-    1. Lavar y cortar el brócoli en ramilletes.
-    2. Cocinar el salmón a la plancha 4 minutos por lado.
+    1. Cortar las verduras en trozos medianos.
+    2. Cocinar el salm\u00F3n a la plancha 4 minutos por lado.
     3. Servir caliente.
     `;
 
     const recipe = RecipeParser.parseRecipeText(text);
     expect(recipe).not.toBeNull();
-    expect(recipe.title).toBe('Salmón con Verduras al Vapor');
+    expect(recipe.title).toBe('Salm\u00F3n con Verduras al Vapor');
     expect(recipe.servings).toBe(3);
     expect(recipe.cookTimeMinutes).toBe(25);
     expect(recipe.ingredients).toHaveLength(3);
     expect(recipe.instructions).toHaveLength(3);
-    expect(recipe.instructions[1].text).toBe('Cocinar el salmón a la plancha 4 minutos por lado.');
+    expect(recipe.instructions[1].text).toBe('Cocinar el salm\u00F3n a la plancha 4 minutos por lado.');
   });
 
-  it('parseIngredientLine soporta formato inverso de webs espaÃ±olas (Directo al Paladar, Cookpad)', () => {
-    const r1 = RecipeParser.parseIngredientLine('Placas de lasaÃ±a 12');
+  it('parseIngredientLine soporta formato inverso de webs espa\u00F1olas (Directo al Paladar, Cookpad)', () => {
+    const r1 = RecipeParser.parseIngredientLine('Placas de lasa\u00F1a 12');
     expect(r1.amount).toBe(12);
     expect(r1.unit).toBe('ud');
-    expect(r1.name).toBe('Placas de lasaÃ±a');
+    expect(r1.name).toBe('Placas de lasa\u00F1a');
     expect(r1.aisle).toBe('bakery');
 
     const r2 = RecipeParser.parseIngredientLine('Tomate triturado 400 g');
@@ -555,7 +567,7 @@ describe('US-15: Importador de Recetas (Schema.org / JSON-LD & Texto Estructurad
     expect(r4.unit).toBe('ml');
   });
 
-  it('parseIngredientLine gestiona ingredientes "al gusto" y descarta cabeceras de secciÃ³n', () => {
+  it('parseIngredientLine gestiona ingredientes "al gusto" y descarta cabeceras de secci\u00F3n', () => {
     const tt = RecipeParser.parseIngredientLine('Sal y pimienta al gusto');
     expect(tt.amount).toBe(1);
     expect(tt.unit).toBe('pizca');
@@ -569,17 +581,62 @@ describe('US-15: Importador de Recetas (Schema.org / JSON-LD & Texto Estructurad
     expect(sh2).toBeNull();
   });
 
+  it('parseIngredientLine elimina prefijos/unidades "count" y normaliza unidades pegadas (Directo al Paladar)', () => {
+    const c1 = RecipeParser.parseIngredientLine('4count Diente de ajo');
+    expect(c1.amount).toBe(4);
+    expect(c1.unit).toBe('ud');
+    expect(c1.name).toBe('Diente de ajo');
+
+    const c2 = RecipeParser.parseIngredientLine('1count Lim\u00F3n');
+    expect(c2.amount).toBe(1);
+    expect(c2.unit).toBe('ud');
+    expect(c2.name).toBe('Lim\u00F3n');
+
+    const c3 = RecipeParser.parseIngredientLine('2count Clavo de olor');
+    expect(c3.amount).toBe(2);
+    expect(c3.unit).toBe('ud');
+    expect(c3.name).toBe('Clavo de olor');
+
+    const c4 = RecipeParser.parseIngredientLine('400g Tofu firme');
+    expect(c4.amount).toBe(400);
+    expect(c4.unit).toBe('g');
+    expect(c4.name).toBe('Tofu firme');
+
+    const c5 = RecipeParser.parseIngredientLine('300ml Agua');
+    expect(c5.amount).toBe(300);
+    expect(c5.unit).toBe('ml');
+    expect(c5.name).toBe('Agua');
+  });
+
+  it('parseSchemaRecipe y parseRecipeText omiten etiqueta "Importada"', () => {
+    const fakeSchema = {
+      '@type': 'Recipe',
+      name: 'Curry Vegano',
+      recipeCategory: ['Vegui', 'Curry'],
+      recipeIngredient: ['400g Tofu firme', '4count Diente de ajo'],
+      recipeInstructions: ['Cocinar todo junto.']
+    };
+    const rSchema = RecipeParser.parseSchemaRecipe(fakeSchema);
+    expect(rSchema.tags).toContain('Vegui');
+    expect(rSchema.tags).not.toContain('Importada');
+
+    const rawText = "Curry r\u00E1pido\nIngredientes:\n1 cebolla\nInstrucciones:\n1. Picar.";
+    const rText = RecipeParser.parseRecipeText(rawText);
+    expect(rText.tags).not.toContain('Importada');
+    expect(rText.tags).not.toContain('Notas');
+  });
+
   it('parseRecipeText procesa recetas completas reales de Directo al Paladar extrayendo raciones, tiempos y pasos con temporizador', () => {
     const rawDirecto = `
-    LasaÃ±a de verduras fÃ¡cil y rÃ¡pida
-    Tiempo de preparaciÃ³n: 20 min
-    Tiempo de cocciÃ³n: 40 min
+    Lasa\u00F1a de verduras f\u00E1cil y r\u00E1pida
+    Tiempo de preparaci\u00F3n: 20 min
+    Tiempo de cocci\u00F3n: 40 min
     Para 4 personas
 
     Ingredientes
-    Placas de lasaÃ±a 12
+    Placas de lasa\u00F1a 12
     Berenjena 1
-    CalabacÃ­n 1
+    Calabac\u00EDn 1
     Cebolla 1
     Pimiento rojo 0.5
     Tomate triturado 400 g
@@ -593,17 +650,17 @@ describe('US-15: Importador de Recetas (Schema.org / JSON-LD & Texto Estructurad
     Nuez moscada 1 pizca
 
     Instrucciones
-    1. Cortar las verduras en dados pequeÃ±os.
-    2. En una sartÃ©n con aceite de oliva, pochar la cebolla y el pimiento durante 10 minutos.
-    3. AÃ±adir el calabacÃ­n y la berenjena y cocinar otros 10 minutos.
+    1. Cortar las verduras en dados peque\u00F1os.
+    2. En una sart\u00E9n con aceite de oliva, pochar la cebolla y el pimiento durante 10 minutos.
+    3. A\u00F1adir el calabac\u00EDn y la berenjena y cocinar otros 10 minutos.
     4. Agregar el tomate triturado, salpimentar y dejar reducir a fuego lento 15 minutos.
-    5. Preparar la bechamel derritiendo la mantequilla, aÃ±adiendo la harina y vertiendo la leche poco a poco.
-    6. Montar la lasaÃ±a alternando pasta, verduras y bechamel.
-    7. Terminar con queso rallado y hornear a 200ÂºC durante 25 minutos.
+    5. Preparar la bechamel derritiendo la mantequilla, a\u00F1adiendo la harina y vertiendo la leche poco a poco.
+    6. Montar la lasa\u00F1a alternando pasta, verduras y bechamel.
+    7. Terminar con queso rallado y hornear a 200\u00BAC durante 25 minutos.
     `;
 
     const recipe = RecipeParser.parseRecipeText(rawDirecto);
-    expect(recipe.title).toBe('LasaÃ±a de verduras fÃ¡cil y rÃ¡pida');
+    expect(recipe.title).toBe('Lasa\u00F1a de verduras f\u00E1cil y r\u00E1pida');
     expect(recipe.servings).toBe(4);
     expect(recipe.prepTimeMinutes).toBe(20);
     expect(recipe.cookTimeMinutes).toBe(40);
