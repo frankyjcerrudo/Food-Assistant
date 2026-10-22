@@ -389,7 +389,7 @@ const RecipeParser = {
     if (/^(?:ingredientes|ingredientes\s+para|instrucciones|paso\s+a\s+paso|preparaci[o\u00F3]n|elaboraci[o\u00F3]n|m[e\u00E9]todo|procedimiento|modo\s+de\s+(?:preparaci[o\u00F3]n|empleo)|pasos(?:\s+a\s+seguir)?)/i.test(l)) return true;
 
     // Detect uppercase sub-section headings like "- CERDO ASADO CUBANO", "- PAN DE CUBANO", "- BOCADILLO CUBANO (1)", "MÃ‰TODO"
-    const stripped = l.replace(/^[-*â€¢#\s]+/, '').replace(/\s*\(\d+\)\s*$/, '').trim();
+    const stripped = l.replace(/^[-*\u2022#\s]+/, '').replace(/\s*\(\d+\)\s*$/, '').trim();
     if (stripped.length >= 3 && !/\d+\s*(?:g|kg|ml|cl|l|cda|cucharada|oz|lb|ud|loncha)/i.test(stripped)) {
       if (/^(?:pan(?:\s+de)?|bocadillo(?:\s+de)?|cerdo(?:\s+asado)?|masa|salsa|mojo|sofrito|relleno|bechamel|adobo|marinado|glaseado|crema|cobertura|decoraci[o\u00F3]n|guarnici[o\u00F3]n|montaje)\b/i.test(stripped)) {
         return true;
@@ -535,6 +535,27 @@ const RecipeParser = {
     if (typeof typeVal === 'string') return typeVal.toLowerCase().includes('recipe');
     if (Array.isArray(typeVal)) return typeVal.some(t => String(t).toLowerCase().includes('recipe'));
     return false;
+  },
+
+  htmlToText(html) {
+    if (!html) return '';
+    if (!html.includes('<html') && !html.includes('<body') && !html.includes('<div') && !html.includes('<p>')) {
+      return html;
+    }
+    if (typeof DOMParser !== 'undefined') {
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        ['script', 'style', 'nav', 'header', 'footer', 'aside', 'svg'].forEach(tag => {
+          doc.querySelectorAll(tag).forEach(el => el.remove());
+        });
+        return doc.body ? (doc.body.innerText || doc.body.textContent || '') : '';
+      } catch (e) {}
+    }
+    return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+               .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+               .replace(/<[^>]+>/g, '\n')
+               .replace(/\n{2,}/g, '\n');
   },
 
   getDomain(url) {
@@ -771,7 +792,7 @@ const RecipeParser = {
         continue;
       }
 
-      if (/^(?:instrucciones|preparaci[o\u00F3]n|pasos|elaboraci[o\u00F3]n|m[e\u00E9]todo|procedimiento|modo de preparaci[o\u00F3]n|c[o\u00F3]mo hacer(?:lo)?|paso a paso):?$/i.test(line) || /^#+\s*(?:instrucciones|pasos|preparaci[o\u00F3]n|elaboraci[o\u00F3]n|m[e\u00E9]todo)/i.test(line)) {
+      if (/^(?:instrucciones|preparaci[o\u00F3]n|pasos|elaboraci[o\u00F3]n|m[e\u00E9]todo|procedimiento|modo de preparaci[o\u00F3]n|c[o\u00F3]mo hacer(?:lo)?|paso a paso):?$/i.test(line) || /^#+\s*(?:instrucciones|pasos|preparaci[o\u00F3]n|elaboraci[o\u00F3]n|m[e\u00E9]todo|c[o\u00F3]mo hacer)/i.test(line)) {
         currentSection = 'instructions';
         continue;
       }
@@ -810,12 +831,20 @@ const RecipeParser = {
         continue;
       }
 
-      // Skip title duplicate lines like "CÃ³mo hacer Bocadillo de atÃºn"
-      if (/^c[o\u00F3]mo hacer/i.test(line) || /paso a paso$/i.test(line)) {
+      // Skip title duplicate lines like "Cómo hacer..."
+      if (/^#*\s*c[o\u00F3]mo hacer/i.test(line) || /paso a paso$/i.test(line)) {
         if (!currentSection || currentSection === 'ingredients') {
           currentSection = 'instructions';
         }
         continue;
+      }
+
+      // Stop parsing instructions on footer sections (ratings, related, comments)
+      if (currentSection === 'instructions') {
+        if (/^(?:#+\s*(?:con qu[e\u00E9]|m[a\u00E1]s recetas|en directo|temas|comentarios|sobre el autor)|^\d\s+\d\s+\d\s+|^\d+\s*votos)/i.test(line)) {
+          currentSection = 'end';
+          continue;
+        }
       }
 
       // Parsing items according to active section
@@ -826,7 +855,7 @@ const RecipeParser = {
         if (this.isSectionHeader(line)) {
           continue;
         }
-        const stepText = line.replace(/^\d+[\.\)]\s*|^paso\s*\d+[:\.\-]\s*/i, '').trim();
+        const stepText = line.replace(/^[#*\-\u2022\s]+/, '').replace(/^\d+[\.\)]\s*|^paso\s*\d+[:\.\-]\s*/i, '').trim();
         if (stepText && stepText.length > 3) {
           const timerMatch = stepText.match(/(?:durante|por|hervir|cocer|hornear|reposar)?\s*(\d+)\s*(?:min|minutos)/i) ||
                              stepText.match(/(?:durante|por|hervir|cocer|hornear|reposar)?\s*(\d+)\s*(?:h|hora|horas)/i);
@@ -965,6 +994,26 @@ class FoodAssistantApp {
       next = isSysDark ? 'light' : 'dark';
     }
     this.applyTheme(next);
+  }
+
+  async forceUpdateApp() {
+    try {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const reg of registrations) {
+          await reg.unregister();
+        }
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+      localStorage.setItem('fa_last_forced_reload', String(Date.now()));
+      window.location.reload(true);
+    } catch (e) {
+      console.warn("Error al reiniciar caché:", e);
+      window.location.reload();
+    }
   }
 
   // ==========================================================================
@@ -1305,6 +1354,14 @@ class FoodAssistantApp {
       this.handleClipboardPaste();
     });
     document.getElementById('btn-paste-clipboard')?.addEventListener('click', () => this.handleClipboardPaste());
+    document.getElementById('btn-import-test-example')?.addEventListener('click', () => {
+      const urlInput = document.getElementById('import-url-input');
+      if (urlInput) {
+        urlInput.value = 'https://www.directoalpaladar.com/recetas-vegetarianas/bolitas-garbanzos-brocoli-al-horno-receta-facil-para-cena-saludable';
+        this.handleRecipeImport();
+      }
+    });
+    document.getElementById('btn-force-cache-update')?.addEventListener('click', () => this.forceUpdateApp());
 
     // Recipe CRUD
     document.getElementById('btn-open-create-recipe')?.addEventListener('click', () => this.openCreateRecipeModal());
@@ -3035,6 +3092,9 @@ class FoodAssistantApp {
           }
 
           let html = null;
+          let fetchSuccess = false;
+          let is404OrEmpty = false;
+
           // Priority 1: Local server proxy (Eliminates CORS, sends real browser headers, bypasses Cloudflare)
           // Priority 2: Jina reader (Strips Cloudflare & returns clean DOM/Markdown)
           // Priority 3: Public CORS proxies as ultimate fallback
@@ -3049,12 +3109,18 @@ class FoodAssistantApp {
           for (const proxyUrl of proxyEndpoints) {
             try {
               const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 8000);
+              const timeoutId = setTimeout(() => controller.abort(), 9000);
               const resp = await fetch(proxyUrl, { signal: controller.signal });
               clearTimeout(timeoutId);
               if (resp.ok) {
-                html = await resp.text();
-                if (html && (html.includes('application/ld+json') || html.includes('recipeIngredient') || html.includes('itemprop') || html.length > 500)) {
+                const textResp = await resp.text();
+                if (textResp && textResp.length > 200) {
+                  if (textResp.includes('404 Not Found') || textResp.includes('Page not found') || textResp.includes('Página no encontrada')) {
+                    is404OrEmpty = true;
+                    continue;
+                  }
+                  html = textResp;
+                  fetchSuccess = true;
                   break;
                 }
               }
@@ -3068,17 +3134,29 @@ class FoodAssistantApp {
             if (schemaObj) {
               extractedRecipe = RecipeParser.parseSchemaRecipe(schemaObj, url);
             } else {
-              // Fallback to HTML text parsing
+              // Fallback to text / markdown parsing
               const extractedText = RecipeParser.htmlToText(html);
               if (extractedText) {
                 extractedRecipe = RecipeParser.parseRecipeText(extractedText, url);
+                if (extractedRecipe && (!extractedRecipe.imageUrl || extractedRecipe.imageUrl.includes('unsplash'))) {
+                  const imgMatch = html.match(/!\[.*?\]\((https?:\/\/[^\s\)]+)\)/i);
+                  if (imgMatch && imgMatch[1] && !imgMatch[1].includes('150_150') && !imgMatch[1].includes('avatar')) {
+                    extractedRecipe.imageUrl = imgMatch[1];
+                  }
+                }
               }
             }
           }
 
-          if (!extractedRecipe) {
+          if (!extractedRecipe || !extractedRecipe.ingredients || extractedRecipe.ingredients.length === 0) {
+            if (is404OrEmpty) {
+              throw new Error("El enlace parece no existir o estar incompleto (error 404). Comprueba que has pegado la URL completa de la receta (ej: https://.../receta/nombre-del-plato).");
+            }
+            if (fetchSuccess) {
+              throw new Error("La página se ha descargado correctamente pero no se encontraron ingredientes reconocibles. Puedes copiar el texto o ingredientes y pegarlo en 'Texto / Notas'.");
+            }
             if (corsBanner) corsBanner.style.display = 'block';
-            throw new Error("Esta web bloquea descargas directas. Puedes copiar y pegar el texto de la receta en 'Texto / Notas' en 1 clic.");
+            throw new Error("Esta web bloquea descargas directas (CORS / Cloudflare). Pulsa el botón de abajo para pegarla desde 'Texto / Notas' en 1 clic.");
           }
         }
       } else {

@@ -312,8 +312,8 @@
   <div id="test-results-container"></div>
 
   <!-- Entorno y dependencias de la app -->
-  <script src="config.js?v=8"></script>
-  <script src="app.js?v=9"></script>
+  <script src="config.js?v=10"></script>
+  <script src="app.js?v=10"></script>
 
   <script>
     const suites = [];
@@ -1150,6 +1150,45 @@
 
           expect(recipe.instructions.length).toBeGreaterThanOrEqual(10);
           expect(recipe.instructions[0].text).toContain('Limpia la aguja de cerdo');
+        }
+      );
+
+      it(
+        'htmlToText y parseRecipeText procesan contenido Markdown de Jina Reader (# Ingredientes, ## Cómo hacer...)',
+        {
+          purpose: 'Validar que el texto extraído por proxies de lectura (como r.jina.ai) con sintaxis Markdown se parsea sin errores.',
+          assertions: 'Verifica extracción correcta de título, raciones, ingredientes y pasos a partir de markdown sin bloques html.'
+        },
+        () => {
+          const sampleMd = [
+            'Title: Bolitas de garbanzos y brócoli al horno: receta fácil',
+            'URL Source: https://www.directoalpaladar.com/recetas-vegetarianas/bolitas-garbanzos',
+            '',
+            '## Ingredientes',
+            'Para 4 personas',
+            '* 400 g Garbanzos cocidos escurridos',
+            '* 100 g Brócoli',
+            '* 1 ud. Cebolla',
+            '',
+            '## Cómo hacer bolitas de garbanzos y brócoli',
+            'Dificultad: Fácil',
+            '* Tiempo total 40 min',
+            '',
+            'Separamos los floretes y lo ponemos a cocer tres minutos.',
+            'Aplastar los garbanzos en un bol.',
+            'Hornear a 200 grados durante 20 minutos.'
+          ].join('\n');
+
+          const cleanedText = window.RecipeParser.htmlToText(sampleMd);
+          expect(cleanedText).toBe(sampleMd);
+
+          const recipe = window.RecipeParser.parseRecipeText(cleanedText, 'https://www.directoalpaladar.com/recetas-vegetarianas/bolitas-garbanzos');
+          expect(recipe).not.toBeNull();
+          expect(recipe.title).toBe('Bolitas de garbanzos y brócoli al horno: receta fácil');
+          expect(recipe.servings).toBe(4);
+          expect(recipe.ingredients.length).toBeGreaterThanOrEqual(3);
+          expect(recipe.instructions.length).toBeGreaterThanOrEqual(3);
+          expect(recipe.sourceDomain).toBe('directoalpaladar.com');
         }
       );
     });

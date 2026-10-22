@@ -260,6 +260,20 @@ body {
   letter-spacing: -0.2px;
 }
 
+.app-version-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background-color: var(--m3-surface-container-high);
+  color: var(--m3-primary);
+  border: 1px solid var(--m3-outline-variant);
+  letter-spacing: 0.2px;
+  display: inline-flex;
+  align-items: center;
+  user-select: none;
+}
+
 .header-actions {
   display: flex;
   align-items: center;
