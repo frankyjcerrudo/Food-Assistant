@@ -430,7 +430,7 @@ const RecipeParser = {
     let clean = rawLine.replace(/^([\u2022\-\*]|\d+[\.\)])\s*/, '').trim();
     if (!clean || this.isSectionHeader(clean)) return null;
 
-    const unitWords = 'g|gr|gramo|gramos|kg|kilo|kilos|kilogramo|kilogramos|ml|cl|l|litro|litros|cda|cdas|cucharada|cucharadas|tbsp|tablespoon|tablespoons|cdta|cdtas|cucharadita|cucharaditas|tsp|teaspoon|teaspoons|taza|tazas|cup|cups|vaso|vasos|pizca|pizcas|pinch|pinches|dash|dashes|diente|dientes|clove|cloves|rebanada|rebanadas|rodaja|rodajas|loncha|lonchas|filete|filetes|slice|slices|rama|ramas|ramita|ramitas|sprig|sprigs|stalk|stalks|hoja|hojas|leaf|leaves|lata|latas|bote|botes|can|cans|paquete|paquetes|pack|packs|packet|packets|pu\u00F1ado|pu\u00F1ados|chorro|chorrito|chorritos|sobre|sobres|ud|uds|unidad|unidades|unit|units|count|counts|item|items|piece|pieces|ea';
+    const unitWords = 'cucharadas|cucharada|cdas|cda|cucharaditas|cucharadita|cdtas|cdta|kilogramos|kilogramo|kilos|kilo|kg|gramos|gramo|gr|g|litros|litro|cl|ml|l|tablespoons|tablespoon|tbsp|teaspoons|teaspoon|tsp|tazas|taza|cups|cup|vasos|vaso|glasses|glass|pinches|pinch|pizcas|pizca|dientes|diente|cloves|clove|rebanadas|rebanada|rodajas|rodaja|lonchas|loncha|filetes|filete|slices|slice|ramitas|ramita|ramas|rama|sprigs|sprig|stalks|stalk|hojas|hoja|leaves|leaf|latas|lata|botes|bote|cans|can|paquetes|paquete|packet|packets|packs|pack|pu\\u00F1ados|pu\\u00F1ado|chorritos|chorrito|chorro|sobres|sobre|unidades|unidad|uds|ud|units|unit|items|item|pieces|piece|counts|count|dashes|dash|ea';
 
     let amount = 1;
     let unit = 'ud';
@@ -439,7 +439,7 @@ const RecipeParser = {
     const fracChars = '\\u00BD\\u00BC\\u00BE\\u2153\\u2154\\u215B\\u215C\\u215D\\u215E';
 
     // Pattern 1: Standard quantity first: "200 g de pollo", "4count Diente de ajo", "3 huevos", "1/2 cucharada de sal"
-    const startNumRegex = new RegExp(`^([\\d${fracChars}\\.,]+(?:\\s*\\/\\s*\\d+)?)\\s*(${unitWords})?\\s*(?:de\\s+)?(.*)$`, 'i');
+    const startNumRegex = new RegExp(`^([\\d${fracChars}\\.,]+(?:\\s*\\/\\s*\\d+)?)\\s*(${unitWords})?\\.?\\s*(?:de\\s+)?(.*)$`, 'i');
     const startMatch = clean.match(startNumRegex);
 
     if (startMatch && (isNaN(startMatch[1]) === false || new RegExp(`[\\/${fracChars}]`).test(startMatch[1]))) {
@@ -448,7 +448,7 @@ const RecipeParser = {
       name = (startMatch[3] || '').trim();
     } else {
       // Pattern 2: Name first, quantity at end: "Tomate triturado 400 g", "Placas de lasa\u00F1a 12", "Berenjena 1"
-      const endNumRegex = new RegExp(`^(.*?)(?::|,)?\\s+([\\d${fracChars}\\.,]+(?:\\s*\\/\\s*\\d+)?)\\s*(${unitWords})?$`, 'i');
+      const endNumRegex = new RegExp(`^(.*?)(?::|,)?\\s+([\\d${fracChars}\\.,]+(?:\\s*\\/\\s*\\d+)?)\\s*(${unitWords})?\\.?$`, 'i');
       const endMatch = clean.match(endNumRegex);
 
       if (endMatch && endMatch[1] && endMatch[2]) {
@@ -471,13 +471,14 @@ const RecipeParser = {
 
     // Clean extraneous prefixes/suffixes from ingredient name
     name = name
+      .replace(/^[\.\,\-\:\s]+/, '')
       .replace(/^count\s+/i, '')
       .replace(/\s+count$/i, '')
       .replace(/^de\s+/i, '')
       .replace(/:\s*$/, '')
       .trim();
 
-    if (!name) return null;
+    if (!name || (name.length <= 1 && /^[a-z\.\,]$/i.test(name))) return null;
 
     return {
       id: 'ing-' + Math.random().toString(36).substr(2, 9),
@@ -618,15 +619,91 @@ const RecipeParser = {
       } catch (e) {}
     }
 
-    const lines = trimmed.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    if (lines.length === 0) return null;
+    const inputLines = trimmed.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (inputLines.length === 0) return null;
 
-    // Find title: skip initial URLs, empty lines or generic header keywords
-    let titleIdx = 0;
-    while (titleIdx < lines.length && (lines[titleIdx].startsWith('http') || /^ingredientes/i.test(lines[titleIdx]))) {
-      titleIdx++;
+    // --- Pre-pass: Detect Title if present as "Cómo hacer [Título]" or similar anywhere ---
+    let detectedTitle = null;
+    for (const l of inputLines) {
+      const comoMatch = l.match(/^c[o\u00F3]mo hacer\s+(?:un\s+|una\s+|el\s+|la\s+|los\s+|las\s+)?(.+)$/i);
+      if (comoMatch && comoMatch[1] && comoMatch[1].length > 2) {
+        detectedTitle = comoMatch[1].replace(/["']/g, '').trim();
+        break;
+      }
+      const pasoMatch = l.match(/^(.+?)\s+paso\s+a\s+paso$/i);
+      if (pasoMatch && pasoMatch[1] && pasoMatch[1].length > 3 && !/ingredientes|instrucciones/i.test(pasoMatch[1])) {
+        if (!detectedTitle) detectedTitle = pasoMatch[1].replace(/["']/g, '').trim();
+      }
     }
-    let title = lines[titleIdx] ? lines[titleIdx].replace(/^#+\s*|^T[i\u00ED]tulo:\s*|^Receta\s+(?:de\s+)?/i, '').replace(/["']/g, '').trim() : 'Receta';
+
+    // --- Pre-pass: Multi-line Normalization ---
+    // Merge split quantities (e.g. "2 uds.\nPan baguette" or "200 g\nAtún en conserva")
+    // Merge split times (e.g. "Tiempo total\n5\nmin")
+    const unitPatternStr = '(?:cucharadas?|cdas?|cucharaditas?|cdtas?|kilogramos?|kilos?|kg|gramos?|gr|g|litros?|cl|ml|l|tablespoons?|tbsp|teaspoons?|tsp|tazas?|cups?|vasos?|glasses?|pinches?|pizcas?|dientes?|cloves?|rebanadas?|rodajas?|lonchas?|filetes?|slices?|ramitas?|ramas?|sprigs?|stalks?|hojas?|leaves|leaf|latas?|botes?|cans?|paquetes?|packs?|pu\\u00F1ados?|chorritos?|sobres?|unidades?|uds?\\.?|ud\\.?|units?|items?|pieces?|counts?)';
+    const numPatternStr = '[\\d\\u00BD\\u00BC\\u00BE\\u2153\\u2154\\u215B\\u215C\\u215D\\u215E\\.,]+(?:\\s*\\/\\s*\\d+)?';
+    const isPureQuantity = (str) => {
+      const qRegex = new RegExp(`^${numPatternStr}\\s*${unitPatternStr}?\\.?$`, 'i');
+      return qRegex.test(str);
+    };
+
+    const isHeaderOrSection = (str) => {
+      return /^(?:ingredientes|instrucciones|preparaci[o\u00F3]n|elaboraci[o\u00F3]n|pasos|c[o\u00F3]mo hacer|tiempo|dificultad|dificil|f[a\u00E1]cil|para\s+\d+|rinde)/i.test(str);
+    };
+
+    const lines = [];
+    for (let idx = 0; idx < inputLines.length; idx++) {
+      const cur = inputLines[idx];
+      const next = idx + 1 < inputLines.length ? inputLines[idx + 1] : null;
+      const next2 = idx + 2 < inputLines.length ? inputLines[idx + 2] : null;
+
+      // Check multi-line times: e.g. "Tiempo total" + "5" + "min"
+      if (/^(?:tiempo(?:\s*total)?|duraci[o\u00F3]n|elaboraci[o\u00F3]n|preparaci[o\u00F3]n|cocc?i[o\u00F3]n)$/i.test(cur) && next && /^\d+$/.test(next)) {
+        if (next2 && /^(?:min|minutos?|m|h|horas?)$/i.test(next2)) {
+          lines.push(`${cur}: ${next} ${next2}`);
+          idx += 2;
+          continue;
+        } else {
+          lines.push(`${cur}: ${next} min`);
+          idx += 1;
+          continue;
+        }
+      }
+
+      // Check multi-line ingredient: pure quantity on cur + ingredient name on next
+      if (isPureQuantity(cur) && next && !isPureQuantity(next) && !isHeaderOrSection(next)) {
+        lines.push(`${cur} ${next}`);
+        idx += 1;
+        continue;
+      }
+
+      lines.push(cur);
+    }
+
+    // Determine initial section & title
+    let titleIdx = -1;
+    let currentSection = null;
+
+    if (/^ingredientes/i.test(lines[0])) {
+      currentSection = 'ingredients';
+    }
+
+    // Find title if not already detected
+    if (!detectedTitle) {
+      for (let i = 0; i < lines.length; i++) {
+        const l = lines[i];
+        if (l.startsWith('http')) continue;
+        if (/^(?:ingredientes|instrucciones|preparaci[o\u00F3]n|elaboraci[o\u00F3]n|pasos|dificultad|tiempo)/i.test(l)) continue;
+        if (/^(?:para|rinde|comensales|porciones|raciones)\s+\d+/i.test(l)) continue;
+        if (/^\d+\s*(?:personas|raciones|porciones)/i.test(l)) continue;
+        if (isPureQuantity(l)) continue;
+
+        titleIdx = i;
+        detectedTitle = l.replace(/^#+\s*|^T[i\u00ED]tulo:\s*|^Receta\s+(?:de\s+)?/i, '').replace(/["']/g, '').trim();
+        break;
+      }
+    }
+
+    let title = detectedTitle || 'Receta';
 
     let servings = 2;
     let prepTimeMinutes = 15;
@@ -634,43 +711,10 @@ const RecipeParser = {
 
     const ingredients = [];
     const instructions = [];
-    let currentSection = null;
 
-    for (let i = titleIdx + 1; i < lines.length; i++) {
+    for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-
-      // Header metadata (servings, times) - only before instructions section begins
-      if (currentSection !== 'instructions') {
-        const servingsMatch = line.match(/(?:para|rinde|porciones|raciones|comensales|personas|servings)[:\s]+(\d+)/i) ||
-                              line.match(/(?:para|de)\s+(\d+)\s*(?:personas|raciones|porciones|comensales|servings)/i) ||
-                              line.match(/^(\d+)\s*(?:personas|raciones|porciones|comensales|servings)$/i);
-        if (servingsMatch) {
-          servings = parseInt(servingsMatch[1], 10);
-          continue;
-        }
-
-        const prepMatch = line.match(/(?:prep|elaborac).*?(\d+)\s*(?:min|m|minuto)/i);
-        if (prepMatch) {
-          prepTimeMinutes = parseInt(prepMatch[1], 10);
-          continue;
-        }
-
-        const cookMatch = line.match(/(?:cocc|horno|cocinado|cook).*?(\d+)\s*(?:min|m|minuto)/i);
-        if (cookMatch) {
-          cookTimeMinutes = parseInt(cookMatch[1], 10);
-          continue;
-        }
-
-        const totalMatch = line.match(/(?:tiempo(?:\s*total)?|duraci[o\u00F3]n).*?(\d+)\s*(?:min|m|minuto)/i);
-        if (totalMatch && cookTimeMinutes === 20) {
-          cookTimeMinutes = parseInt(totalMatch[1], 10);
-          continue;
-        }
-
-        if (/^(?:dificultad|calor[i\u00ED]as|autor|categor[i\u00ED]a|valoraci[o\u00F3]n|coste|precio):/i.test(line)) {
-          continue;
-        }
-      }
+      if (i === titleIdx) continue;
 
       // Section switches
       if (/^(?:ingredientes|lista de ingredientes|lo que necesitas):?$/i.test(line) || /^#+\s*ingredientes/i.test(line)) {
@@ -680,6 +724,45 @@ const RecipeParser = {
 
       if (/^(?:instrucciones|preparaci[o\u00F3]n|pasos|elaboraci[o\u00F3]n|c[o\u00F3]mo hacer(?:lo)?|modo de preparaci[o\u00F3]n|paso a paso):?$/i.test(line) || /^#+\s*(?:instrucciones|pasos|preparaci[o\u00F3]n|elaboraci[o\u00F3]n)/i.test(line)) {
         currentSection = 'instructions';
+        continue;
+      }
+
+      // Metadata (servings, times)
+      const servingsMatch = line.match(/(?:para|rinde|porciones|raciones|comensales|personas|servings)[:\s]+(\d+)/i) ||
+                            line.match(/(?:para|de)\s+(\d+)\s*(?:personas|raciones|porciones|comensales|servings)/i) ||
+                            line.match(/^(\d+)\s*(?:personas|raciones|porciones|comensales|servings)$/i);
+      if (servingsMatch && currentSection !== 'instructions') {
+        servings = parseInt(servingsMatch[1], 10);
+        continue;
+      }
+
+      const prepMatch = line.match(/(?:prep|elaborac).*?(\d+)\s*(?:min|m|minuto)/i);
+      if (prepMatch) {
+        prepTimeMinutes = parseInt(prepMatch[1], 10);
+        continue;
+      }
+
+      const cookMatch = line.match(/(?:cocc|horno|cocinado|cook).*?(\d+)\s*(?:min|m|minuto)/i);
+      if (cookMatch) {
+        cookTimeMinutes = parseInt(cookMatch[1], 10);
+        continue;
+      }
+
+      const totalMatch = line.match(/(?:tiempo(?:\s*total)?|duraci[o\u00F3]n).*?(\d+)\s*(?:min|m|minuto)/i);
+      if (totalMatch && cookTimeMinutes === 20) {
+        cookTimeMinutes = parseInt(totalMatch[1], 10);
+        continue;
+      }
+
+      if (/^(?:dificultad|calor[i\u00ED]as|autor|categor[i\u00ED]a|valoraci[o\u00F3]n|coste|precio):/i.test(line)) {
+        continue;
+      }
+
+      // Skip title duplicate lines like "Cómo hacer Bocadillo de atún"
+      if (/^c[o\u00F3]mo hacer/i.test(line) || /paso a paso$/i.test(line)) {
+        if (!currentSection || currentSection === 'ingredients') {
+          currentSection = 'instructions';
+        }
         continue;
       }
 

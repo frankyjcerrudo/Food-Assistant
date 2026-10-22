@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es" data-theme="light">
 <head>
   <meta charset="UTF-8">
@@ -1010,6 +1010,68 @@
           expect(recipe.instructions).toHaveLength(7);
           expect(recipe.instructions[1].timerMinutes).toBe(10);
           expect(recipe.instructions[6].timerMinutes).toBe(25);
+        }
+      );
+
+      it(
+        'parseRecipeText procesa recetas con ingredientes en dos lÃ­neas (cantidad y nombre separados) como Bocadillo de atÃºn',
+        {
+          purpose: 'Validar la importaciÃ³n de recetas copiadas donde el gestor de contenidos separa cantidades e ingredientes en lÃ­neas contiguas y tiempos en bloques.',
+          assertions: 'Verifica tÃ­tulo Bocadillo de atÃºn, 2 raciones, 5 min, 7 ingredientes limpios (Pan baguette 2 ud, Mayonesa 4 cda, AtÃºn 200 g) y 4 pasos.'
+        },
+        () => {
+          const rawBocadillo = [
+            "Ingredientes",
+            " Para 2 personas",
+            "2 uds.",
+            "Pan baguette",
+            "4 cucharadas",
+            "Mayonesa",
+            "2 cucharadas",
+            "Mostaza",
+            "200 g",
+            "At\u00FAn en conserva",
+            "2 uds.",
+            "Tomate en rama",
+            "1 ud.",
+            "Cogollo de lechuga",
+            "2 uds.",
+            "Huevo cocido",
+            "C\u00F3mo hacer Bocadillo de at\u00FAn",
+            "Dificultad: F\u00E1cil",
+            "Tiempo total",
+            "5",
+            "min",
+            "Elaboraci\u00F3n",
+            "5",
+            "min",
+            "Primero abrimos las barras de pan. Mezclamos la mayonesa con la mostaza, y untamos la base de las barras con la salsa.",
+            "",
+            "Escurrimos los lomos de at\u00FAn, pelamos y cortamos los huevos en rodajas, y cortamos en rodajas los tomates.",
+            "",
+            "Colocamos las rodajas de tomate en la base de los bocadillos seguidas de las hojas de lechuga.",
+            "",
+            "Ponemos encima el at\u00FAn, y por \u00FAltimo, las rodajas de huevo cocido antes de cerrar el bocadillo.",
+            "",
+            "Bocadillo De Atun Paso A Paso"
+          ].join("\n");
+
+          const recipe = window.RecipeParser.parseRecipeText(rawBocadillo);
+          expect(recipe.title).toBe('Bocadillo de at\u00FAn');
+          expect(recipe.servings).toBe(2);
+          expect(recipe.prepTimeMinutes).toBe(5);
+          expect(recipe.cookTimeMinutes).toBe(5);
+          expect(recipe.ingredients).toHaveLength(7);
+          expect(recipe.ingredients[0].name).toBe('Pan baguette');
+          expect(recipe.ingredients[0].amount).toBe(2);
+          expect(recipe.ingredients[0].unit).toBe('ud');
+          expect(recipe.ingredients[1].name).toBe('Mayonesa');
+          expect(recipe.ingredients[1].amount).toBe(4);
+          expect(recipe.ingredients[1].unit).toBe('cda');
+          expect(recipe.ingredients[3].name).toBe('At\u00FAn en conserva');
+          expect(recipe.ingredients[3].amount).toBe(200);
+          expect(recipe.ingredients[3].unit).toBe('g');
+          expect(recipe.instructions).toHaveLength(4);
         }
       );
     });
