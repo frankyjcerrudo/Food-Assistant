@@ -89,6 +89,15 @@
 
 ---
 
+## 👥 Épica 8: Comunidad y Recetas Compartidas (Social Hub)
+
+| ID | Historia de Usuario / Feature | Prioridad | Estado | Criterios de Aceptación (DoD) |
+| :--- | :--- | :---: | :---: | :--- |
+| **US-29** | Hub de Recetas Comunitarias (Explorar, publicar y guardar recetas de otros usuarios) | 🟡 Media | `Backlog` | • **Pestaña / Sección Comunidad**: Acceso dentro de la app para explorar recetas compartidas públicamente por otros usuarios y cocineros.<br>• **Publicar receta propia**: Acción en la ficha o menú de cada receta personal para "Compartir en la comunidad" (publicando alias del autor, título, foto, tiempos, ingredientes y pasos).<br>• **Guardar en mis recetas**: Botón de 1 clic para clonar/guardar cualquier receta comunitaria directamente en la biblioteca privada y editable del usuario.<br>• **Interacciones sociales ligeras**: Contador de "Me gusta" (❤️) o guardados, buscador por ingredientes o etiquetas populares, y enlace directo para compartir recetas vía web/redes.<br>• **Backend y Seguridad (Supabase)**: Tabla pública `community_recipes` con políticas Row Level Security (RLS) para permitir lectura global y publicación/edición solo por el autor autenticado. |
+
+
+---
+
 ## 🐛 Historial y Registro de Defectos (Bugs)
 
 | ID | Defecto | Severidad | Estado | Resolución |
