@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Food Assistant - Application Core Logic
  * Google Material 3 Design, Google Material Symbols, 3-Way Theme Manager & Cloud Sync
  */
@@ -385,8 +385,19 @@ const RecipeParser = {
     const l = line.trim();
     if (!l) return true;
     if (l.endsWith(':')) return true;
-    if (/^(para\s+(la|el|los|las|hacer|servir|decorar|marinar|el\s+sofrito|la\s+salsa|la\s+masa|el\s+relleno|la\s+bechamel))/i.test(l)) return true;
-    if (/^(ingredientes|ingredientes\s+para|instrucciones|paso\s+a\s+paso|preparaci[o\u00F3]n|elaboraci[o\u00F3]n)/i.test(l)) return true;
+    if (/^(para\s+(la|el|los|las|hacer|servir|decorar|marinar|el\s+sofrito|la\s+salsa|la\s+masa|el\s+relleno|la\s+bechamel|el\s+pan|el\s+adobo))/i.test(l)) return true;
+    if (/^(?:ingredientes|ingredientes\s+para|instrucciones|paso\s+a\s+paso|preparaci[o\u00F3]n|elaboraci[o\u00F3]n|m[e\u00E9]todo|procedimiento|modo\s+de\s+(?:preparaci[o\u00F3]n|empleo)|pasos(?:\s+a\s+seguir)?)/i.test(l)) return true;
+
+    // Detect uppercase sub-section headings like "- CERDO ASADO CUBANO", "- PAN DE CUBANO", "- BOCADILLO CUBANO (1)", "MÃ‰TODO"
+    const stripped = l.replace(/^[-*â€¢#\s]+/, '').replace(/\s*\(\d+\)\s*$/, '').trim();
+    if (stripped.length >= 3 && !/\d+\s*(?:g|kg|ml|cl|l|cda|cucharada|oz|lb|ud|loncha)/i.test(stripped)) {
+      if (/^(?:pan(?:\s+de)?|bocadillo(?:\s+de)?|cerdo(?:\s+asado)?|masa|salsa|mojo|sofrito|relleno|bechamel|adobo|marinado|glaseado|crema|cobertura|decoraci[o\u00F3]n|guarnici[o\u00F3]n|montaje)\b/i.test(stripped)) {
+        return true;
+      }
+      if (/^[-*â€¢]\s*[A-ZÃÃ‰ÃÃ“ÃšÃ‘\s\d\(\)]+$/.test(l)) {
+        return true;
+      }
+    }
     return false;
   },
 
@@ -430,7 +441,7 @@ const RecipeParser = {
     let clean = rawLine.replace(/^([\u2022\-\*]|\d+[\.\)])\s*/, '').trim();
     if (!clean || this.isSectionHeader(clean)) return null;
 
-    const unitWords = 'cucharadas|cucharada|cdas|cda|cucharaditas|cucharadita|cdtas|cdta|kilogramos|kilogramo|kilos|kilo|kg|gramos|gramo|gr|g|litros|litro|cl|ml|l|tablespoons|tablespoon|tbsp|teaspoons|teaspoon|tsp|tazas|taza|cups|cup|vasos|vaso|glasses|glass|pinches|pinch|pizcas|pizca|dientes|diente|cloves|clove|rebanadas|rebanada|rodajas|rodaja|lonchas|loncha|filetes|filete|slices|slice|ramitas|ramita|ramas|rama|sprigs|sprig|stalks|stalk|hojas|hoja|leaves|leaf|latas|lata|botes|bote|cans|can|paquetes|paquete|packet|packets|packs|pack|pu\\u00F1ados|pu\\u00F1ado|chorritos|chorrito|chorro|sobres|sobre|unidades|unidad|uds|ud|units|unit|items|item|pieces|piece|counts|count|dashes|dash|ea';
+    const unitWords = 'cucharadas|cucharada|cdas|cda|cucharaditas|cucharadita|cdtas|cdta|kilogramos|kilogramo|kilos|kilo|kg|gramos|gramo|gr|litros|litro|cl|ml|tablespoons|tablespoon|tbsp|teaspoons|teaspoon|tsp|tazas|taza|cups|cup|vasos|vaso|glasses|glass|pinches|pinch|pizcas|pizca|dientes|diente|cloves|clove|rebanadas|rebanada|rodajas|rodaja|lonchas|loncha|filetes|filete|slices|slice|ramitas|ramita|ramas|rama|sprigs|sprig|stalks|stalk|hojas|hoja|leaves|leaf|latas|lata|botes|bote|cans|can|paquetes|paquete|packet|packets|packs|pack|pu\\u00F1ados|pu\\u00F1ado|chorritos|chorrito|chorro|sobres|sobre|unidades|unidad|uds|ud|units|unit|items|item|pieces|piece|counts|count|dashes|dash|ea|g|l';
 
     let amount = 1;
     let unit = 'ud';
@@ -439,7 +450,7 @@ const RecipeParser = {
     const fracChars = '\\u00BD\\u00BC\\u00BE\\u2153\\u2154\\u215B\\u215C\\u215D\\u215E';
 
     // Pattern 1: Standard quantity first: "200 g de pollo", "4count Diente de ajo", "3 huevos", "1/2 cucharada de sal"
-    const startNumRegex = new RegExp(`^([\\d${fracChars}\\.,]+(?:\\s*\\/\\s*\\d+)?)\\s*(${unitWords})?\\.?\\s*(?:de\\s+)?(.*)$`, 'i');
+    const startNumRegex = new RegExp(`^([\\d${fracChars}\\.,]+(?:\\s*\\/\\s*\\d+)?)\\s*(${unitWords})?\\.?\\b\\s*(?:de\\s+)?(.*)$`, 'i');
     const startMatch = clean.match(startNumRegex);
 
     if (startMatch && (isNaN(startMatch[1]) === false || new RegExp(`[\\/${fracChars}]`).test(startMatch[1]))) {
@@ -622,7 +633,7 @@ const RecipeParser = {
     const inputLines = trimmed.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     if (inputLines.length === 0) return null;
 
-    // --- Pre-pass: Detect Title if present as "Cómo hacer [Título]" or similar anywhere ---
+    // --- Pre-pass: Detect Title if present as "CÃ³mo hacer [TÃ­tulo]" or similar anywhere ---
     let detectedTitle = null;
     for (const l of inputLines) {
       const comoMatch = l.match(/^c[o\u00F3]mo hacer\s+(?:un\s+|una\s+|el\s+|la\s+|los\s+|las\s+)?(.+)$/i);
@@ -631,15 +642,33 @@ const RecipeParser = {
         break;
       }
       const pasoMatch = l.match(/^(.+?)\s+paso\s+a\s+paso$/i);
-      if (pasoMatch && pasoMatch[1] && pasoMatch[1].length > 3 && !/ingredientes|instrucciones/i.test(pasoMatch[1])) {
+      if (pasoMatch && pasoMatch[1] && pasoMatch[1].length > 3 && !/ingredientes|instrucciones|m[e\u00E9]todo/i.test(pasoMatch[1])) {
         if (!detectedTitle) detectedTitle = pasoMatch[1].replace(/["']/g, '').trim();
       }
     }
 
+    // Check if any line has an explicit dish/sandwich name
+    if (!detectedTitle) {
+      for (const l of inputLines) {
+        if (/^[-*\u2022#\s]*(?:bocadillo|sandwich|hamburguesa|tarta|pastel|ensalada|arroz|pasta|pizza|sopa|crema)\b/i.test(l)) {
+          const cand = l
+            .replace(/^[-*\u2022#\s]+/, '')
+            .replace(/\s*\(\d+\)\s*$/, '')
+            .replace(/\s*(?:[\-\u2013\u2014\|]\s*(?:diegodoal|directo al paladar|recetas|cocina|blog|youtube).*)$/i, '')
+            .replace(/["']/g, '')
+            .trim();
+          if (cand.length >= 4 && cand.length <= 60 && !/ingredientes|instrucciones|m[e\u00E9]todo/i.test(cand)) {
+            detectedTitle = cand;
+            break;
+          }
+        }
+      }
+    }
+
     // --- Pre-pass: Multi-line Normalization ---
-    // Merge split quantities (e.g. "2 uds.\nPan baguette" or "200 g\nAtún en conserva")
+    // Merge split quantities (e.g. "2 uds.\nPan baguette" or "200 g\nAtÃºn en conserva")
     // Merge split times (e.g. "Tiempo total\n5\nmin")
-    const unitPatternStr = '(?:cucharadas?|cdas?|cucharaditas?|cdtas?|kilogramos?|kilos?|kg|gramos?|gr|g|litros?|cl|ml|l|tablespoons?|tbsp|teaspoons?|tsp|tazas?|cups?|vasos?|glasses?|pinches?|pizcas?|dientes?|cloves?|rebanadas?|rodajas?|lonchas?|filetes?|slices?|ramitas?|ramas?|sprigs?|stalks?|hojas?|leaves|leaf|latas?|botes?|cans?|paquetes?|packs?|pu\\u00F1ados?|chorritos?|sobres?|unidades?|uds?\\.?|ud\\.?|units?|items?|pieces?|counts?)';
+    const unitPatternStr = '(?:cucharadas?|cdas?|cucharaditas?|cdtas?|kilogramos?|kilos?|kg|gramos?|gr|litros?|cl|ml|tablespoons?|tbsp|teaspoons?|tsp|tazas?|cups?|vasos?|glasses?|pinches?|pizcas?|dientes?|cloves?|rebanadas?|rodajas?|lonchas?|filetes?|slices?|ramitas?|ramas?|sprigs?|stalks?|hojas?|leaves|leaf|latas?|botes?|cans?|paquetes?|packs?|pu\\u00F1ados?|chorritos?|sobres?|unidades?|uds?\\.?|ud\\.?|units?|items?|pieces?|counts?|g|l)';
     const numPatternStr = '[\\d\\u00BD\\u00BC\\u00BE\\u2153\\u2154\\u215B\\u215C\\u215D\\u215E\\.,]+(?:\\s*\\/\\s*\\d+)?';
     const isPureQuantity = (str) => {
       const qRegex = new RegExp(`^${numPatternStr}\\s*${unitPatternStr}?\\.?$`, 'i');
@@ -647,7 +676,7 @@ const RecipeParser = {
     };
 
     const isHeaderOrSection = (str) => {
-      return /^(?:ingredientes|instrucciones|preparaci[o\u00F3]n|elaboraci[o\u00F3]n|pasos|c[o\u00F3]mo hacer|tiempo|dificultad|dificil|f[a\u00E1]cil|para\s+\d+|rinde)/i.test(str);
+      return /^(?:ingredientes|instrucciones|preparaci[o\u00F3]n|elaboraci[o\u00F3]n|m[e\u00E9]todo|pasos|c[o\u00F3]mo hacer|tiempo|dificultad|dificil|f[a\u00E1]cil|para\s+\d+|rinde)/i.test(str);
     };
 
     const lines = [];
@@ -692,13 +721,18 @@ const RecipeParser = {
       for (let i = 0; i < lines.length; i++) {
         const l = lines[i];
         if (l.startsWith('http')) continue;
-        if (/^(?:ingredientes|instrucciones|preparaci[o\u00F3]n|elaboraci[o\u00F3]n|pasos|dificultad|tiempo)/i.test(l)) continue;
-        if (/^(?:para|rinde|comensales|porciones|raciones)\s+\d+/i.test(l)) continue;
-        if (/^\d+\s*(?:personas|raciones|porciones)/i.test(l)) continue;
+        if (/^(?:ingredientes|instrucciones|preparaci[o\u00F3]n|elaboraci[o\u00F3]n|m[e\u00E9]todo|pasos|dificultad|tiempo)/i.test(l)) continue;
+        if (/^(?:para|rinde|comensales|porciones|raciones|cantidad)\s*[:\s]+\d+/i.test(l)) continue;
+        if (/^\d+\s*(?:personas|raciones|porciones|bocadillos)/i.test(l)) continue;
         if (isPureQuantity(l)) continue;
 
         titleIdx = i;
-        detectedTitle = l.replace(/^#+\s*|^T[i\u00ED]tulo:\s*|^Receta\s+(?:de\s+)?/i, '').replace(/["']/g, '').trim();
+        detectedTitle = l
+          .replace(/^#+\s*|^T[i\u00ED]tulo:\s*|^Receta\s+(?:de\s+)?/i, '')
+          .replace(/^[-*\u2022#\s]+/, '')
+          .replace(/\s*(?:[\-\u2013\u2014\|]\s*(?:diegodoal|directo al paladar|recetas|cocina|blog|youtube).*)$/i, '')
+          .replace(/["']/g, '')
+          .trim();
         break;
       }
     }
@@ -722,43 +756,46 @@ const RecipeParser = {
         continue;
       }
 
-      if (/^(?:instrucciones|preparaci[o\u00F3]n|pasos|elaboraci[o\u00F3]n|c[o\u00F3]mo hacer(?:lo)?|modo de preparaci[o\u00F3]n|paso a paso):?$/i.test(line) || /^#+\s*(?:instrucciones|pasos|preparaci[o\u00F3]n|elaboraci[o\u00F3]n)/i.test(line)) {
+      if (/^(?:instrucciones|preparaci[o\u00F3]n|pasos|elaboraci[o\u00F3]n|m[e\u00E9]todo|procedimiento|modo de preparaci[o\u00F3]n|c[o\u00F3]mo hacer(?:lo)?|paso a paso):?$/i.test(line) || /^#+\s*(?:instrucciones|pasos|preparaci[o\u00F3]n|elaboraci[o\u00F3]n|m[e\u00E9]todo)/i.test(line)) {
         currentSection = 'instructions';
         continue;
       }
 
-      // Metadata (servings, times)
-      const servingsMatch = line.match(/(?:para|rinde|porciones|raciones|comensales|personas|servings)[:\s]+(\d+)/i) ||
-                            line.match(/(?:para|de)\s+(\d+)\s*(?:personas|raciones|porciones|comensales|servings)/i) ||
-                            line.match(/^(\d+)\s*(?:personas|raciones|porciones|comensales|servings)$/i);
-      if (servingsMatch && currentSection !== 'instructions') {
-        servings = parseInt(servingsMatch[1], 10);
-        continue;
-      }
+      // Metadata (servings, times) - only evaluate outside instructions
+      const isShortMeta = line.length < 80 && !/(?:mezclamos|escurrimos|colocamos|ponemos|abrimos|limpia|corta|vierte|hornea|dora)/i.test(line);
+      if (currentSection !== 'instructions' || isShortMeta) {
+        const servingsMatch = line.match(/(?:para|rinde|porciones|raciones|comensales|personas|servings|cantidad)[:\s]+(\d+)/i) ||
+                              line.match(/(?:para|de|rinde)\s+(\d+)\s*(?:personas|raciones|porciones|comensales|servings|bocadillos|unidades|piezas)/i) ||
+                              line.match(/^(\d+)\s*(?:personas|raciones|porciones|comensales|servings|bocadillos|unidades|piezas)$/i);
+        if (servingsMatch) {
+          servings = parseInt(servingsMatch[1], 10);
+        }
 
-      const prepMatch = line.match(/(?:prep|elaborac).*?(\d+)\s*(?:min|m|minuto)/i);
-      if (prepMatch) {
-        prepTimeMinutes = parseInt(prepMatch[1], 10);
-        continue;
-      }
+        const prepMatch = line.match(/(?:prep|elaborac|tiempo\s*activo).*?(\d+)\s*(?:h|hora|horas|min|m|minuto)/i);
+        if (prepMatch) {
+          prepTimeMinutes = this.parseIsoDuration(prepMatch[0]);
+        }
 
-      const cookMatch = line.match(/(?:cocc|horno|cocinado|cook).*?(\d+)\s*(?:min|m|minuto)/i);
-      if (cookMatch) {
-        cookTimeMinutes = parseInt(cookMatch[1], 10);
-        continue;
-      }
+        const cookMatch = line.match(/(?:cocc|horno|cocinado|cook).*?(\d+)\s*(?:h|hora|horas|min|m|minuto)/i);
+        if (cookMatch) {
+          cookTimeMinutes = this.parseIsoDuration(cookMatch[0]);
+        }
 
-      const totalMatch = line.match(/(?:tiempo(?:\s*total)?|duraci[o\u00F3]n).*?(\d+)\s*(?:min|m|minuto)/i);
-      if (totalMatch && cookTimeMinutes === 20) {
-        cookTimeMinutes = parseInt(totalMatch[1], 10);
-        continue;
+        const totalMatch = line.match(/(?:tiempo(?:\s*total)?|duraci[o\u00F3]n).*?(\d+)\s*(?:h|hora|horas|min|m|minuto)/i);
+        if (totalMatch && (cookTimeMinutes === 20 || cookTimeMinutes === 0 || cookTimeMinutes === prepTimeMinutes)) {
+          cookTimeMinutes = this.parseIsoDuration(totalMatch[0]);
+        }
+
+        if (servingsMatch || prepMatch || cookMatch || totalMatch) {
+          continue;
+        }
       }
 
       if (/^(?:dificultad|calor[i\u00ED]as|autor|categor[i\u00ED]a|valoraci[o\u00F3]n|coste|precio):/i.test(line)) {
         continue;
       }
 
-      // Skip title duplicate lines like "Cómo hacer Bocadillo de atún"
+      // Skip title duplicate lines like "CÃ³mo hacer Bocadillo de atÃºn"
       if (/^c[o\u00F3]mo hacer/i.test(line) || /paso a paso$/i.test(line)) {
         if (!currentSection || currentSection === 'ingredients') {
           currentSection = 'instructions';
@@ -771,13 +808,21 @@ const RecipeParser = {
         const parsed = this.parseIngredientLine(line);
         if (parsed) ingredients.push(parsed);
       } else if (currentSection === 'instructions') {
+        if (this.isSectionHeader(line)) {
+          continue;
+        }
         const stepText = line.replace(/^\d+[\.\)]\s*|^paso\s*\d+[:\.\-]\s*/i, '').trim();
         if (stepText && stepText.length > 3) {
-          const timerMatch = stepText.match(/(?:durante|por|hervir|cocer|hornear|reposar)?\s*(\d+)\s*(?:min|minutos)/i);
+          const timerMatch = stepText.match(/(?:durante|por|hervir|cocer|hornear|reposar)?\s*(\d+)\s*(?:min|minutos)/i) ||
+                             stepText.match(/(?:durante|por|hervir|cocer|hornear|reposar)?\s*(\d+)\s*(?:h|hora|horas)/i);
+          let timerMin = null;
+          if (timerMatch) {
+            timerMin = this.parseIsoDuration(timerMatch[0]);
+          }
           instructions.push({
             step: instructions.length + 1,
             text: stepText,
-            timerMinutes: timerMatch ? parseInt(timerMatch[1], 10) : null
+            timerMinutes: timerMin
           });
         }
       } else {

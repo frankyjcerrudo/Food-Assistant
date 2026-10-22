@@ -1074,6 +1074,80 @@
           expect(recipe.instructions).toHaveLength(4);
         }
       );
+
+      it(
+        'parseRecipeText procesa recetas complejas con subsecciones, metodo, tiempos en horas y lonchas como Bocadillo Cubano',
+        {
+          purpose: 'Validar la importaciÃ³n de recetas complejas con subencabezados (- CERDO ASADO CUBANO, - PAN DE CUBANO), secciÃ³n MÃ‰TODO, raciones expresadas como CANTIDAD: 4 BOCADILLOS, tiempos en horas y unidades de lonchas sin conflicto con litros.',
+          assertions: 'Verifica tÃ­tulo Bocadillo Cubano completamente casero, 4 raciones, 120 min prep, 300 min cocciÃ³n, 4 lonchas de jamÃ³n (no 4 l), 2 lonchas de queso y pasos de mÃ©todo limpios.'
+        },
+        () => {
+          const rawCubano = [
+            "Bocadillo Cubano completamente casero \u2014 diegodoal",
+            "",
+            "DIFICULTAD: INTERMEDIA - INGREDIENTES: F\u00C1CIL - TIEMPO: 5 HORAS",
+            "TIEMPO ACTIVO: 2 HORAS - CANTIDAD: 4 BOCADILLOS",
+            "INGREDIENTES",
+            "- CERDO ASADO CUBANO",
+            "2 kg de aguja de cerdo deshuesada",
+            "Sal",
+            "Mojo:",
+            "60 ml de zumo de lima",
+            "120 ml de zumo de naranja",
+            "60 ml de aceite de oliva virgen extra",
+            "1 cucharada de or\u00E9gano seco",
+            "- PAN DE CUBANO",
+            "350 g de harina de fuerza",
+            "15 g de az\u00FAcar",
+            "5 g de levadura instant\u00E1nea de panadero",
+            "9 g de sal",
+            "250 ml de agua templada",
+            "30 g de manteca de cerdo",
+            "- BOCADILLO CUBANO (1)",
+            "Cerdo asado cubano",
+            "4 lonchas de jam\u00F3n cocido finas",
+            "2 lonchas de queso emmental",
+            "Mostaza amarilla",
+            "Pepinillos",
+            "Mantequilla",
+            "M\u00C9TODO",
+            "- CERDO ASADO CUBANO",
+            "Limpia la aguja de cerdo si tiene hueso. S\u00E1lala por toda la superficie abundantemente.",
+            "En un bol, mezcla todos los ingredientes del mojo. Reserva la mitad en la nevera y con la otra mitad marina la carne. D\u00E9jala en la nevera al menos dos horas, pero idealmente toda la noche.",
+            "Envuelve el trozo de carne y sus jugos con papel de aluminio y m\u00E9telo a un horno a 180 grados, calor solo por abajo, dos horas.",
+            "Desenvu\u00E9lvelo, b\u00E1\u00F1alo con sus jugos, y devu\u00E9lvelo al horno 2 horas m\u00E1s. B\u00E1\u00F1alo con los jugos cada 30 minutos.",
+            "S\u00E1calo del horno y d\u00E9jalo reposar 15 minutos. Mientras, mezcla sus jugos con el mojo que hab\u00EDamos reservado en la nevera.",
+            "R\u00F3mpelo en trozos medianos con las manos o dos tenedores. Vierte el mojo por toda la carne y mezcla bien.",
+            "- PAN DE CUBANO",
+            "En un bol grande, a\u00F1ade la harina de fuerza, el az\u00FAcar, la levadura instant\u00E1nea y la sal. Mezcla con unas varillas.",
+            "Haz un hueco en el centro y a\u00F1ade el agua. Mezcla con unas varillas y despu\u00E9s con las manos, hasta que toda la harina se integre.",
+            "A\u00F1ade la manteca a temperatura ambiente e int\u00E9grala en la masa. Amasa en una mesa durante 8-9 minutos, hasta que sea el\u00E1stica y rebote al tacto.",
+            "Haz una bola con la masa y d\u00E9jala reposar en un bol tapada con un trapo h\u00FAmedo, durante 45 minutos, o hasta que retomen la forma."
+          ].join("\n");
+
+          const recipe = window.RecipeParser.parseRecipeText(rawCubano);
+          expect(recipe.title).toBe('Bocadillo Cubano completamente casero');
+          expect(recipe.servings).toBe(4);
+          expect(recipe.prepTimeMinutes).toBe(120);
+          expect(recipe.cookTimeMinutes).toBe(300);
+
+          const jamon = recipe.ingredients.find(i => i.name.toLowerCase().includes('jam'));
+          expect(jamon).toBeDefined();
+          expect(jamon.amount).toBe(4);
+          expect(jamon.unit).toBe('loncha');
+
+          const queso = recipe.ingredients.find(i => i.name.toLowerCase().includes('emmental'));
+          expect(queso).toBeDefined();
+          expect(queso.amount).toBe(2);
+          expect(queso.unit).toBe('loncha');
+
+          const metodoIng = recipe.ingredients.find(i => i.name.toLowerCase().includes('m\u00E9todo'));
+          expect(metodoIng).toBe(undefined);
+
+          expect(recipe.instructions.length).toBeGreaterThanOrEqual(10);
+          expect(recipe.instructions[0].text).toContain('Limpia la aguja de cerdo');
+        }
+      );
     });
 
     // =========================================================
