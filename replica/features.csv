@@ -1,6 +1,6 @@
-﻿feature,area,priority,original,clone,notes
-Importar receta desde URL web (schema JSON-LD),importer,must,yes,yes,Extracción limpia de ingredientes pasos e imagen
-Importar receta desde redes sociales con Gemini fallback,importer,must,yes,yes,Parsing inteligente con IA si no hay microdatos
+feature,area,priority,original,clone,notes
+Importar receta desde URL web (schema JSON-LD) con atribución de fuente,importer,must,yes,yes,Extracción limpia sin CORS ni Cloudflare con link a fuente original
+Importador multimodal IA Premium (OCR fotos y transcripción vídeo),ai_gemini,should,yes,no,Digitalización de fotos de libros y transcripción de Reels/TikToks sin texto (exclusivo Premium)
 Biblioteca de recetas guardadas con búsqueda y filtros por etiquetas,recipes,must,yes,yes,Visualización en grid con fotos y tiempos
 Detalle de receta con escalador de porciones,recipes,must,yes,yes,Recálculo automático de cantidades de ingredientes dinámico
 Modo cocina paso a paso con temporizadores,recipes,should,yes,yes,Vista a pantalla completa con aviso sonoro Web Audio API

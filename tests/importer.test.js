@@ -1,4 +1,4 @@
-﻿import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 // RecipeParser implementation under test
 const RecipeParser = {
@@ -238,7 +238,17 @@ const RecipeParser = {
     return false;
   },
 
-  parseSchemaRecipe(schema) {
+  getDomain(url) {
+    if (!url || typeof url !== 'string') return '';
+    try {
+      const match = url.match(/https?:\/\/(?:www\.)?([^\/\?#]+)/i);
+      return match ? match[1].toLowerCase() : '';
+    } catch {
+      return '';
+    }
+  },
+
+  parseSchemaRecipe(schema, sourceUrl = '') {
     if (!schema) return null;
     let imageUrl = '';
     if (schema.image) {

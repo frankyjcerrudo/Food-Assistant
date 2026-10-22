@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Food Assistant - Application Core Logic
  * Google Material 3 Design, Google Material Symbols, 3-Way Theme Manager & Cloud Sync
  */
@@ -537,7 +537,17 @@ const RecipeParser = {
     return false;
   },
 
-  parseSchemaRecipe(schema) {
+  getDomain(url) {
+    if (!url || typeof url !== 'string') return '';
+    try {
+      const match = url.match(/https?:\/\/(?:www\.)?([^\/\?#]+)/i);
+      return match ? match[1].toLowerCase() : '';
+    } catch {
+      return '';
+    }
+  },
+
+  parseSchemaRecipe(schema, sourceUrl = '') {
     if (!schema) return null;
     let imageUrl = '';
     if (schema.image) {
@@ -587,6 +597,9 @@ const RecipeParser = {
       });
     }
 
+    const resolvedSourceUrl = sourceUrl || schema.mainEntityOfPage || schema.url || '';
+    const resolvedDomain = this.getDomain(resolvedSourceUrl) || (schema.publisher?.name || '');
+
     return {
       id: 'rec-' + Date.now(),
       title: schema.name ? String(schema.name).trim() : 'Receta Web',
@@ -597,7 +610,9 @@ const RecipeParser = {
       servings: this.parseServings(schema.recipeYield),
       tags: tags.slice(0, 4),
       ingredients: ingredients,
-      instructions: instructions
+      instructions: instructions,
+      sourceUrl: resolvedSourceUrl,
+      sourceDomain: resolvedDomain
     };
   },
 
@@ -615,7 +630,7 @@ const RecipeParser = {
       .trim();
   },
 
-  parseRecipeText(rawText) {
+  parseRecipeText(rawText, sourceUrl = '') {
     if (!rawText || typeof rawText !== 'string') return null;
     const trimmed = rawText.trim();
     if (!trimmed) return null;
@@ -625,7 +640,7 @@ const RecipeParser = {
       try {
         const schema = this.extractJsonLdFromHtml(trimmed) || (trimmed.startsWith('{') ? JSON.parse(trimmed) : null);
         if (schema && (this.isRecipeType(schema['@type']) || schema.recipeIngredient || schema.ingredients)) {
-          return this.parseSchemaRecipe(schema);
+          return this.parseSchemaRecipe(schema, sourceUrl);
         }
       } catch (e) {}
     }
@@ -834,6 +849,7 @@ const RecipeParser = {
       }
     }
 
+    const resolvedDomain = sourceUrl ? this.getDomain(sourceUrl) : '';
     return {
       id: 'rec-' + Date.now(),
       title: title || 'Receta de Notas',
@@ -844,7 +860,9 @@ const RecipeParser = {
       servings: servings,
       tags: [],
       ingredients: ingredients,
-      instructions: instructions
+      instructions: instructions,
+      sourceUrl: sourceUrl || '',
+      sourceDomain: resolvedDomain
     };
   }
 };
@@ -1489,6 +1507,11 @@ class FoodAssistantApp {
           <h3 class="recipe-title">${rec.title}</h3>
           <p class="recipe-desc">${rec.description}</p>
           <div class="recipe-tags">
+            ${rec.sourceDomain ? `
+              <span class="tag-chip" style="background: var(--m3-surface-container-high); color: var(--m3-primary); font-weight: 500; display: inline-flex; align-items: center; gap: 3px;" title="Fuente: ${rec.sourceDomain}">
+                <span class="material-symbols-outlined" style="font-size: 13px;">link</span> ${rec.sourceDomain}
+              </span>
+            ` : ''}
             ${rec.tags.map(t => `<span class="tag-chip">${t}</span>`).join('')}
           </div>
         </div>
@@ -1551,7 +1574,13 @@ class FoodAssistantApp {
       </div>
       
       <div style="padding: 18px;">
-        <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">
+        <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center;">
+          ${r.sourceUrl ? `
+            <a href="${r.sourceUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="tag-chip" style="background: var(--m3-secondary-container); color: var(--m3-on-secondary-container); font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: var(--radius-full);" title="Abrir enlace original en nueva pestaña">
+              <span class="material-symbols-outlined" style="font-size: 14px;">open_in_new</span>
+              Fuente: ${r.sourceDomain || 'Web Original'}
+            </a>
+          ` : ''}
           ${r.tags.map(t => `<span class="tag-chip" style="background: var(--m3-primary-container); color: var(--m3-on-primary-container); font-weight: 700;">${t}</span>`).join('')}
         </div>
         
@@ -3006,21 +3035,26 @@ class FoodAssistantApp {
           }
 
           let html = null;
-          const proxies = [
+          // Priority 1: Local server proxy (Eliminates CORS, sends real browser headers, bypasses Cloudflare)
+          // Priority 2: Jina reader (Strips Cloudflare & returns clean DOM/Markdown)
+          // Priority 3: Public CORS proxies as ultimate fallback
+          const proxyEndpoints = [
+            `/api/fetch?url=${encodeURIComponent(url)}`,
+            `http://localhost:3000/api/fetch?url=${encodeURIComponent(url)}`,
+            `https://r.jina.ai/${url}`,
             `https://corsproxy.io/?${encodeURIComponent(url)}`,
-            `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
           ];
 
-          for (const proxyUrl of proxies) {
+          for (const proxyUrl of proxyEndpoints) {
             try {
               const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 6000);
+              const timeoutId = setTimeout(() => controller.abort(), 8000);
               const resp = await fetch(proxyUrl, { signal: controller.signal });
               clearTimeout(timeoutId);
               if (resp.ok) {
                 html = await resp.text();
-                if (html && (html.includes('application/ld+json') || html.includes('recipeIngredient') || html.includes('itemprop'))) {
+                if (html && (html.includes('application/ld+json') || html.includes('recipeIngredient') || html.includes('itemprop') || html.length > 500)) {
                   break;
                 }
               }
@@ -3032,19 +3066,19 @@ class FoodAssistantApp {
           if (html) {
             const schemaObj = RecipeParser.extractJsonLdFromHtml(html);
             if (schemaObj) {
-              extractedRecipe = RecipeParser.parseSchemaRecipe(schemaObj);
+              extractedRecipe = RecipeParser.parseSchemaRecipe(schemaObj, url);
             } else {
               // Fallback to HTML text parsing
               const extractedText = RecipeParser.htmlToText(html);
               if (extractedText) {
-                extractedRecipe = RecipeParser.parseRecipeText(extractedText);
+                extractedRecipe = RecipeParser.parseRecipeText(extractedText, url);
               }
             }
           }
 
           if (!extractedRecipe) {
             if (corsBanner) corsBanner.style.display = 'block';
-            throw new Error("Esta web bloquea descargas directas (CORS / Cloudflare). Pulsa el bot\u00F3n de abajo para pegarla desde 'Texto / Notas' en 1 clic.");
+            throw new Error("Esta web bloquea descargas directas. Puedes copiar y pegar el texto de la receta en 'Texto / Notas' en 1 clic.");
           }
         }
       } else {
@@ -3053,7 +3087,7 @@ class FoodAssistantApp {
       }
 
       if (!extractedRecipe || !extractedRecipe.title || !extractedRecipe.ingredients || extractedRecipe.ingredients.length === 0) {
-        throw new Error("No se pudieron detectar ingredientes v\u00E1lidos en el texto introducido. Comprueba que contenga la lista de ingredientes.");
+        throw new Error("No se pudieron detectar ingredientes válidos en el texto introducido. Comprueba que contenga la lista de ingredientes.");
       }
 
       // Store in memory for confirmation
@@ -3071,13 +3105,19 @@ class FoodAssistantApp {
         const timeEl = document.getElementById('import-preview-time');
         if (timeEl) timeEl.innerHTML = `<span class="material-symbols-outlined icon-sm">schedule</span> ${extractedRecipe.prepTimeMinutes + extractedRecipe.cookTimeMinutes} min`;
         const badgeIng = document.getElementById('import-preview-badge-ing');
-        if (badgeIng) badgeIng.textContent = `\u2713 ${extractedRecipe.ingredients.length} ingredientes`;
+        if (badgeIng) badgeIng.textContent = `✓ ${extractedRecipe.ingredients.length} ingredientes`;
         const badgeSteps = document.getElementById('import-preview-badge-steps');
-        if (badgeSteps) badgeSteps.textContent = `\u2713 ${extractedRecipe.instructions.length} pasos`;
+        if (badgeSteps) badgeSteps.textContent = `✓ ${extractedRecipe.instructions.length} pasos`;
 
         const summaryList = document.getElementById('import-preview-summary-list');
         if (summaryList) {
           summaryList.innerHTML = `
+            ${extractedRecipe.sourceUrl ? `
+              <div style="margin-bottom: 8px; font-size: 12px; display: flex; align-items: center; gap: 4px; color: var(--m3-primary); font-weight: 500;">
+                <span class="material-symbols-outlined" style="font-size: 15px;">link</span>
+                Fuente: <a href="${extractedRecipe.sourceUrl}" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: underline;">${extractedRecipe.sourceDomain || extractedRecipe.sourceUrl}</a>
+              </div>
+            ` : ''}
             <strong>Ingredientes:</strong> ${extractedRecipe.ingredients.map(i => `${i.amount} ${i.unit} ${i.name}`).slice(0, 6).join(', ')}${extractedRecipe.ingredients.length > 6 ? '...' : ''}
           `;
         }

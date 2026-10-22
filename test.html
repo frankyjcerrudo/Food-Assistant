@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es" data-theme="light">
 <head>
   <meta charset="UTF-8">
@@ -787,6 +787,10 @@
           expect(recipe.ingredients).toHaveLength(3);
           expect(recipe.instructions).toHaveLength(2);
           expect(recipe.instructions[0].text).toBe('Pelar y cortar las patatas.');
+
+          const recipeWithSource = window.RecipeParser.parseSchemaRecipe(extracted, 'https://www.directoalpaladar.com/recetas/tortilla');
+          expect(recipeWithSource.sourceUrl).toBe('https://www.directoalpaladar.com/recetas/tortilla');
+          expect(recipeWithSource.sourceDomain).toBe('directoalpaladar.com');
         }
       );
 
