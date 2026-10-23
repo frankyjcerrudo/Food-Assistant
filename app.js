@@ -766,7 +766,7 @@ const RecipeParser = {
 
         titleIdx = i;
         detectedTitle = l
-          .replace(/^#+\s*|^T[i\u00ED]tulo:\s*|^Receta\s+(?:de\s+)?/i, '')
+          .replace(/^#+\s*|^(?:T[i\u00ED]tulo|Title):\s*|^Receta\s+(?:de\s+)?/i, '')
           .replace(/^[-*\u2022#\s]+/, '')
           .replace(/\s*(?:[\-\u2013\u2014\|]|â€”)\s*(?:diegodoal|directo al paladar|recetas|cocina|blog|youtube).*$/i, '')
           .replace(/["']/g, '')
