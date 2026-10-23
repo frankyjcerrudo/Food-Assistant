@@ -1562,7 +1562,6 @@ class FoodAssistantApp {
     // Importer (US-15: Schema.org & Text Parser)
     document.getElementById('btn-quick-import')?.addEventListener('click', () => this.openImportModal());
     document.getElementById('btn-close-import-modal')?.addEventListener('click', () => this.closeImportModal());
-    document.getElementById('btn-cancel-import')?.addEventListener('click', () => this.closeImportModal());
     document.getElementById('tab-import-url')?.addEventListener('click', () => this.switchImportTab('url'));
     document.getElementById('tab-import-text')?.addEventListener('click', () => this.switchImportTab('text'));
     document.getElementById('btn-execute-import')?.addEventListener('click', () => this.handleRecipeImport());
@@ -1572,9 +1571,6 @@ class FoodAssistantApp {
       this.handleClipboardPaste();
     });
     document.getElementById('btn-paste-clipboard')?.addEventListener('click', () => this.handleClipboardPaste());
-    document.getElementById('btn-import-test-example')?.addEventListener('click', () => {
-      this.fillAndTestSampleRecipe();
-    });
     document.getElementById('btn-force-cache-update')?.addEventListener('click', () => this.forceUpdateApp());
 
     // Recipe CRUD
@@ -3392,7 +3388,7 @@ class FoodAssistantApp {
               throw new Error("La página web se ha descargado correctamente pero no contiene una receta con ingredientes reconocibles (puede ser un buscador, portada o listado general). Copia el enlace de una receta concreta o pega su texto en 'Texto / Notas'.");
             }
             if (corsBanner) corsBanner.style.display = 'block';
-            throw new Error("Esta web bloquea descargas directas (CORS / Cloudflare). Pulsa el botón de abajo para pegarla desde 'Texto / Notas' en 1 clic.");
+            throw new Error("Esta web no permite la descarga directa automática. Puedes pegarla desde 'Texto / Notas' en 1 clic.");
           }
         }
       } else {
