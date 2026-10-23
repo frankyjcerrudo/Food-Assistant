@@ -99,7 +99,13 @@
 | ID | Historia de Usuario / Feature | Prioridad | Estado | Criterios de Aceptación (DoD) |
 | :--- | :--- | :---: | :---: | :--- |
 | **US-29** | Hub de Recetas Comunitarias (Explorar, publicar y guardar recetas de otros usuarios) | 🟡 Media | `Backlog` | • **Pestaña / Sección Comunidad**: Acceso dentro de la app para explorar recetas compartidas públicamente por otros usuarios y cocineros.<br>• **Publicar receta propia**: Acción en la ficha o menú de cada receta personal para "Compartir en la comunidad" (publicando alias del autor, título, foto, tiempos, ingredientes y pasos).<br>• **Guardar en mis recetas**: Botón de 1 clic para clonar/guardar cualquier receta comunitaria directamente en la biblioteca privada y editable del usuario.<br>• **Interacciones sociales ligeras**: Contador de "Me gusta" (❤️) o guardados, buscador por ingredientes o etiquetas populares, y enlace directo para compartir recetas vía web/redes.<br>• **Backend y Seguridad (Supabase)**: Tabla pública `community_recipes` con políticas Row Level Security (RLS) para permitir lectura global y publicación/edición solo por el autor autenticado. |
+---
 
+## ☁️ épica 9: Sincronización en la Nube y Cuenta Multi-Dispositivo
+
+| ID | Historia de Usuario / Feature | Prioridad | Estado | Criterios de Aceptación (DoD) |
+| :--- | :--- | :---: | :---: | :--- |
+| **US-35** | Sincronización Total y Transparente Multi-Dispositivo con Supabase | 🔴 Alta | `Ready for Dev` | • **Descarga y Fusión Automática**: Al iniciar sesión o abrir la app con sesión activa en cualquier dispositivo, descarga y fusiona en segundo plano las recetas del usuario (`recipes`), el planificador semanal (`meal_plans`) y la lista de la compra (`shopping_items`).<br>• **Sincronización en Tiempo Real al Mutar**: Subida instantánea (`upsert`) a Supabase al crear/editar/importar recetas (con `sourceUrl` y dominio), cambiar el plan semanal o modificar/tachar ingredientes en la lista.<br>• **Experiencia Transparente e Inadvertida**: Cambiar de teléfono a PC o tablet muestra exactamente los mismos datos sin necesidad de exportaciones ni importaciones manuales.<br>• **Resiliencia Local-First (Offline)**: Si el dispositivo no tiene red, sigue operando al 100% en `localStorage` y envía automáticamente los cambios pendientes a Supabase al recuperar la conexión.<br>• **Indicador Visual Discreto**: Feedback sutil del estado de sincronización en la barra superior o ajustes. |
 
 ---
 
