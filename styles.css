@@ -354,7 +354,7 @@ body {
 .view-panel {
   display: none;
   flex: 1;
-  padding: 20px 16px;
+  padding: 20px 16px calc(108px + env(safe-area-inset-bottom, 0px));
   animation: fadeIn 0.15s ease-out;
 }
 
