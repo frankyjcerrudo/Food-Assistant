@@ -533,6 +533,13 @@ const RecipeParser = {
     if (/^(?:image\s*\d+|editor\s+senior|foto\s+principal)/i.test(clean)) {
       return null;
     }
+    // Reject table headers, portion column labels, bare numbers (e.g. HelloFresh column headers)
+    if (/^(?:cantidad\s+de\s+la\s+raci[o\u00F3]n|unidad(?:\(es\)|es)?|raci[o\u00F3]n\b|raciones\b|porci[o\u00F3]n\b|porciones\b)/i.test(clean)) {
+      return null;
+    }
+    if (/^\d+(?:[.,]\d+)?$/.test(clean)) {
+      return null;
+    }
 
     // Compound accompaniment/serving line detection: e.g. "Para acompañar: huevo duro y jamón serrano a taquitos"
     const compoundMatch = clean.match(/^(?:para\s+(?:acompañar|servir|decorar|guarnici[oó]n)|guarnici[oó]n|opcional):\s*(.+)$/i);
@@ -642,6 +649,14 @@ const RecipeParser = {
     // "huevo duro" / "huevos duros" / "huevo cocido" -> el ingrediente básico es el huevo
     if (/^huevos?\s+(?:duros?|cocidos?|pasados?\s+por\s+agua|fritos?)$/i.test(name)) {
       name = amount > 1 ? 'Huevos' : 'Huevo';
+    }
+
+    // Reject if name ended up as a table column header or bare numbers
+    if (/^(?:cantidad(?:\s+de\s+la\s+raci[o\u00F3]n)?|unidad(?:\(es\)|es)?|raci[o\u00F3]n\b|raciones\b|porci[o\u00F3]n\b|porciones\b|ingredientes?)$/i.test(name)) {
+      return null;
+    }
+    if (/^\d+(?:[.,]\d+)?$/.test(name)) {
+      return null;
     }
 
     if (!name || (name.length <= 1 && /^[a-z\.\,]$/i.test(name))) return null;
@@ -1130,6 +1145,10 @@ class FoodAssistantApp {
     this.timerInterval = null;
     this.timerSecondsLeft = 0;
 
+    // Import Review Mode state (review draft before saving or canceling)
+    this.isReviewingImport = false;
+    this.pendingImportRecipe = null;
+
     // Supabase client instance
     this.supabaseClient = null;
 
@@ -1566,6 +1585,9 @@ class FoodAssistantApp {
     document.getElementById('tab-import-text')?.addEventListener('click', () => this.switchImportTab('text'));
     document.getElementById('btn-execute-import')?.addEventListener('click', () => this.handleRecipeImport());
     document.getElementById('btn-confirm-save-import')?.addEventListener('click', () => this.confirmSaveImportRecipe());
+    document.getElementById('btn-review-edit-recipe')?.addEventListener('click', () => this.editImportReview());
+    document.getElementById('btn-review-cancel-recipe')?.addEventListener('click', () => this.cancelImportReview());
+    document.getElementById('btn-review-save-recipe')?.addEventListener('click', () => this.confirmSaveImportRecipe());
     document.getElementById('btn-cors-goto-text')?.addEventListener('click', () => {
       this.switchImportTab('text');
       this.handleClipboardPaste();
@@ -1842,14 +1864,60 @@ class FoodAssistantApp {
     const recipe = state.recipes.find(r => r.id === recipeId);
     if (!recipe) return;
 
+    this.isReviewingImport = false;
+    this.pendingImportRecipe = null;
     this.activeRecipe = recipe;
     this.activeServings = recipe.servings;
+    this.updateRecipeDetailActionBars();
     this.renderRecipeModalContent();
     this.modalRecipeDetail.classList.add('active');
   }
 
+  openImportReview(recipe) {
+    if (!recipe) return;
+    this.isReviewingImport = true;
+    this.pendingImportRecipe = recipe;
+    this.activeRecipe = recipe;
+    this.activeServings = recipe.servings || 2;
+    this.updateRecipeDetailActionBars();
+    this.renderRecipeModalContent();
+    this.modalRecipeDetail.classList.add('active');
+  }
+
+  updateRecipeDetailActionBars() {
+    const normalActions = document.getElementById('recipe-detail-normal-actions');
+    const reviewActions = document.getElementById('recipe-detail-review-actions');
+    if (this.isReviewingImport) {
+      if (normalActions) normalActions.style.display = 'none';
+      if (reviewActions) reviewActions.style.display = 'flex';
+    } else {
+      if (normalActions) normalActions.style.display = 'flex';
+      if (reviewActions) reviewActions.style.display = 'none';
+    }
+  }
+
+  cancelImportReview() {
+    this.isReviewingImport = false;
+    this.pendingImportRecipe = null;
+    this.activeRecipe = null;
+    this.modalRecipeDetail.classList.remove('active');
+    this.updateRecipeDetailActionBars();
+  }
+
+  editImportReview() {
+    const draft = this.pendingImportRecipe || this.activeRecipe;
+    if (!draft) return;
+    this.modalRecipeDetail.classList.remove('active');
+    this.openEditRecipeModal(draft);
+  }
+
   closeRecipeModal() {
     this.modalRecipeDetail.classList.remove('active');
+    if (this.isReviewingImport) {
+      this.isReviewingImport = false;
+      this.pendingImportRecipe = null;
+      this.updateRecipeDetailActionBars();
+    }
   }
 
   closeModalByElement(overlay) {
@@ -1900,6 +1968,19 @@ class FoodAssistantApp {
       </div>
       
       <div style="padding: 18px;">
+        ${this.isReviewingImport ? `
+          <div style="background: var(--color-brand-container); color: var(--color-brand-on-container); border: 1px solid var(--color-brand); border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="material-symbols-outlined" style="color: var(--color-brand); font-size: 22px;">verified</span>
+              <div>
+                <div style="font-size: 13px; font-weight: 700;">Revisión de Receta Importada (Borrador)</div>
+                <div style="font-size: 11px; opacity: 0.9;">Comprueba ingredientes y pasos antes de guardar o descártala.</div>
+              </div>
+            </div>
+            <span class="badge" style="background: var(--color-brand); color: #ffffff; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-full); text-transform: uppercase;">Borrador</span>
+          </div>
+        ` : ''}
+
         <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center;">
           ${r.sourceUrl ? `
             <a href="${r.sourceUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="tag-chip" style="background: var(--m3-secondary-container); color: var(--m3-on-secondary-container); font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: var(--radius-full);" title="Abrir enlace original en nueva pestaña">
@@ -1938,9 +2019,11 @@ class FoodAssistantApp {
         <div style="margin-bottom: 18px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <h3 style="font-size: 15px; font-weight: 500;">Ingredientes</h3>
-            <button class="btn btn-tonal btn-sm" onclick="app.addRecipeIngredientsToShopping('${r.id}')">
-              <span class="material-symbols-outlined icon-sm">add_shopping_cart</span> Enviar a la Compra
-            </button>
+            ${!this.isReviewingImport ? `
+              <button class="btn btn-tonal btn-sm" onclick="app.addRecipeIngredientsToShopping('${r.id}')">
+                <span class="material-symbols-outlined icon-sm">add_shopping_cart</span> Enviar a la Compra
+              </button>
+            ` : ''}
           </div>
           <ul style="list-style: none; display: flex; flex-direction: column; gap: 6px;">
             ${r.ingredients.map(ing => {
@@ -1976,9 +2059,25 @@ class FoodAssistantApp {
           </div>
         </div>
 
-        <button class="btn btn-primary" style="width: 100%; padding: 12px;" onclick="app.startCookMode()">
-          <span class="material-symbols-outlined">skillet</span> Empezar Modo Cocina Paso a Paso
-        </button>
+        ${this.isReviewingImport ? `
+          <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--m3-outline-variant);">
+            <button class="btn btn-primary" id="btn-bottom-save-import-recipe" style="width: 100%; padding: 12px; font-weight: 700; background-color: var(--color-brand); color: #ffffff; font-size: 14px;" onclick="app.confirmSaveImportRecipe()">
+              <span class="material-symbols-outlined">check_circle</span> Guardar en Recetas
+            </button>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-secondary" style="flex: 1; padding: 10px; font-size: 13px;" onclick="app.editImportReview()">
+                <span class="material-symbols-outlined icon-sm">edit</span> Editar receta
+              </button>
+              <button class="btn btn-ghost" style="flex: 1; padding: 10px; font-size: 13px; color: var(--m3-error);" onclick="app.cancelImportReview()">
+                <span class="material-symbols-outlined icon-sm">cancel</span> Cancelar importación
+              </button>
+            </div>
+          </div>
+        ` : `
+          <button class="btn btn-primary" style="width: 100%; padding: 12px;" onclick="app.startCookMode()">
+            <span class="material-symbols-outlined">skillet</span> Empezar Modo Cocina Paso a Paso
+          </button>
+        `}
       </div>
     `;
   }
@@ -2014,33 +2113,41 @@ class FoodAssistantApp {
     this.modalRecipeEdit.classList.add('active');
   }
 
-  openEditRecipeModal(recipeId) {
-    const r = state.recipes.find(rec => rec.id === recipeId);
+  openEditRecipeModal(recipeOrId) {
+    let r;
+    if (typeof recipeOrId === 'object' && recipeOrId !== null) {
+      r = recipeOrId;
+    } else {
+      r = state.recipes.find(rec => rec.id === recipeOrId);
+    }
     if (!r) return;
 
-    document.getElementById('recipe-edit-modal-title').textContent = "Editar Receta";
-    document.getElementById('edit-recipe-id').value = r.id;
-    document.getElementById('edit-recipe-title').value = r.title;
+    document.getElementById('recipe-edit-modal-title').textContent = this.isReviewingImport ? "Editar y Revisar Receta Importada" : "Editar Receta";
+    document.getElementById('edit-recipe-id').value = r.id || ('rec-' + Date.now());
+    document.getElementById('edit-recipe-title').value = r.title || "";
     document.getElementById('edit-recipe-desc').value = r.description || "";
     document.getElementById('edit-recipe-prep').value = r.prepTimeMinutes || 0;
     document.getElementById('edit-recipe-cook').value = r.cookTimeMinutes || 0;
     document.getElementById('edit-recipe-servings').value = r.servings || 2;
     document.getElementById('edit-recipe-image').value = r.imageUrl || "";
-    document.getElementById('edit-recipe-tags').value = r.tags.join(', ');
+    document.getElementById('edit-recipe-tags').value = (r.tags || []).join(', ');
 
     const ingContainer = document.getElementById('edit-ingredients-container');
     ingContainer.innerHTML = "";
-    r.ingredients.forEach(ing => this.addIngredientRow(ing));
+    (r.ingredients || []).forEach(ing => this.addIngredientRow(ing));
 
     const stepContainer = document.getElementById('edit-steps-container');
     stepContainer.innerHTML = "";
-    r.instructions.forEach(step => this.addStepRow(step));
+    (r.instructions || []).forEach(step => this.addStepRow(step));
 
     this.modalRecipeEdit.classList.add('active');
   }
 
   closeEditModal() {
     this.modalRecipeEdit.classList.remove('active');
+    if (this.isReviewingImport && this.pendingImportRecipe) {
+      this.openImportReview(this.pendingImportRecipe);
+    }
   }
 
   addIngredientRow(data = {}) {
@@ -2156,6 +2263,7 @@ class FoodAssistantApp {
       instructions
     };
 
+    const wasReviewing = this.isReviewingImport;
     const existingIdx = state.recipes.findIndex(r => r.id === id);
     if (existingIdx >= 0) {
       state.recipes[existingIdx] = updatedRecipe;
@@ -2164,6 +2272,8 @@ class FoodAssistantApp {
     }
 
     state.save('fa_recipes', state.recipes);
+    this.isReviewingImport = false;
+    this.pendingImportRecipe = null;
     this.closeEditModal();
     this.render();
     this.openRecipeDetail(id);
@@ -3462,43 +3572,9 @@ class FoodAssistantApp {
       // Store in memory for confirmation
       this.pendingImportRecipe = extractedRecipe;
 
-      // Populate Live Preview UI
-      if (previewBox) {
-        previewBox.style.display = 'block';
-        const img = document.getElementById('import-preview-img');
-        if (img) img.src = extractedRecipe.imageUrl;
-        const titleEl = document.getElementById('import-preview-title');
-        if (titleEl) titleEl.textContent = extractedRecipe.title;
-        const servingsEl = document.getElementById('import-preview-servings');
-        if (servingsEl) servingsEl.innerHTML = `<span class="material-symbols-outlined icon-sm">group</span> ${extractedRecipe.servings} raciones`;
-        const timeEl = document.getElementById('import-preview-time');
-        if (timeEl) timeEl.innerHTML = `<span class="material-symbols-outlined icon-sm">schedule</span> ${extractedRecipe.prepTimeMinutes + extractedRecipe.cookTimeMinutes} min`;
-        const badgeIng = document.getElementById('import-preview-badge-ing');
-        if (badgeIng) badgeIng.textContent = `✓ ${extractedRecipe.ingredients.length} ingredientes`;
-        const badgeSteps = document.getElementById('import-preview-badge-steps');
-        if (badgeSteps) badgeSteps.textContent = `✓ ${extractedRecipe.instructions.length} pasos`;
-
-        const summaryList = document.getElementById('import-preview-summary-list');
-        if (summaryList) {
-          summaryList.innerHTML = `
-            ${extractedRecipe.sourceUrl ? `
-              <div style="margin-bottom: 8px; font-size: 12px; display: flex; align-items: center; gap: 4px; color: var(--m3-primary); font-weight: 500;">
-                <span class="material-symbols-outlined" style="font-size: 15px;">link</span>
-                Fuente: <a href="${extractedRecipe.sourceUrl}" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: underline;">${extractedRecipe.sourceDomain || extractedRecipe.sourceUrl}</a>
-              </div>
-            ` : ''}
-            <strong>Ingredientes:</strong> ${extractedRecipe.ingredients.map(i => `${i.amount} ${i.unit} ${i.name}`).slice(0, 6).join(', ')}${extractedRecipe.ingredients.length > 6 ? '...' : ''}
-          `;
-        }
-      }
-
-      if (status) {
-        status.style.color = 'var(--color-brand)';
-        status.innerHTML = '\u2713 \u00A1Receta extra\u00EDda con \u00E9xito! Revisa la previsualizaci\u00F3n y pulsa Guardar.';
-      }
-
-      if (btnExecute) btnExecute.style.display = 'none';
-      if (btnConfirm) btnConfirm.style.display = 'inline-flex';
+      // Close the import modal directly and open the full recipe detail screen in review mode
+      this.closeImportModal();
+      this.openImportReview(extractedRecipe);
 
     } catch (err) {
       if (status) {
@@ -3511,15 +3587,29 @@ class FoodAssistantApp {
     }
   }
   confirmSaveImportRecipe() {
-    if (!this.pendingImportRecipe) return;
-    const newRecipe = this.pendingImportRecipe;
-    state.recipes.unshift(newRecipe);
+    const newRecipe = this.pendingImportRecipe || this.activeRecipe;
+    if (!newRecipe) return;
+
+    if (!newRecipe.id) {
+      newRecipe.id = 'rec-' + Date.now();
+    }
+
+    const existingIdx = state.recipes.findIndex(r => r.id === newRecipe.id);
+    if (existingIdx >= 0) {
+      state.recipes[existingIdx] = newRecipe;
+    } else {
+      state.recipes.unshift(newRecipe);
+    }
+
     state.save('fa_recipes', state.recipes);
     this.syncDataWithCloud(true);
+    this.isReviewingImport = false;
+    this.pendingImportRecipe = null;
     this.closeImportModal();
     this.render();
     this.switchView('view-recipes');
     this.openRecipeDetail(newRecipe.id);
+    alert("Â¡Receta guardada con Ã©xito en tu colecciÃ³n!");
   }
 
   // SETTINGS

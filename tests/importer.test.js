@@ -167,6 +167,12 @@ describe('US-15: Importador de Recetas (Schema.org / JSON-LD & Texto Estructurad
     expect(RecipeParser.parseIngredientLine('Ingredientes:')).toBeNull();
     expect(RecipeParser.parseIngredientLine('Para la bechamel:')).toBeNull();
     expect(RecipeParser.parseIngredientLine('Instrucciones')).toBeNull();
+    expect(RecipeParser.parseIngredientLine('Cantidad de la ración')).toBeNull();
+    expect(RecipeParser.parseIngredientLine('1 ud Cantidad de la ración')).toBeNull();
+    expect(RecipeParser.parseIngredientLine('4')).toBeNull();
+    expect(RecipeParser.parseIngredientLine('2 ud 4')).toBeNull();
+    expect(RecipeParser.parseIngredientLine('Unidad(es)')).toBeNull();
+    expect(RecipeParser.parseIngredientLine('1 ud Unidad(es)')).toBeNull();
   });
 
   it('parseIngredientLine elimina prefijos/unidades "count" y normaliza unidades pegadas (Directo al Paladar)', () => {

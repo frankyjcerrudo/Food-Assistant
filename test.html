@@ -912,6 +912,13 @@
 
           const sh2 = window.RecipeParser.parseIngredientLine('Ingredientes:');
           expect(sh2).toBeNull();
+
+          expect(window.RecipeParser.parseIngredientLine('Cantidad de la raci\u00F3n')).toBeNull();
+          expect(window.RecipeParser.parseIngredientLine('1 ud Cantidad de la raci\u00F3n')).toBeNull();
+          expect(window.RecipeParser.parseIngredientLine('4')).toBeNull();
+          expect(window.RecipeParser.parseIngredientLine('2 ud 4')).toBeNull();
+          expect(window.RecipeParser.parseIngredientLine('Unidad(es)')).toBeNull();
+          expect(window.RecipeParser.parseIngredientLine('1 ud Unidad(es)')).toBeNull();
         }
       );
 
@@ -1553,6 +1560,82 @@
 
           fakeApp.closeModalByElement({ id: 'modal-recipe-import', classList: { remove: () => {} } });
           expect(fakeApp.importClosed).toBe(true);
+        }
+      );
+
+      it(
+        'openImportReview abre directamente la pantalla de receta en modo revisión y permite guardar, editar o cancelar',
+        {
+          purpose: 'Verificar el flujo directo donde al importar una receta se abre directamente la pantalla de la receta en modo revisión para editar o guardar antes de consolidar.',
+          assertions: 'Valida isReviewingImport, visibilidad de barras de acciones y métodos confirmSaveImportRecipe y cancelImportReview.'
+        },
+        () => {
+          const fakeDetailModal = document.createElement('div');
+          fakeDetailModal.id = 'modal-recipe-detail';
+          fakeDetailModal.className = 'modal-overlay';
+          const fakeBody = document.createElement('div');
+          fakeBody.id = 'recipe-modal-body';
+          fakeDetailModal.appendChild(fakeBody);
+          const normalActions = document.createElement('div');
+          normalActions.id = 'recipe-detail-normal-actions';
+          const reviewActions = document.createElement('div');
+          reviewActions.id = 'recipe-detail-review-actions';
+          document.body.appendChild(fakeDetailModal);
+          document.body.appendChild(normalActions);
+          document.body.appendChild(reviewActions);
+
+          const sampleDraft = {
+            id: 'rec-draft-1',
+            title: 'Crema casera de calabacÃ­n y manzana',
+            servings: 2,
+            prepTimeMinutes: 10,
+            cookTimeMinutes: 25,
+            imageUrl: 'https://media.hellofresh.com/image.jpg',
+            tags: [],
+            ingredients: [
+              { name: 'CalabacÃ­n', amount: 1, unit: 'ud', aisle: 'produce' },
+              { name: 'Manzana', amount: 1, unit: 'ud', aisle: 'produce' }
+            ],
+            instructions: [{ step: 1, text: 'Cortar y cocer.', timerMinutes: 25 }]
+          };
+
+          const testApp = {
+            isReviewingImport: false,
+            pendingImportRecipe: null,
+            activeRecipe: null,
+            activeServings: 2,
+            modalRecipeDetail: fakeDetailModal,
+            openImportReview: window.FoodAssistantApp.prototype.openImportReview,
+            updateRecipeDetailActionBars: window.FoodAssistantApp.prototype.updateRecipeDetailActionBars,
+            renderRecipeModalContent: window.FoodAssistantApp.prototype.renderRecipeModalContent,
+            cancelImportReview: window.FoodAssistantApp.prototype.cancelImportReview,
+            confirmSaveImportRecipe: window.FoodAssistantApp.prototype.confirmSaveImportRecipe,
+            closeImportModal: () => {},
+            render: () => {},
+            switchView: () => {},
+            openRecipeDetail: () => {},
+            syncDataWithCloud: () => {}
+          };
+
+          testApp.openImportReview(sampleDraft);
+          expect(testApp.isReviewingImport).toBe(true);
+          expect(testApp.pendingImportRecipe).toBe(sampleDraft);
+          expect(fakeDetailModal.classList.contains('active')).toBe(true);
+          expect(normalActions.style.display).toBe('none');
+          expect(reviewActions.style.display).toBe('flex');
+          expect(fakeBody.innerHTML).toContain('Revisi\u00F3n de Receta Importada (Borrador)');
+
+          // Test cancel
+          testApp.cancelImportReview();
+          expect(testApp.isReviewingImport).toBe(false);
+          expect(testApp.pendingImportRecipe).toBe(null);
+          expect(fakeDetailModal.classList.contains('active')).toBe(false);
+          expect(normalActions.style.display).toBe('flex');
+          expect(reviewActions.style.display).toBe('none');
+
+          document.body.removeChild(fakeDetailModal);
+          document.body.removeChild(normalActions);
+          document.body.removeChild(reviewActions);
         }
       );
     });

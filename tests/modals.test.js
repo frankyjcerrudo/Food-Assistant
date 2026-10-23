@@ -67,4 +67,44 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
 
     expect(detailModal.classList.contains('active')).toBe(false);
   });
+
+  it('openImportReview activa el modo revisión en modal-recipe-detail y permite guardar o cancelar', () => {
+    document.body.innerHTML += `
+      <div id="recipe-modal-body"></div>
+      <div id="recipe-detail-normal-actions" style="display: flex;"></div>
+      <div id="recipe-detail-review-actions" style="display: none;"></div>
+    `;
+
+    const draft = {
+      id: 'rec-draft-test',
+      title: 'Crema casera de calabacín y manzana',
+      servings: 2,
+      prepTimeMinutes: 10,
+      cookTimeMinutes: 25,
+      imageUrl: 'https://media.hellofresh.com/image.jpg',
+      tags: [],
+      ingredients: [
+        { name: 'Calabacín', amount: 1, unit: 'ud', aisle: 'produce' },
+        { name: 'Manzana', amount: 1, unit: 'ud', aisle: 'produce' }
+      ],
+      instructions: [{ step: 1, text: 'Cortar y cocer.', timerMinutes: 25 }]
+    };
+
+    appInstance.openImportReview(draft);
+    expect(appInstance.isReviewingImport).toBe(true);
+    expect(appInstance.pendingImportRecipe).toBe(draft);
+    expect(document.getElementById('modal-recipe-detail').classList.contains('active')).toBe(true);
+    expect(document.getElementById('recipe-detail-normal-actions').style.display).toBe('none');
+    expect(document.getElementById('recipe-detail-review-actions').style.display).toBe('flex');
+    expect(document.getElementById('recipe-modal-body').innerHTML).toContain('Revisión de Receta Importada (Borrador)');
+
+    // Cancel import review
+    appInstance.cancelImportReview();
+    expect(appInstance.isReviewingImport).toBe(false);
+    expect(appInstance.pendingImportRecipe).toBe(null);
+    expect(document.getElementById('modal-recipe-detail').classList.contains('active')).toBe(false);
+    expect(document.getElementById('recipe-detail-normal-actions').style.display).toBe('flex');
+    expect(document.getElementById('recipe-detail-review-actions').style.display).toBe('none');
+  });
 });
+
