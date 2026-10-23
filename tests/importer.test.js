@@ -728,4 +728,94 @@ Bocadillo De Atun Paso A Paso
     expect(recipe.ingredients.some(i => i.name.includes('marzo') || i.name.includes('Image'))).toBe(false);
     expect(recipe.instructions.some(i => i.text.includes('Cooksnap') || i.text.includes('foto'))).toBe(false);
   });
+
+  it('parseIngredientLine y parseSchemaRecipe procesan correctamente recetas de HelloFresh con unidades como unidad(es), gramo(s), y pasos con HTML', () => {
+    // 1. Ingredients parsing with HelloFresh unit variations
+    const ing1 = RecipeParser.parseIngredientLine('1 unidad(es) Manzana');
+    expect(ing1).not.toBeNull();
+    expect(ing1.name).toBe('Manzana');
+    expect(ing1.amount).toBe(1);
+    expect(ing1.unit).toBe('ud');
+
+    const ing2 = RecipeParser.parseIngredientLine('380 gramo(s) Lentejas');
+    expect(ing2).not.toBeNull();
+    expect(ing2.name).toBe('Lentejas');
+    expect(ing2.amount).toBe(380);
+    expect(ing2.unit).toBe('g');
+
+    const ing3 = RecipeParser.parseIngredientLine('½ unidad(es) Cebolla');
+    expect(ing3).not.toBeNull();
+    expect(ing3.name).toBe('Cebolla');
+    expect(ing3.amount).toBe(0.5);
+    expect(ing3.unit).toBe('ud');
+
+    const ing4 = RecipeParser.parseIngredientLine('1 sobre(s) Caldo vegetal');
+    expect(ing4).not.toBeNull();
+    expect(ing4.name).toBe('Caldo vegetal');
+    expect(ing4.amount).toBe(1);
+    expect(ing4.unit).toBe('sobre');
+
+    const ing5 = RecipeParser.parseIngredientLine('500 mililitro(s) Agua');
+    expect(ing5).not.toBeNull();
+    expect(ing5.name).toBe('Agua');
+    expect(ing5.amount).toBe(500);
+    expect(ing5.unit).toBe('ml');
+
+    const allergen = RecipeParser.parseIngredientLine('(Contiene: Apio)');
+    expect(allergen).toBeNull();
+
+    // 2. Full Schema.org parsing with HTML tags in instructions
+    const helloFreshSchema = {
+      "@context": "http://schema.org/",
+      "@type": "Recipe",
+      "name": "Crema casera de calabacín y manzana con lentejas crujientes al horno",
+      "recipeYield": 2,
+      "totalTime": "PT35M",
+      "recipeIngredient": [
+        "1 unidad(es) Manzana",
+        "1 unidad(es) Calabacín",
+        "380 gramo(s) Lentejas",
+        "1 unidad(es) Puerro",
+        "½ unidad(es) Cebolla",
+        "1 sobre(s) Caldo vegetal",
+        "200 gramo(s) Crème Fraîche",
+        "1 sobre(s) Nuez moscada",
+        "1 pizca(s) Sal y pimienta",
+        "2 cucharada(s) Aceite de oliva",
+        "1 unidad(es) Ajo",
+        "500 mililitro(s) Agua"
+      ],
+      "recipeInstructions": [
+        {
+          "@type": "HowToStep",
+          "text": "<div>¡Asegúrate de utilizar las cantidades indicadas a la izquierda para preparar tu receta! Precalienta el horno a 200ºC. Escurre las <strong>lentejas</strong> con ayuda de un colador.</div>"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "<p>Reparte las <strong>lentejas</strong> en una bandeja y hornea a media altura 15-20 min. Remueve a mitad de cocción.</p>"
+        }
+      ]
+    };
+
+    const parsed = RecipeParser.parseSchemaRecipe(helloFreshSchema, 'https://www.hellofresh.es/recipes/crema-casera-de-calabacin-y-manzana-650afe12270f68660e1b06a1');
+    expect(parsed).not.toBeNull();
+    expect(parsed.title).toBe('Crema casera de calabacín y manzana con lentejas crujientes al horno');
+    expect(parsed.servings).toBe(2);
+    expect(parsed.ingredients).toHaveLength(12);
+
+    expect(parsed.ingredients[0].name).toBe('Manzana');
+    expect(parsed.ingredients[0].unit).toBe('ud');
+    expect(parsed.ingredients[1].name).toBe('Calabacín');
+    expect(parsed.ingredients[1].unit).toBe('ud');
+    expect(parsed.ingredients[2].name).toBe('Lentejas');
+    expect(parsed.ingredients[2].unit).toBe('g');
+    expect(parsed.ingredients[2].amount).toBe(380);
+
+    // HTML stripped from steps
+    expect(parsed.instructions[0].text).not.toContain('<div>');
+    expect(parsed.instructions[0].text).not.toContain('<strong>');
+    expect(parsed.instructions[0].text).toBe('¡Asegúrate de utilizar las cantidades indicadas a la izquierda para preparar tu receta! Precalienta el horno a 200ºC. Escurre las lentejas con ayuda de un colador.');
+    expect(parsed.instructions[1].text).not.toContain('<p>');
+    expect(parsed.instructions[1].timerMinutes).toBe(20);
+  });
 });

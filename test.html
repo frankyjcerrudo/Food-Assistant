@@ -337,6 +337,8 @@
       }
       currentSuite.tests.push({ description, meta, testFn: fn });
     }
+    const test = it;
+    window.test = it;
 
     function expect(actual) {
       const matchers = {
@@ -1638,6 +1640,55 @@
           document.body.removeChild(reviewActions);
         }
       );
+
+      it(
+        'US-15: HelloFresh - unidades como unidad(es), gramo(s) e instrucciones con HTML limpio',
+        {
+          purpose: 'Verificar la extracci\u00F3n correcta de cantidades compuestas y limpieza de tags HTML en pasos de HelloFresh',
+          assertions: '1 unidad(es) Manzana -> 1 ud Manzana, 380 gramo(s) Lentejas -> 380 g Lentejas, HTML eliminado en instrucciones'
+        },
+        () => {
+          const ing1 = window.RecipeParser.parseIngredientLine('1 unidad(es) Manzana');
+          expect(ing1).not.toBeNull();
+          expect(ing1.name).toBe('Manzana');
+          expect(ing1.amount).toBe(1);
+          expect(ing1.unit).toBe('ud');
+
+          const ing2 = window.RecipeParser.parseIngredientLine('380 gramo(s) Lentejas');
+          expect(ing2).not.toBeNull();
+          expect(ing2.name).toBe('Lentejas');
+          expect(ing2.amount).toBe(380);
+          expect(ing2.unit).toBe('g');
+
+          const ing3 = window.RecipeParser.parseIngredientLine('500 mililitro(s) Agua');
+          expect(ing3).not.toBeNull();
+          expect(ing3.name).toBe('Agua');
+          expect(ing3.amount).toBe(500);
+          expect(ing3.unit).toBe('ml');
+
+          const allergen = window.RecipeParser.parseIngredientLine('(Contiene: Apio)');
+          expect(allergen).toBeNull();
+
+          const schema = {
+            "@context": "http://schema.org/",
+            "@type": "Recipe",
+            "name": "Crema casera de calabac\u00EDn y manzana",
+            "recipeYield": 2,
+            "recipeIngredient": ["1 unidad(es) Manzana", "380 gramo(s) Lentejas", "1 sobre(s) Caldo vegetal"],
+            "recipeInstructions": [
+              { "@type": "HowToStep", "text": "<div>Precalienta el horno a 200\u00BAC. Escurre las <strong>lentejas</strong>.</div>" }
+            ]
+          };
+
+          const parsed = window.RecipeParser.parseSchemaRecipe(schema);
+          expect(parsed.ingredients.length).toBe(3);
+          expect(parsed.ingredients[0].name).toBe('Manzana');
+          expect(parsed.ingredients[0].unit).toBe('ud');
+          expect(parsed.ingredients[1].name).toBe('Lentejas');
+          expect(parsed.ingredients[1].unit).toBe('g');
+          expect(parsed.instructions[0].text).toBe('Precalienta el horno a 200\u00BAC. Escurre las lentejas.');
+        }
+      );
     });
 
     // =========================================================
@@ -1672,7 +1723,7 @@
       });
     }
 
-    async function runAllTests() {
+    function runAllTests() {
       const container = document.getElementById('test-results-container');
       container.innerHTML = '';
 
@@ -1749,6 +1800,7 @@
       document.getElementById('metric-time').textContent = `${elapsed}ms`;
     }
 
+    runAllTests();
     window.addEventListener('DOMContentLoaded', () => {
       runAllTests();
     });

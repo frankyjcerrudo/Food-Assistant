@@ -304,7 +304,10 @@ const RecipeParser = {
   // Normalize units
   normalizeUnit(rawUnit) {
     if (!rawUnit) return 'ud';
-    const u = rawUnit.toLowerCase().trim().replace(/\.$/, '');
+    const u = rawUnit.toLowerCase().trim()
+      .replace(/\.(?=\s|$)/, '')
+      .replace(/\((?:s|es)\)/g, '')
+      .trim();
     if (/^(g|gr|gramo|gramos)$/.test(u)) return 'g';
     if (/^(kg|kilo|kilos|kilogramo|kilogramos)$/.test(u)) return 'kg';
     if (/^(ml|mililitro|mililitros)$/.test(u)) return 'ml';
@@ -513,9 +516,15 @@ const RecipeParser = {
       .replace(/\*\*([^*]+)\*\*/g, '$1')
       .replace(/__([^_]+)__/g, '$1')
       .replace(/^([\u2022\-\*]|\d+[\.\)])\s*/, '')
+      .replace(/\b([a-zA-Z\u00C0-\u017F]+)\((?:s|es)\)/gi, '$1')
       .trim();
 
     if (!clean || this.isSectionHeader(clean)) return null;
+
+    // Reject allergen badge rows or notices (e.g. "(Contiene: Apio)" or "Alérgenos: ...")
+    if (/^\(?\s*(?:contiene\s*:|al[eé]rgenos?\s*:)/i.test(clean)) {
+      return null;
+    }
 
     // Reject obvious instruction / procedural lines that slipped into ingredient parsing
     if (clean.length > 90 || /\b(?:pelamos|cortamos|batimos|mezclamos|ponemos|a[n\u00F1]adimos|dejamos|doramos|sofre[i\u00ED]mos|cocinamos|horneamos|trituramos|trocea|tritura|pela|bate|mezcla|fr[i\u00ED]e|hornea|saltea|precalienta|limpia|remueve|unta|vierte|introduce|sirve|cuajamos|escurre|reserva|se\s+(?:pelan|cortan|baten|rebozan|fr[i\u00ED]en|mezclan|presenta|ponen))\b/i.test(clean)) {
@@ -592,7 +601,7 @@ const RecipeParser = {
       .replace(/^nueve\b/i, '9')
       .replace(/^diez\b/i, '10');
 
-    const unitWords = 'cucharadas?\\s+pequeñas?|cucharaditas?\\s+de\s+postre|cucharadas?\\s+de\\s+postre|cucharadas?\\s+soperas?|cucharadas?|cdas?|cucharaditas?|cdtas?|kilogramos?|kilos?|kg|gramos?|gr|litros?|dl\\.?|cl|ml|decilitros?|tablespoons?|tbsp|teaspoons?|tsp|tazas?|cups?|vasos?|glasses?|copitas?|copas?|pinches?|pizcas?|pellizcos?|dientes?|cloves?|rebanadas?|rodajas?|lonchas?|filetes?|slices?|ramitas?|ramas?|sprigs?|stalks?|hojas?|leaves|leaf|latas?|botes?|cans?|paquetes?|packs?|packet|packets|puñados?|chorritos?|chorro|sobres?|unidades?|uds?\\.?|ud\\.?|units?|items?|pieces?|counts?|dashes?|cazos?|trozos?|ea|g|l';
+    const unitWords = 'cucharadas?\\s+pequeñas?|cucharaditas?\\s+de\\s+postre|cucharadas?\\s+de\\s+postre|cucharadas?\\s+soperas?|cucharadas?|cdas?|cucharaditas?|cdtas?|kilogramos?|kilos?|kg|gramos?|gr|litros?|mililitros?|centilitros?|decilitros?|dl\\.?|cl|ml|tablespoons?|tbsp|teaspoons?|tsp|tazas?|cups?|vasos?|glasses?|copitas?|copas?|pinches?|pizcas?|pellizcos?|dientes?|cloves?|rebanadas?|rodajas?|lonchas?|filetes?|slices?|ramitas?|ramas?|sprigs?|stalks?|hojas?|leaves|leaf|latas?|botes?|cans?|paquetes?|packs?|packet|packets|puñados?|chorritos?|chorro|sobres?|unidad(?:es)?|uds?\\.?|ud\\.?|units?|items?|pieces?|counts?|dashes?|cazos?|trozos?|ea|g|l';
 
     let amount = 1;
     let unit = 'ud';
@@ -600,14 +609,22 @@ const RecipeParser = {
 
     const fracChars = '\\u00BD\\u00BC\\u00BE\\u2153\\u2154\\u215B\\u215C\\u215D\\u215E';
 
-    // Pattern 1: Standard quantity first: "200 g de pollo", "4count Diente de ajo", "3 huevos", "1/2 cucharada de sal"
-    const startNumRegex = new RegExp(`^([\\d${fracChars}\\.,]+(?:\\s*\\/\\s*\\d+)?)\\s*(${unitWords})?\\.?\\b\\s*(?:de\\s+la\\s+|de\\s+los\\s+|de\\s+las\\s+|de\\s+|del\\s+|con\\s+)?(.*)$`, 'i');
-    const startMatch = clean.match(startNumRegex);
+    // Pattern 1a: Standard quantity with explicit unit (e.g. "200 g de pollo", "1 unidad Manzana", "380 gramo Lentejas")
+    const startWithUnitRegex = new RegExp(`^([\\d${fracChars}\\.,]+(?:\\s*\\/\\s*\\d+)?)\\s*(${unitWords})\\.?\\b\\s*(?:de\\s+la\\s+|de\\s+los\\s+|de\\s+las\\s+|de\\s+|del\\s+|con\\s+)?(.*)$`, 'i');
+    // Pattern 1b: Standard quantity without unit (e.g. "3 huevos", "2 manzanas")
+    const startNoUnitRegex = new RegExp(`^([\\d${fracChars}\\.,]+(?:\\s*\\/\\s*\\d+)?)\\s+(?:de\\s+la\\s+|de\\s+los\\s+|de\\s+las\\s+|de\\s+|del\\s+|con\\s+)?(.*)$`, 'i');
 
-    if (startMatch && (isNaN(startMatch[1]) === false || new RegExp(`[\\/${fracChars}]`).test(startMatch[1]))) {
-      amount = this.parseNumber(startMatch[1]);
-      unit = startMatch[2] ? this.normalizeUnit(startMatch[2]) : 'ud';
-      name = (startMatch[3] || '').trim();
+    const unitMatch = clean.match(startWithUnitRegex);
+    const noUnitMatch = !unitMatch ? clean.match(startNoUnitRegex) : null;
+
+    if (unitMatch && (isNaN(unitMatch[1]) === false || new RegExp(`[\\/${fracChars}]`).test(unitMatch[1]))) {
+      amount = this.parseNumber(unitMatch[1]);
+      unit = this.normalizeUnit(unitMatch[2]);
+      name = (unitMatch[3] || '').trim();
+    } else if (noUnitMatch && (isNaN(noUnitMatch[1]) === false || new RegExp(`[\\/${fracChars}]`).test(noUnitMatch[1]))) {
+      amount = this.parseNumber(noUnitMatch[1]);
+      unit = 'ud';
+      name = (noUnitMatch[2] || '').trim();
     } else {
       // Pattern 2: Name first, quantity at end: "Tomate triturado 400 g", "Placas de lasa\u00F1a 12", "Berenjena 1"
       const endNumRegex = new RegExp(`^(.*?)(?::|,)?\\s+([\\d${fracChars}\\.,]+(?:\\s*\\/\\s*\\d+)?)\\s*(${unitWords})?\\.?$`, 'i');
@@ -634,11 +651,12 @@ const RecipeParser = {
     // Clean extraneous prefixes/suffixes and notes from ingredient name
     name = name
       .replace(/^[\.\,\-\:\s]+/, '')
+      .replace(/^(?:\(s\)|\(es\))\s*/i, '')
       .replace(/^count\s+/i, '')
       .replace(/\s+count$/i, '')
       .replace(/^(?:de\s+la|de\s+los|de\s+las|de|del|con)\s+/i, '')
       .replace(/^(?:para\s+(?:acompañar|servir|decorar|el\s+sofrito|la\s+salsa|el\s+relleno|la\s+guarnición)|opcional):\s*/i, '')
-      .replace(/\s*\((?:ver\s+nota|nota\s*\d*|opcional|al\s+gusto|a\s+temperatura\s+ambiente|según\s+tamaño|unas?\s+\d+[^)]*|aprox[^)]*)\)/gi, '')
+      .replace(/\s*\((?:ver\s+nota|nota\s*\d*|opcional|al\s+gusto|a\s+temperatura\s+ambiente|según\s+tamaño|unas?\s+\d+[^)]*|aprox[^)]*|contiene\s*:[^)]*|al[eé]rgenos?\s*:[^)]*)\)/gi, '')
       .replace(/:\s*$/, '')
       .trim();
 
@@ -779,16 +797,32 @@ const RecipeParser = {
     const instructions = [];
     const processItem = (item) => {
       if (!item) return;
+      let rawText = '';
       if (typeof item === 'string') {
-        const cleaned = item.trim();
-        if (cleaned) {
-          instructions.push({ step: instructions.length + 1, text: cleaned, timerMinutes: this.extractTimerMinutes(cleaned) });
-        }
+        rawText = item;
       } else if (item.text) {
-        const cleaned = item.text.trim();
-        instructions.push({ step: instructions.length + 1, text: cleaned, timerMinutes: this.extractTimerMinutes(cleaned) });
+        rawText = item.text;
       } else if (item.itemListElement && Array.isArray(item.itemListElement)) {
         item.itemListElement.forEach(sub => processItem(sub));
+        return;
+      }
+      if (rawText) {
+        const cleaned = rawText
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/\s+([.,;:!?])/g, '$1')
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (cleaned && cleaned.length > 5) {
+          instructions.push({ 
+            step: instructions.length + 1, 
+            text: cleaned, 
+            timerMinutes: this.extractTimerMinutes(cleaned) 
+          });
+        }
       }
     };
 
@@ -879,7 +913,7 @@ const RecipeParser = {
         .trim();
 
       if (cleaned) {
-        if (/^(?:Image \d+:|Editor Senior|\d+\s*votos)/i.test(cleaned) || /\b(?:viajer[ao]\s+gastron[o\u00F3]mic[ao]|periodista\s+intr[e\u00E9]pida|editor\s+senior)\b/i.test(cleaned)) continue;
+        if (/^(?:Image \d+:|Editor Senior|\d+\s*votos|Ahorra hasta|Suscribirme|Guardar|Calor[i\u00ED]as|\d+\s*kcal|Prote[i\u00ED]nas|\d+g?\s*prote[i\u00ED]nas|Difficulty|Vegetariano|Vegano|Keto)/i.test(cleaned) || /\b(?:viajer[ao]\s+gastron[o\u00F3]mic[ao]|periodista\s+intr[e\u00E9]pida|editor\s+senior)\b/i.test(cleaned)) continue;
         const spanishMonths = 'enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre';
         if (new RegExp(`(?:^|\\b)(?:\\d{1,2}\\s+(?:de\\s+)?(?:${spanishMonths})|(?:${spanishMonths})\\s+\\d{4})\\b`, 'i').test(cleaned)) continue;
         if (/\b\d{1,2}:\d{2}(?::\d{2})?\b/.test(cleaned) && new RegExp(`(?:${spanishMonths}|\\d{4})`, 'i').test(cleaned)) continue;
@@ -1028,7 +1062,8 @@ const RecipeParser = {
       // Automatic transition: if we are in ingredients or unassigned, and line is clearly an instruction step
       const isInstructionAction = (str) => {
         if (!str || str.length < 15) return false;
-        if (/^\d+[\.\)]\s*(?:\d+[\.\)]\s*)?/.test(str)) return true;
+        if (/^\[.*?\]\(.*?\)$/.test(str)) return false;
+        if (/^\d+[\.\)]\s*\[/.test(str)) return false;
         if (/\b(?:se\s+(?:pelan|cortan|baten|rebozan|fr[i\u00ED]en|mezclan|presenta|ponen|agregan|dejan|sirven)|pelamos|cortamos|batimos|mezclamos|ponemos|a[n\u00F1]adimos|dejamos|doramos|sofre[i\u00ED]mos|cocinamos|horneamos|trituramos|trocea|tritura|pela|bate|mezcla|fr[i\u00ED]e|hornea|saltea|precalienta|limpia|remueve|unta|vierte|introduce|sirve|cuajamos|escurre|reserva)\b/i.test(str)) {
           return true;
         }
@@ -3503,8 +3538,14 @@ class FoodAssistantApp {
               console.log("[FoodAssistant] Intentando descargar receta vía proxy:", proxyUrl);
               const controller = new AbortController();
               const timeoutId = setTimeout(() => controller.abort(), 11000);
+              const fetchHeaders = {};
+              if (proxyUrl.includes('r.jina.ai')) {
+                fetchHeaders['X-Return-Format'] = 'html';
+                fetchHeaders['Accept'] = 'text/html';
+              }
               const resp = await fetch(proxyUrl, { 
-                signal: controller.signal
+                signal: controller.signal,
+                headers: fetchHeaders
               });
               clearTimeout(timeoutId);
               if (resp.ok) {
