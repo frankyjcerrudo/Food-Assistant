@@ -1,10 +1,10 @@
-const CACHE_NAME = 'food-assistant-v0.11';
+const CACHE_NAME = 'food-assistant-v0.12';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './styles.css?v=0.11',
-  './config.js?v=0.11',
-  './app.js?v=0.11',
+  './styles.css?v=0.12',
+  './config.js?v=0.12',
+  './app.js?v=0.12',
   './manifest.json'
 ];
 
@@ -31,15 +31,10 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests and exclude external APIs (Gemini, Supabase, Google Fonts, CORS proxies)
+  // Only handle same-origin GET requests; completely bypass any external origins (proxies, APIs, images, CDNs)
   if (
     event.request.method !== 'GET' || 
-    event.request.url.includes('generativelanguage.googleapis.com') ||
-    event.request.url.includes('supabase.co') ||
-    event.request.url.includes('r.jina.ai') ||
-    event.request.url.includes('allorigins.win') ||
-    event.request.url.includes('codetabs.com') ||
-    event.request.url.includes('corsproxy.io')
+    !event.request.url.startsWith(self.location.origin)
   ) {
     return;
   }

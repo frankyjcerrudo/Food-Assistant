@@ -539,23 +539,38 @@ const RecipeParser = {
 
   htmlToText(html) {
     if (!html) return '';
-    if (!html.includes('<html') && !html.includes('<body') && !html.includes('<div') && !html.includes('<p>')) {
-      return html;
+    // If it's already clean markdown/text without full HTML structure
+    if (!html.includes('<html') && !html.includes('<body') && !html.includes('<div') && !html.includes('<p>') && !html.includes('<article')) {
+      return html
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .trim();
     }
     if (typeof DOMParser !== 'undefined') {
       try {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
-        ['script', 'style', 'nav', 'header', 'footer', 'aside', 'svg'].forEach(tag => {
+        ['script', 'style', 'nav', 'header', 'footer', 'aside', 'svg', 'noscript'].forEach(tag => {
           doc.querySelectorAll(tag).forEach(el => el.remove());
         });
-        return doc.body ? (doc.body.innerText || doc.body.textContent || '') : '';
+        const text = doc.body ? (doc.body.innerText || doc.body.textContent || '') : '';
+        if (text && text.trim().length > 50) {
+          return text.trim();
+        }
       } catch (e) {}
     }
-    return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-               .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-               .replace(/<[^>]+>/g, '\n')
-               .replace(/\n{2,}/g, '\n');
+    return html
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+      .replace(/<[^>]+>/g, '\n')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/\n\s*\n/g, '\n')
+      .trim();
   },
 
   getDomain(url) {
@@ -637,19 +652,6 @@ const RecipeParser = {
     };
   },
 
-  htmlToText(html) {
-    if (!html) return '';
-    return html
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-      .replace(/<[^>]+>/g, '\n')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/\n\s*\n/g, '\n')
-      .trim();
-  },
 
   parseRecipeText(rawText, sourceUrl = '') {
     if (!rawText || typeof rawText !== 'string') return null;
@@ -3104,14 +3106,9 @@ class FoodAssistantApp {
           let fetchSuccess = false;
           let is404OrEmpty = false;
 
-          // Check for incomplete or category URLs (e.g. recetas-vege, recetas-de-s)
-          const isTruncatedUrl = /recetas-vege|recetas-de-s|\/categoria\/|\/recetas\/?$/i.test(cleanUrl) ||
-                                (cleanUrl.split('/').length < 5 && /directoalpaladar|cookpad|allrecipes/i.test(cleanUrl));
-
           // Priority proxy endpoints
           const proxyEndpoints = [
             `https://r.jina.ai/${cleanUrl}`,
-            `https://api.allorigins.win/raw?url=${encodeURIComponent(cleanUrl)}`,
             `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(cleanUrl)}`,
             `https://corsproxy.io/?url=${encodeURIComponent(cleanUrl)}`
           ];
@@ -3122,29 +3119,30 @@ class FoodAssistantApp {
 
           for (const proxyUrl of proxyEndpoints) {
             try {
+              console.log("[FoodAssistant] Intentando descargar receta vía proxy:", proxyUrl);
               const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 12000);
+              const timeoutId = setTimeout(() => controller.abort(), 11000);
               const resp = await fetch(proxyUrl, { 
-                signal: controller.signal,
-                headers: { 'Accept': 'text/plain, text/markdown, text/html, */*' }
+                signal: controller.signal
               });
               clearTimeout(timeoutId);
               if (resp.ok) {
                 const textResp = await resp.text();
                 if (textResp && textResp.length > 80) {
-                  // Detect 404 / missing pages in response content
-                  if (/404|not found|no se ha encontrado|p[aá]gina que buscas no existe|no existe la p[aá]gina|lo sentimos|error 404/i.test(textResp.substring(0, 3000))) {
+                  // Detect true 404 / missing pages in response header or title
+                  if (/^404\s+not\s+found|<title>.*?(?:404|not found|no encontrada).*?<\/title>|^Title:\s*404/i.test(textResp.substring(0, 1000))) {
                     is404OrEmpty = true;
                     fetchSuccess = true;
                     break;
                   }
                   html = textResp;
                   fetchSuccess = true;
+                  console.log("[FoodAssistant] Descarga exitosa (" + textResp.length + " bytes)");
                   break;
                 }
               }
             } catch (proxyErr) {
-              // Try next proxy
+              console.warn("[FoodAssistant] Proxy falló o timeout:", proxyUrl, proxyErr);
             }
           }
 
@@ -3167,9 +3165,9 @@ class FoodAssistantApp {
             }
           }
 
-          if (is404OrEmpty || isTruncatedUrl) {
+          if (is404OrEmpty) {
             if (corsBanner) corsBanner.style.display = 'none';
-            throw new Error(`El enlace parece no existir o estar incompleto ("${cleanUrl}"). Asegúrate de copiar la URL completa de una receta (ej: https://www.directoalpaladar.com/recetas-vegetarianas/nombre-del-plato) o pulsa el botón "Probar ahora" de arriba.`);
+            throw new Error(`La página web parece no existir o devolver error 404 ("${cleanUrl}"). Asegúrate de copiar la URL completa de una receta.`);
           }
 
           if (!extractedRecipe || !extractedRecipe.ingredients || extractedRecipe.ingredients.length === 0) {
