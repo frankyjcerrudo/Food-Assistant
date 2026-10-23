@@ -2,7 +2,7 @@
 
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
-> **Última actualización**: Octubre 2026  
+> **Última actualización**: Octubre 2026 (incorporados hallazgos de la auditoría de código v0.15)  
 
 ---
 
@@ -32,6 +32,8 @@
 | **US-14** | Comidas flexibles en planificador (Desayunos, meriendas, snacks) | 🔴 Alta | `Done` | • Soporte configurable para personas que comen >3 veces al día.<br>• Habilitar/deshabilitar Desayuno, Media Mañana, Almuerzo, Merienda, Cena, Post-entreno.<br>• Interfaz responsiva que acomode las nuevas filas sin scroll horizontal roto. |
 | **US-19** | Mover recetas por la semana y cambiar momentos | 🟡 Media | `Backlog` | • Drag & drop táctil o menú contextual "Mover a..." en cada tarjeta.<br>• Permitir mover de un día a otro o de almuerzo a cena sin tener que borrar y buscar de nuevo. |
 | **US-22** | Semana estandarizada de Lunes a Domingo | 🔴 Alta | `Backlog` | • El calendario semanal empieza siempre en Lunes (ISO 8601).<br>• Fin de semana (Sábado y Domingo) claramente agrupado al final. |
+| **US-65** | Modo "Sobras" (cocinar x2 y reutilizar) | 🟢 Baja | `Backlog` | • Opción "Cocinar ración doble" al asignar un plato.<br>• Rellena automáticamente un slot del día siguiente con la misma receta marcada como "Sobras".<br>• La lista de la compra no duplica ingredientes de las sobras.<br>• *Relacionado: US-06 (Batch Cooking).* |
+| **US-66** | Sugerencias de productos de temporada | 🟢 Baja | `Backlog` | • Tabla estática de frutas y verduras por mes.<br>• Indicador "De temporada" en recetas que las usan.<br>• Sugerencia opcional en el planificador. |
 
 ---
 
@@ -46,6 +48,7 @@
 | **US-20** | Autocompletado inteligente de ingredientes y categoría automática | 🟡 Media | `Backlog` | • Sugerencias predictivas al tipear el nombre del ingrediente.<br>• Clasificación automática en pasillo/categoría (Verdulería, Carnicería, Lácteos, Despensa).<br>• Icono visual distintivo por ingrediente o grupo. |
 | **US-33** | Alternancia de Vistas en Lista de la Compra: Por Pasillo vs Por Receta (Estilo ReciMe) | 🟡 Media | `Backlog` | • Selector o toggle en la cabecera de la lista de la compra.<br>• **Vista Por Pasillos**: Agrupación por sección de supermercado (Frutas, Carnicería, Lácteos, Despensa, etc.).<br>• **Vista Por Receta**: Agrupación por plato para saber exactamente qué ingredientes corresponden a cada comida planificada.<br>• Unificación automática de cantidades en ambas vistas para evitar duplicados. |
 | **US-34** | Buscador Inverso "¿Qué cocino hoy con lo que tengo en la nevera?" | 🔴 Alta | `Backlog` | • Interfaz rápida para marcar o tipear 2-3 ingredientes que el usuario tiene disponibles en casa.<br>• Filtro dinámico en el catálogo de recetas ordenando por porcentaje de coincidencia de ingredientes.<br>• Indicador visual en cada tarjeta (ej: *"Tienes 4 de 5 ingredientes"*).<br>• Resuelve la principal queja y demanda no atendida en apps competidoras como ReciMe. |
+| **US-64** | Conversión y normalización de unidades en la compra | 🟡 Media | `Backlog` | • Sumar cantidades compatibles (500 g + 1 kg = 1,5 kg; ml/cl/l).<br>• Unificar singular/plural y acentos al fusionar ("Tomate" = "Tomates").<br>• Mostrar la unidad más legible (1500 g → 1,5 kg).<br>• *Relacionado: US-33 (unificación de cantidades).* |
 
 ---
 
@@ -63,6 +66,12 @@
 | **US-28** | Rediseño enfocado de la pantalla "Hoy" (Zero Clutter) | 🔴 Alta | `Ready for Dev` | • **Eliminar la tarjeta "Hoy"**: Suprimir el bloque hero y las estadísticas redundantes (Recetas, En Menú, Por Comprar) para aprovechar al máximo el espacio en pantalla.<br>• **Retirar Acciones Frecuentes**: Quitar los accesos directos a "Lista de la Compra" y "Asistente Gemini" por ser redundantes con la barra de navegación inferior.<br>• **Foco en Comidas Planificadas**: Cabecera limpia con fecha del día y presentación clara de las comidas asignadas (Desayuno, Almuerzo, Merienda, Cena).<br>• **Añadir otra comida**: Botón accesible y visible para añadir momentos de comida extra (snacks, post-entreno) o asignar platos rápidamente.<br>• **Optimización móvil**: Experiencia directa sin ruido visual (*above the fold*) en dispositivos móviles. |
 | **US-31** | Colecciones y Libros de Recetas Personalizados (Cookbooks / Carpetas) | 🟡 Media | `Backlog` | • Crear carpetas temáticas ilimitadas (ej: "Favoritas de Mamá", "Cenas Rápidas", "Postres", "Airfryer", "Chef X").<br>• Asignar una receta a una o múltiples colecciones.<br>• Selector de libro en la cabecera del catálogo para navegar entre carpetas con 1 toque (el patrón visual más elogiado en ReciMe). |
 | **US-32** | Notas Personales y Ajustes Caseros en Ficha de Receta | 🟡 Media | `Backlog` | • Sección editable de "Mis notas y trucos" en el detalle de la receta (ej: *"Poner 30g menos de azúcar"*, *"Hornear 5 min más"*).<br>• Persistencia local y en la nube sin sobreescribir los datos originales de la receta importada.<br>• Visualización destacada en el Modo Cocina para no olvidar los ajustes al cocinar. |
+| **US-58** | Previsualización editable al importar | 🟢 Baja | `Backlog` | • Corregir título, raciones, tiempos, ingredientes y pasos en la previsualización antes de guardar.<br>• Evita tener que guardar y después editar.<br>• *Relacionado: US-15.* |
+| **US-59** | Compartir enlaces a la app (Web Share Target) | 🟡 Media | `Backlog` | • `share_target` en `manifest.json`.<br>• Al compartir una URL desde Chrome/Instagram/TikTok, la app abre el importador con el enlace ya rellenado.<br>• Requiere la PWA instalada (depende de BUG-06 y US-56). |
+| **US-60** | Pantalla siempre encendida en Modo Cocina (Wake Lock) | 🟢 Baja | `Backlog` | • Solicitar `navigator.wakeLock.request('screen')` al entrar en Modo Cocina.<br>• Liberar al salir y readquirir al volver a la pestaña (`visibilitychange`).<br>• Degradación silenciosa si el navegador no lo soporta. |
+| **US-61** | Varios temporizadores simultáneos con aviso | 🟢 Baja | `Backlog` | • Lanzar más de un temporizador a la vez (horno + sartén).<br>• Cálculo por marca de tiempo de fin (no se retrasa con la pantalla bloqueada).<br>• Aviso por sonido, vibración y notificación aunque la app esté en segundo plano. |
+| **US-62** | Escalado de raciones dentro del Modo Cocina | 🟢 Baja | `Backlog` | • Selector de raciones en el Modo Cocina.<br>• Las cantidades mostradas en ingredientes y pasos se ajustan al valor elegido. |
+| **US-63** | Historial "Cocinado X veces" y valoración personal | 🟢 Baja | `Backlog` | • Registrar cada vez que se completa el Modo Cocina.<br>• Valoración de 1-5 estrellas en la ficha.<br>• Ordenar por favoritas o "hace tiempo que no la cocinas". |
 
 ---
 
@@ -107,6 +116,51 @@
 | :--- | :--- | :---: | :---: | :--- |
 | **US-35** | Sincronización Total y Transparente Multi-Dispositivo con Supabase | 🔴 Alta | `Ready for Dev` | • **Descarga y Fusión Automática**: Al iniciar sesión o abrir la app con sesión activa en cualquier dispositivo, descarga y fusiona en segundo plano las recetas del usuario (`recipes`), el planificador semanal (`meal_plans`) y la lista de la compra (`shopping_items`).<br>• **Sincronización en Tiempo Real al Mutar**: Subida instantánea (`upsert`) a Supabase al crear/editar/importar recetas (con `sourceUrl` y dominio), cambiar el plan semanal o modificar/tachar ingredientes en la lista.<br>• **Experiencia Transparente e Inadvertida**: Cambiar de teléfono a PC o tablet muestra exactamente los mismos datos sin necesidad de exportaciones ni importaciones manuales.<br>• **Resiliencia Local-First (Offline)**: Si el dispositivo no tiene red, sigue operando al 100% en `localStorage` y envía automáticamente los cambios pendientes a Supabase al recuperar la conexión.<br>• **Indicador Visual Discreto**: Feedback sutil del estado de sincronización en la barra superior o ajustes. |
 
+> **Bloqueantes de US-35 detectados en auditoría**: BUG-21, BUG-22, BUG-23 y BUG-24 (ver registro de defectos).
+
+---
+
+## 🔒 Épica 10: Seguridad
+
+| ID | Historia de Usuario / Feature | Prioridad | Estado | Criterios de Aceptación (DoD) |
+| :--- | :--- | :---: | :---: | :--- |
+| **US-36** | Escapado de HTML y validación de URLs (XSS almacenado) | 🔴 Alta | `Backlog` | • Función `escapeHtml()` aplicada a toda interpolación en plantillas `innerHTML` (título, descripción, ingredientes, etiquetas, compra, slots, editor).<br>• `imageUrl` y `sourceUrl` solo se aceptan si `new URL()` devuelve protocolo `http:`/`https:` (bloquea `javascript:`).<br>• Validar la estructura de los backups JSON antes de importarlos.<br>• Tests con cargas XSS conocidas. |
+| **US-37** | Sanear la salida de Gemini y los mensajes de error | 🔴 Alta | `Backlog` | • Escapar la respuesta antes de aplicar el formato markdown mínimo (negritas, saltos).<br>• `err.message` mostrado con `textContent`.<br>• Prueba con prompt injection en títulos de recetas. |
+| **US-38** | Eliminar el login simulado y datos personales en el código | 🟡 Media | `Backlog` | • Sin cliente Supabase, no se muestra "cuenta conectada" (o se etiqueta claramente como "Demo").<br>• Eliminar el email personal escrito en `handleGoogleAuth`. |
+| **US-39** | Proteger la clave de Gemini | 🟡 Media | `Backlog` | • Enviar la clave en la cabecera `x-goog-api-key`, no en la URL.<br>• A medio plazo: proxy en Supabase Edge Function para no exponer la clave en el cliente.<br>• *Relacionado: US-30 (Premium).* |
+| **US-40** | Endurecer el servidor local (`server.ps1`) | 🟡 Media | `Backlog` | • `Access-Control-Allow-Origin` limitado a `http://localhost:3000`.<br>• `/api/fetch` rechaza destinos en IPs privadas/`localhost` (SSRF).<br>• Comprobar que la ruta de archivo resuelta está dentro de `$root` (path traversal).<br>• Reutilizar un único `HttpClient`; añadir MIME de `.webmanifest`, `.ico`, `.jpg`, `.webp`. |
+| **US-41** | Fijar versión y SRI de dependencias CDN | 🟢 Baja | `Backlog` | • Script de Supabase con versión exacta (no `@2`) y atributo `integrity`. |
+
+---
+
+## 🧱 Épica 11: Calidad Técnica y Arquitectura
+
+| ID | Historia de Usuario / Feature | Prioridad | Estado | Criterios de Aceptación (DoD) |
+| :--- | :--- | :---: | :---: | :--- |
+| **US-42** | Dividir `app.js` en módulos ES | 🟡 Media | `Backlog` | • Módulos separados: `parser.js`, `store.js`, `sync.js`, `ai.js`, `views/*.js`.<br>• Los tests usan `import` en lugar de `new Function(appCode)()`.<br>• CI en verde sin cambios funcionales. |
+| **US-43** | Delegación de eventos en lugar de `onclick="app.…"` | 🟡 Media | `Backlog` | • Atributos `data-action` + un listener por contenedor.<br>• Sin dependencia de `window.app` global.<br>• Permite una Content Security Policy sin `unsafe-inline`. |
+| **US-44** | Renderizado selectivo | 🟢 Baja | `Backlog` | • `render()` solo pinta la vista activa y las afectadas por el cambio. |
+| **US-45** | Identificadores únicos con `crypto.randomUUID()` | 🟡 Media | `Backlog` | • Sustituir `Date.now()` y `Math.random().substr()` en recetas, ingredientes, slots y artículos de la compra.<br>• Los artículos de la compra pasan a tener `id` (requisito del esquema).<br>• Migración transparente de los datos existentes. |
+| **US-46** | Migrar el almacenamiento local a IndexedDB | 🟡 Media | `Backlog` | • Sustituir `localStorage` (síncrono, ~5 MB) por IndexedDB.<br>• Migración automática de las claves `fa_*`.<br>• Prepara US-16 (fotos propias) y la cola offline de US-35. |
+| **US-47** | Versión centralizada | 🟢 Baja | `Backlog` | • Una sola fuente de versión (constante o script de bump) para `sw.js`, `index.html`, `test.html` y `package.json`.<br>• `package.json` en formato `0.x` según AGENTS.md. |
+| **US-48** | Lint real en CI | 🟢 Baja | `Backlog` | • ESLint + Prettier configurados; `npm run lint` deja de ser un `echo`.<br>• Paso de lint en el workflow `CI & Quality Gate`. |
+| **US-49** | Mover estilos en línea a clases CSS | 🟢 Baja | `Backlog` | • Eliminar los `style="…"` de las plantillas JS en favor de clases de `styles.css`.<br>• *Relacionado: US-23, US-24.* |
+| **US-50** | Ampliar la cobertura de tests | 🟡 Media | `Backlog` | • Tests de cálculo de fechas locales y semana (BUG-07, BUG-08).<br>• Tests de escalado de la compra (BUG-12).<br>• Tests de escapado HTML (US-36).<br>• Tests de sincronización con cliente Supabase simulado. |
+| **US-51** | Revisar la utilidad de `test.html` | 🟢 Baja | `Backlog` | • Decidir si se mantiene el arnés en navegador o se unifica con Vitest para evitar divergencias. |
+| **US-52** | Proxy de importación propio (Supabase Edge Function) | 🟡 Media | `Backlog` | • Sustituir r.jina.ai / codetabs / corsproxy por un endpoint propio.<br>• Funciona en producción HTTPS (no solo con `server.ps1` local).<br>• Límite de tamaño, timeout y bloqueo de IPs privadas.<br>• *Relacionado: US-15.* |
+
+---
+
+## ♿ Épica 12: Accesibilidad y PWA
+
+| ID | Historia de Usuario / Feature | Prioridad | Estado | Criterios de Aceptación (DoD) |
+| :--- | :--- | :---: | :---: | :--- |
+| **US-53** | Permitir zoom | 🟡 Media | `Backlog` | • Eliminar `maximum-scale=1, user-scalable=no` del viewport (WCAG 1.4.4). |
+| **US-54** | Elementos interactivos accesibles por teclado | 🟡 Media | `Backlog` | • Slots, tarjetas de receta y filas del selector pasan a `<button>` o tienen `role="button"`, `tabindex="0"` y soporte de Enter/Espacio.<br>• Foco visible. |
+| **US-55** | Modales con `<dialog>` nativo | 🟡 Media | `Backlog` | • Migrar los modales a `<dialog>` + `showModal()`.<br>• Cierre con Esc, foco atrapado y devuelto al disparador.<br>• *Relacionado: US-18.* |
+| **US-56** | Iconos PWA y colores de marca coherentes | 🟡 Media | `Backlog` | • Iconos PNG de 192 y 512 px + versión `maskable` en `manifest.json`.<br>• `theme-color` igual en HTML y manifest; favicon acorde a la marca.<br>• *Requisito de US-10 y US-26.* |
+| **US-57** | Optimizar la carga de Material Symbols | 🟢 Baja | `Backlog` | • Fijar ejes (`opsz`, `wght`, `FILL`, `GRAD`) o usar `icon_names=` para reducir el peso de la fuente. |
+
 ---
 
 ## 🐛 Historial y Registro de Defectos (Bugs)
@@ -118,6 +172,25 @@
 | **BUG-03** | Lista de compra cortada en parte inferior con scroll | 🔴 Alta | `Done` | Corregido padding con `env(safe-area-inset-bottom)` y `100dvh` (`v4`). |
 | **BUG-04** | Botón Limpiar lista de la compra no comunicaba al usuario | 🟡 Media | `Done` | Añadida confirmación y feedback contextual (`v5`). |
 | **BUG-05** | Faltaban desayunos y meriendas para planes de >3 comidas | 🔴 Alta | `Done` | Expandido a 4 momentos estándar + momentos dinámicos ilimitados (`v8`). |
+| **BUG-06** | El Service Worker nunca se registra: la app no funciona offline | 🔴 Alta | `Backlog` | Registrar `sw.js` en `index.html` y precachear fuentes de iconos y script de Supabase. *Relacionado: US-10.* |
+| **BUG-07** | Las fechas se calculan en UTC: entre 00:00 y 02:00 "hoy" es ayer | 🔴 Alta | `Backlog` | Sustituir `toISOString().split('T')[0]` por una función `toLocalDateKey()` en todos los usos. |
+| **BUG-08** | El plan semanal se queda congelado en la primera semana y "Hoy" muestra comidas inventadas | 🔴 Alta | `Backlog` | Calcular la semana visible a partir de la fecha actual y crear días bajo demanda; "Hoy" sin plan muestra slots vacíos. *Relacionado: US-22, US-05.* |
+| **BUG-09** | Editar una receta importada borra `sourceUrl` y `sourceDomain` | 🔴 Alta | `Backlog` | Fusionar con la receta existente (`{ ...existing, ...editados }`) en `saveRecipeEdit`. *Relacionado: US-15.* |
+| **BUG-10** | Las recetas de ejemplo borradas reaparecen al recargar; el reset comparte referencia con `SEED_RECIPES` | 🔴 Alta | `Backlog` | Fusionar semillas una sola vez por versión (`fa_seed_version`); usar `structuredClone` en `resetDemoData`. |
+| **BUG-11** | Temporizador del Modo Cocina: el primer toque tras cambiar de paso pausa en vez de iniciar; recetas sin pasos rompen el Modo Cocina | 🔴 Alta | `Backlog` | Poner `timerInterval = null` al limpiar, reiniciar el texto del botón por paso y bloquear el Modo Cocina si no hay pasos. |
+| **BUG-12** | Escalado incoherente de raciones en la compra desde el plan (salta de 0,5× a 1,5×) | 🟡 Media | `Backlog` | Guardar las raciones base por grupo y escalar con `baseAmount * nuevas / group.baseServings`. |
+| **BUG-13** | Recetas importadas: tiempo total inflado (`totalTime` usado como cocción) y 15 min inventados si no hay dato | 🟡 Media | `Backlog` | Restar `prepTime` de `totalTime` cuando falte `cookTime`; dejar 0 o vacío si no hay dato. |
+| **BUG-14** | Clasificación de pasillo errónea ("chocolate"/"filete" → Bebidas, "salsa" → Especias) y dos clasificadores distintos | 🟡 Media | `Backlog` | Un único diccionario con límites de palabra (`\b`) y normalización de acentos. *Relacionado: US-20.* |
+| **BUG-15** | "Aplicar este menú al Planificador" ignora la propuesta de Gemini y reparte recetas en rotación | 🟡 Media | `Backlog` | Pedir a Gemini salida estructurada (JSON Schema con IDs de receta por día/slot) y aplicar exactamente esa respuesta; corregir los filtros por etiqueta. *Relacionado: US-17.* |
+| **BUG-16** | Importar dos veces la misma URL crea recetas duplicadas | 🟢 Baja | `Backlog` | Detectar `sourceUrl` existente y ofrecer "Abrir existente" o "Guardar copia". |
+| **BUG-17** | Días creados al añadir una comida fuera del plan quedan sin nombre y el planificador no ordena las fechas | 🟢 Baja | `Backlog` | Calcular `dayName` desde la fecha y ordenar por clave. Probablemente resuelto junto con BUG-08. |
+| **BUG-18** | Búsqueda y chips de etiqueta no se combinan; la búsqueda no incluye ingredientes | 🟢 Baja | `Backlog` | Estado de filtro único (texto + etiqueta) y búsqueda también por nombre de ingrediente. |
+| **BUG-19** | Copiar la lista de la compra falla en silencio si el portapapeles no está disponible | 🟢 Baja | `Backlog` | Gestionar el rechazo de `navigator.clipboard` con mensaje y alternativa. *Relacionado: US-08.* |
+| **BUG-20** | Login: la contraseña se recorta con `trim()` y el registro marca al usuario como conectado aunque falte confirmar el email | 🟡 Media | `Backlog` | No recortar la contraseña; si `data.session` es `null`, mostrar "Revisa tu correo para confirmar la cuenta". |
+| **BUG-21** | Sincronización: los errores de Supabase se ignoran y se muestra "Sincronizado" aunque falle o no haya sesión | 🔴 Alta | `Backlog` | Comprobar `{ error }` de cada llamada, no actualizar `lastSyncedAt` si falla y reflejar el error en el indicador. *Bloquea US-35.* |
+| **BUG-22** | Los IDs de las recetas de ejemplo colisionan entre usuarios en Supabase (RLS rechaza al segundo usuario) | 🔴 Alta | `Backlog` | Clave primaria compuesta `(user_id, id)` o IDs únicos por usuario. *Bloquea US-35; relacionado con US-45.* |
+| **BUG-23** | El esquema de Supabase no coincide con el modelo y los borrados no se propagan | 🔴 Alta | `Backlog` | Migración: `meal_plans` con `breakfast`, `snack` y `custom_slots`; `recipes` con `source_url` y `source_domain`; `id` en artículos de la compra; borrado remoto al eliminar. *Bloquea US-35.* |
+| **BUG-24** | Cada acción lanza N peticiones secuenciales (una por receta) aunque solo cambie un artículo de la compra | 🟡 Media | `Backlog` | `upsert` en lote, *debounce* y envío solo de entidades modificadas. *Bloquea US-35.* |
 
 ---
 
