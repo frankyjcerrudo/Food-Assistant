@@ -384,6 +384,7 @@ const RecipeParser = {
   isSectionHeader(line) {
     const l = line.trim();
     if (!l) return true;
+    if (l.length >= 50) return false;
     if (l.endsWith(':')) return true;
     if (/^(para\s+(la|el|los|las|hacer|servir|decorar|marinar|el\s+sofrito|la\s+salsa|la\s+masa|el\s+relleno|la\s+bechamel|el\s+pan|el\s+adobo))/i.test(l)) return true;
     if (/^(?:ingredientes|ingredientes\s+para|instrucciones|paso\s+a\s+paso|preparaci[o\u00F3]n|elaboraci[o\u00F3]n|m[e\u00E9]todo|procedimiento|modo\s+de\s+(?:preparaci[o\u00F3]n|empleo)|pasos(?:\s+a\s+seguir)?)/i.test(l)) return true;
@@ -444,10 +445,11 @@ const RecipeParser = {
 
     let clean = rawLine
       .replace(/!\[.*?\]\(.*?\)/g, '')
+      .replace(/(\d+(?:[.,]\d+)?\s*[a-zA-Z\u00C0-\u017F\.]+)\[([^\]]+)\]/g, '$1 [$2]')
       .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
       .replace(/\*\*([^*]+)\*\*/g, '$1')
       .replace(/__([^_]+)__/g, '$1')
-      .replace(/(\d+(?:[.,]\d+)?\s*(?:g|gr|kg|ml|cl|l|dl)\.?)([a-zA-Z\u00C0-\u017F])/g, '$1 $2')
+      .replace(/(\d+(?:[.,]\d+)?\s*(?:g|gr|kg|ml|cl|dl)\.?)([a-zA-Z\u00C0-\u017F])/g, '$1 $2')
       .replace(/^([\u2022\-\*]|\d+[\.\)])\s*/, '')
       .trim();
 
@@ -723,10 +725,11 @@ const RecipeParser = {
       // Clean markdown images, unwrap markdown links, unbold, fix unit spacing
       const cleaned = l
         .replace(/!\[.*?\]\(.*?\)/g, '')
+        .replace(/(\d+(?:[.,]\d+)?\s*[a-zA-Z\u00C0-\u017F\.]+)\[([^\]]+)\]/g, '$1 [$2]')
         .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
         .replace(/\*\*([^*]+)\*\*/g, '$1')
         .replace(/__([^_]+)__/g, '$1')
-        .replace(/(\d+(?:[.,]\d+)?\s*(?:g|gr|kg|ml|cl|l|dl)\.?)([a-zA-Z\u00C0-\u017F])/g, '$1 $2')
+        .replace(/(\d+(?:[.,]\d+)?\s*(?:g|gr|kg|ml|cl|dl)\.?)([a-zA-Z\u00C0-\u017F])/g, '$1 $2')
         .trim();
 
       if (cleaned) {
@@ -931,7 +934,7 @@ const RecipeParser = {
         }
         const stepText = line
           .replace(/^[#*\-\u2022\s]+/, '')
-          .replace(/^\d+[\.\)]\s*(?:\d+[\.\)]\s*)?|^paso\s*\d+[:\.\-]\s*/i, '')
+          .replace(/^\d+[\.\)]\s*(?:\d+[\.\)]?\s+)?|^paso\s*\d+[:\.\-]\s*/i, '')
           .trim();
 
         if (stepText && stepText.length > 5 && !/^(?:Image \d+|Dificultad:|Tiempo total|\* Tiempo)/i.test(stepText)) {
