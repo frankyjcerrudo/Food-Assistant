@@ -1355,11 +1355,7 @@ class FoodAssistantApp {
     });
     document.getElementById('btn-paste-clipboard')?.addEventListener('click', () => this.handleClipboardPaste());
     document.getElementById('btn-import-test-example')?.addEventListener('click', () => {
-      const urlInput = document.getElementById('import-url-input');
-      if (urlInput) {
-        urlInput.value = 'https://www.directoalpaladar.com/recetas-vegetarianas/bolitas-garbanzos-brocoli-al-horno-receta-facil-para-cena-saludable';
-        this.handleRecipeImport();
-      }
+      this.fillAndTestSampleRecipe();
     });
     document.getElementById('btn-force-cache-update')?.addEventListener('click', () => this.forceUpdateApp());
 
@@ -2986,6 +2982,18 @@ class FoodAssistantApp {
     this.switchImportTab('url');
   }
 
+  fillAndTestSampleRecipe() {
+    const urlInput = document.getElementById('import-url-input');
+    if (urlInput) {
+      urlInput.value = 'https://www.directoalpaladar.com/recetas-vegetarianas/bolitas-garbanzos-brocoli-al-horno-receta-facil-para-cena-saludable';
+    }
+    const corsBanner = document.getElementById('import-cors-banner');
+    if (corsBanner) corsBanner.style.display = 'none';
+    const status = document.getElementById('import-status-indicator');
+    if (status) status.style.display = 'none';
+    this.handleRecipeImport();
+  }
+
   closeImportModal() {
     this.modalRecipeImport.classList.remove('active');
     this.pendingImportRecipe = null;
@@ -3087,37 +3095,48 @@ class FoodAssistantApp {
           extractedRecipe = RecipeParser.parseSchemaRecipe(jsonLd);
         } else {
           // Normalize URL
-          if (!/^https?:\/\//i.test(url)) {
-            url = 'https://' + url;
+          let cleanUrl = url.trim();
+          if (!/^https?:\/\//i.test(cleanUrl)) {
+            cleanUrl = 'https://' + cleanUrl;
           }
 
           let html = null;
           let fetchSuccess = false;
           let is404OrEmpty = false;
 
-          // Priority 1: Local server proxy (Eliminates CORS, sends real browser headers, bypasses Cloudflare)
-          // Priority 2: Jina reader (Strips Cloudflare & returns clean DOM/Markdown)
-          // Priority 3: Public CORS proxies as ultimate fallback
+          // Check for incomplete or category URLs (e.g. recetas-vege, recetas-de-s)
+          const isTruncatedUrl = /recetas-vege|recetas-de-s|\/categoria\/|\/recetas\/?$/i.test(cleanUrl) ||
+                                (cleanUrl.split('/').length < 5 && /directoalpaladar|cookpad|allrecipes/i.test(cleanUrl));
+
+          // Priority proxy endpoints
           const proxyEndpoints = [
-            `/api/fetch?url=${encodeURIComponent(url)}`,
-            `http://localhost:3000/api/fetch?url=${encodeURIComponent(url)}`,
-            `https://r.jina.ai/${url}`,
-            `https://corsproxy.io/?${encodeURIComponent(url)}`,
-            `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+            `https://r.jina.ai/${cleanUrl}`,
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(cleanUrl)}`,
+            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(cleanUrl)}`,
+            `https://corsproxy.io/?url=${encodeURIComponent(cleanUrl)}`
           ];
+
+          if (window.location.protocol === 'http:' || window.location.hostname === 'localhost') {
+            proxyEndpoints.unshift(`/api/fetch?url=${encodeURIComponent(cleanUrl)}`);
+          }
 
           for (const proxyUrl of proxyEndpoints) {
             try {
               const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 9000);
-              const resp = await fetch(proxyUrl, { signal: controller.signal });
+              const timeoutId = setTimeout(() => controller.abort(), 12000);
+              const resp = await fetch(proxyUrl, { 
+                signal: controller.signal,
+                headers: { 'Accept': 'text/plain, text/markdown, text/html, */*' }
+              });
               clearTimeout(timeoutId);
               if (resp.ok) {
                 const textResp = await resp.text();
-                if (textResp && textResp.length > 200) {
-                  if (textResp.includes('404 Not Found') || textResp.includes('Page not found') || textResp.includes('Página no encontrada')) {
+                if (textResp && textResp.length > 80) {
+                  // Detect 404 / missing pages in response content
+                  if (/404|not found|no se ha encontrado|p[aá]gina que buscas no existe|no existe la p[aá]gina|lo sentimos|error 404/i.test(textResp.substring(0, 3000))) {
                     is404OrEmpty = true;
-                    continue;
+                    fetchSuccess = true;
+                    break;
                   }
                   html = textResp;
                   fetchSuccess = true;
@@ -3129,15 +3148,15 @@ class FoodAssistantApp {
             }
           }
 
-          if (html) {
+          if (html && !is404OrEmpty) {
             const schemaObj = RecipeParser.extractJsonLdFromHtml(html);
             if (schemaObj) {
-              extractedRecipe = RecipeParser.parseSchemaRecipe(schemaObj, url);
+              extractedRecipe = RecipeParser.parseSchemaRecipe(schemaObj, cleanUrl);
             } else {
               // Fallback to text / markdown parsing
               const extractedText = RecipeParser.htmlToText(html);
               if (extractedText) {
-                extractedRecipe = RecipeParser.parseRecipeText(extractedText, url);
+                extractedRecipe = RecipeParser.parseRecipeText(extractedText, cleanUrl);
                 if (extractedRecipe && (!extractedRecipe.imageUrl || extractedRecipe.imageUrl.includes('unsplash'))) {
                   const imgMatch = html.match(/!\[.*?\]\((https?:\/\/[^\s\)]+)\)/i);
                   if (imgMatch && imgMatch[1] && !imgMatch[1].includes('150_150') && !imgMatch[1].includes('avatar')) {
@@ -3148,12 +3167,15 @@ class FoodAssistantApp {
             }
           }
 
+          if (is404OrEmpty || isTruncatedUrl) {
+            if (corsBanner) corsBanner.style.display = 'none';
+            throw new Error(`El enlace parece no existir o estar incompleto ("${cleanUrl}"). Asegúrate de copiar la URL completa de una receta (ej: https://www.directoalpaladar.com/recetas-vegetarianas/nombre-del-plato) o pulsa el botón "Probar ahora" de arriba.`);
+          }
+
           if (!extractedRecipe || !extractedRecipe.ingredients || extractedRecipe.ingredients.length === 0) {
-            if (is404OrEmpty) {
-              throw new Error("El enlace parece no existir o estar incompleto (error 404). Comprueba que has pegado la URL completa de la receta (ej: https://.../receta/nombre-del-plato).");
-            }
             if (fetchSuccess) {
-              throw new Error("La página se ha descargado correctamente pero no se encontraron ingredientes reconocibles. Puedes copiar el texto o ingredientes y pegarlo en 'Texto / Notas'.");
+              if (corsBanner) corsBanner.style.display = 'none';
+              throw new Error("La página web se ha descargado correctamente pero no contiene una receta con ingredientes reconocibles (puede ser un buscador, portada o listado general). Copia el enlace de una receta concreta o pega su texto en 'Texto / Notas'.");
             }
             if (corsBanner) corsBanner.style.display = 'block';
             throw new Error("Esta web bloquea descargas directas (CORS / Cloudflare). Pulsa el botón de abajo para pegarla desde 'Texto / Notas' en 1 clic.");
