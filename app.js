@@ -299,7 +299,9 @@ const state = new StateStore();
 
 // ==========================================================================
 // US-15: RECIPE PARSER (SCHEMA.ORG / JSON-LD & STRUCTURED TEXT)
-// ==============================  // Normalize units
+// ==========================================================================
+const RecipeParser = {
+  // Normalize units
   normalizeUnit(rawUnit) {
     if (!rawUnit) return 'ud';
     const u = rawUnit.toLowerCase().trim().replace(/\.$/, '');
