@@ -299,9 +299,7 @@ const state = new StateStore();
 
 // ==========================================================================
 // US-15: RECIPE PARSER (SCHEMA.ORG / JSON-LD & STRUCTURED TEXT)
-// ==========================================================================
-const RecipeParser = {
-  // Normalize units
+// ==============================  // Normalize units
   normalizeUnit(rawUnit) {
     if (!rawUnit) return 'ud';
     const u = rawUnit.toLowerCase().trim().replace(/\.$/, '');
@@ -309,20 +307,22 @@ const RecipeParser = {
     if (/^(kg|kilo|kilos|kilogramo|kilogramos)$/.test(u)) return 'kg';
     if (/^(ml|mililitro|mililitros)$/.test(u)) return 'ml';
     if (/^(cl|centilitro|centilitros)$/.test(u)) return 'cl';
+    if (/^(dl|decilitro|decilitros)$/.test(u)) return 'dl';
     if (/^(l|litro|litros)$/.test(u)) return 'l';
-    if (/^(cda|cdas|cucharada|cucharadas|tbsp|tablespoon|tablespoons)$/.test(u)) return 'cda';
-    if (/^(cdta|cdtas|cucharadita|cucharaditas|tsp|teaspoon|teaspoons)$/.test(u)) return 'cdta';
+    if (/^(cda|cdas|cucharada|cucharadas|cucharada\s+sopera|cucharadas\s+soperas|tbsp|tablespoon|tablespoons)$/.test(u)) return 'cda';
+    if (/^(cdta|cdtas|cucharadita|cucharaditas|cucharada\s+pequeña|cucharadas\s+pequeñas|cucharadita\s+de\s+postre|cucharadas?\s+de\s+postre|tsp|teaspoon|teaspoons)$/.test(u)) return 'cdta';
     if (/^(taza|tazas|cup|cups)$/.test(u)) return 'taza';
     if (/^(vaso|vasos|glass|glasses)$/.test(u)) return 'vaso';
-    if (/^(pizca|pizcas|pinch|pinches|dash|dashes)$/.test(u)) return 'pizca';
-    if (/^(diente|dientes|clove|cloves)$/.test(u)) return 'diente';
+    if (/^(copa|copas|copita|copitas)$/.test(u)) return 'copita';
+    if (/^(pizca|pizcas|pinch|pinches|dash|dashes|pellizco|pellizcos)$/.test(u)) return 'pizca';
+    if (/^(diente|dientes|clove|cloves)$/.test(u)) return 'ud';
     if (/^(rebanada|rebanadas|rodaja|rodajas)$/.test(u)) return 'rebanada';
     if (/^(loncha|lonchas|filete|filetes|slice|slices)$/.test(u)) return 'loncha';
     if (/^(rama|ramas|ramita|ramitas|sprig|sprigs|stalk|stalks)$/.test(u)) return 'rama';
     if (/^(hoja|hojas|leaf|leaves)$/.test(u)) return 'hoja';
     if (/^(lata|latas|bote|botes|can|cans)$/.test(u)) return 'lata';
     if (/^(paquete|paquetes|pack|packs|packet|packets)$/.test(u)) return 'paquete';
-    if (/^(pu\u00F1ado|pu\u00F1ados)$/.test(u)) return 'pu\u00F1ado';
+    if (/^(puñado|puñados)$/.test(u)) return 'puñado';
     if (/^(chorro|chorrito|chorritos)$/.test(u)) return 'chorrito';
     if (/^(sobre|sobres)$/.test(u)) return 'sobre';
     if (/^(ud|uds|unidad|unidades|unit|units|count|counts|item|items|piece|pieces|ea)$/.test(u)) return 'ud';
@@ -389,13 +389,13 @@ const RecipeParser = {
     if (/^(para\s+(la|el|los|las|hacer|servir|decorar|marinar|el\s+sofrito|la\s+salsa|la\s+masa|el\s+relleno|la\s+bechamel|el\s+pan|el\s+adobo))/i.test(l)) return true;
     if (/^(?:ingredientes|ingredientes\s+para|instrucciones|paso\s+a\s+paso|preparaci[o\u00F3]n|elaboraci[o\u00F3]n|m[e\u00E9]todo|procedimiento|modo\s+de\s+(?:preparaci[o\u00F3]n|empleo)|pasos(?:\s+a\s+seguir)?)/i.test(l)) return true;
 
-    // Detect uppercase sub-section headings like "- CERDO ASADO CUBANO", "- PAN DE CUBANO", "- BOCADILLO CUBANO (1)", "MÃ‰TODO"
+    // Detect uppercase sub-section headings like "- CERDO ASADO CUBANO", "- PAN DE CUBANO", "- BOCADILLO CUBANO (1)", "MÉTODO"
     const stripped = l.replace(/^[-*\u2022#\s]+/, '').replace(/\s*\(\d+\)\s*$/, '').trim();
     if (stripped.length >= 3 && !/\d+\s*(?:g|kg|ml|cl|l|cda|cucharada|oz|lb|ud|loncha)/i.test(stripped)) {
       if (/^(?:pan(?:\s+de)?|bocadillo(?:\s+de)?|cerdo(?:\s+asado)?|masa|salsa|mojo|sofrito|relleno|bechamel|adobo|marinado|glaseado|crema|cobertura|decoraci[o\u00F3]n|guarnici[o\u00F3]n|montaje)\b/i.test(stripped)) {
         return true;
       }
-      if (/^[-*â€¢]\s*[A-ZÃÃ‰ÃÃ“ÃšÃ‘\s\d\(\)]+$/.test(l)) {
+      if (/^[-*•]\s*[A-ZÁÉÍÓÚÑ\s\d\(\)]+$/.test(l)) {
         return true;
       }
     }
@@ -406,6 +406,29 @@ const RecipeParser = {
     if (!durationStr) return 15;
     if (typeof durationStr === 'number') return durationStr;
     const str = String(durationStr).trim();
+
+    // Check Spanish fractions of hours: "1 hora y media", "media hora", "1 hora y cuarto"
+    const halfHourMatch = str.match(/(?:(\d+)\s*(?:h|horas?)\s*y\s*media|media\s*hora)/i);
+    if (halfHourMatch) {
+      const h = halfHourMatch[1] ? parseInt(halfHourMatch[1], 10) : 0;
+      return h * 60 + 30;
+    }
+    const quarterHourMatch = str.match(/(?:(\d+)\s*(?:h|horas?)\s*y\s*(?:un\s+)?cuarto|(?:un\s+)?cuarto\s*de\s*hora)/i);
+    if (quarterHourMatch) {
+      const h = quarterHourMatch[1] ? parseInt(quarterHourMatch[1], 10) : 0;
+      return h * 60 + 15;
+    }
+
+    // Ranges in minutes: "18-20 minutos", "18 a 20 min", "2 o 3 minutos" -> take upper bound
+    const rangeMinMatch = str.match(/(\d+)\s*(?:[-–—]|a|o)\s*(\d+)\s*(?:min|minutos|m\b)/i);
+    if (rangeMinMatch) {
+      return Math.max(parseInt(rangeMinMatch[1], 10), parseInt(rangeMinMatch[2], 10));
+    }
+    const rangeHourMatch = str.match(/(\d+)\s*(?:[-–—]|a|o)\s*(\d+)\s*(?:h|horas?)/i);
+    if (rangeHourMatch) {
+      return Math.max(parseInt(rangeHourMatch[1], 10), parseInt(rangeHourMatch[2], 10)) * 60;
+    }
+
     const simpleMatch = str.match(/^(\d+)\s*(min|m|minutos)?$/i);
     if (simpleMatch) return parseInt(simpleMatch[1], 10);
 
@@ -429,6 +452,44 @@ const RecipeParser = {
     return anyNum ? parseInt(anyNum[0], 10) : 15;
   },
 
+  extractTimerMinutes(stepText) {
+    if (!stepText || typeof stepText !== 'string') return null;
+
+    // 1. Spanish fraction hour expressions
+    const halfMatch = stepText.match(/(?:durante|por|remojo|reposar|cocer|hornear|cocinar|llevar[aá])\s+(?:unos?\s+)?(?:(\d+)\s*(?:h|horas?)\s*y\s*media|media\s*hora)/i) ||
+                      stepText.match(/(?:(\d+)\s*(?:h|horas?)\s*y\s*media|media\s*hora)/i);
+    if (halfMatch) {
+      return this.parseIsoDuration(halfMatch[0]);
+    }
+
+    // 2. Primary cooking/action duration patterns (verbs of cooking/duration)
+    // e.g. "lo que nos llevará unos 18-20 minutos", "durante 15 minutos", "hornear 45 min"
+    const primaryRegex = /(?:durante(?:\s+toda\s+la\s+cocc?i[o\u00F3]n)?|llevar[aá]\s*(?:unos?)?|cocer|cocinar|hornear|hervir|sofre[ií]r|pochar|dorar|reducir|remojo|reposar)\s+(?:unos?\s+)?(\d+(?:\s*(?:[-–—]|a|o)\s*\d+)?)\s*(minutos?|min|horas?|h\b)/gi;
+    const primaryMatches = [...stepText.matchAll(primaryRegex)];
+    if (primaryMatches.length > 0) {
+      let maxVal = 0;
+      for (const m of primaryMatches) {
+        const val = this.parseIsoDuration(m[0]);
+        if (val > maxVal) maxVal = val;
+      }
+      if (maxVal > 0) return maxVal;
+    }
+
+    // 3. Fallback: general time mention
+    const generalRegex = /(\d+(?:\s*(?:[-–—]|a|o)\s*\d+)?)\s*(minutos?|min|horas?|h\b)/gi;
+    const generalMatches = [...stepText.matchAll(generalRegex)];
+    if (generalMatches.length > 0) {
+      let maxVal = 0;
+      for (const m of generalMatches) {
+        const val = this.parseIsoDuration(m[0]);
+        if (val > maxVal && val <= 720) maxVal = val;
+      }
+      if (maxVal > 0) return maxVal;
+    }
+
+    return null;
+  },
+
   parseServings(yieldVal) {
     if (!yieldVal) return 2;
     if (typeof yieldVal === 'number') return yieldVal;
@@ -449,7 +510,6 @@ const RecipeParser = {
       .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
       .replace(/\*\*([^*]+)\*\*/g, '$1')
       .replace(/__([^_]+)__/g, '$1')
-      .replace(/(\d+(?:[.,]\d+)?\s*(?:g|gr|kg|ml|cl|dl)\.?)([a-zA-Z\u00C0-\u017F])/g, '$1 $2')
       .replace(/^([\u2022\-\*]|\d+[\.\)])\s*/, '')
       .trim();
 
@@ -460,12 +520,44 @@ const RecipeParser = {
       return null;
     }
 
-    // Reject dates, image labels or captions
-    if (/^(?:image\s*\d+|editor\s+senior|foto\s+principal|marzo\s+de\s+\d{4}|\d+\s+de\s+[a-z]+\s+de\s+\d{4})/i.test(clean)) {
+    // Reject dates, timestamps, image labels or captions
+    const spanishMonths = 'enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre';
+    if (new RegExp(`(?:^|\\b)(?:\\d{1,2}\\s+(?:de\\s+)?(?:${spanishMonths})|(?:${spanishMonths})\\s+\\d{4})\\b`, 'i').test(clean)) {
+      return null;
+    }
+    if (/\b\d{1,2}:\d{2}(?::\d{2})?\b/.test(clean) && new RegExp(`(?:${spanishMonths}|\\d{4})`, 'i').test(clean)) {
+      return null;
+    }
+    if (/^(?:image\s*\d+|editor\s+senior|foto\s+principal)/i.test(clean)) {
       return null;
     }
 
-    const unitWords = 'cucharadas|cucharada|cdas|cda|cucharaditas|cucharadita|cdtas|cdta|kilogramos|kilogramo|kilos|kilo|kg|gramos|gramo|gr|litros|litro|cl|ml|tablespoons|tablespoon|tbsp|teaspoons|teaspoon|tsp|tazas|taza|cups|cup|vasos|vaso|glasses|glass|pinches|pinch|pizcas|pizca|dientes|diente|cloves|clove|rebanadas|rebanada|rodajas|rodaja|lonchas|loncha|filetes|filete|slices|slice|ramitas|ramita|ramas|rama|sprigs|sprig|stalks|stalk|hojas|hoja|leaves|leaf|latas|lata|botes|bote|cans|can|paquetes|paquete|packet|packets|packs|pack|pu\\u00F1ados|pu\\u00F1ado|chorritos|chorrito|chorro|sobres|sobre|unidades|unidad|uds|ud|units|unit|items|item|pieces|piece|counts|count|dashes|dash|ea|g|l';
+    // Pre-processing Spanish written quantities and fractions at the beginning
+    clean = clean
+      // Ranges like "18-20" or "2 o 3" -> take upper bound
+      .replace(/^(\d+)\s*(?:[-–—]|a|o)\s*(\d+)\b/i, (m, g1, g2) => Math.max(parseFloat(g1), parseFloat(g2)))
+      // "unos 5" / "unas 5" / "una 5" -> "5"
+      .replace(/^(?:unos?|unas?)\s+(\d+)\b/i, '$1')
+      // "1 y medio" / "1 y media" -> "1.5"
+      .replace(/^(\d+)\s+y\s+(?:medio|media)\b/i, (m, g1) => (parseFloat(g1) + 0.5).toString())
+      // "medio" / "media" -> "0.5"
+      .replace(/^(?:medio|media)\b/i, '0.5')
+      // "un cuarto" -> "0.25", "tres cuartos" -> "0.75"
+      .replace(/^tres\s+cuartos\b/i, '0.75')
+      .replace(/^un\s+cuarto\b/i, '0.25')
+      // Word numbers before units or ingredient names
+      .replace(/^un[oa]?\b/i, '1')
+      .replace(/^dos\b/i, '2')
+      .replace(/^tres\b/i, '3')
+      .replace(/^cuatro\b/i, '4')
+      .replace(/^cinco\b/i, '5')
+      .replace(/^seis\b/i, '6')
+      .replace(/^siete\b/i, '7')
+      .replace(/^ocho\b/i, '8')
+      .replace(/^nueve\b/i, '9')
+      .replace(/^diez\b/i, '10');
+
+    const unitWords = 'cucharadas?\\s+pequeñas?|cucharaditas?\\s+de\s+postre|cucharadas?\\s+de\\s+postre|cucharadas?\\s+soperas?|cucharadas?|cdas?|cucharaditas?|cdtas?|kilogramos?|kilos?|kg|gramos?|gr|litros?|dl\\.?|cl|ml|decilitros?|tablespoons?|tbsp|teaspoons?|tsp|tazas?|cups?|vasos?|glasses?|copitas?|copas?|pinches?|pizcas?|pellizcos?|dientes?|cloves?|rebanadas?|rodajas?|lonchas?|filetes?|slices?|ramitas?|ramas?|sprigs?|stalks?|hojas?|leaves|leaf|latas?|botes?|cans?|paquetes?|packs?|packet|packets|puñados?|chorritos?|chorro|sobres?|unidades?|uds?\\.?|ud\\.?|units?|items?|pieces?|counts?|dashes?|cazos?|trozos?|ea|g|l';
 
     let amount = 1;
     let unit = 'ud';
@@ -474,7 +566,7 @@ const RecipeParser = {
     const fracChars = '\\u00BD\\u00BC\\u00BE\\u2153\\u2154\\u215B\\u215C\\u215D\\u215E';
 
     // Pattern 1: Standard quantity first: "200 g de pollo", "4count Diente de ajo", "3 huevos", "1/2 cucharada de sal"
-    const startNumRegex = new RegExp(`^([\\d${fracChars}\\.,]+(?:\\s*\\/\\s*\\d+)?)\\s*(${unitWords})?\\.?\\b\\s*(?:de\\s+)?(.*)$`, 'i');
+    const startNumRegex = new RegExp(`^([\\d${fracChars}\\.,]+(?:\\s*\\/\\s*\\d+)?)\\s*(${unitWords})?\\.?\\b\\s*(?:de\\s+la\\s+|de\\s+los\\s+|de\\s+las\\s+|de\\s+|del\\s+|con\\s+)?(.*)$`, 'i');
     const startMatch = clean.match(startNumRegex);
 
     if (startMatch && (isNaN(startMatch[1]) === false || new RegExp(`[\\/${fracChars}]`).test(startMatch[1]))) {
@@ -504,14 +596,21 @@ const RecipeParser = {
       }
     }
 
-    // Clean extraneous prefixes/suffixes from ingredient name
+    // Clean extraneous prefixes/suffixes and notes from ingredient name
     name = name
       .replace(/^[\.\,\-\:\s]+/, '')
       .replace(/^count\s+/i, '')
       .replace(/\s+count$/i, '')
-      .replace(/^de\s+/i, '')
+      .replace(/^(?:de\s+la|de\s+los|de\s+las|de|del|con)\s+/i, '')
+      .replace(/^(?:para\s+(?:acompañar|servir|decorar|el\s+sofrito|la\s+salsa|el\s+relleno|la\s+guarnición)|opcional):\s*/i, '')
+      .replace(/\s*\((?:ver\s+nota|nota\s*\d*|opcional|al\s+gusto|a\s+temperatura\s+ambiente|según\s+tamaño|unas?\s+\d+[^)]*|aprox[^)]*)\)/gi, '')
       .replace(/:\s*$/, '')
       .trim();
+
+    // Specific culinary cleanups: "sal fina" -> "Sal"
+    if (/^sal\s+fina$/i.test(name)) {
+      name = 'Sal';
+    }
 
     if (!name || (name.length <= 1 && /^[a-z\.\,]$/i.test(name))) return null;
 
@@ -633,13 +732,11 @@ const RecipeParser = {
       if (typeof item === 'string') {
         const cleaned = item.trim();
         if (cleaned) {
-          const timerMatch = cleaned.match(/(?:durante|por|hervir|cocer|hornear|reposar)?\s*(\d+)\s*(?:min|minutos)/i);
-          instructions.push({ step: instructions.length + 1, text: cleaned, timerMinutes: timerMatch ? parseInt(timerMatch[1], 10) : null });
+          instructions.push({ step: instructions.length + 1, text: cleaned, timerMinutes: this.extractTimerMinutes(cleaned) });
         }
       } else if (item.text) {
         const cleaned = item.text.trim();
-        const timerMatch = cleaned.match(/(?:durante|por|hervir|cocer|hornear|reposar)?\s*(\d+)\s*(?:min|minutos)/i);
-        instructions.push({ step: instructions.length + 1, text: cleaned, timerMinutes: timerMatch ? parseInt(timerMatch[1], 10) : null });
+        instructions.push({ step: instructions.length + 1, text: cleaned, timerMinutes: this.extractTimerMinutes(cleaned) });
       } else if (item.itemListElement && Array.isArray(item.itemListElement)) {
         item.itemListElement.forEach(sub => processItem(sub));
       }
@@ -722,18 +819,20 @@ const RecipeParser = {
         continue;
       }
 
-      // Clean markdown images, unwrap markdown links, unbold, fix unit spacing
+      // Clean markdown images, unwrap markdown links, unbold
       const cleaned = l
         .replace(/!\[.*?\]\(.*?\)/g, '')
         .replace(/(\d+(?:[.,]\d+)?\s*[a-zA-Z\u00C0-\u017F\.]+)\[([^\]]+)\]/g, '$1 [$2]')
         .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
         .replace(/\*\*([^*]+)\*\*/g, '$1')
         .replace(/__([^_]+)__/g, '$1')
-        .replace(/(\d+(?:[.,]\d+)?\s*(?:g|gr|kg|ml|cl|dl)\.?)([a-zA-Z\u00C0-\u017F])/g, '$1 $2')
         .trim();
 
       if (cleaned) {
         if (/^(?:Image \d+:|Editor Senior|\d+\s*votos)/i.test(cleaned) || /\b(?:viajer[ao]\s+gastron[o\u00F3]mic[ao]|periodista\s+intr[e\u00E9]pida|editor\s+senior)\b/i.test(cleaned)) continue;
+        const spanishMonths = 'enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre';
+        if (new RegExp(`(?:^|\\b)(?:\\d{1,2}\\s+(?:de\\s+)?(?:${spanishMonths})|(?:${spanishMonths})\\s+\\d{4})\\b`, 'i').test(cleaned)) continue;
+        if (/\b\d{1,2}:\d{2}(?::\d{2})?\b/.test(cleaned) && new RegExp(`(?:${spanishMonths}|\\d{4})`, 'i').test(cleaned)) continue;
         inputLines.push(cleaned);
       }
     }
@@ -938,12 +1037,7 @@ const RecipeParser = {
           .trim();
 
         if (stepText && stepText.length > 5 && !/^(?:Image \d+|Dificultad:|Tiempo total|\* Tiempo)/i.test(stepText)) {
-          const timerMatch = stepText.match(/(?:durante|por|hervir|cocer|hornear|reposar)?\s*(\d+)\s*(?:min|minutos)/i) ||
-                             stepText.match(/(?:durante|por|hervir|cocer|hornear|reposar)?\s*(\d+)\s*(?:h|hora|horas)/i);
-          let timerMin = null;
-          if (timerMatch) {
-            timerMin = this.parseIsoDuration(timerMatch[0]);
-          }
+          const timerMin = this.extractTimerMinutes(stepText);
           instructions.push({
             step: instructions.length + 1,
             text: stepText,
@@ -951,8 +1045,10 @@ const RecipeParser = {
           });
         }
       } else {
-        // Line before any explicit section header
-        if (/^[\d\-\* ]/.test(line)) {
+        // Line before any explicit section header:
+        // If the recipe contains an explicit ingredients header further down, ignore pre-header lines!
+        const hasExplicitIngredients = lines.some(l => /^(?:#+\s*)?(?:ingredientes|lista de ingredientes|lo que necesitas):?$/i.test(l) || /^#+\s*ingredientes\b/i.test(l));
+        if (!hasExplicitIngredients && /^[\-\*\u2022]/.test(line)) {
           const parsed = this.parseIngredientLine(line);
           if (parsed) ingredients.push(parsed);
         }

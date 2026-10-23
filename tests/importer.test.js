@@ -196,6 +196,44 @@ describe('US-15: Importador de Recetas (Schema.org / JSON-LD & Texto Estructurad
     expect(c5.name).toBe('Agua');
   });
 
+  it('parseIngredientLine procesa cantidades en texto español (medio, media, dos) y limpia notas explicativas', () => {
+    const c1 = RecipeParser.parseIngredientLine('medio diente de ajo');
+    expect(c1.amount).toBe(0.5);
+    expect(c1.unit).toBe('ud');
+    expect(c1.name).toBe('Ajo');
+
+    const c2 = RecipeParser.parseIngredientLine('media cucharada pequeña con sal fina');
+    expect(c2.amount).toBe(0.5);
+    expect(c2.unit).toBe('cdta');
+    expect(c2.name).toBe('Sal');
+
+    const c3 = RecipeParser.parseIngredientLine('500 gramos de tomates maduros (ver nota)');
+    expect(c3.amount).toBe(500);
+    expect(c3.unit).toBe('g');
+    expect(c3.name).toBe('Tomates maduros');
+
+    const c4 = RecipeParser.parseIngredientLine('100 gramos de pan');
+    expect(c4.amount).toBe(100);
+    expect(c4.unit).toBe('g');
+    expect(c4.name).toBe('Pan');
+
+    const c5 = RecipeParser.parseIngredientLine('media cebolla fresca');
+    expect(c5.amount).toBe(0.5);
+    expect(c5.unit).toBe('ud');
+    expect(c5.name).toBe('Cebolla fresca');
+
+    const c6 = RecipeParser.parseIngredientLine('16 septiembre 2026, 16:53');
+    expect(c6).toBeNull();
+  });
+
+  it('parseIsoDuration procesa fracciones de hora en español y rangos de cocción', () => {
+    expect(RecipeParser.parseIsoDuration('1 hora y media')).toBe(90);
+    expect(RecipeParser.parseIsoDuration('media hora')).toBe(30);
+    expect(RecipeParser.parseIsoDuration('1 hora y cuarto')).toBe(75);
+    expect(RecipeParser.parseIsoDuration('18-20 minutos')).toBe(20);
+    expect(RecipeParser.parseIsoDuration('2 o 3 minutos')).toBe(3);
+  });
+
   it('parseSchemaRecipe y parseRecipeText omiten etiqueta "Importada"', () => {
     const fakeSchema = {
       '@type': 'Recipe',
@@ -436,7 +474,8 @@ Bocadillo De Atun Paso A Paso
       '![Image 1: Tortilla Patata](https://i.blogs.es/93cdb8/tortilla_patata/650_1200.jpg)',
       '16 septiembre 2026, 16:53',
       '![Image 2: pakus](https://i.blogs.es/093f03/blob/150_150.jpeg)',
-      'Editor Senior',
+      'Editor Senior  977 votos',
+      'Quizás la receta de la tortilla de patata sea una de las primeras que todo aspirante a cocinillas debería aprender a hacer.',
       '',
       '## Ingredientes',
       'Para 4 personas',
@@ -459,13 +498,14 @@ Bocadillo De Atun Paso A Paso
     expect(recipe.title).toContain('Tortilla de patatas con cebolla');
     expect(recipe.servings).toBe(4);
     expect(recipe.ingredients.length).toBeGreaterThanOrEqual(4);
+    expect(recipe.ingredients.some(i => i.name.toLowerCase().includes('septiembre'))).toBe(false);
     expect(recipe.instructions.length).toBe(3);
     // Ensure metadata was NOT added as instruction steps
     expect(recipe.instructions[0].text).toContain('caramelizar la cebolla');
     expect(recipe.instructions.some(i => i.text.includes('URL Source') || i.text.includes('Editor Senior'))).toBe(false);
   });
 
-  it('elimina imágenes inline markdown de ingredientes e instrucciones (caso Bon Viveur)', () => {
+  it('elimina imágenes inline markdown de ingredientes e instrucciones y calcula temporizadores complejos (caso Bon Viveur)', () => {
     const rawBonViveur = [
       'Title: Risotto de boletus: una receta italiana exquisita y muy fácil de preparar',
       'URL Source: https://bonviveur.com/es/recetas/risotto-de-boletus?hl=es-ES',
@@ -479,10 +519,10 @@ Bocadillo De Atun Paso A Paso
       '',
       '## Cómo hacer el risotto de boletus',
       '![Image 3: Rehidratar boletus para hacer el risotto](https://imag.bonviveur.com/rehidratar-boletus-para-hacer-el-risotto.jpg)',
-      'Para hacer el risotto de boletus lo primero que hay que hacer es rehidratar 20 g de boletus deshidratados en agua tibia durante 20 minutos.',
+      'Para hacer el risotto de boletus lo primero que hay que hacer es rehidratar 20 g de boletus deshidratados en agua fría y los dejamos a remojo durante 1 hora y media aproximadamente.',
       '![Image 4: Picar boletus para hacer el risotto](https://imag.bonviveur.com/picar-boletus-para-hacer-el-risotto.jpg)',
       'Transcurrido este tiempo, escurrimos y picamos los boletus, y reservamos el agua de hidratación.',
-      'Pelamos y cortamos 1 diente de ajo en láminas y picamos media cebolla.',
+      'Pasados 2 o 3 minutos, añadimos medio vaso de vino blanco y dejamos que se evapore durante toda la cocción del arroz mientras este se va cociendo y absorbiendo el caldo, lo que nos llevará unos 18-20 minutos.',
       'María Ángeles Fernández Viajera gastronómica y periodista intrépida.'
     ].join('\n');
 
@@ -495,19 +535,23 @@ Bocadillo De Atun Paso A Paso
     expect(recipe.instructions.some(i => i.text.includes('Image') || i.text.includes('bonviveur'))).toBe(false);
     expect(recipe.instructions.length).toBe(3);
     expect(recipe.instructions[0].text).toContain('rehidratar 20 g de boletus');
+    // Step 1: "1 hora y media" should be 90 minutes
+    expect(recipe.instructions[0].timerMinutes).toBe(90);
+    // Step 3: "lo que nos llevará unos 18-20 minutos" should be 20 minutes
+    expect(recipe.instructions[2].timerMinutes).toBe(20);
   });
 
-  it('reconoce cabeceras tipo "### RECETA DE..." y no confunde pasos con ingredientes (caso Javi Recetas)', () => {
+  it('reconoce cabeceras tipo "### RECETA DE...", procesa ingredientes con gramos/cantidades en texto y limpia notas (caso Javi Recetas)', () => {
     const rawSalmorejo = [
       'Title: SALMOREJO CORDOBÉS - Receta Súper FÁCIL - Javi Recetas',
       'URL Source: https://www.javirecetas.com/salmorejo-cordobes/',
       '',
       '## INGREDIENTES PARA EL SALMOREJO:',
-      '* 500 g de tomates maduros',
-      '* 100 g de pan',
-      '* 50 ml de aceite de oliva',
-      '* 1/2 diente de ajo',
-      '* 1/2 cucharada pequeña con sal fina',
+      '* 500 gramos de tomates maduros (ver nota)',
+      '* 100 gramos de pan',
+      '* 50 ml de aceite de oliva (una 5 cucharadas)',
+      '* medio diente de ajo',
+      '* media cucharada pequeña con sal fina',
       '* Para acompañar: huevo duro y jamón serrano a taquitos',
       '',
       '### RECETA DE SALMOREJO CORDOBÉS:',
@@ -520,9 +564,34 @@ Bocadillo De Atun Paso A Paso
 
     const recipe = RecipeParser.parseRecipeText(rawSalmorejo, 'https://www.javirecetas.com/salmorejo-cordobes/');
     expect(recipe).not.toBeNull();
-    // Ingredients should only contain the actual ingredients
+    // Ingredients should only contain the actual ingredients with clean names
     expect(recipe.ingredients.length).toBe(6);
     expect(recipe.ingredients.some(i => i.name.toLowerCase().includes('tritura') || i.name.toLowerCase().includes('trocea'))).toBe(false);
+
+    const tomates = recipe.ingredients.find(i => i.name.toLowerCase().includes('tomate'));
+    expect(tomates.name).toBe('Tomates maduros');
+    expect(tomates.amount).toBe(500);
+    expect(tomates.unit).toBe('g');
+
+    const pan = recipe.ingredients.find(i => i.name.toLowerCase() === 'pan');
+    expect(pan.amount).toBe(100);
+    expect(pan.unit).toBe('g');
+
+    const aceite = recipe.ingredients.find(i => i.name.toLowerCase().includes('aceite'));
+    expect(aceite.name).toBe('Aceite de oliva');
+    expect(aceite.amount).toBe(50);
+    expect(aceite.unit).toBe('ml');
+
+    const ajo = recipe.ingredients.find(i => i.name.toLowerCase() === 'ajo');
+    expect(ajo.amount).toBe(0.5);
+    expect(ajo.unit).toBe('ud');
+
+    const sal = recipe.ingredients.find(i => i.name.toLowerCase() === 'sal');
+    expect(sal.amount).toBe(0.5);
+
+    const guarnicion = recipe.ingredients.find(i => i.name.toLowerCase().includes('huevo duro'));
+    expect(guarnicion.name).toBe('Huevo duro y jamón serrano a taquitos');
+
     // Instructions should contain the 5 cooking steps
     expect(recipe.instructions.length).toBe(5);
     expect(recipe.instructions[1].text).toContain('Corta los tomates en trozos');
@@ -560,7 +629,7 @@ Bocadillo De Atun Paso A Paso
     expect(recipe.instructions.some(i => i.text.includes('Dale un toque') || i.text.includes('Trucos y consejos'))).toBe(false);
   });
 
-  it('soporta recetas sin cabecera de instrucciones, enlaces en ingredientes y numeración doble (caso Cookpad)', () => {
+  it('soporta recetas sin cabecera de instrucciones, enlaces en ingredientes y unidades como dl o copita (caso Cookpad)', () => {
     const rawCookpad = [
       'Title: Buñuelos De Manzana "Finisterre" Receta de carme castillo',
       'URL Source: https://cookpad.com/es/recetas/111818',
@@ -590,11 +659,27 @@ Bocadillo De Atun Paso A Paso
     expect(recipe.servings).toBe(6);
     // Ingredients should parse 8 items with cleaned names (no markdown link syntax)
     expect(recipe.ingredients.length).toBe(8);
+
+    const manzanas = recipe.ingredients.find(i => i.name.toLowerCase().includes('manzana'));
+    expect(manzanas.name).toBe('Manzanas');
+    expect(manzanas.amount).toBe(600);
+    expect(manzanas.unit).toBe('g');
+
     const harina = recipe.ingredients.find(i => i.name.toLowerCase().includes('harina'));
     expect(harina).toBeDefined();
+    expect(harina.name).toBe('Harina');
     expect(harina.amount).toBe(200);
     expect(harina.unit).toBe('g');
-    expect(harina.name).not.toContain('(');
+
+    const cerveza = recipe.ingredients.find(i => i.name.toLowerCase().includes('cerveza'));
+    expect(cerveza.name).toBe('Cerveza');
+    expect(cerveza.amount).toBe(2);
+    expect(cerveza.unit).toBe('dl');
+
+    const ron = recipe.ingredients.find(i => i.name.toLowerCase().includes('ron'));
+    expect(ron.name).toBe('Ron');
+    expect(ron.amount).toBe(1);
+    expect(ron.unit).toBe('copita');
 
     // Numbered steps with action verbs automatically detected as instructions
     expect(recipe.instructions.length).toBe(5);

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Food Assistant - Informe Detallado de Calidad y Tests</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.13">
+  <link rel="stylesheet" href="styles.css?v=0.14">
   <style>
     :root {
       --qa-pass: #059669;
@@ -312,8 +312,8 @@
   <div id="test-results-container"></div>
 
   <!-- Entorno y dependencias de la app -->
-  <script src="config.js?v=0.13"></script>
-  <script src="app.js?v=0.13"></script>
+  <script src="config.js?v=0.14"></script>
+  <script src="app.js?v=0.14"></script>
 
   <script>
     const suites = [];
@@ -1202,12 +1202,10 @@
           const rawDirecto = [
             'Title: Tortilla de patatas con cebolla: receta tradicional española paso a paso',
             'URL Source: https://www.directoalpaladar.com/recetas-de-huevos-y-tortillas/empezando-en-la-cocina-receta-de-tortilla-de-patatas-con-cebolla/amp',
-            'Published Time: 2026-09-16T14:53:16Z',
             'Markdown Content:',
-            '![Image 1: Tortilla Patata](https://i.blogs.es/93cdb8/tortilla_patata/650_1200.jpg)',
             '16 septiembre 2026, 16:53',
-            '![Image 2: pakus](https://i.blogs.es/093f03/blob/150_150.jpeg)',
-            'Editor Senior',
+            'Editor Senior  977 votos',
+            'Quizás la receta de la tortilla de patata sea una de las primeras que todo aspirante a cocinillas debería aprender a hacer.',
             '',
             '## Ingredientes',
             'Para 4 personas',
@@ -1230,6 +1228,7 @@
           expect(recipe.title).toContain('Tortilla de patatas con cebolla');
           expect(recipe.servings).toBe(4);
           expect(recipe.ingredients.length).toBeGreaterThanOrEqual(4);
+          expect(recipe.ingredients.some(i => i.name.toLowerCase().includes('septiembre'))).toBe(false);
           expect(recipe.instructions.length).toBe(3);
           expect(recipe.instructions[0].text).toContain('caramelizar la cebolla');
           expect(recipe.instructions.some(i => i.text.includes('URL Source') || i.text.includes('Editor Senior'))).toBe(false);
@@ -1237,10 +1236,10 @@
       );
 
       it(
-        'elimina imágenes inline markdown de ingredientes e instrucciones (caso Bon Viveur)',
+        'elimina imágenes inline markdown de ingredientes e instrucciones y calcula temporizadores complejos (caso Bon Viveur)',
         {
-          purpose: 'Validar que las imágenes en markdown ![Image: ...](url) incrustadas entre ingredientes o pasos de preparación se limpian por completo sin crear falsos ingredientes ni pasos vacíos.',
-          assertions: 'Verifica que ningún ingrediente contiene nombres de imagen ni urls y que los pasos de instrucción no son enlaces de imagen.'
+          purpose: 'Validar que las imágenes en markdown ![Image: ...](url) incrustadas entre ingredientes o pasos de preparación se limpian por completo y los temporizadores complejos (1 hora y media = 90min, 18-20 min = 20min) se calculan con exactitud.',
+          assertions: 'Verifica ausencia de nombres de imagen, 3 pasos limpios, temporizador de 90 min en paso 1 y 20 min en paso 3.'
         },
         () => {
           const rawBonViveur = [
@@ -1256,10 +1255,10 @@
             '',
             '## Cómo hacer el risotto de boletus',
             '![Image 3: Rehidratar boletus para hacer el risotto](https://imag.bonviveur.com/rehidratar-boletus-para-hacer-el-risotto.jpg)',
-            'Para hacer el risotto de boletus lo primero que hay que hacer es rehidratar 20 g de boletus deshidratados en agua tibia durante 20 minutos.',
+            'Para hacer el risotto de boletus lo primero que hay que hacer es rehidratar 20 g de boletus deshidratados en agua fría y los dejamos a remojo durante 1 hora y media aproximadamente.',
             '![Image 4: Picar boletus para hacer el risotto](https://imag.bonviveur.com/picar-boletus-para-hacer-el-risotto.jpg)',
             'Transcurrido este tiempo, escurrimos y picamos los boletus, y reservamos el agua de hidratación.',
-            'Pelamos y cortamos 1 diente de ajo en láminas y picamos media cebolla.',
+            'Pasados 2 o 3 minutos, añadimos medio vaso de vino blanco y dejamos que se evapore durante toda la cocción del arroz mientras este se va cociendo y absorbiendo el caldo, lo que nos llevará unos 18-20 minutos.',
             'María Ángeles Fernández Viajera gastronómica y periodista intrépida.'
           ].join('\n');
 
@@ -1270,14 +1269,16 @@
           expect(recipe.instructions.some(i => i.text.includes('Image') || i.text.includes('bonviveur'))).toBe(false);
           expect(recipe.instructions.length).toBe(3);
           expect(recipe.instructions[0].text).toContain('rehidratar 20 g de boletus');
+          expect(recipe.instructions[0].timerMinutes).toBe(90);
+          expect(recipe.instructions[2].timerMinutes).toBe(20);
         }
       );
 
       it(
-        'reconoce cabeceras tipo "### RECETA DE..." y no confunde pasos con ingredientes (caso Javi Recetas)',
+        'reconoce cabeceras tipo "### RECETA DE...", procesa ingredientes con gramos/cantidades en texto y limpia notas (caso Javi Recetas)',
         {
-          purpose: 'Validar que las cabeceras con formato "RECETA DE..." conmutan inmediatamente a la sección de instrucciones para no volcar los pasos de preparación dentro de la lista de ingredientes.',
-          assertions: 'Verifica que la lista de ingredientes sólo tiene 6 elementos y las instrucciones contienen exactamente los pasos de elaboración.'
+          purpose: 'Validar que las cabeceras con formato "RECETA DE..." conmutan inmediatamente a instrucciones, cantidades escritas como "medio diente" o "media cucharada pequeña" se extraen a 0.5 y se limpian notas como "(ver nota)".',
+          assertions: 'Verifica 6 ingredientes limpios (Tomates maduros 500g, Pan 100g, Aceite 50ml, Ajo 0.5ud, Sal 0.5, Huevo duro 1ud) y 5 pasos de elaboración.'
         },
         () => {
           const rawSalmorejo = [
@@ -1285,11 +1286,11 @@
             'URL Source: https://www.javirecetas.com/salmorejo-cordobes/',
             '',
             '## INGREDIENTES PARA EL SALMOREJO:',
-            '* 500 g de tomates maduros',
-            '* 100 g de pan',
-            '* 50 ml de aceite de oliva',
-            '* 1/2 diente de ajo',
-            '* 1/2 cucharada pequeña con sal fina',
+            '* 500 gramos de tomates maduros (ver nota)',
+            '* 100 gramos de pan',
+            '* 50 ml de aceite de oliva (una 5 cucharadas)',
+            '* medio diente de ajo',
+            '* media cucharada pequeña con sal fina',
             '* Para acompañar: huevo duro y jamón serrano a taquitos',
             '',
             '### RECETA DE SALMOREJO CORDOBÉS:',
@@ -1304,6 +1305,31 @@
           expect(recipe).not.toBeNull();
           expect(recipe.ingredients.length).toBe(6);
           expect(recipe.ingredients.some(i => i.name.toLowerCase().includes('tritura') || i.name.toLowerCase().includes('trocea'))).toBe(false);
+
+          const tomates = recipe.ingredients.find(i => i.name.toLowerCase().includes('tomate'));
+          expect(tomates.name).toBe('Tomates maduros');
+          expect(tomates.amount).toBe(500);
+          expect(tomates.unit).toBe('g');
+
+          const pan = recipe.ingredients.find(i => i.name.toLowerCase() === 'pan');
+          expect(pan.amount).toBe(100);
+          expect(pan.unit).toBe('g');
+
+          const aceite = recipe.ingredients.find(i => i.name.toLowerCase().includes('aceite'));
+          expect(aceite.name).toBe('Aceite de oliva');
+          expect(aceite.amount).toBe(50);
+          expect(aceite.unit).toBe('ml');
+
+          const ajo = recipe.ingredients.find(i => i.name.toLowerCase() === 'ajo');
+          expect(ajo.amount).toBe(0.5);
+          expect(ajo.unit).toBe('ud');
+
+          const sal = recipe.ingredients.find(i => i.name.toLowerCase() === 'sal');
+          expect(sal.amount).toBe(0.5);
+
+          const guarnicion = recipe.ingredients.find(i => i.name.toLowerCase().includes('huevo duro'));
+          expect(guarnicion.name).toBe('Huevo duro y jamón serrano a taquitos');
+
           expect(recipe.instructions.length).toBe(5);
           expect(recipe.instructions[1].text).toContain('Corta los tomates en trozos');
         }
@@ -1348,10 +1374,10 @@
       );
 
       it(
-        'soporta recetas sin cabecera de instrucciones, enlaces en ingredientes y numeración doble (caso Cookpad)',
+        'soporta recetas sin cabecera de instrucciones, enlaces en ingredientes y unidades como dl o copita (caso Cookpad)',
         {
-          purpose: 'Validar la transición automática a instrucciones cuando no existe cabecera explícita, limpiando enlaces markdown pegados a unidades y quitando numeración doble como "1. 1 ".',
-          assertions: 'Verifica 8 ingredientes limpios con Harina a 200g, 5 pasos sin prefijo numérico duplicado y omisión de fechas o fotos de perfil.'
+          purpose: 'Validar la transición automática a instrucciones cuando no existe cabecera explícita, limpiando enlaces markdown pegados a unidades y normalizando dl o copita.',
+          assertions: 'Verifica 8 ingredientes limpios con Harina a 200g, Manzanas a 600g, Cerveza a 2dl, Ron a 1 copita, 5 pasos y omisión de fechas.'
         },
         () => {
           const rawCookpad = [
@@ -1382,11 +1408,27 @@
           expect(recipe).not.toBeNull();
           expect(recipe.servings).toBe(6);
           expect(recipe.ingredients.length).toBe(8);
+
+          const manzanas = recipe.ingredients.find(i => i.name.toLowerCase().includes('manzana'));
+          expect(manzanas.name).toBe('Manzanas');
+          expect(manzanas.amount).toBe(600);
+          expect(manzanas.unit).toBe('g');
+
           const harina = recipe.ingredients.find(i => i.name.toLowerCase().includes('harina'));
           expect(harina).toBeDefined();
+          expect(harina.name).toBe('Harina');
           expect(harina.amount).toBe(200);
           expect(harina.unit).toBe('g');
-          expect(harina.name).not.toContain('(');
+
+          const cerveza = recipe.ingredients.find(i => i.name.toLowerCase().includes('cerveza'));
+          expect(cerveza.name).toBe('Cerveza');
+          expect(cerveza.amount).toBe(2);
+          expect(cerveza.unit).toBe('dl');
+
+          const ron = recipe.ingredients.find(i => i.name.toLowerCase().includes('ron'));
+          expect(ron.name).toBe('Ron');
+          expect(ron.amount).toBe(1);
+          expect(ron.unit).toBe('copita');
 
           expect(recipe.instructions.length).toBe(5);
           expect(recipe.instructions[0].text).not.toMatch(/^1\b/);
