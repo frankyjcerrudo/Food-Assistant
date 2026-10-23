@@ -163,6 +163,25 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     expect(parsed.instructions[1].text).toContain('Colocar la cama de brotes');
     expect(parsed.instructions.some(s => s.text.toLowerCase().includes('anterior') || s.text.toLowerCase().includes('velocidadcuchara'))).toBe(false);
   });
+
+  it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
+    expect(window.APP_VERSION).toBe('v0.19');
+    expect(appInstance.appVersion).toBe('v0.19');
+
+    const badge = document.createElement('span');
+    badge.id = 'app-version-badge';
+    const settingsVer = document.createElement('strong');
+    settingsVer.id = 'settings-app-version-text';
+    document.body.appendChild(badge);
+    document.body.appendChild(settingsVer);
+
+    appInstance.initVersion();
+    expect(badge.textContent).toBe('v0.19');
+    expect(settingsVer.textContent).toBe('v0.19');
+
+    document.body.removeChild(badge);
+    document.body.removeChild(settingsVer);
+  });
 });
 
 

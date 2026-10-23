@@ -1175,11 +1175,13 @@ const RecipeParser = {
 };
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
+  window.APP_VERSION = 'v0.19';
 }
 
 // UI Controller
 class FoodAssistantApp {
   constructor() {
+    this.appVersion = 'v0.19';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -1198,11 +1200,19 @@ class FoodAssistantApp {
     this.supabaseClient = null;
 
     this.initElements();
+    this.initVersion();
     this.initTheme();
     this.initSupabaseClient();
     this.initEvents();
     this.updateUserAccountUI();
     this.render();
+  }
+
+  initVersion() {
+    const badge = document.getElementById('app-version-badge');
+    if (badge) badge.textContent = this.appVersion;
+    const settingsVer = document.getElementById('settings-app-version-text');
+    if (settingsVer) settingsVer.textContent = this.appVersion;
   }
 
   initElements() {
