@@ -1754,11 +1754,11 @@
       it(
         'Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes',
         {
-          purpose: 'Garantizar que la versión de la app (v0.21) está unificada y se refleja en cabecera y ajustes sin desincronizaciones.',
-          assertions: 'Valida que window.APP_VERSION sea v0.21 y actualice elementos DOM correspondientes.'
+          purpose: 'Garantizar que la versión de la app (v0.22) está unificada y se refleja en cabecera y ajustes sin desincronizaciones.',
+          assertions: 'Valida que window.APP_VERSION sea v0.22 y actualice elementos DOM correspondientes.'
         },
         () => {
-          expect(window.APP_VERSION).toBe('v0.21');
+          expect(window.APP_VERSION).toBe('v0.22');
 
           const badge = document.createElement('span');
           badge.id = 'app-version-badge';
@@ -1773,11 +1773,52 @@
           };
           fakeApp.initVersion();
 
-          expect(badge.textContent).toBe('v0.21');
-          expect(settingsVer.textContent).toBe('v0.21');
+          expect(badge.textContent).toBe('v0.22');
+          expect(settingsVer.textContent).toBe('v0.22');
 
           document.body.removeChild(badge);
           document.body.removeChild(settingsVer);
+        }
+      );
+
+      it(
+        'RecipeParser: Extracción de imagen OpenGraph (og:image) y Twitter Card',
+        {
+          purpose: 'Comprobar que recetas sin imagen Schema recuperan la imagen de alta resolución desde metadatos OpenGraph.',
+          assertions: 'Valida extracción de og:image y filtrado de avatares o logos.'
+        },
+        () => {
+          const htmlWithOg = '<html><head><meta property="og:image" content="https://media.velocidadcuchara.com/uploads/Croquetas.png"></head><body><h1>Croquetas</h1></body></html>';
+          const extractedImg = window.RecipeParser.extractImageFromHtml(htmlWithOg);
+          expect(extractedImg).toBe('https://media.velocidadcuchara.com/uploads/Croquetas.png');
+
+          const htmlWithBadImg = '<html><head><meta property="og:image" content="https://site.com/avatar_150_150.jpg"></head></html>';
+          expect(window.RecipeParser.extractImageFromHtml(htmlWithBadImg)).toBe('');
+        }
+      );
+
+      it(
+        'RecipeParser: Detección y etiquetado de Robot de Cocina (Thermomix / Mambo) y temporizadores de programa',
+        {
+          purpose: 'Comprobar detección automática de parámetros de robot culinario y extracción de tiempos con "programa X min".',
+          assertions: 'Asigna tags "Robot de Cocina" y "Thermomix", y extrae 8 minutos de "programa 8 minutos, Varoma, velocidad cuchara".'
+        },
+        () => {
+          const recipeMock = {
+            title: 'Pudin de Pan con Pasas en Thermomix',
+            tags: [],
+            instructions: [
+              { text: 'Pon en el vaso la leche y programa 8 minutos, Varoma, giro a la izquierda y velocidad cuchara.' },
+              { text: 'Tritura 20 segundos en velocidad 5-9.' }
+            ]
+          };
+
+          window.RecipeParser.detectRobotFeatures(recipeMock);
+          expect(recipeMock.tags.includes('Robot de Cocina')).toBe(true);
+          expect(recipeMock.tags.includes('Thermomix')).toBe(true);
+
+          const timer = window.RecipeParser.extractTimerMinutes(recipeMock.instructions[0].text);
+          expect(timer).toBe(8);
         }
       );
     });

@@ -468,8 +468,8 @@ const RecipeParser = {
     }
 
     // 2. Primary cooking/action duration patterns (verbs of cooking/duration)
-    // e.g. "lo que nos llevará unos 18-20 minutos", "durante 15 minutos", "hornear 45 min"
-    const primaryRegex = /(?:durante(?:\s+toda\s+la\s+cocc?i[o\u00F3]n)?|llevar[aá]\s*(?:unos?)?|cocer|cocinar|hornear|hervir|sofre[ií]r|pochar|dorar|reducir|remojo|reposar)\s+(?:unos?\s+)?(\d+(?:\s*(?:[-–—]|a|o)\s*\d+)?)\s*(minutos?|min|horas?|h\b)/gi;
+    // e.g. "lo que nos llevará unos 18-20 minutos", "durante 15 minutos", "hornear 45 min", "programa 8 minutos"
+    const primaryRegex = /(?:durante(?:\s+toda\s+la\s+cocc?i[o\u00F3]n)?|llevar[aá]\s*(?:unos?)?|cocer|cocinar|hornear|hervir|sofre[ií]r|pochar|dorar|reducir|remojo|reposar|programa|programar)\s+(?:unos?\s+)?(\d+(?:\s*(?:[-–—]|a|o)\s*\d+)?)\s*(minutos?|min|horas?|h\b)/gi;
     const primaryMatches = [...stepText.matchAll(primaryRegex)];
     if (primaryMatches.length > 0) {
       let maxVal = 0;
@@ -750,6 +750,9 @@ const RecipeParser = {
           if (imgEl) {
             imageUrl = imgEl.getAttribute('src') || imgEl.getAttribute('content') || imgEl.getAttribute('data-src') || '';
           }
+          if (!imageUrl || this.isBadImage(imageUrl)) {
+            imageUrl = this.extractImageFromHtml(html);
+          }
 
           const yieldEl = doc.querySelector('[itemprop="recipeYield"]');
           const recipeYield = yieldEl ? (yieldEl.getAttribute('content') || yieldEl.textContent.trim()) : '';
@@ -773,6 +776,76 @@ const RecipeParser = {
       } catch (e) {}
     }
     return null;
+  },
+
+  extractImageFromHtml(html) {
+    if (!html || typeof html !== 'string') return '';
+    
+    // 1. OpenGraph image (og:image)
+    const ogMatch = html.match(/<meta\s+[^>]*property=["']og:image(?::secure_url)?["'][^>]*content=["']([^"']+)["']/i) ||
+                    html.match(/<meta\s+[^>]*content=["']([^"']+)["'][^>]*property=["']og:image(?::secure_url)?["']/i);
+    if (ogMatch && ogMatch[1] && !this.isBadImage(ogMatch[1])) {
+      return this.cleanImageUrl(ogMatch[1]);
+    }
+
+    // 2. Twitter Card image (twitter:image)
+    const twMatch = html.match(/<meta\s+[^>]*name=["']twitter:image(?::src)?["'][^>]*content=["']([^"']+)["']/i) ||
+                    html.match(/<meta\s+[^>]*content=["']([^"']+)["'][^>]*name=["']twitter:image(?::src)?["']/i);
+    if (twMatch && twMatch[1] && !this.isBadImage(twMatch[1])) {
+      return this.cleanImageUrl(twMatch[1]);
+    }
+
+    // 3. Schema.org / Microdata image link
+    const schemaImgMatch = html.match(/<meta\s+[^>]*itemprop=["']image["'][^>]*content=["']([^"']+)["']/i) ||
+                           html.match(/<link\s+[^>]*rel=["']image_src["'][^>]*href=["']([^"']+)["']/i);
+    if (schemaImgMatch && schemaImgMatch[1] && !this.isBadImage(schemaImgMatch[1])) {
+      return this.cleanImageUrl(schemaImgMatch[1]);
+    }
+
+    // 4. In DOM if available (featured image, post thumbnail, recipe image)
+    if (typeof DOMParser !== 'undefined') {
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const imgCandidates = doc.querySelectorAll('.post-thumbnail img, .featured-image img, .entry-content img, .recipe-image img, article img');
+        for (const img of imgCandidates) {
+          const src = img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-lazy-src') || '';
+          if (src && !this.isBadImage(src)) {
+            return this.cleanImageUrl(src);
+          }
+        }
+      } catch (e) {}
+    }
+
+    return '';
+  },
+
+  isBadImage(url) {
+    if (!url) return true;
+    return /150_150|avatar|guest_user|author|logo|icon|favicon|98x98|16x16|32x32|gravatar|pixel\.gif|blank\.gif|emoji/i.test(url);
+  },
+
+  cleanImageUrl(url) {
+    if (!url) return '';
+    return url.replace(/&amp;/g, '&').trim();
+  },
+
+  detectRobotFeatures(recipe) {
+    if (!recipe) return;
+    const fullText = ((recipe.title || '') + ' ' + (recipe.instructions || []).map(i => i.text).join(' ')).toLowerCase();
+    const isRobot = /\b(?:varoma|velocidad\s+(?:cuchara|\d+)|giro\s+(?:a\s+la\s+izquierda|inverso)|cubilete|mariposa|cestillo|thermomix|tm\s*[356]\d*|mambo|robot\s+de\s+cocina)\b/i.test(fullText);
+    if (isRobot) {
+      if (!Array.isArray(recipe.tags)) recipe.tags = [];
+      if (!recipe.tags.includes('Robot de Cocina')) {
+        recipe.tags.push('Robot de Cocina');
+      }
+      if (/\b(?:thermomix|tm\s*[356]\d*)\b/i.test(fullText) && !recipe.tags.includes('Thermomix')) {
+        recipe.tags.push('Thermomix');
+      }
+      if (/\bmambo\b/i.test(fullText) && !recipe.tags.includes('Mambo')) {
+        recipe.tags.push('Mambo');
+      }
+    }
   },
 
   isRecipeType(typeVal) {
@@ -912,7 +985,7 @@ const RecipeParser = {
     const resolvedSourceUrl = sourceUrl || schema.mainEntityOfPage || schema.url || '';
     const resolvedDomain = this.getDomain(resolvedSourceUrl) || (schema.publisher?.name || '');
 
-    return {
+    const recipe = {
       id: 'rec-' + Date.now(),
       title: schema.name ? String(schema.name).trim() : 'Receta Web',
       description: schema.description ? String(schema.description).trim() : '',
@@ -926,6 +999,8 @@ const RecipeParser = {
       sourceUrl: resolvedSourceUrl,
       sourceDomain: resolvedDomain
     };
+    this.detectRobotFeatures(recipe);
+    return recipe;
   },
 
 
@@ -944,14 +1019,16 @@ const RecipeParser = {
       } catch (e) {}
     }
 
-    // Extract first valid food image from markdown if present
-    let candidateImage = '';
-    const imgMatches = trimmed.matchAll(/!\[.*?\]\((https?:\/\/[^\s\)]+)\)/g);
-    for (const m of imgMatches) {
-      const url = m[1];
-      if (!/150_150|avatar|guest_user|author|logo|icon|98x98|16x16/i.test(url)) {
-        candidateImage = url;
-        break;
+    // Extract first valid food image from HTML / OpenGraph or markdown
+    let candidateImage = this.extractImageFromHtml(rawText);
+    if (!candidateImage) {
+      const imgMatches = trimmed.matchAll(/!\[.*?\]\((https?:\/\/[^\s\)]+)\)/g);
+      for (const m of imgMatches) {
+        const url = m[1];
+        if (!this.isBadImage(url)) {
+          candidateImage = url;
+          break;
+        }
       }
     }
 
@@ -1235,7 +1312,7 @@ const RecipeParser = {
     }
 
     const resolvedDomain = sourceUrl ? this.getDomain(sourceUrl) : '';
-    return {
+    const recipe = {
       id: 'rec-' + Date.now(),
       title: title || 'Receta de Notas',
       description: 'Receta importada desde texto estructurado.',
@@ -1249,17 +1326,19 @@ const RecipeParser = {
       sourceUrl: sourceUrl || '',
       sourceDomain: resolvedDomain
     };
+    this.detectRobotFeatures(recipe);
+    return recipe;
   }
 };
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.21';
+  window.APP_VERSION = 'v0.22';
 }
 
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.21';
+    this.appVersion = 'v0.22';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -3555,11 +3634,12 @@ class FoodAssistantApp {
   }
 
   async handleClipboardPaste() {
+    const textarea = document.getElementById('import-text-input');
+    const status = document.getElementById('import-status-indicator');
     try {
       if (navigator.clipboard && navigator.clipboard.readText) {
         const text = await navigator.clipboard.readText();
         if (text && text.trim()) {
-          const textarea = document.getElementById('import-text-input');
           if (textarea) {
             textarea.value = text.trim();
             this.handleRecipeImport();
@@ -3570,10 +3650,14 @@ class FoodAssistantApp {
     } catch (e) {
       console.warn("Acceso directo a portapapeles no disponible:", e);
     }
-    const textarea = document.getElementById('import-text-input');
     if (textarea) {
       textarea.focus();
       textarea.select();
+      if (status) {
+        status.style.display = 'block';
+        status.style.color = 'var(--m3-on-surface-variant)';
+        status.innerHTML = '<span class="material-symbols-outlined icon-sm" style="vertical-align: middle;">help</span> Para pegar, pulsa <strong>Ctrl + V</strong> (o mantén pulsado el área de texto en móvil).';
+      }
     }
   }
 
@@ -3696,9 +3780,14 @@ class FoodAssistantApp {
               }
             }
             if (extractedRecipe && (!extractedRecipe.imageUrl || extractedRecipe.imageUrl.includes('unsplash'))) {
-              const imgMatch = html.match(/!\[.*?\]\((https?:\/\/[^\s\)]+)\)/i);
-              if (imgMatch && imgMatch[1] && !imgMatch[1].includes('150_150') && !imgMatch[1].includes('avatar')) {
-                extractedRecipe.imageUrl = imgMatch[1];
+              const detectedImg = RecipeParser.extractImageFromHtml(html);
+              if (detectedImg) {
+                extractedRecipe.imageUrl = detectedImg;
+              } else {
+                const imgMatch = html.match(/!\[.*?\]\((https?:\/\/[^\s\)]+)\)/i);
+                if (imgMatch && imgMatch[1] && !RecipeParser.isBadImage(imgMatch[1])) {
+                  extractedRecipe.imageUrl = imgMatch[1];
+                }
               }
             }
           }
