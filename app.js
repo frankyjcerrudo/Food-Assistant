@@ -692,7 +692,7 @@ const RecipeParser = {
           const cand = l
             .replace(/^[-*\u2022#\s]+/, '')
             .replace(/\s*\(\d+\)\s*$/, '')
-            .replace(/\s*(?:[\-\u2013\u2014\|]\s*(?:diegodoal|directo al paladar|recetas|cocina|blog|youtube).*)$/i, '')
+            .replace(/\s*(?:[\-\u2013\u2014\|]|â€”)\s*(?:diegodoal|directo al paladar|recetas|cocina|blog|youtube).*$/i, '')
             .replace(/["']/g, '')
             .trim();
           if (cand.length >= 4 && cand.length <= 60 && !/ingredientes|instrucciones|m[e\u00E9]todo/i.test(cand)) {
@@ -768,7 +768,7 @@ const RecipeParser = {
         detectedTitle = l
           .replace(/^#+\s*|^T[i\u00ED]tulo:\s*|^Receta\s+(?:de\s+)?/i, '')
           .replace(/^[-*\u2022#\s]+/, '')
-          .replace(/\s*(?:[\-\u2013\u2014\|]\s*(?:diegodoal|directo al paladar|recetas|cocina|blog|youtube).*)$/i, '')
+          .replace(/\s*(?:[\-\u2013\u2014\|]|â€”)\s*(?:diegodoal|directo al paladar|recetas|cocina|blog|youtube).*$/i, '')
           .replace(/["']/g, '')
           .trim();
         break;
