@@ -1175,13 +1175,13 @@ const RecipeParser = {
 };
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.19';
+  window.APP_VERSION = 'v0.20';
 }
 
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.19';
+    this.appVersion = 'v0.20';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -2334,7 +2334,6 @@ class FoodAssistantApp {
     this.render();
     this.openRecipeDetail(id);
     this.syncDataWithCloud(true);
-    alert("¡Receta guardada con éxito!");
   }
 
   // COOK MODE
@@ -3671,7 +3670,6 @@ class FoodAssistantApp {
     this.render();
     this.switchView('view-recipes');
     this.openRecipeDetail(newRecipe.id);
-    alert("Â¡Receta guardada con Ã©xito en tu colecciÃ³n!");
   }
 
   // SETTINGS
