@@ -15,7 +15,13 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
   beforeEach(() => {
     document.body.innerHTML = `
       <div class="modal-overlay" id="modal-recipe-detail">
-        <div class="modal-content"><p>Detalle Receta</p></div>
+        <div class="modal-header-bar">
+          <div id="recipe-detail-normal-actions" style="display: flex;"></div>
+          <div id="recipe-detail-review-actions" style="display: none;"></div>
+        </div>
+        <div class="modal-content">
+          <div id="recipe-modal-body"><p>Detalle Receta</p></div>
+        </div>
       </div>
       <div class="modal-overlay" id="modal-recipe-import">
         <div class="modal-content"><p>Importar Receta</p></div>
@@ -69,11 +75,6 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
   });
 
   it('openImportReview activa el modo revisión en modal-recipe-detail y permite guardar o cancelar', () => {
-    document.body.innerHTML += `
-      <div id="recipe-modal-body"></div>
-      <div id="recipe-detail-normal-actions" style="display: flex;"></div>
-      <div id="recipe-detail-review-actions" style="display: none;"></div>
-    `;
 
     const draft = {
       id: 'rec-draft-test',
