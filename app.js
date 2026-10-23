@@ -438,8 +438,30 @@ const RecipeParser = {
 
   parseIngredientLine(rawLine) {
     if (!rawLine || typeof rawLine !== 'string') return null;
-    let clean = rawLine.replace(/^([\u2022\-\*]|\d+[\.\)])\s*/, '').trim();
+
+    // Drop markdown images or image tags
+    if (/!\[.*?\]\(.*?\)|<img\b/i.test(rawLine)) return null;
+
+    let clean = rawLine
+      .replace(/!\[.*?\]\(.*?\)/g, '')
+      .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/__([^_]+)__/g, '$1')
+      .replace(/(\d+(?:[.,]\d+)?\s*(?:g|gr|kg|ml|cl|l|dl)\.?)([a-zA-Z\u00C0-\u017F])/g, '$1 $2')
+      .replace(/^([\u2022\-\*]|\d+[\.\)])\s*/, '')
+      .trim();
+
     if (!clean || this.isSectionHeader(clean)) return null;
+
+    // Reject obvious instruction / procedural lines that slipped into ingredient parsing
+    if (clean.length > 90 || /\b(?:pelamos|cortamos|batimos|mezclamos|ponemos|a[n\u00F1]adimos|dejamos|doramos|sofre[i\u00ED]mos|cocinamos|horneamos|trituramos|trocea|tritura|pela|bate|mezcla|fr[i\u00ED]e|hornea|saltea|precalienta|limpia|remueve|unta|vierte|introduce|sirve|cuajamos|escurre|reserva|se\s+(?:pelan|cortan|baten|rebozan|fr[i\u00ED]en|mezclan|presenta|ponen))\b/i.test(clean)) {
+      return null;
+    }
+
+    // Reject dates, image labels or captions
+    if (/^(?:image\s*\d+|editor\s+senior|foto\s+principal|marzo\s+de\s+\d{4}|\d+\s+de\s+[a-z]+\s+de\s+\d{4})/i.test(clean)) {
+      return null;
+    }
 
     const unitWords = 'cucharadas|cucharada|cdas|cda|cucharaditas|cucharadita|cdtas|cdta|kilogramos|kilogramo|kilos|kilo|kg|gramos|gramo|gr|litros|litro|cl|ml|tablespoons|tablespoon|tbsp|teaspoons|teaspoon|tsp|tazas|taza|cups|cup|vasos|vaso|glasses|glass|pinches|pinch|pizcas|pizca|dientes|diente|cloves|clove|rebanadas|rebanada|rodajas|rodaja|lonchas|loncha|filetes|filete|slices|slice|ramitas|ramita|ramas|rama|sprigs|sprig|stalks|stalk|hojas|hoja|leaves|leaf|latas|lata|botes|bote|cans|can|paquetes|paquete|packet|packets|packs|pack|pu\\u00F1ados|pu\\u00F1ado|chorritos|chorrito|chorro|sobres|sobre|unidades|unidad|uds|ud|units|unit|items|item|pieces|piece|counts|count|dashes|dash|ea|g|l';
 
@@ -668,11 +690,54 @@ const RecipeParser = {
       } catch (e) {}
     }
 
-    const inputLines = trimmed.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    // Extract first valid food image from markdown if present
+    let candidateImage = '';
+    const imgMatches = trimmed.matchAll(/!\[.*?\]\((https?:\/\/[^\s\)]+)\)/g);
+    for (const m of imgMatches) {
+      const url = m[1];
+      if (!/150_150|avatar|guest_user|author|logo|icon|98x98|16x16/i.test(url)) {
+        candidateImage = url;
+        break;
+      }
+    }
+
+    const rawLines = trimmed.split(/(?:\r?\n|  (?=[#A-Z0-9\*\!]))/).map(l => l.trim()).filter(Boolean);
+    if (rawLines.length === 0) return null;
+
+    const inputLines = [];
+    let detectedTitle = null;
+
+    for (const l of rawLines) {
+      if (!detectedTitle && /^Title:\s*(.+)$/i.test(l)) {
+        detectedTitle = l
+          .replace(/^Title:\s*/i, '')
+          .replace(/\s*(?:[\-\u2013\u2014\|]|—)\s*(?:diegodoal|directo al paladar|recetas|cocina|blog|youtube).*$/i, '')
+          .replace(/["']/g, '')
+          .trim();
+        continue;
+      }
+      if (/^(?:URL Source|Published Time|Markdown Content):/i.test(l)) {
+        continue;
+      }
+
+      // Clean markdown images, unwrap markdown links, unbold, fix unit spacing
+      const cleaned = l
+        .replace(/!\[.*?\]\(.*?\)/g, '')
+        .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/__([^_]+)__/g, '$1')
+        .replace(/(\d+(?:[.,]\d+)?\s*(?:g|gr|kg|ml|cl|l|dl)\.?)([a-zA-Z\u00C0-\u017F])/g, '$1 $2')
+        .trim();
+
+      if (cleaned) {
+        if (/^(?:Image \d+:|Editor Senior|\d+\s*votos)/i.test(cleaned)) continue;
+        inputLines.push(cleaned);
+      }
+    }
+
     if (inputLines.length === 0) return null;
 
-    // --- Pre-pass: Detect Title if present as "CÃ³mo hacer [TÃ­tulo]" or similar anywhere ---
-    let detectedTitle = null;
+    // --- Pre-pass: Detect Title if present as "Cómo hacer [Título]" or similar anywhere ---
     for (const l of inputLines) {
       const comoMatch = l.match(/^c[o\u00F3]mo hacer\s+(?:un\s+|una\s+|el\s+|la\s+|los\s+|las\s+)?(.+)$/i);
       if (comoMatch && comoMatch[1] && comoMatch[1].length > 2) {
@@ -788,15 +853,38 @@ const RecipeParser = {
       const line = lines[i];
       if (i === titleIdx) continue;
 
+      // Stop parsing instructions on footer sections (ratings, related tips, comments, author, dates)
+      if (currentSection === 'instructions') {
+        if (/^(?:#+\s*(?:con qu[e\u00E9]\s+acompa[n\u00F1]ar|trucos\s+y\s+consejos|trucos|consejos|truco|notas|nota|curiosidades|informaci[o\u00F3]n\s+nutricional|resumen\s+f[a\u00E1]cil|dale\s+un\s+toque|variaciones|m[a\u00E1]s\s+recetas|recetas\s+recomendadas|otras\s+recetas|te\s+puede\s+interesar|comentarios|sobre\s+el\s+autor|autor|comparte|cooksnap|\?has\s+hecho\s+la\s+receta)|(?:dale\s+un\s+toque|trucos\s+y\s+consejos|c[o\u00F3]mo\s+conseguir\s+que|un\s+truco\s+para\s+que|\?has\s+hecho\s+la\s+receta|comparte\s+una\s+cooksnap|suscr[i\u00ED]bete|ver\s+todos\s+los\s+comentarios|En DAP\s*\||\d+\s*votos)|^(?:\d+\s+de\s+)?[a-z]+\s+de\s+\d{4})/i.test(line)) {
+          currentSection = 'end';
+          continue;
+        }
+      }
+      if (currentSection === 'end') continue;
+
       // Section switches
-      if (/^(?:ingredientes|lista de ingredientes|lo que necesitas):?$/i.test(line) || /^#+\s*ingredientes/i.test(line)) {
+      if (/^(?:#+\s*)?(?:ingredientes|lista de ingredientes|lo que necesitas):?$/i.test(line) || /^#+\s*ingredientes\b/i.test(line)) {
         currentSection = 'ingredients';
         continue;
       }
 
-      if (/^(?:instrucciones|preparaci[o\u00F3]n|pasos|elaboraci[o\u00F3]n|m[e\u00E9]todo|procedimiento|modo de preparaci[o\u00F3]n|c[o\u00F3]mo hacer(?:lo)?|paso a paso):?$/i.test(line) || /^#+\s*(?:instrucciones|pasos|preparaci[o\u00F3]n|elaboraci[o\u00F3]n|m[e\u00E9]todo|c[o\u00F3]mo hacer)/i.test(line)) {
+      if (/^(?:#+\s*)?(?:receta(?:\s+de\b[^\n:]*)?|c[o\u00F3]mo\s+(?:hacer|preparar|cocinar)\b[^\n:]*|instrucciones|preparaci[o\u00F3]n|elaboraci[o\u00F3]n|pasos(?:\s+a\s+seguir)?|m[e\u00E9]todo|procedimiento|modo\s+de\s+preparaci[o\u00F3]n|paso\s+a\s+paso):?$/i.test(line) || /^#+\s*(?:receta|instrucciones|pasos|preparaci[o\u00F3]n|elaboraci[o\u00F3]n|m[e\u00E9]todo|c[o\u00F3]mo hacer)/i.test(line)) {
         currentSection = 'instructions';
         continue;
+      }
+
+      // Automatic transition: if we are in ingredients or unassigned, and line is clearly an instruction step
+      const isInstructionAction = (str) => {
+        if (!str || str.length < 15) return false;
+        if (/^\d+[\.\)]\s*(?:\d+[\.\)]\s*)?/.test(str)) return true;
+        if (/\b(?:se\s+(?:pelan|cortan|baten|rebozan|fr[i\u00ED]en|mezclan|presenta|ponen|agregan|dejan|sirven)|pelamos|cortamos|batimos|mezclamos|ponemos|a[n\u00F1]adimos|dejamos|doramos|sofre[i\u00ED]mos|cocinamos|horneamos|trituramos|trocea|tritura|pela|bate|mezcla|fr[i\u00ED]e|hornea|saltea|precalienta|limpia|remueve|unta|vierte|introduce|sirve|cuajamos|escurre|reserva)\b/i.test(str)) {
+          return true;
+        }
+        return false;
+      };
+
+      if ((currentSection === 'ingredients' || !currentSection) && isInstructionAction(line)) {
+        currentSection = 'instructions';
       }
 
       // Metadata (servings, times) - only evaluate outside instructions
@@ -833,22 +921,6 @@ const RecipeParser = {
         continue;
       }
 
-      // Skip title duplicate lines like "Cómo hacer..."
-      if (/^#*\s*c[o\u00F3]mo hacer/i.test(line) || /paso a paso$/i.test(line)) {
-        if (!currentSection || currentSection === 'ingredients') {
-          currentSection = 'instructions';
-        }
-        continue;
-      }
-
-      // Stop parsing instructions on footer sections (ratings, related, comments)
-      if (currentSection === 'instructions') {
-        if (/^(?:#+\s*(?:con qu[e\u00E9]|m[a\u00E1]s recetas|en directo|temas|comentarios|sobre el autor)|^\d\s+\d\s+\d\s+|^\d+\s*votos)/i.test(line)) {
-          currentSection = 'end';
-          continue;
-        }
-      }
-
       // Parsing items according to active section
       if (currentSection === 'ingredients') {
         const parsed = this.parseIngredientLine(line);
@@ -857,8 +929,12 @@ const RecipeParser = {
         if (this.isSectionHeader(line)) {
           continue;
         }
-        const stepText = line.replace(/^[#*\-\u2022\s]+/, '').replace(/^\d+[\.\)]\s*|^paso\s*\d+[:\.\-]\s*/i, '').trim();
-        if (stepText && stepText.length > 3) {
+        const stepText = line
+          .replace(/^[#*\-\u2022\s]+/, '')
+          .replace(/^\d+[\.\)]\s*(?:\d+[\.\)]\s*)?|^paso\s*\d+[:\.\-]\s*/i, '')
+          .trim();
+
+        if (stepText && stepText.length > 5 && !/^(?:Image \d+|Dificultad:|Tiempo total|\* Tiempo)/i.test(stepText)) {
           const timerMatch = stepText.match(/(?:durante|por|hervir|cocer|hornear|reposar)?\s*(\d+)\s*(?:min|minutos)/i) ||
                              stepText.match(/(?:durante|por|hervir|cocer|hornear|reposar)?\s*(\d+)\s*(?:h|hora|horas)/i);
           let timerMin = null;
@@ -885,7 +961,7 @@ const RecipeParser = {
       id: 'rec-' + Date.now(),
       title: title || 'Receta de Notas',
       description: 'Receta importada desde texto estructurado.',
-      imageUrl: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop&q=80',
+      imageUrl: candidateImage || 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop&q=80',
       prepTimeMinutes: prepTimeMinutes,
       cookTimeMinutes: cookTimeMinutes,
       servings: servings,

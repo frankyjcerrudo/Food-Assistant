@@ -426,4 +426,183 @@ Bocadillo De Atun Paso A Paso
     expect(recipe.instructions.length).toBeGreaterThanOrEqual(3);
     expect(recipe.sourceDomain).toBe('directoalpaladar.com');
   });
+
+  it('procesa correctamente recetas de Directo al Paladar con título "paso a paso" y metadatos de Jina', () => {
+    const rawDirecto = [
+      'Title: Tortilla de patatas con cebolla: receta tradicional española paso a paso',
+      'URL Source: https://www.directoalpaladar.com/recetas-de-huevos-y-tortillas/empezando-en-la-cocina-receta-de-tortilla-de-patatas-con-cebolla/amp',
+      'Published Time: 2026-09-16T14:53:16Z',
+      'Markdown Content:',
+      '![Image 1: Tortilla Patata](https://i.blogs.es/93cdb8/tortilla_patata/650_1200.jpg)',
+      '16 septiembre 2026, 16:53',
+      '![Image 2: pakus](https://i.blogs.es/093f03/blob/150_150.jpeg)',
+      'Editor Senior',
+      '',
+      '## Ingredientes',
+      'Para 4 personas',
+      '* Patata 4',
+      '* Huevo 4',
+      '* Cebolla 1',
+      '* Aceite de oliva virgen extra',
+      '* Sal',
+      '',
+      '## Cómo hacer tortilla de patatas con cebolla tradicional',
+      'Comenzamos con la tarea más larga, la de caramelizar la cebolla que nos llevará unos 30 minutos.',
+      'Mientras la cebolla se hace, pelamos las patatas y las cortamos en rodajas finas durante 15 minutos.',
+      'Cuajamos la tortilla en una sartén caliente 3 minutos por lado.',
+      '',
+      'En DAP | Tortilla de patatas con Thermomix'
+    ].join('\n');
+
+    const recipe = RecipeParser.parseRecipeText(rawDirecto, 'https://www.directoalpaladar.com/recetas-de-huevos-y-tortillas/tortilla');
+    expect(recipe).not.toBeNull();
+    expect(recipe.title).toContain('Tortilla de patatas con cebolla');
+    expect(recipe.servings).toBe(4);
+    expect(recipe.ingredients.length).toBeGreaterThanOrEqual(4);
+    expect(recipe.instructions.length).toBe(3);
+    // Ensure metadata was NOT added as instruction steps
+    expect(recipe.instructions[0].text).toContain('caramelizar la cebolla');
+    expect(recipe.instructions.some(i => i.text.includes('URL Source') || i.text.includes('Editor Senior'))).toBe(false);
+  });
+
+  it('elimina imágenes inline markdown de ingredientes e instrucciones (caso Bon Viveur)', () => {
+    const rawBonViveur = [
+      'Title: Risotto de boletus: una receta italiana exquisita y muy fácil de preparar',
+      'URL Source: https://bonviveur.com/es/recetas/risotto-de-boletus?hl=es-ES',
+      '',
+      '## Ingredientes del risotto de boletus',
+      '* 20 g de boletus deshidratados',
+      '* 180 g de arroz para risotto',
+      '* 500 ml de caldo de verduras',
+      '* 2 cda de aceite de oliva virgen extra',
+      '![Image 2: Ingredientes para preparar el risotto de boletus](https://imag.bonviveur.com/ingredientes-para-preparar-el-risotto-de-boletus.jpg)',
+      '',
+      '## Cómo hacer el risotto de boletus',
+      '![Image 3: Rehidratar boletus para hacer el risotto](https://imag.bonviveur.com/rehidratar-boletus-para-hacer-el-risotto.jpg)',
+      'Para hacer el risotto de boletus lo primero que hay que hacer es rehidratar 20 g de boletus deshidratados en agua tibia durante 20 minutos.',
+      '![Image 4: Picar boletus para hacer el risotto](https://imag.bonviveur.com/picar-boletus-para-hacer-el-risotto.jpg)',
+      'Transcurrido este tiempo, escurrimos y picamos los boletus, y reservamos el agua de hidratación.',
+      'Pelamos y cortamos 1 diente de ajo en láminas y picamos media cebolla.',
+      'María Ángeles Fernández Viajera gastronómica y periodista intrépida.'
+    ].join('\n');
+
+    const recipe = RecipeParser.parseRecipeText(rawBonViveur, 'https://bonviveur.com/es/recetas/risotto-de-boletus');
+    expect(recipe).not.toBeNull();
+    // No images in ingredients
+    expect(recipe.ingredients.some(i => i.name.includes('Image') || i.name.includes('bonviveur'))).toBe(false);
+    expect(recipe.ingredients.length).toBe(4);
+    // No images in instructions
+    expect(recipe.instructions.some(i => i.text.includes('Image') || i.text.includes('bonviveur'))).toBe(false);
+    expect(recipe.instructions.length).toBe(3);
+    expect(recipe.instructions[0].text).toContain('rehidratar 20 g de boletus');
+  });
+
+  it('reconoce cabeceras tipo "### RECETA DE..." y no confunde pasos con ingredientes (caso Javi Recetas)', () => {
+    const rawSalmorejo = [
+      'Title: SALMOREJO CORDOBÉS - Receta Súper FÁCIL - Javi Recetas',
+      'URL Source: https://www.javirecetas.com/salmorejo-cordobes/',
+      '',
+      '## INGREDIENTES PARA EL SALMOREJO:',
+      '* 500 g de tomates maduros',
+      '* 100 g de pan',
+      '* 50 ml de aceite de oliva',
+      '* 1/2 diente de ajo',
+      '* 1/2 cucharada pequeña con sal fina',
+      '* Para acompañar: huevo duro y jamón serrano a taquitos',
+      '',
+      '### RECETA DE SALMOREJO CORDOBÉS:',
+      '1. Opcional: Yo antes pelaba los tomates para que el salmorejo quedara más fino.',
+      '2. Corta los tomates en trozos y ponlos en el vaso de una batidora y tritura todo bien.',
+      '3. Trocea el pan y ponlo en un recipiente hondo. Añade por encima el tomate triturado.',
+      '4. Pela el ajo y quítale el centro para que no repita. Añádelo al pan y al tomate.',
+      '5. Añade el aceite y la sal fina. Tritura todo durante un buen rato hasta que quede fino.'
+    ].join('\n');
+
+    const recipe = RecipeParser.parseRecipeText(rawSalmorejo, 'https://www.javirecetas.com/salmorejo-cordobes/');
+    expect(recipe).not.toBeNull();
+    // Ingredients should only contain the actual ingredients
+    expect(recipe.ingredients.length).toBe(6);
+    expect(recipe.ingredients.some(i => i.name.toLowerCase().includes('tritura') || i.name.toLowerCase().includes('trocea'))).toBe(false);
+    // Instructions should contain the 5 cooking steps
+    expect(recipe.instructions.length).toBe(5);
+    expect(recipe.instructions[1].text).toContain('Corta los tomates en trozos');
+  });
+
+  it('termina la captura de instrucciones antes de los consejos y trucos del blog (caso Hogarmania)', () => {
+    const rawHogarmania = [
+      'Title: Karlos Arguiñano te enseña cómo hacer pollo al horno jugoso y crujiente',
+      'URL Source: https://www.hogarmania.com/cocina/recetas/carnes/pollo-al-horno.html',
+      '',
+      '## Ingredientes',
+      '* 1 pollo entero limpio',
+      '* 3 patatas',
+      '* 1 cebolla',
+      '* 1 vaso de vino blanco',
+      '',
+      '## Cómo hacer un pollo asado al horno',
+      '1. Precalienta el horno a 180º con calor arriba y abajo.',
+      '2. Sazona el pollo por dentro y por fuera y colócalo en la bandeja durante 45 minutos.',
+      '3. Sirve el pollo asado en un plato con su guarnición.',
+      '',
+      '## Dale un toque más de sabor a tu pollo al horno',
+      'Karlos Arguiñano nos propone hacer la receta de pollo asado con manzana para darle un extra de dulzor.',
+      'Pela las manzanas y córtalas en rodajas.',
+      '## Trucos y consejos para preparar pollo al horno',
+      'Cómo conseguir que el pollo al horno quede jugoso'
+    ].join('\n');
+
+    const recipe = RecipeParser.parseRecipeText(rawHogarmania, 'https://www.hogarmania.com/cocina/recetas/carnes/pollo-al-horno.html');
+    expect(recipe).not.toBeNull();
+    expect(recipe.ingredients.length).toBe(4);
+    // Should stop before "Dale un toque más..."
+    expect(recipe.instructions.length).toBe(3);
+    expect(recipe.instructions[2].text).toContain('Sirve el pollo asado');
+    expect(recipe.instructions.some(i => i.text.includes('Dale un toque') || i.text.includes('Trucos y consejos'))).toBe(false);
+  });
+
+  it('soporta recetas sin cabecera de instrucciones, enlaces en ingredientes y numeración doble (caso Cookpad)', () => {
+    const rawCookpad = [
+      'Title: Buñuelos De Manzana "Finisterre" Receta de carme castillo',
+      'URL Source: https://cookpad.com/es/recetas/111818',
+      'Markdown Content:',
+      '6 raciones',
+      '* 600 gr manzanas',
+      '* 1/2 litro aceite',
+      '* 200 gr[harina](https://cookpad.com/es/buscar/harina)',
+      '* 25 gr azúcar',
+      '* 200 gr mermelada de fresa',
+      '* 2 huevos',
+      '* 2 dl.[cerveza](https://cookpad.com/es/buscar/cerveza)',
+      '* 1 copita[ron](https://cookpad.com/es/buscar/ron)',
+      '',
+      '1.   1 Se pelan las manzanas y se cortan en rodajas de 1/2 ml de grosor, eliminando el corazón.',
+      '2.   2 En un bowl preparar la harina, con la yema de los dos huevos, una pizca de sal y la cerveza.',
+      '3.   3 A continuación se baten las claras de huevo a punto de nieve y se agregan a la mezcla.',
+      '4.   4 Con la mezcla que hemos hecho, se rebozan las rodajas de manzana y se fríen en aceite caliente.',
+      '5.   5 Se presenta en una bandeja o plato y antes de servirlas se cubren con mermelada.',
+      '',
+      '11 de marzo de 2010',
+      '![Image 4: Foto principal de Buñuelos de manzana](https://img-global.cpcdn.com/recipes/cef86bab5d23afa3/240x320cq80/photo.jpg)'
+    ].join('\n');
+
+    const recipe = RecipeParser.parseRecipeText(rawCookpad, 'https://cookpad.com/es/recetas/111818');
+    expect(recipe).not.toBeNull();
+    expect(recipe.servings).toBe(6);
+    // Ingredients should parse 8 items with cleaned names (no markdown link syntax)
+    expect(recipe.ingredients.length).toBe(8);
+    const harina = recipe.ingredients.find(i => i.name.toLowerCase().includes('harina'));
+    expect(harina).toBeDefined();
+    expect(harina.amount).toBe(200);
+    expect(harina.unit).toBe('g');
+    expect(harina.name).not.toContain('(');
+
+    // Numbered steps with action verbs automatically detected as instructions
+    expect(recipe.instructions.length).toBe(5);
+    // Double numbering cleaned
+    expect(recipe.instructions[0].text).not.toMatch(/^1\b/);
+    expect(recipe.instructions[0].text).toContain('Se pelan las manzanas');
+
+    // Date and footer image not in ingredients
+    expect(recipe.ingredients.some(i => i.name.includes('marzo') || i.name.includes('Image'))).toBe(false);
+  });
 });
