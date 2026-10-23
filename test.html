@@ -364,6 +364,10 @@
         toContain(expected) {
           const hasIt = Array.isArray(actual) ? actual.includes(expected) : (typeof actual === 'string' ? actual.includes(expected) : false);
           if (!hasIt) throw new Error(`Se esperaba que contuviera ${JSON.stringify(expected)}`);
+        },
+        toMatch(pattern) {
+          const isMatch = pattern instanceof RegExp ? pattern.test(String(actual)) : new RegExp(pattern).test(String(actual));
+          if (!isMatch) throw new Error(`Se esperaba que ${JSON.stringify(actual)} coincidiera con el patrón ${pattern}`);
         }
       };
       matchers.not = {
@@ -379,6 +383,10 @@
         toContain(expected) {
           const hasIt = Array.isArray(actual) ? actual.includes(expected) : (typeof actual === 'string' ? actual.includes(expected) : false);
           if (hasIt) throw new Error(`No se esperaba que contuviera ${JSON.stringify(expected)}`);
+        },
+        toMatch(pattern) {
+          const isMatch = pattern instanceof RegExp ? pattern.test(String(actual)) : new RegExp(pattern).test(String(actual));
+          if (isMatch) throw new Error(`No se esperaba que ${JSON.stringify(actual)} coincidiera con el patrón ${pattern}`);
         }
       };
       return matchers;
