@@ -527,7 +527,9 @@ const RecipeParser = {
     }
 
     // Reject obvious instruction / procedural lines that slipped into ingredient parsing
-    if (clean.length > 90 || /\b(?:pelamos|cortamos|batimos|mezclamos|ponemos|a[n\u00F1]adimos|dejamos|doramos|sofre[i\u00ED]mos|cocinamos|horneamos|trituramos|trocea|tritura|pela|bate|mezcla|fr[i\u00ED]e|hornea|saltea|precalienta|limpia|remueve|unta|vierte|introduce|sirve|cuajamos|escurre|reserva|se\s+(?:pelan|cortan|baten|rebozan|fr[i\u00ED]en|mezclan|presenta|ponen))\b/i.test(clean)) {
+    if (clean.length > 95 || 
+        /^(?:limpia|remueve|unta|vierte|introduce|sirve|bate|hornea|saltea|precalienta|pela|trocea|fr[i\u00ED]e)\b/i.test(clean) ||
+        /\b(?:pelamos|cortamos|batimos|mezclamos|ponemos|a[n\u00F1]adimos|dejamos|doramos|sofre[i\u00ED]mos|cocinamos|horneamos|trituramos|se\s+(?:pelan|cortan|baten|rebozan|fr[i\u00ED]en|mezclan|presenta|ponen))\b/i.test(clean)) {
       return null;
     }
 
@@ -696,7 +698,13 @@ const RecipeParser = {
 
     while ((match = scriptRegex.exec(html)) !== null) {
       try {
-        const rawJson = match[1].trim();
+        let rawJson = match[1].trim();
+        // Strip comments from JSON-LD (common in WordPress plugins / blogs like Javi Recetas)
+        rawJson = rawJson.replace(/\/\*[\s\S]*?\*\//g, '');
+        rawJson = rawJson.replace(/^[ \t]*\/\/[^\r\n]*/gm, '');
+        rawJson = rawJson.replace(/([,;\{\}\[\]])[ \t]*\/\/[^\r\n]*/g, '$1');
+        // Clean unescaped carriage returns inside strings before quotes (common in Javi Recetas CMS)
+        rawJson = rawJson.replace(/[\r\n]+(?=\s*")/g, '');
         const parsed = JSON.parse(rawJson);
         if (Array.isArray(parsed)) {
           jsonObjects.push(...parsed);
@@ -714,6 +722,55 @@ const RecipeParser = {
       if (this.isRecipeType(item['@type'])) {
         return item;
       }
+    }
+    return null;
+  },
+
+  extractMicrodataRecipe(html) {
+    if (!html || typeof html !== 'string') return null;
+    if (!/itemprop=["'](?:recipeIngredient|ingredients|recipeInstructions)["']/i.test(html)) return null;
+
+    if (typeof DOMParser !== 'undefined') {
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+
+        const ingEls = doc.querySelectorAll('[itemprop="recipeIngredient"], [itemprop="ingredients"]');
+        const instEls = doc.querySelectorAll('[itemprop="recipeInstructions"]');
+
+        if (ingEls.length > 0 || instEls.length > 0) {
+          const ingredients = Array.from(ingEls).map(el => el.textContent.trim()).filter(Boolean);
+          const instructions = Array.from(instEls).map(el => el.textContent.trim()).filter(Boolean);
+
+          const titleEl = doc.querySelector('[itemprop="name"]') || doc.querySelector('h1');
+          const title = titleEl ? titleEl.textContent.trim() : '';
+
+          const imgEl = doc.querySelector('[itemprop="image"]');
+          let imageUrl = '';
+          if (imgEl) {
+            imageUrl = imgEl.getAttribute('src') || imgEl.getAttribute('content') || imgEl.getAttribute('data-src') || '';
+          }
+
+          const yieldEl = doc.querySelector('[itemprop="recipeYield"]');
+          const recipeYield = yieldEl ? (yieldEl.getAttribute('content') || yieldEl.textContent.trim()) : '';
+
+          const prepEl = doc.querySelector('[itemprop="prepTime"]');
+          const cookEl = doc.querySelector('[itemprop="cookTime"]');
+          const totalEl = doc.querySelector('[itemprop="totalTime"]');
+
+          return {
+            '@type': 'Recipe',
+            name: title,
+            image: imageUrl,
+            recipeYield: recipeYield,
+            prepTime: prepEl ? (prepEl.getAttribute('content') || prepEl.textContent) : '',
+            cookTime: cookEl ? (cookEl.getAttribute('content') || cookEl.textContent) : '',
+            totalTime: totalEl ? (totalEl.getAttribute('content') || totalEl.textContent) : '',
+            recipeIngredient: ingredients,
+            recipeInstructions: instructions
+          };
+        }
+      } catch (e) {}
     }
     return null;
   },
@@ -742,6 +799,9 @@ const RecipeParser = {
         const doc = parser.parseFromString(html, 'text/html');
         ['script', 'style', 'nav', 'header', 'footer', 'aside', 'svg', 'noscript'].forEach(tag => {
           doc.querySelectorAll(tag).forEach(el => el.remove());
+        });
+        doc.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6, li, tr, hr, br').forEach(el => {
+          el.insertAdjacentText('afterend', '\n');
         });
         const text = doc.body ? (doc.body.innerText || doc.body.textContent || '') : '';
         if (text && text.trim().length > 50) {
@@ -783,15 +843,26 @@ const RecipeParser = {
 
     const rawIngredients = schema.recipeIngredient || schema.ingredients || [];
     const ingredients = [];
+    let linesToParse = [];
     if (Array.isArray(rawIngredients)) {
-      rawIngredients.forEach(line => {
-        const parsed = this.parseIngredientLine(String(line));
-        if (parsed) {
-          if (Array.isArray(parsed)) ingredients.push(...parsed);
-          else ingredients.push(parsed);
-        }
-      });
+      if (rawIngredients.length === 1 && typeof rawIngredients[0] === 'string' && rawIngredients[0].includes(',')) {
+        linesToParse = rawIngredients[0].split(',').map(s => s.trim()).filter(Boolean);
+      } else {
+        linesToParse = rawIngredients;
+      }
+    } else if (typeof rawIngredients === 'string') {
+      if (rawIngredients.includes('\n')) linesToParse = rawIngredients.split(/\r?\n/);
+      else if (rawIngredients.includes(',')) linesToParse = rawIngredients.split(',');
+      else linesToParse = [rawIngredients];
     }
+
+    linesToParse.forEach(line => {
+      const parsed = this.parseIngredientLine(String(line));
+      if (parsed) {
+        if (Array.isArray(parsed)) ingredients.push(...parsed);
+        else ingredients.push(parsed);
+      }
+    });
 
     const rawInstructions = schema.recipeInstructions || schema.instructions || [];
     const instructions = [];
@@ -1044,7 +1115,7 @@ const RecipeParser = {
         const isFooterStop = /^(?:#+\s*(?:con qu[e\u00E9]\s+acompa[n\u00F1]ar|trucos\s+y\s+consejos|trucos|consejos|truco|notas|nota|curiosidades|informaci[o\u00F3]n\s+nutricional|resumen\s+f[a\u00E1]cil|dale\s+un\s+toque|variaciones|m[a\u00E1]s\s+recetas|recetas\s+recomendadas|otras\s+recetas|te\s+puede\s+interesar|comentarios|sobre\s+el\s+autor|autor|comparte|cooksnap|[¿\?]?\s*has\s+hecho\s+la\s+receta)|(?:dale\s+un\s+toque|trucos\s+y\s+consejos|c[o\u00F3]mo\s+conseguir\s+que|un\s+truco\s+para\s+que|[¿\?]?\s*has\s+hecho\s+la\s+receta|comparte\s+(?:una|tu)\s+cooksnap|suscr[i\u00ED]bete|ver\s+todos\s+los\s+comentarios|En DAP\s*\||\d+\s*votos)|^(?:\d+\s+de\s+)?[a-z]+\s+de\s+\d{4})/i.test(line) ||
           /\b(?:viajer[ao]\s+gastron[o\u00F3]mic[ao]|periodista|editor\s+senior|cooksnap)\b/i.test(line) ||
           /[¿\?]?\s*has\s+hecho\s+la\s+receta/i.test(line) ||
-          /^(?:anterior\s+entrada|siguiente\s+entrada|te\s+va\s+a\s+encantar|previous|next|entradas?\s+relacionadas?|art[i\u00ED]culos?\s+relacionados?|recetas?\s+relacionadas?)/i.test(line) ||
+          /^(?:anterior\s+entrada|siguiente\s+entrada|te\s+va\s+a\s+encantar|previous|next|entradas?\s+relacionadas?|art[i\u00ED]culos?\s+relacionados?|recetas?\s+relacionadas?|deja\s+(?:un|tu)\s+comentario|\d+\s+comentarios?|comentarios?\s*(?:\(\d+\)|:\s*\d+)?|deja\s+una\s+respuesta|cancelar\s+la\s+respuesta|tu\s+direcci[o\u00F3]n\s+de\s+correo|guardar\s+mi\s+nombre|notif[i\u00ED]came|votar\s+y\s+compartir)/i.test(line) ||
           /^\[\s*\]\(https?:\/\//i.test(line);
 
         if (isFooterStop) {
@@ -1055,8 +1126,12 @@ const RecipeParser = {
       if (currentSection === 'end') continue;
 
       // Section switches
-      if (/^(?:#+\s*)?(?:ingredientes|lista de ingredientes|lo que necesitas):?$/i.test(line) || /^#+\s*ingredientes\b/i.test(line)) {
+      if (/^(?:#+\s*)?(?:ingredientes(?:\s+(?:para|de|necesarios)\b[^\n:]*)?|lista de ingredientes|lo que necesitas):?$/i.test(line) || /^#+\s*ingredientes\b/i.test(line)) {
         currentSection = 'ingredients';
+        const servM = line.match(/(?:para|rinde|de)\s+(\d+)\s*(?:personas|raciones|porciones|comensales)/i);
+        if (servM) {
+          servings = parseInt(servM[1], 10);
+        }
         continue;
       }
 
@@ -1065,18 +1140,21 @@ const RecipeParser = {
         continue;
       }
 
-      // Automatic transition: if we are in ingredients or unassigned, and line is clearly an instruction step
+      // Automatic transition: only if unassigned or if line is a clear step action
       const isInstructionAction = (str) => {
         if (!str || str.length < 15) return false;
         if (/^\[.*?\]\(.*?\)$/.test(str)) return false;
         if (/^\d+[\.\)]\s*\[/.test(str)) return false;
-        if (/\b(?:se\s+(?:pelan|cortan|baten|rebozan|fr[i\u00ED]en|mezclan|presenta|ponen|agregan|dejan|sirven)|pelamos|cortamos|batimos|mezclamos|ponemos|a[n\u00F1]adimos|dejamos|doramos|sofre[i\u00ED]mos|cocinamos|horneamos|trituramos|trocea|tritura|pela|bate|mezcla|fr[i\u00ED]e|hornea|saltea|precalienta|limpia|remueve|unta|vierte|introduce|sirve|cuajamos|escurre|reserva)\b/i.test(str)) {
+        if (/^(?:limpia|remueve|unta|vierte|introduce|sirve|bate|hornea|saltea|precalienta|pela|trocea|fr[i\u00ED]e)\b/i.test(str)) {
+          return true;
+        }
+        if (/\b(?:se\s+(?:pelan|cortan|baten|rebozan|fr[i\u00ED]en|mezclan|presenta|ponen|agregan|dejan|sirven)|pelamos|cortamos|batimos|mezclamos|ponemos|a[n\u00F1]adimos|dejamos|doramos|sofre[i\u00ED]mos|cocinamos|horneamos|trituramos)\b/i.test(str)) {
           return true;
         }
         return false;
       };
 
-      if ((currentSection === 'ingredients' || !currentSection) && isInstructionAction(line)) {
+      if (!currentSection && isInstructionAction(line)) {
         currentSection = 'instructions';
       }
 
@@ -1175,13 +1253,13 @@ const RecipeParser = {
 };
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.20';
+  window.APP_VERSION = 'v0.21';
 }
 
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.20';
+    this.appVersion = 'v0.21';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -3571,8 +3649,13 @@ class FoodAssistantApp {
               if (resp.ok) {
                 const textResp = await resp.text();
                 if (textResp && textResp.length > 80) {
-                  // Detect true 404 / missing pages in response header or title
-                  if (/^404\s+not\s+found|<title>.*?(?:404|not found|no encontrada).*?<\/title>|^Title:\s*404/i.test(textResp.substring(0, 1000))) {
+                  // Detect Cloudflare Turnstile / Managed challenge anti-bot
+                  if (/<title>.*?(?:Just a moment|Cloudflare|Security Check).*?<\/title>|cf-turnstile|__cf_chl/i.test(textResp.substring(0, 2000))) {
+                    if (corsBanner) corsBanner.style.display = 'block';
+                    throw new Error("Esta web cuenta con protección activa anti-scraping (Cloudflare). Puedes importar la receta al instante copiando y pegando su texto en la pestaña 'Texto / Notas'.");
+                  }
+                  // Detect true 404 / missing pages in response header or title (including DAP & SPA Next.js 404s)
+                  if (/^404\s+not\s+found|<title>.*?(?:404|not\s+found|no\s+encontrada|no\s+se\s+ha\s+encontrado).*?<\/title>|^Title:\s*404|"(?:page|statusCode)":\s*"(?:\/error-pages\/not-found|404)"/i.test(textResp.substring(0, 3000))) {
                     is404OrEmpty = true;
                     fetchSuccess = true;
                     break;
@@ -3589,20 +3672,33 @@ class FoodAssistantApp {
           }
 
           if (html && !is404OrEmpty) {
-            const schemaObj = RecipeParser.extractJsonLdFromHtml(html);
+            const schemaObj = RecipeParser.extractJsonLdFromHtml(html) || RecipeParser.extractMicrodataRecipe(html);
             if (schemaObj) {
               extractedRecipe = RecipeParser.parseSchemaRecipe(schemaObj, cleanUrl);
-            } else {
-              // Fallback to text / markdown parsing
+            }
+            // If schema parsing yielded no recipe, or 0 ingredients, or 0 instructions, try text parser to complement or replace
+            if (!extractedRecipe || extractedRecipe.ingredients.length === 0 || extractedRecipe.instructions.length === 0) {
               const extractedText = RecipeParser.htmlToText(html);
               if (extractedText) {
-                extractedRecipe = RecipeParser.parseRecipeText(extractedText, cleanUrl);
-                if (extractedRecipe && (!extractedRecipe.imageUrl || extractedRecipe.imageUrl.includes('unsplash'))) {
-                  const imgMatch = html.match(/!\[.*?\]\((https?:\/\/[^\s\)]+)\)/i);
-                  if (imgMatch && imgMatch[1] && !imgMatch[1].includes('150_150') && !imgMatch[1].includes('avatar')) {
-                    extractedRecipe.imageUrl = imgMatch[1];
+                const textRecipe = RecipeParser.parseRecipeText(extractedText, cleanUrl);
+                if (textRecipe) {
+                  if (!extractedRecipe) {
+                    extractedRecipe = textRecipe;
+                  } else {
+                    if (extractedRecipe.ingredients.length === 0 && textRecipe.ingredients.length > 0) {
+                      extractedRecipe.ingredients = textRecipe.ingredients;
+                    }
+                    if (extractedRecipe.instructions.length === 0 && textRecipe.instructions.length > 0) {
+                      extractedRecipe.instructions = textRecipe.instructions;
+                    }
                   }
                 }
+              }
+            }
+            if (extractedRecipe && (!extractedRecipe.imageUrl || extractedRecipe.imageUrl.includes('unsplash'))) {
+              const imgMatch = html.match(/!\[.*?\]\((https?:\/\/[^\s\)]+)\)/i);
+              if (imgMatch && imgMatch[1] && !imgMatch[1].includes('150_150') && !imgMatch[1].includes('avatar')) {
+                extractedRecipe.imageUrl = imgMatch[1];
               }
             }
           }
