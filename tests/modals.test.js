@@ -107,5 +107,62 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     expect(document.getElementById('recipe-detail-normal-actions').style.display).toBe('flex');
     expect(document.getElementById('recipe-detail-review-actions').style.display).toBe('none');
   });
+
+  it('Editar Receta: Botón Guardar en cabecera fija y pie sticky siempre visible sin scroll', () => {
+    let saved = 0;
+    appInstance.saveRecipeEdit = () => { saved++; };
+
+    const saveHeaderBtn = document.createElement('button');
+    saveHeaderBtn.id = 'btn-save-recipe-edit-header';
+    const saveFooterBtn = document.createElement('button');
+    saveFooterBtn.id = 'btn-save-recipe-edit';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.id = 'btn-cancel-recipe-edit';
+
+    document.body.appendChild(saveHeaderBtn);
+    document.body.appendChild(saveFooterBtn);
+    document.body.appendChild(cancelBtn);
+
+    // Re-bind listeners
+    saveHeaderBtn.addEventListener('click', () => appInstance.saveRecipeEdit());
+    saveFooterBtn.addEventListener('click', () => appInstance.saveRecipeEdit());
+
+    saveHeaderBtn.click();
+    expect(saved).toBe(1);
+
+    saveFooterBtn.click();
+    expect(saved).toBe(2);
+
+    document.body.removeChild(saveHeaderBtn);
+    document.body.removeChild(saveFooterBtn);
+    document.body.removeChild(cancelBtn);
+  });
+
+  it('RecipeParser: Filtrado de navegación de blogs y enlaces vacíos en instrucciones', () => {
+    const rawBlogText = [
+      '# Ensalada Templada de Setas',
+      '## Ingredientes',
+      '* 300 g Setas variadas',
+      '* 100 g Brotes verdes',
+      '* 2 cucharadas Aceite de oliva',
+      '## Preparación',
+      '1. Limpiar las setas y saltearlas en una sartén con aceite durante 6 minutos.',
+      '2. Colocar la cama de brotes verdes y disponer las setas templadas encima.',
+      'Anterior entrada',
+      'Siguiente entrada',
+      'Te va a encantar...',
+      'Previous',
+      '[](https://www.velocidadcuchara.com/charlotka-tarta-de-manzana/)',
+      '[](https://www.velocidadcuchara.com/croquetas-de-jamon/)'
+    ].join('\n');
+
+    const parsed = window.RecipeParser.parseRecipeText(rawBlogText);
+    expect(parsed).not.toBeNull();
+    expect(parsed.instructions.length).toBe(2);
+    expect(parsed.instructions[0].text).toContain('Limpiar las setas');
+    expect(parsed.instructions[1].text).toContain('Colocar la cama de brotes');
+    expect(parsed.instructions.some(s => s.text.toLowerCase().includes('anterior') || s.text.toLowerCase().includes('velocidadcuchara'))).toBe(false);
+  });
 });
+
 

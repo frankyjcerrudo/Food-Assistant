@@ -1039,9 +1039,15 @@ const RecipeParser = {
       const line = lines[i];
       if (i === titleIdx) continue;
 
-      // Stop parsing instructions on footer sections (ratings, related tips, comments, author, dates)
+      // Stop parsing instructions on footer sections (ratings, related tips, comments, author, dates, blog pagination)
       if (currentSection === 'instructions') {
-        if (/^(?:#+\s*(?:con qu[e\u00E9]\s+acompa[n\u00F1]ar|trucos\s+y\s+consejos|trucos|consejos|truco|notas|nota|curiosidades|informaci[o\u00F3]n\s+nutricional|resumen\s+f[a\u00E1]cil|dale\s+un\s+toque|variaciones|m[a\u00E1]s\s+recetas|recetas\s+recomendadas|otras\s+recetas|te\s+puede\s+interesar|comentarios|sobre\s+el\s+autor|autor|comparte|cooksnap|[¿\?]?\s*has\s+hecho\s+la\s+receta)|(?:dale\s+un\s+toque|trucos\s+y\s+consejos|c[o\u00F3]mo\s+conseguir\s+que|un\s+truco\s+para\s+que|[¿\?]?\s*has\s+hecho\s+la\s+receta|comparte\s+(?:una|tu)\s+cooksnap|suscr[i\u00ED]bete|ver\s+todos\s+los\s+comentarios|En DAP\s*\||\d+\s*votos)|^(?:\d+\s+de\s+)?[a-z]+\s+de\s+\d{4})/i.test(line) || /\b(?:viajer[ao]\s+gastron[o\u00F3]mic[ao]|periodista|editor\s+senior|cooksnap)\b/i.test(line) || /[¿\?]?\s*has\s+hecho\s+la\s+receta/i.test(line)) {
+        const isFooterStop = /^(?:#+\s*(?:con qu[e\u00E9]\s+acompa[n\u00F1]ar|trucos\s+y\s+consejos|trucos|consejos|truco|notas|nota|curiosidades|informaci[o\u00F3]n\s+nutricional|resumen\s+f[a\u00E1]cil|dale\s+un\s+toque|variaciones|m[a\u00E1]s\s+recetas|recetas\s+recomendadas|otras\s+recetas|te\s+puede\s+interesar|comentarios|sobre\s+el\s+autor|autor|comparte|cooksnap|[¿\?]?\s*has\s+hecho\s+la\s+receta)|(?:dale\s+un\s+toque|trucos\s+y\s+consejos|c[o\u00F3]mo\s+conseguir\s+que|un\s+truco\s+para\s+que|[¿\?]?\s*has\s+hecho\s+la\s+receta|comparte\s+(?:una|tu)\s+cooksnap|suscr[i\u00ED]bete|ver\s+todos\s+los\s+comentarios|En DAP\s*\||\d+\s*votos)|^(?:\d+\s+de\s+)?[a-z]+\s+de\s+\d{4})/i.test(line) ||
+          /\b(?:viajer[ao]\s+gastron[o\u00F3]mic[ao]|periodista|editor\s+senior|cooksnap)\b/i.test(line) ||
+          /[¿\?]?\s*has\s+hecho\s+la\s+receta/i.test(line) ||
+          /^(?:anterior\s+entrada|siguiente\s+entrada|te\s+va\s+a\s+encantar|previous|next|entradas?\s+relacionadas?|art[i\u00ED]culos?\s+relacionados?|recetas?\s+relacionadas?)/i.test(line) ||
+          /^\[\s*\]\(https?:\/\//i.test(line);
+
+        if (isFooterStop) {
           currentSection = 'end';
           continue;
         }
@@ -1124,7 +1130,11 @@ const RecipeParser = {
           .replace(/^\d+[\.\)]\s*(?:\d+[\.\)]?\s+)?|^paso\s*\d+[:\.\-]\s*/i, '')
           .trim();
 
-        if (stepText && stepText.length > 5 && !/^(?:Image \d+|Dificultad:|Tiempo total|\* Tiempo)/i.test(stepText)) {
+        const isSpuriousInstruction = /^(?:Image \d+|Dificultad:|Tiempo total|\* Tiempo|anterior entrada|siguiente entrada|previous|next|te va a encantar)/i.test(stepText) ||
+          /^\[\s*\]\(https?:\/\//i.test(stepText) ||
+          /^https?:\/\//i.test(stepText);
+
+        if (stepText && stepText.length > 5 && !isSpuriousInstruction) {
           const timerMin = this.extractTimerMinutes(stepText);
           instructions.push({
             step: instructions.length + 1,
@@ -1642,6 +1652,7 @@ class FoodAssistantApp {
     document.getElementById('btn-close-recipe-edit')?.addEventListener('click', () => this.closeEditModal());
     document.getElementById('btn-cancel-recipe-edit')?.addEventListener('click', () => this.closeEditModal());
     document.getElementById('btn-save-recipe-edit')?.addEventListener('click', () => this.saveRecipeEdit());
+    document.getElementById('btn-save-recipe-edit-header')?.addEventListener('click', () => this.saveRecipeEdit());
     document.getElementById('btn-add-ingredient-row')?.addEventListener('click', () => this.addIngredientRow());
     document.getElementById('btn-add-step-row')?.addEventListener('click', () => this.addStepRow());
 

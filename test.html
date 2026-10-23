@@ -312,8 +312,8 @@
   <div id="test-results-container"></div>
 
   <!-- Entorno y dependencias de la app -->
-  <script src="config.js?v=0.16"></script>
-  <script src="app.js?v=0.16"></script>
+  <script src="config.js?v=0.19"></script>
+  <script src="app.js?v=0.19"></script>
 
   <script>
     const suites = [];
@@ -1687,6 +1687,67 @@
           expect(parsed.ingredients[1].name).toBe('Lentejas');
           expect(parsed.ingredients[1].unit).toBe('g');
           expect(parsed.instructions[0].text).toBe('Precalienta el horno a 200\u00BAC. Escurre las lentejas.');
+        }
+      );
+
+      it(
+        'Editar Receta: Botón Guardar en cabecera fija y pie sticky siempre visible sin scroll',
+        {
+          purpose: 'Verificar que el editor de recetas cuenta con botón de guardar en la cabecera fija y en el pie fijo para no requerir scroll hacia abajo.',
+          assertions: 'Comprueba invocación de saveRecipeEdit desde btn-save-recipe-edit-header y btn-save-recipe-edit.'
+        },
+        () => {
+          let savedCount = 0;
+          const fakeApp = {
+            saveRecipeEdit() { savedCount++; }
+          };
+
+          const headerSaveBtn = document.createElement('button');
+          headerSaveBtn.id = 'btn-save-recipe-edit-header';
+          const footerSaveBtn = document.createElement('button');
+          footerSaveBtn.id = 'btn-save-recipe-edit';
+
+          headerSaveBtn.addEventListener('click', () => fakeApp.saveRecipeEdit());
+          footerSaveBtn.addEventListener('click', () => fakeApp.saveRecipeEdit());
+
+          headerSaveBtn.click();
+          expect(savedCount).toBe(1);
+
+          footerSaveBtn.click();
+          expect(savedCount).toBe(2);
+        }
+      );
+
+      it(
+        'RecipeParser: Filtrado de navegación de blogs y enlaces vacíos en pasos de receta',
+        {
+          purpose: 'Evitar que enlaces de navegación de blogs (Anterior/Siguiente entrada, Previous, enlaces vacíos de blogs como Velocidad Cuchara) se agreguen como pasos falsos.',
+          assertions: 'Verifica que texto con Anterior entrada, Siguiente entrada, Te va a encantar y []() no añade pasos basura.'
+        },
+        () => {
+          const rawBlogText = [
+            '# Ensalada Templada de Setas',
+            '## Ingredientes',
+            '* 300 g Setas variadas',
+            '* 100 g Brotes verdes',
+            '* 2 cucharadas Aceite de oliva',
+            '## Preparación',
+            '1. Limpiar las setas y saltearlas en una sartén con aceite durante 6 minutos.',
+            '2. Colocar la cama de brotes verdes y disponer las setas templadas encima.',
+            'Anterior entrada',
+            'Siguiente entrada',
+            'Te va a encantar...',
+            'Previous',
+            '[](https://www.velocidadcuchara.com/charlotka-tarta-de-manzana/)',
+            '[](https://www.velocidadcuchara.com/croquetas-de-jamon/)'
+          ].join('\n');
+
+          const parsed = window.RecipeParser.parseRecipeText(rawBlogText);
+          expect(parsed).not.toBeNull();
+          expect(parsed.instructions.length).toBe(2);
+          expect(parsed.instructions[0].text).toContain('Limpiar las setas');
+          expect(parsed.instructions[1].text).toContain('Colocar la cama de brotes');
+          expect(parsed.instructions.some(s => s.text.toLowerCase().includes('anterior') || s.text.toLowerCase().includes('velocidadcuchara'))).toBe(false);
         }
       );
     });

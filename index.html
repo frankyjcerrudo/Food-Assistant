@@ -532,15 +532,24 @@
 
 <!-- MODAL: RECIPE EDITOR (CREATE & EDIT) -->
 <div class="modal-overlay" id="modal-recipe-edit">
-  <div class="modal-content" style="padding: 20px;">
-    <div style="display: justify-content: space-between; align-items: center; margin-bottom: 14px;">
-      <h3 style="font-size: 17px; font-weight: 500;" id="recipe-edit-modal-title">Editar Receta</h3>
-      <button class="btn btn-ghost btn-icon" id="btn-close-recipe-edit">
-        <span class="material-symbols-outlined">close</span>
-      </button>
+  <div class="modal-content" style="padding: 0; max-width: 620px; width: 92%; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; border-radius: var(--radius-xl);">
+    <!-- Pinned Header -->
+    <div class="modal-header-bar" style="padding: 14px 18px; flex-shrink: 0; background: var(--m3-surface);">
+      <h3 style="font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin: 0;" id="recipe-edit-modal-title">
+        <span class="material-symbols-outlined" style="color: var(--m3-primary);">edit_note</span> Editar Receta
+      </h3>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button class="btn btn-primary btn-sm" id="btn-save-recipe-edit-header" style="display: flex; align-items: center; gap: 4px; font-weight: 600;">
+          <span class="material-symbols-outlined icon-sm">save</span> Guardar
+        </button>
+        <button class="btn btn-ghost btn-icon" id="btn-close-recipe-edit" title="Cerrar">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
     </div>
 
-    <div style="max-height: 72vh; overflow-y: auto; padding-right: 4px;">
+    <!-- Scrollable Form Body -->
+    <div style="flex: 1; overflow-y: auto; padding: 18px 20px; min-height: 0;">
       <input type="hidden" id="edit-recipe-id">
       
       <div class="form-group">
@@ -599,11 +608,14 @@
         </div>
         <div id="edit-steps-container" style="display: flex; flex-direction: column; gap: 8px;"></div>
       </div>
+    </div>
 
-      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--m3-outline-variant);">
-        <button class="btn btn-secondary" id="btn-cancel-recipe-edit">Cancelar</button>
-        <button class="btn btn-primary" id="btn-save-recipe-edit">Guardar Receta</button>
-      </div>
+    <!-- Pinned Sticky Footer (Always visible without scrolling!) -->
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 18px; border-top: 1px solid var(--m3-outline-variant); background: var(--m3-surface); box-shadow: 0 -4px 12px rgba(0,0,0,0.05); flex-shrink: 0;">
+      <button class="btn btn-secondary" id="btn-cancel-recipe-edit">Cancelar</button>
+      <button class="btn btn-primary" id="btn-save-recipe-edit" style="display: flex; align-items: center; gap: 6px; padding: 9px 20px; font-weight: 600;">
+        <span class="material-symbols-outlined icon-sm">save</span> Guardar Receta
+      </button>
     </div>
   </div>
 </div>
@@ -877,7 +889,7 @@
   </div>
 </div>
 
-<script src="config.js?v=0.18"></script>
-<script src="app.js?v=0.18"></script>
+<script src="config.js?v=0.19"></script>
+<script src="app.js?v=0.19"></script>
 </body>
 </html>
