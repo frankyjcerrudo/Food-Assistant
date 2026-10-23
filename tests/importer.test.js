@@ -224,6 +224,24 @@ describe('US-15: Importador de Recetas (Schema.org / JSON-LD & Texto Estructurad
 
     const c6 = RecipeParser.parseIngredientLine('16 septiembre 2026, 16:53');
     expect(c6).toBeNull();
+
+    const comp = RecipeParser.parseIngredientLine('Para acompañar: huevo duro y jamón serrano a taquitos');
+    expect(Array.isArray(comp)).toBe(true);
+    expect(comp.length).toBe(2);
+    expect(comp[0].name).toBe('Huevo');
+    expect(comp[0].amount).toBe(1);
+    expect(comp[0].unit).toBe('ud');
+    expect(comp[0].aisle).toBe('dairy');
+    expect(comp[1].name).toBe('Jamón serrano a taquitos');
+    expect(comp[1].amount).toBe(1);
+    expect(comp[1].unit).toBe('ud');
+    expect(comp[1].aisle).toBe('meat');
+
+    const hSolo = RecipeParser.parseIngredientLine('1 huevo duro');
+    expect(hSolo.name).toBe('Huevo');
+    expect(hSolo.amount).toBe(1);
+    expect(hSolo.unit).toBe('ud');
+    expect(hSolo.aisle).toBe('dairy');
   });
 
   it('parseIsoDuration procesa fracciones de hora en español y rangos de cocción', () => {
@@ -565,7 +583,7 @@ Bocadillo De Atun Paso A Paso
     const recipe = RecipeParser.parseRecipeText(rawSalmorejo, 'https://www.javirecetas.com/salmorejo-cordobes/');
     expect(recipe).not.toBeNull();
     // Ingredients should only contain the actual ingredients with clean names
-    expect(recipe.ingredients.length).toBe(6);
+    expect(recipe.ingredients.length).toBe(7);
     expect(recipe.ingredients.some(i => i.name.toLowerCase().includes('tritura') || i.name.toLowerCase().includes('trocea'))).toBe(false);
 
     const tomates = recipe.ingredients.find(i => i.name.toLowerCase().includes('tomate'));
@@ -589,8 +607,18 @@ Bocadillo De Atun Paso A Paso
     const sal = recipe.ingredients.find(i => i.name.toLowerCase() === 'sal');
     expect(sal.amount).toBe(0.5);
 
-    const guarnicion = recipe.ingredients.find(i => i.name.toLowerCase().includes('huevo duro'));
-    expect(guarnicion.name).toBe('Huevo duro y jamón serrano a taquitos');
+    const huevo = recipe.ingredients.find(i => i.name === 'Huevo');
+    expect(huevo).toBeDefined();
+    expect(huevo.amount).toBe(1);
+    expect(huevo.unit).toBe('ud');
+    expect(huevo.aisle).toBe('dairy');
+
+    const jamon = recipe.ingredients.find(i => i.name.toLowerCase().includes('jamón serrano'));
+    expect(jamon).toBeDefined();
+    expect(jamon.name).toBe('Jamón serrano a taquitos');
+    expect(jamon.amount).toBe(1);
+    expect(jamon.unit).toBe('ud');
+    expect(jamon.aisle).toBe('meat');
 
     // Instructions should contain the 5 cooking steps
     expect(recipe.instructions.length).toBe(5);

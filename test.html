@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Food Assistant - Informe Detallado de Calidad y Tests</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.14">
+  <link rel="stylesheet" href="styles.css?v=0.15">
   <style>
     :root {
       --qa-pass: #059669;
@@ -312,8 +312,8 @@
   <div id="test-results-container"></div>
 
   <!-- Entorno y dependencias de la app -->
-  <script src="config.js?v=0.14"></script>
-  <script src="app.js?v=0.14"></script>
+  <script src="config.js?v=0.15"></script>
+  <script src="app.js?v=0.15"></script>
 
   <script>
     const suites = [];
@@ -1278,7 +1278,7 @@
         'reconoce cabeceras tipo "### RECETA DE...", procesa ingredientes con gramos/cantidades en texto y limpia notas (caso Javi Recetas)',
         {
           purpose: 'Validar que las cabeceras con formato "RECETA DE..." conmutan inmediatamente a instrucciones, cantidades escritas como "medio diente" o "media cucharada pequeña" se extraen a 0.5 y se limpian notas como "(ver nota)".',
-          assertions: 'Verifica 6 ingredientes limpios (Tomates maduros 500g, Pan 100g, Aceite 50ml, Ajo 0.5ud, Sal 0.5, Huevo duro 1ud) y 5 pasos de elaboración.'
+          assertions: 'Verifica 7 ingredientes limpios (Tomates maduros 500g, Pan 100g, Aceite 50ml, Ajo 0.5ud, Sal 0.5, Huevo 1ud, Jamón serrano a taquitos 1ud) y 5 pasos de elaboración.'
         },
         () => {
           const rawSalmorejo = [
@@ -1303,7 +1303,7 @@
 
           const recipe = window.RecipeParser.parseRecipeText(rawSalmorejo, 'https://www.javirecetas.com/salmorejo-cordobes/');
           expect(recipe).not.toBeNull();
-          expect(recipe.ingredients.length).toBe(6);
+          expect(recipe.ingredients.length).toBe(7);
           expect(recipe.ingredients.some(i => i.name.toLowerCase().includes('tritura') || i.name.toLowerCase().includes('trocea'))).toBe(false);
 
           const tomates = recipe.ingredients.find(i => i.name.toLowerCase().includes('tomate'));
@@ -1327,8 +1327,18 @@
           const sal = recipe.ingredients.find(i => i.name.toLowerCase() === 'sal');
           expect(sal.amount).toBe(0.5);
 
-          const guarnicion = recipe.ingredients.find(i => i.name.toLowerCase().includes('huevo duro'));
-          expect(guarnicion.name).toBe('Huevo duro y jamón serrano a taquitos');
+          const huevo = recipe.ingredients.find(i => i.name === 'Huevo');
+          expect(huevo).toBeDefined();
+          expect(huevo.amount).toBe(1);
+          expect(huevo.unit).toBe('ud');
+          expect(huevo.aisle).toBe('dairy');
+
+          const jamon = recipe.ingredients.find(i => i.name.toLowerCase().includes('jamón serrano'));
+          expect(jamon).toBeDefined();
+          expect(jamon.name).toBe('Jamón serrano a taquitos');
+          expect(jamon.amount).toBe(1);
+          expect(jamon.unit).toBe('ud');
+          expect(jamon.aisle).toBe('meat');
 
           expect(recipe.instructions.length).toBe(5);
           expect(recipe.instructions[1].text).toContain('Corta los tomates en trozos');

@@ -534,6 +534,32 @@ const RecipeParser = {
       return null;
     }
 
+    // Compound accompaniment/serving line detection: e.g. "Para acompañar: huevo duro y jamón serrano a taquitos"
+    const compoundMatch = clean.match(/^(?:para\s+(?:acompañar|servir|decorar|guarnici[oó]n)|guarnici[oó]n|opcional):\s*(.+)$/i);
+    let partsToProcess = null;
+    if (compoundMatch && compoundMatch[1]) {
+      const parts = compoundMatch[1].split(/\s+y\s+|\s*,\s*(?![^()]*\))/i).map(p => p.trim()).filter(Boolean);
+      if (parts.length > 1) {
+        partsToProcess = parts;
+      } else if (parts.length === 1) {
+        clean = parts[0];
+      }
+    } else if (/\b(?:huevos?\s+(?:duros?|cocidos?))\s+y\s+(?:jam[oó]n\b.*)$/i.test(clean)) {
+      partsToProcess = clean.split(/\s+y\s+/i).map(p => p.trim()).filter(Boolean);
+    }
+
+    if (partsToProcess && partsToProcess.length > 1) {
+      const results = [];
+      for (const part of partsToProcess) {
+        const parsed = this.parseIngredientLine(part);
+        if (parsed) {
+          if (Array.isArray(parsed)) results.push(...parsed);
+          else results.push(parsed);
+        }
+      }
+      if (results.length > 0) return results;
+    }
+
     // Pre-processing Spanish written quantities and fractions at the beginning
     clean = clean
       // Ranges like "18-20" or "2 o 3" -> take upper bound
@@ -612,6 +638,10 @@ const RecipeParser = {
     // Specific culinary cleanups: "sal fina" -> "Sal"
     if (/^sal\s+fina$/i.test(name)) {
       name = 'Sal';
+    }
+    // "huevo duro" / "huevos duros" / "huevo cocido" -> el ingrediente básico es el huevo
+    if (/^huevos?\s+(?:duros?|cocidos?|pasados?\s+por\s+agua|fritos?)$/i.test(name)) {
+      name = amount > 1 ? 'Huevos' : 'Huevo';
     }
 
     if (!name || (name.length <= 1 && /^[a-z\.\,]$/i.test(name))) return null;
@@ -723,7 +753,10 @@ const RecipeParser = {
     if (Array.isArray(rawIngredients)) {
       rawIngredients.forEach(line => {
         const parsed = this.parseIngredientLine(String(line));
-        if (parsed) ingredients.push(parsed);
+        if (parsed) {
+          if (Array.isArray(parsed)) ingredients.push(...parsed);
+          else ingredients.push(parsed);
+        }
       });
     }
 
@@ -1028,7 +1061,10 @@ const RecipeParser = {
       // Parsing items according to active section
       if (currentSection === 'ingredients') {
         const parsed = this.parseIngredientLine(line);
-        if (parsed) ingredients.push(parsed);
+        if (parsed) {
+          if (Array.isArray(parsed)) ingredients.push(...parsed);
+          else ingredients.push(parsed);
+        }
       } else if (currentSection === 'instructions') {
         if (this.isSectionHeader(line)) {
           continue;
@@ -1052,7 +1088,10 @@ const RecipeParser = {
         const hasExplicitIngredients = lines.some(l => /^(?:#+\s*)?(?:ingredientes|lista de ingredientes|lo que necesitas):?$/i.test(l) || /^#+\s*ingredientes\b/i.test(l));
         if (!hasExplicitIngredients && /^[\-\*\u2022]/.test(line)) {
           const parsed = this.parseIngredientLine(line);
-          if (parsed) ingredients.push(parsed);
+          if (parsed) {
+            if (Array.isArray(parsed)) ingredients.push(...parsed);
+            else ingredients.push(parsed);
+          }
         }
       }
     }
