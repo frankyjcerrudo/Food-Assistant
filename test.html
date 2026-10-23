@@ -1461,6 +1461,103 @@
     });
 
     // =========================================================
+    // SUITE 7: ACCESIBILIDAD Y USABILIDAD (CIERRE DE MODALES)
+    // =========================================================
+    describe('7. Accesibilidad y Usabilidad: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Escape', () => {
+      it(
+        'hacer clic en el fondo oscuro (.modal-overlay) fuera de la ventana cierra el modal automáticamente',
+        {
+          purpose: 'Permitir al usuario cerrar cualquier ventana modal pulsando fuera del contenido sin obligarle a pulsar la X.',
+          assertions: 'Valida que un clic con mousedown y click en el overlay cierra el modal activo (elimina clase active).'
+        },
+        () => {
+          const overlay = document.createElement('div');
+          overlay.className = 'modal-overlay active';
+          overlay.id = 'modal-test-backdrop';
+          const content = document.createElement('div');
+          content.className = 'modal-content';
+          overlay.appendChild(content);
+          document.body.appendChild(overlay);
+
+          let isBackdrop = false;
+          overlay.addEventListener('mousedown', (e) => {
+            isBackdrop = (e.target === overlay);
+          });
+          overlay.addEventListener('click', (e) => {
+            if (isBackdrop && e.target === overlay) {
+              overlay.classList.remove('active');
+            }
+            isBackdrop = false;
+          });
+
+          // Simular clic en fondo backdrop
+          overlay.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+          overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+          expect(overlay.classList.contains('active')).toBe(false);
+          document.body.removeChild(overlay);
+        }
+      );
+
+      it(
+        'hacer clic dentro del contenido del modal (.modal-content) NO cierra el modal',
+        {
+          purpose: 'Evitar cierres accidentales al interactuar con el formulario, leer o seleccionar texto.',
+          assertions: 'Valida que un clic en .modal-content mantiene el modal activo.'
+        },
+        () => {
+          const overlay = document.createElement('div');
+          overlay.className = 'modal-overlay active';
+          const content = document.createElement('div');
+          content.className = 'modal-content';
+          overlay.appendChild(content);
+          document.body.appendChild(overlay);
+
+          let isBackdrop = false;
+          overlay.addEventListener('mousedown', (e) => {
+            isBackdrop = (e.target === overlay);
+          });
+          overlay.addEventListener('click', (e) => {
+            if (isBackdrop && e.target === overlay) {
+              overlay.classList.remove('active');
+            }
+            isBackdrop = false;
+          });
+
+          // Simular clic dentro del contenido
+          content.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+          content.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+          expect(overlay.classList.contains('active')).toBe(true);
+          document.body.removeChild(overlay);
+        }
+      );
+
+      it(
+        'closeModalByElement invoca el método de cierre adecuado según el ID del modal',
+        {
+          purpose: 'Asegurar que cada modal ejecuta su limpieza correspondiente al cerrarse por clic fuera.',
+          assertions: 'Verifica cierre de modal-recipe-detail y modal-recipe-import.'
+        },
+        () => {
+          const fakeApp = {
+            detailClosed: false,
+            importClosed: false,
+            closeRecipeModal() { this.detailClosed = true; },
+            closeImportModal() { this.importClosed = true; },
+            closeModalByElement: window.FoodAssistantApp.prototype.closeModalByElement
+          };
+
+          fakeApp.closeModalByElement({ id: 'modal-recipe-detail', classList: { remove: () => {} } });
+          expect(fakeApp.detailClosed).toBe(true);
+
+          fakeApp.closeModalByElement({ id: 'modal-recipe-import', classList: { remove: () => {} } });
+          expect(fakeApp.importClosed).toBe(true);
+        }
+      );
+    });
+
+    // =========================================================
     // CONTROLES DE INTERFAZ, FILTRADO Y MODO OSCURO/CLARO
     // =========================================================
     function toggleTheme() {

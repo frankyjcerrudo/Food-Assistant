@@ -1619,12 +1619,41 @@ class FoodAssistantApp {
     document.getElementById('input-import-backup')?.addEventListener('change', (e) => this.importBackup(e));
     document.getElementById('btn-reset-demo')?.addEventListener('click', () => this.resetDemoData());
 
-    // Modal closes
+    // Modal closes & Light Dismiss (clicking outside the modal window / backdrop closes it)
     document.getElementById('btn-close-recipe-modal')?.addEventListener('click', () => this.closeRecipeModal());
     document.getElementById('btn-close-picker-modal')?.addEventListener('click', () => this.closePickerModal());
     document.getElementById('btn-exit-cook-mode')?.addEventListener('click', () => this.exitCookMode());
     document.getElementById('btn-cook-next-step')?.addEventListener('click', () => this.nextCookStep());
     document.getElementById('btn-cook-prev-step')?.addEventListener('click', () => this.prevCookStep());
+
+    // Backdrop click dismiss: closes modal when user clicks outside the dialog content
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+      let isBackdropClick = false;
+      overlay.addEventListener('mousedown', (e) => {
+        isBackdropClick = (e.target === overlay);
+      });
+      overlay.addEventListener('click', (e) => {
+        if (isBackdropClick && e.target === overlay) {
+          this.closeModalByElement(overlay);
+        }
+        isBackdropClick = false;
+      });
+    });
+
+    // Escape key dismiss for active modal & cook mode
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (this.cookModeOverlay && this.cookModeOverlay.classList.contains('active')) {
+          this.exitCookMode();
+          return;
+        }
+        const activeModals = document.querySelectorAll('.modal-overlay.active');
+        if (activeModals.length > 0) {
+          const topModal = activeModals[activeModals.length - 1];
+          this.closeModalByElement(topModal);
+        }
+      }
+    });
 
     // Gemini Chat
     document.getElementById('btn-send-ai-chat')?.addEventListener('click', () => this.handleAiChatSubmit());
@@ -1821,6 +1850,36 @@ class FoodAssistantApp {
 
   closeRecipeModal() {
     this.modalRecipeDetail.classList.remove('active');
+  }
+
+  closeModalByElement(overlay) {
+    if (!overlay) return;
+    switch (overlay.id) {
+      case 'modal-recipe-detail':
+        this.closeRecipeModal();
+        break;
+      case 'modal-recipe-import':
+        this.closeImportModal();
+        break;
+      case 'modal-recipe-edit':
+        this.closeEditModal();
+        break;
+      case 'modal-recipe-picker':
+        this.closePickerModal();
+        break;
+      case 'modal-auth':
+        this.closeAuthModal();
+        break;
+      case 'modal-shopping-preview':
+        this.closeShoppingPreviewModal();
+        break;
+      case 'modal-add-custom-slot':
+        this.closeAddCustomSlotModal();
+        break;
+      default:
+        overlay.classList.remove('active');
+        break;
+    }
   }
 
   adjustServings(delta) {
