@@ -1403,14 +1403,14 @@
             'URL Source: https://cookpad.com/es/recetas/111818',
             'Markdown Content:',
             '6 raciones',
-            '* 600 gr manzanas',
-            '* 1/2 litro aceite',
-            '* 200 gr[harina](https://cookpad.com/es/buscar/harina)',
-            '* 25 gr azúcar',
-            '* 200 gr mermelada de fresa',
-            '* 2 huevos',
-            '* 2 dl.[cerveza](https://cookpad.com/es/buscar/cerveza)',
-            '* 1 copita[ron](https://cookpad.com/es/buscar/ron)',
+            '*   600 gr manzanas',
+            '*   1/2 litro aceite',
+            '*   200 gr[harina](https://cookpad.com/es/buscar/harina)',
+            '*   25 gr azúcar',
+            '*   200 gr mermelada de fresa',
+            '*   2 huevos',
+            '*   2 dl.[cerveza](https://cookpad.com/es/buscar/cerveza)',
+            '*   1 copita[ron](https://cookpad.com/es/buscar/ron)',
             '',
             '1.   1 Se pelan las manzanas y se cortan en rodajas de 1/2 ml de grosor, eliminando el corazón.',
             '2.   2 En un bowl preparar la harina, con la yema de los dos huevos, una pizca de sal y la cerveza.',
@@ -1418,6 +1418,9 @@
             '4.   4 Con la mezcla que hemos hecho, se rebozan las rodajas de manzana y se fríen en aceite caliente.',
             '5.   5 Se presenta en una bandeja o plato y antes de servirlas se cubren con mermelada.',
             '',
+            '## ¿Has hecho la receta? ¡Comparte una Cooksnap!',
+            'Dile al carme castillo cómo te quedó.',
+            '¡No hay nada mejor para dar las gracias que una foto!',
             '11 de marzo de 2010',
             '![Image 4: Foto principal de Buñuelos de manzana](https://img-global.cpcdn.com/recipes/cef86bab5d23afa3/240x320cq80/photo.jpg)'
           ].join('\n');
@@ -1452,6 +1455,7 @@
           expect(recipe.instructions[0].text).not.toMatch(/^1\b/);
           expect(recipe.instructions[0].text).toContain('Se pelan las manzanas');
           expect(recipe.ingredients.some(i => i.name.includes('marzo') || i.name.includes('Image'))).toBe(false);
+          expect(recipe.instructions.some(i => i.text.includes('Cooksnap') || i.text.includes('foto'))).toBe(false);
         }
       );
     });
