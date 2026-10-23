@@ -3,7 +3,8 @@
     Sincroniza BACKLOG.md de Food Assistant con GitHub Issues y GitHub Projects v2.
 .DESCRIPTION
     Parsea las historias de usuario (US-xx) y defectos (BUG-xx) de BACKLOG.md,
-    comprueba cuáles existen ya en GitHub, crea los que falten con sus etiquetas
+    comprueba cuáles existen ya en GitHub, crea los que falten con sus etiquetas,
+    actualiza los existentes si tienen discrepancias o texto corrupto,
     y los añade al tablero de GitHub Projects ("Food Assistant Roadmap").
 #>
 
@@ -13,8 +14,12 @@ param(
     [string]$Owner = "frankyjcerrudo",
     [string]$Repo = "Food-Assistant",
     [string]$ProjectId = "PVT_kwHODCGG2s4Bn8Jm",
+    [switch]$UpdateExisting,
     [switch]$DryRun
 )
+
+$OutputEncoding = [System.Text.Encoding]::UTF8
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 # 1. Obtener Token de GitHub
 if (-not $Token) {
@@ -73,22 +78,22 @@ $priorityOptions = @{
     "Low"    = "bf845904"
 }
 
-# Mapeo de prefijos por Épica
-function Get-EpicPrefix([string]$epicName) {
-    switch -Regex ($epicName) {
-        'Nutricional'    { return @{ Prefix = "[NUTRITION]"; Label = "enhancement" } }
-        'Planificador'   { return @{ Prefix = "[PLANNER]";   Label = "epic-2-planificador" } }
-        'Lista de la Compra' { return @{ Prefix = "[SHOPPING]"; Label = "epic-3-compra" } }
-        'Catálogo de Recetas' { return @{ Prefix = "[RECIPES]";  Label = "epic-4-recetas" } }
-        'Inteligencia Artificial' { return @{ Prefix = "[AI]";    Label = "epic-5-ia" } }
-        'Diseño'         { return @{ Prefix = "[DESIGN]";   Label = "design-system" } }
-        'Android'        { return @{ Prefix = "[MOBILE]";   Label = "mobile" } }
-        'Comunidad'      { return @{ Prefix = "[COMMUNITY]"; Label = "enhancement" } }
-        'Sincronización' { return @{ Prefix = "[SYNC]";     Label = "enhancement" } }
-        'Seguridad'      { return @{ Prefix = "[SECURITY]"; Label = "security" } }
-        'Calidad Técnica'{ return @{ Prefix = "[ARCH]";     Label = "architecture" } }
-        'Accesibilidad'  { return @{ Prefix = "[A11Y/PWA]"; Label = "accessibility" } }
-        default          { return @{ Prefix = "[FEAT]";     Label = "enhancement" } }
+# Mapeo de prefijos y etiquetas por número de Épica (inmune a problemas de codificación)
+function Get-EpicInfo([int]$epicNum) {
+    switch ($epicNum) {
+        1  { return @{ Prefix = "[NUTRITION]"; Label = "enhancement" } }
+        2  { return @{ Prefix = "[PLANNER]";   Label = "epic-2-planificador" } }
+        3  { return @{ Prefix = "[SHOPPING]";  Label = "epic-3-compra" } }
+        4  { return @{ Prefix = "[RECIPES]";   Label = "epic-4-recetas" } }
+        5  { return @{ Prefix = "[AI]";        Label = "epic-5-ia" } }
+        6  { return @{ Prefix = "[DESIGN]";    Label = "design-system" } }
+        7  { return @{ Prefix = "[MOBILE]";    Label = "mobile" } }
+        8  { return @{ Prefix = "[COMMUNITY]"; Label = "enhancement" } }
+        9  { return @{ Prefix = "[SYNC]";      Label = "enhancement" } }
+        10 { return @{ Prefix = "[SECURITY]";  Label = "security" } }
+        11 { return @{ Prefix = "[ARCH]";      Label = "architecture" } }
+        12 { return @{ Prefix = "[A11Y/PWA]";  Label = "accessibility" } }
+        default { return @{ Prefix = "[FEAT]"; Label = "enhancement" } }
     }
 }
 
@@ -103,19 +108,34 @@ Write-Host ">>> Parseando BACKLOG.md..." -ForegroundColor Cyan
 $lines = Get-Content -Path $backlogFile -Encoding UTF8
 
 $itemsToProcess = @()
-$currentEpic = ""
+$currentEpicNum = 0
+$currentEpicName = ""
 $inBugSection = $false
 
+# Constantes Unicode seguras
+$clipEmoji = [char]::ConvertFromUtf32(0x1F4CB)
+$checkEmoji = [char]::ConvertFromUtf32(0x2705)
+$bugEmoji = [char]::ConvertFromUtf32(0x1F41B)
+$toolsEmoji = "$([char]::ConvertFromUtf32(0x1F6E0))$([char]0xFE0F)"
+$wordDesc = "Descripci$([char]0x00F3)n"
+$wordEpic = "$([char]0x00C9)pica"
+$wordAcept = "Aceptaci$([char]0x00F3)n"
+$wordRes = "Resoluci$([char]0x00F3)n"
+$wordCorr = "Correcci$([char]0x00F3)n"
+$wordAuto = "autom$([char]0x00E1)ticamente"
+
 foreach ($line in $lines) {
-    if ($line -match '^##\s+.*?(\d+):\s*(.*)') {
-        $currentEpic = "Épica $($matches[1]): $($matches[2].Trim())"
-        $inBugSection = $false
-        continue
-    }
-    if ($line -match 'Defectos\s*\(Bugs\)') {
-        $inBugSection = $true
-        $currentEpic = "Bugs & Defectos"
-        continue
+    if ($line -match '^##\s+(?:.*?[eE\u00C9\u00E9]pica\s*(\d+)\s*:\s*(.*)|(.*))') {
+        if ($matches[1]) {
+            $currentEpicNum = [int]$matches[1]
+            $currentEpicName = "$wordEpic $($matches[1]): $($matches[2].Trim())"
+            $inBugSection = $false
+            continue
+        } elseif ($matches[3] -match 'Defectos|Bugs') {
+            $inBugSection = $true
+            $currentEpicName = "Bugs & Defectos"
+            continue
+        }
     }
 
     # User Story
@@ -140,31 +160,30 @@ foreach ($line in $lines) {
         if ($statusRaw -match 'Done') { $projStatus = "Done" }
         elseif ($statusRaw -match 'In Progress|Ready for Dev') { $projStatus = "In Progress" }
 
-        $epicInfo = Get-EpicPrefix $currentEpic
+        $epicInfo = Get-EpicInfo $currentEpicNum
         $issueTitle = "$($epicInfo.Prefix) $($id): $title"
 
-        # Formatear DoD como lista de checkboxes markdown
+        # Formatear DoD como lista de checkboxes limpia (sin viñetas residuales)
         $dodFormatted = ""
         $bullets = $dod -split '<br>'
         foreach ($b in $bullets) {
-            $cleanBullet = $b.Trim().TrimStart('•').Trim()
+            $cleanBullet = [regex]::Replace($b.Trim(), '^(\s*(\u2022|[\-\*])\s*)+', '')
             if ($cleanBullet) {
                 $dodFormatted += "- [ ] $cleanBullet`n"
             }
         }
 
         $body = @"
-## 📋 Descripción
+## $clipEmoji $wordDesc
 **Historia**: $id - $title  
-**Épica**: $currentEpic  
+**$wordEpic**: $currentEpicName  
 **Prioridad**: $prioRaw  
-**Estado en Backlog**: `$statusRaw`  
+**Estado en Backlog**: ``$statusRaw``  
 
-## ✅ Criterios de Aceptación (DoD)
+## $checkEmoji Criterios de $wordAcept (DoD)
 $dodFormatted
-
 ---
-*Sincronizado automáticamente desde [BACKLOG.md](https://github.com/$Owner/$Repo/blob/main/BACKLOG.md)*
+*Sincronizado $wordAuto desde [BACKLOG.md](https://github.com/$Owner/$Repo/blob/main/BACKLOG.md)*
 "@
 
         $labels = @("enhancement", $prioLabel)
@@ -209,16 +228,16 @@ $dodFormatted
         $issueTitle = "[BUG] $($id): $desc"
 
         $body = @"
-## 🐛 Registro de Defecto
+## $bugEmoji Registro de Defecto
 **Incidencia**: $id - $desc  
 **Severidad**: $sevRaw  
-**Estado en Backlog**: `$statusRaw`  
+**Estado en Backlog**: ``$statusRaw``  
 
-## 🛠️ Resolución / Criterios de Corrección
+## $toolsEmoji $wordRes / Criterios de $wordCorr
 $res
 
 ---
-*Sincronizado automáticamente desde [BACKLOG.md](https://github.com/$Owner/$Repo/blob/main/BACKLOG.md)*
+*Sincronizado $wordAuto desde [BACKLOG.md](https://github.com/$Owner/$Repo/blob/main/BACKLOG.md)*
 "@
 
         $labels = @("bug", $prioLabel)
@@ -238,7 +257,7 @@ $res
 
 Write-Host "Elementos encontrados en BACKLOG.md: $($itemsToProcess.Count)" -ForegroundColor Green
 
-# 3. Consultar Issues existentes en GitHub para evitar duplicados
+# 3. Consultar Issues existentes en GitHub
 Write-Host ">>> Consultando Issues existentes en GitHub ($Owner/$Repo)..." -ForegroundColor Cyan
 $existingMap = @{}
 $page = 1
@@ -256,23 +275,14 @@ while ($true) {
 Write-Host "Total issues ya registrados en GitHub: $($existingMap.Count)" -ForegroundColor Yellow
 
 $missingItems = $itemsToProcess | Where-Object { -not $existingMap.ContainsKey($_.ID) }
-Write-Host "Nuevos elementos pendientes de crear y sincronizar: $($missingItems.Count)" -ForegroundColor Magenta
-
-if ($DryRun) {
-    Write-Host "`n[DRY RUN] Simulación activada. No se modificará GitHub." -ForegroundColor Yellow
-    Write-Host "Detalle de los primeros 10 elementos que se crearían:" -ForegroundColor Gray
-    $missingItems | Select-Object -First 10 | ForEach-Object {
-        Write-Host " - [$($_.ID)] $($_.Title) | Prio: $($_.Priority) | Status: $($_.ProjectStatus) | Labels: $(($_.Labels) -join ', ')"
-    }
-    Write-Host "`nPara ejecutar la sincronización real, ejecuta el script sin el parámetro -DryRun." -ForegroundColor Green
-    exit 0
-}
+Write-Host "Nuevos elementos pendientes de crear: $($missingItems.Count)" -ForegroundColor Magenta
 
 # 4. Asegurar que las etiquetas necesarias existan en el repositorio
 $labelsToEnsure = @{
     "security"     = "b60205"
     "architecture" = "1d76db"
     "pwa"          = "0075ca"
+    "epic-4-recetas" = "d93f0b"
 }
 
 foreach ($lbl in $labelsToEnsure.Keys) {
@@ -287,71 +297,123 @@ foreach ($lbl in $labelsToEnsure.Keys) {
     }
 }
 
-# 5. Crear issues y agregarlos al Project V2
-Write-Host "`n>>> Iniciando sincronización con GitHub..." -ForegroundColor Cyan
-$createdCount = 0
+# 5. Si se especifica -UpdateExisting, sincronizar issues existentes que difieran
+if ($UpdateExisting) {
+    Write-Host "`n>>> Verificando y actualizando issues existentes..." -ForegroundColor Cyan
+    $updatedCount = 0
+    foreach ($item in $itemsToProcess) {
+        if ($existingMap.ContainsKey($item.ID)) {
+            $existing = $existingMap[$item.ID]
+            $issueNum = $existing.number
+            $curTitle = $existing.title
+            $curBody = $existing.body
 
-foreach ($item in $missingItems) {
-    Write-Host "Creando $($item.ID): $($item.Title)..." -NoNewline
-    
-    $issuePayload = @{
-        title  = $item.Title
-        body   = $item.Body
-        labels = $item.Labels
-    } | ConvertTo-Json -Depth 5
+            $normCurBody = $curBody.Replace("`r`n", "`n").Trim()
+            $normTargetBody = $item.Body.Replace("`r`n", "`n").Trim()
 
-    try {
-        # A) Crear Issue en el repo
-        $createdIssue = Invoke-RestMethod -Uri "https://api.github.com/repos/$Owner/$Repo/issues" `
-            -Method Post -Headers $headersRest -Body ([System.Text.Encoding]::UTF8.GetBytes($issuePayload)) -ContentType "application/json; charset=utf-8"
+            $titleDiff = ($curTitle -ne $item.Title)
+            $bodyDiff = ($normCurBody -ne $normTargetBody)
+
+            if ($titleDiff -or $bodyDiff) {
+                Write-Host "Actualizando Issue #$issueNum ($($item.ID))..." -NoNewline
+                if ($DryRun) {
+                    Write-Host " [SIMULADO]" -ForegroundColor Yellow
+                } else {
+                    $patchPayload = @{
+                        title = $item.Title
+                        body  = $item.Body
+                    }
+                    $jsonBytes = [System.Text.Encoding]::UTF8.GetBytes(($patchPayload | ConvertTo-Json -Depth 5))
+                    try {
+                        $null = Invoke-RestMethod -Uri "https://api.github.com/repos/$Owner/$Repo/issues/$issueNum" `
+                            -Method Patch -Headers $headersRest -Body $jsonBytes -ContentType "application/json; charset=utf-8"
+                        Write-Host " [OK]" -ForegroundColor Green
+                        $updatedCount++
+                        Start-Sleep -Milliseconds 400
+                    } catch {
+                        Write-Host " [ERROR: $($_.Exception.Message)]" -ForegroundColor Red
+                    }
+                }
+            }
+        }
+    }
+    Write-Host "Total issues existentes actualizados: $updatedCount" -ForegroundColor Green
+}
+
+if ($DryRun) {
+    Write-Host "`n[DRY RUN] Simulacion activada. Fin del proceso." -ForegroundColor Yellow
+    exit 0
+}
+
+# 6. Crear issues pendientes y agregarlos al Project V2
+if ($missingItems.Count -gt 0) {
+    Write-Host "`n>>> Creando nuevos issues pendientes..." -ForegroundColor Cyan
+    $createdCount = 0
+
+    foreach ($item in $missingItems) {
+        Write-Host "Creando $($item.ID): $($item.Title)..." -NoNewline
         
-        $issueNum = $createdIssue.number
-        $issueNodeId = $createdIssue.node_id
+        $issuePayload = @{
+            title  = $item.Title
+            body   = $item.Body
+            labels = $item.Labels
+        } | ConvertTo-Json -Depth 5
 
-        # B) Añadir al Project V2 vía GraphQL
-        $addMutation = @"
+        try {
+            # A) Crear Issue en el repo
+            $createdIssue = Invoke-RestMethod -Uri "https://api.github.com/repos/$Owner/$Repo/issues" `
+                -Method Post -Headers $headersRest -Body ([System.Text.Encoding]::UTF8.GetBytes($issuePayload)) -ContentType "application/json; charset=utf-8"
+            
+            $issueNum = $createdIssue.number
+            $issueNodeId = $createdIssue.node_id
+
+            # B) Añadir al Project V2 vía GraphQL
+            $addMutation = @"
 {"query": "mutation { addProjectV2ItemById(input: { projectId: \"$ProjectId\", contentId: \"$issueNodeId\" }) { item { id } } }"}
 "@
-        $addRes = Invoke-RestMethod -Uri "https://api.github.com/graphql" -Method Post -Headers $headersGql -Body $addMutation
-        $projectItemId = $addRes.data.addProjectV2ItemById.item.id
+            $addRes = Invoke-RestMethod -Uri "https://api.github.com/graphql" -Method Post -Headers $headersGql -Body $addMutation
+            $projectItemId = $addRes.data.addProjectV2ItemById.item.id
 
-        # C) Asignar Status en el Proyecto
-        $statusOptId = $statusOptions[$item.ProjectStatus]
-        if ($projectItemId -and $statusOptId) {
-            $updateStatusGql = @"
+            # C) Asignar Status en el Proyecto
+            $statusOptId = $statusOptions[$item.ProjectStatus]
+            if ($projectItemId -and $statusOptId) {
+                $updateStatusGql = @"
 {"query": "mutation { updateProjectV2ItemFieldValue(input: { projectId: \"$ProjectId\", itemId: \"$projectItemId\", fieldId: \"$fieldStatusId\", value: { singleSelectOptionId: \"$statusOptId\" } }) { projectV2Item { id } } }"}
 "@
-            $null = Invoke-RestMethod -Uri "https://api.github.com/graphql" -Method Post -Headers $headersGql -Body $updateStatusGql
-        }
+                $null = Invoke-RestMethod -Uri "https://api.github.com/graphql" -Method Post -Headers $headersGql -Body $updateStatusGql
+            }
 
-        # D) Asignar Prioridad en el Proyecto
-        $prioOptId = $priorityOptions[$item.Priority]
-        if ($projectItemId -and $prioOptId) {
-            $updatePrioGql = @"
+            # D) Asignar Prioridad en el Proyecto
+            $prioOptId = $priorityOptions[$item.Priority]
+            if ($projectItemId -and $prioOptId) {
+                $updatePrioGql = @"
 {"query": "mutation { updateProjectV2ItemFieldValue(input: { projectId: \"$ProjectId\", itemId: \"$projectItemId\", fieldId: \"$fieldPriorityId\", value: { singleSelectOptionId: \"$prioOptId\" } }) { projectV2Item { id } } }"}
 "@
-            $null = Invoke-RestMethod -Uri "https://api.github.com/graphql" -Method Post -Headers $headersGql -Body $updatePrioGql
+                $null = Invoke-RestMethod -Uri "https://api.github.com/graphql" -Method Post -Headers $headersGql -Body $updatePrioGql
+            }
+
+            # E) Si el item ya estaba marcado como Done, cerramos el Issue en GitHub
+            if ($item.RawStatus -eq 'Done') {
+                $closePayload = @{ state = "closed" } | ConvertTo-Json
+                $null = Invoke-RestMethod -Uri "https://api.github.com/repos/$Owner/$Repo/issues/$issueNum" `
+                    -Method Patch -Headers $headersRest -Body $closePayload
+            }
+
+            Write-Host " [OK -> Issue #$issueNum]" -ForegroundColor Green
+            $createdCount++
+
+            # Pausa suave para evitar Rate Limits secundarios de GitHub
+            Start-Sleep -Milliseconds 600
+
+        } catch {
+            Write-Host " [ERROR: $($_.Exception.Message)]" -ForegroundColor Red
         }
-
-        # E) Si el item ya estaba marcado como Done, cerramos el Issue en GitHub
-        if ($item.RawStatus -eq 'Done') {
-            $closePayload = @{ state = "closed" } | ConvertTo-Json
-            $null = Invoke-RestMethod -Uri "https://api.github.com/repos/$Owner/$Repo/issues/$issueNum" `
-                -Method Patch -Headers $headersRest -Body $closePayload
-        }
-
-        Write-Host " [OK -> Issue #$issueNum]" -ForegroundColor Green
-        $createdCount++
-
-        # Pausa suave para evitar Rate Limits secundarios de GitHub
-        Start-Sleep -Milliseconds 600
-
-    } catch {
-        Write-Host " [ERROR: $($_.Exception.Message)]" -ForegroundColor Red
     }
+
+    Write-Host "`nNuevos elementos anadidos: $createdCount" -ForegroundColor Green
 }
 
 Write-Host "`n========================================================" -ForegroundColor Cyan
-Write-Host " Sincronización completada: $createdCount elementos añadidos a GitHub Projects!" -ForegroundColor Green
+Write-Host " Sincronizacion finalizada con exito!" -ForegroundColor Green
 Write-Host " Tablero: https://github.com/users/$Owner/projects/1" -ForegroundColor Yellow
 Write-Host "========================================================" -ForegroundColor Cyan
