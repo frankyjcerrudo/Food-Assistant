@@ -23,6 +23,9 @@
       --qa-fail-bg: rgba(239, 68, 68, 0.12);
       --qa-fail-border: rgba(239, 68, 68, 0.25);
     }
+    html {
+      background-color: var(--m3-surface);
+    }
     body {
       background-color: var(--m3-surface);
       color: var(--m3-on-surface);
@@ -1001,11 +1004,13 @@
           assertions: 'Verifica que sin fa_theme_mode, se asigne light al elemento raíz.'
         },
         () => {
+          const prevTheme = document.documentElement.getAttribute('data-theme') || 'light';
           localStorage.removeItem('fa_theme_mode');
           const defaultTheme = localStorage.getItem('fa_theme_mode') || 'light';
           expect(defaultTheme).toBe('light');
           document.documentElement.setAttribute('data-theme', defaultTheme);
           expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+          document.documentElement.setAttribute('data-theme', prevTheme);
         }
       );
 
@@ -1016,10 +1021,13 @@
           assertions: 'Guarda "dark" en localStorage y comprueba data-theme="dark".'
         },
         () => {
+          const prevTheme = document.documentElement.getAttribute('data-theme') || 'light';
           localStorage.setItem('fa_theme_mode', 'dark');
           document.documentElement.setAttribute('data-theme', 'dark');
           expect(localStorage.getItem('fa_theme_mode')).toBe('dark');
           expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+          // Restaurar tema previo del documento
+          document.documentElement.setAttribute('data-theme', prevTheme);
         }
       );
 
@@ -1111,7 +1119,7 @@
             "recipeIngredient": ["5 patatas medianas", "6 huevos", "Aceite de oliva", "Sal"],
             "recipeInstructions": ["Pelar y cortar las patatas.", "Freír a fuego medio.", "Batir los huevos y mezclar.", "Cuajar la tortilla."]
           }
-          </script>
+          ` + '<' + `/script>
         </head>
       </html>
     `;
@@ -1143,7 +1151,7 @@
           }
         ]
       }
-      </script>
+      ` + '<' + `/script>
     `;
     const extracted = RecipeParser.extractJsonLdFromHtml(html);
     expect(extracted).not.toBeNull();
@@ -2023,15 +2031,18 @@ Bocadillo De Atun Paso A Paso
     // =========================================================
     function toggleTheme() {
       const html = document.documentElement;
-      const current = html.getAttribute('data-theme');
+      const current = html.getAttribute('data-theme') || 'light';
       const next = current === 'dark' ? 'light' : 'dark';
       html.setAttribute('data-theme', next);
+      localStorage.setItem('fa_theme_mode', next);
       
       const btn = document.getElementById('btn-theme-toggle');
-      if (next === 'dark') {
-        btn.innerHTML = '<span class="material-symbols-outlined icon-sm">light_mode</span> Modo Claro';
-      } else {
-        btn.innerHTML = '<span class="material-symbols-outlined icon-sm">dark_mode</span> Modo Oscuro';
+      if (btn) {
+        if (next === 'dark') {
+          btn.innerHTML = '<span class="material-symbols-outlined icon-sm">light_mode</span> Modo Claro';
+        } else {
+          btn.innerHTML = '<span class="material-symbols-outlined icon-sm">dark_mode</span> Modo Oscuro';
+        }
       }
     }
 
@@ -2088,7 +2099,7 @@ Bocadillo De Atun Paso A Paso
           item.dataset.status = pass ? 'pass' : 'fail';
 
           item.innerHTML = `
-            <div class="test-case-header" onclick="const box = this.nextElementSibling; box.style.display = box.style.display === 'none' ? 'block' : 'none';">
+            <div class="test-case-header" onclick="const box = this.nextElementSibling; box.style.display = (box.style.display === 'block') ? 'none' : 'block';">
               <div class="test-case-title">
                 <span class="material-symbols-outlined" style="font-size: 18px; color: ${pass ? 'var(--qa-pass)' : 'var(--qa-fail)'}">
                   ${pass ? 'check_circle' : 'cancel'}
@@ -2125,12 +2136,25 @@ Bocadillo De Atun Paso A Paso
       document.getElementById('metric-passed').textContent = String(passed);
       document.getElementById('metric-failed').textContent = String(failed);
       document.getElementById('metric-time').textContent = `${elapsed}ms`;
+
+      // Restaurar tema visual preferido por el usuario
+      const activeTheme = localStorage.getItem('fa_theme_mode') || 'light';
+      document.documentElement.setAttribute('data-theme', activeTheme);
+      const btn = document.getElementById('btn-theme-toggle');
+      if (btn) {
+        if (activeTheme === 'dark') {
+          btn.innerHTML = '<span class="material-symbols-outlined icon-sm">light_mode</span> Modo Claro';
+        } else {
+          btn.innerHTML = '<span class="material-symbols-outlined icon-sm">dark_mode</span> Modo Oscuro';
+        }
+      }
     }
 
-    runAllTests();
-    window.addEventListener('DOMContentLoaded', () => {
+    if (document.readyState === 'loading') {
+      window.addEventListener('DOMContentLoaded', runAllTests);
+    } else {
       runAllTests();
-    });
+    }
   </script>
 </body>
 </html>
