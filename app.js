@@ -264,7 +264,7 @@ function getWeekDates(referenceDate) {
 }
 
 /**
- * Formats a week range in Spanish, e.g. "20 oct – 26 oct 2026"
+ * Formats a week range in Spanish, e.g. "19 oct – 25 oct 2026"
  */
 function formatWeekRange(weekDays) {
   if (!weekDays || weekDays.length !== 7) return '';
@@ -274,13 +274,15 @@ function formatWeekRange(weekDays) {
   const startMonth = MONTHS_SHORT_ES[start.getMonth()];
   const endDay = end.getDate();
   const endMonth = MONTHS_SHORT_ES[end.getMonth()];
-  const year = end.getFullYear();
+  const startYear = start.getFullYear();
+  const endYear = end.getFullYear();
 
-  if (start.getMonth() === end.getMonth()) {
-    return `${startDay} – ${endDay} ${startMonth} ${year}`;
+  if (startYear !== endYear) {
+    return `${startDay} ${startMonth} ${startYear} – ${endDay} ${endMonth} ${endYear}`;
   }
-  return `${startDay} ${startMonth} – ${endDay} ${endMonth} ${year}`;
+  return `${startDay} ${startMonth} – ${endDay} ${endMonth} ${endYear}`;
 }
+
 
 // Application State Store (Local First + Cloud Sync)
 class StateStore {
@@ -1444,7 +1446,7 @@ const RecipeParser = {
 };
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.27';
+  window.APP_VERSION = 'v0.28';
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
   window.getMondayOfWeek = getMondayOfWeek;
@@ -1456,7 +1458,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.27';
+    this.appVersion = 'v0.28';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;

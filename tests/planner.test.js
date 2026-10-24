@@ -129,7 +129,7 @@ describe('US-22: Semana estandarizada de Lunes a Domingo (ISO 8601)', () => {
     const refDate = new Date(2026, 9, 22);
     const week = getWeekDates(refDate);
     const formatted = formatWeekRange(week);
-    expect(formatted).toBe('19 – 25 oct 2026');
+    expect(formatted).toBe('19 oct – 25 oct 2026');
   });
 });
 
