@@ -7,4 +7,7 @@
 
 2. **Gestión de Backlog y Tareas**:
    - Las tareas permanecen en `In Progress` hasta que el usuario las pruebe y dé su aprobación explícita.
-   - Las versiones previas a publicación deben seguir el formato `0.x` (ejemplo: `v0.12`).
+   - Las versiones previas a publicación deben seguir el formato `0.x` (ejemplo: `v0.12`). En cada avance, cambio o nueva funcionalidad completada, el agente debe incrementar proactivamente la versión (ej. de `v0.22` a `v0.23`) en todos los archivos del proyecto (`package.json`, `app.js`, `index.html`, `sw.js`, tests).
+
+3. **Trato y Comunicación con el Usuario**:
+   - En cada respuesta o mensaje que el agente escriba, debe dirigirse siempre al usuario por su nombre: **Franky**.
