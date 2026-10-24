@@ -2065,70 +2065,98 @@ Bocadillo De Atun Paso A Paso
       const container = document.getElementById('test-results-container');
       container.innerHTML = '';
 
+      // Backup live localStorage del usuario para ejecución determinista y proteger sus datos reales
+      const backupStorage = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        backupStorage[k] = localStorage.getItem(k);
+      }
+
       let total = 0;
       let passed = 0;
       let failed = 0;
       const startTime = performance.now();
 
-      for (const s of suites) {
-        currentSuite = { title: s.title, tests: [] };
-        s.fn();
+      try {
+        for (const s of suites) {
+          currentSuite = { title: s.title, tests: [] };
+          s.fn();
 
-        const suiteCard = document.createElement('div');
-        suiteCard.className = 'test-suite-card';
-        suiteCard.innerHTML = `<div class="test-suite-title"><span class="material-symbols-outlined icon-sm">folder_open</span> ${s.title}</div>`;
+          const suiteCard = document.createElement('div');
+          suiteCard.className = 'test-suite-card';
+          suiteCard.innerHTML = `<div class="test-suite-title"><span class="material-symbols-outlined icon-sm">folder_open</span> ${s.title}</div>`;
 
-        for (const t of currentSuite.tests) {
-          total++;
-          const tStart = performance.now();
-          let pass = false;
-          let errMsg = '';
+          for (const t of currentSuite.tests) {
+            // Aislamiento completo de entorno para cada test (equivalente a beforeEach en Vitest)
+            localStorage.clear();
+            if (window.state && typeof window.state.generateInitialMealPlan === 'function') {
+              window.state.mealPlan = window.state.generateInitialMealPlan();
+              window.state.recipes = [...(window.SEED_RECIPES || [])];
+              window.state.shoppingList = [];
+            }
 
-          try {
-            t.testFn();
-            passed++;
-            pass = true;
-          } catch (err) {
-            failed++;
-            errMsg = err.message;
+            total++;
+            const tStart = performance.now();
+            let pass = false;
+            let errMsg = '';
+
+            try {
+              t.testFn();
+              passed++;
+              pass = true;
+            } catch (err) {
+              failed++;
+              errMsg = err.message;
+            }
+            const tElapsed = Math.max(1, Math.round(performance.now() - tStart));
+
+            const item = document.createElement('div');
+            item.className = 'test-case-item';
+            item.dataset.status = pass ? 'pass' : 'fail';
+
+            item.innerHTML = `
+              <div class="test-case-header" onclick="const box = this.nextElementSibling; box.style.display = (box.style.display === 'block') ? 'none' : 'block';">
+                <div class="test-case-title">
+                  <span class="material-symbols-outlined" style="font-size: 18px; color: ${pass ? 'var(--qa-pass)' : 'var(--qa-fail)'}">
+                    ${pass ? 'check_circle' : 'cancel'}
+                  </span>
+                  <span>${t.description}</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="test-time">${tElapsed}ms</span>
+                  <span class="test-badge ${pass ? 'badge-pass' : 'badge-fail'}">
+                    ${pass ? 'PASS' : 'FAIL'}
+                  </span>
+                </div>
+              </div>
+              <div class="test-details-box">
+                <div class="detail-row">
+                  <span class="detail-tag">&#127919; Objetivo:</span>
+                  <span class="detail-content">${t.meta.purpose || 'Comportamiento funcional esperado'}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-tag">&#128269; Validaci&oacute;n:</span>
+                  <span class="detail-content"><span class="code-snippet">${t.meta.assertions || 'Aserciones de c&oacute;digo'}</span></span>
+                </div>
+                ${errMsg ? `<div class="error-box"><strong>Error detectado:</strong> ${errMsg}</div>` : ''}
+              </div>
+            `;
+
+            suiteCard.appendChild(item);
           }
-          const tElapsed = Math.max(1, Math.round(performance.now() - tStart));
-
-          const item = document.createElement('div');
-          item.className = 'test-case-item';
-          item.dataset.status = pass ? 'pass' : 'fail';
-
-          item.innerHTML = `
-            <div class="test-case-header" onclick="const box = this.nextElementSibling; box.style.display = (box.style.display === 'block') ? 'none' : 'block';">
-              <div class="test-case-title">
-                <span class="material-symbols-outlined" style="font-size: 18px; color: ${pass ? 'var(--qa-pass)' : 'var(--qa-fail)'}">
-                  ${pass ? 'check_circle' : 'cancel'}
-                </span>
-                <span>${t.description}</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="test-time">${tElapsed}ms</span>
-                <span class="test-badge ${pass ? 'badge-pass' : 'badge-fail'}">
-                  ${pass ? 'PASS' : 'FAIL'}
-                </span>
-              </div>
-            </div>
-            <div class="test-details-box">
-              <div class="detail-row">
-                <span class="detail-tag">&#127919; Objetivo:</span>
-                <span class="detail-content">${t.meta.purpose || 'Comportamiento funcional esperado'}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-tag">&#128269; Validaci&oacute;n:</span>
-                <span class="detail-content"><span class="code-snippet">${t.meta.assertions || 'Aserciones de c&oacute;digo'}</span></span>
-              </div>
-              ${errMsg ? `<div class="error-box"><strong>Error detectado:</strong> ${errMsg}</div>` : ''}
-            </div>
-          `;
-
-          suiteCard.appendChild(item);
+          container.appendChild(suiteCard);
         }
-        container.appendChild(suiteCard);
+      } finally {
+        // Restaurar íntegramente los datos y recetas del usuario en localStorage
+        localStorage.clear();
+        for (const [k, v] of Object.entries(backupStorage)) {
+          localStorage.setItem(k, v);
+        }
+        if (window.state && typeof window.state.load === 'function') {
+          window.state.mealPlan = window.state.load('fa_mealplan', null) || window.state.generateInitialMealPlan();
+          window.state.recipes = window.state.load('fa_recipes', window.SEED_RECIPES || []);
+          window.state.shoppingList = window.state.load('fa_shopping', []);
+        }
       }
 
       const elapsed = Math.round(performance.now() - startTime);
@@ -2138,7 +2166,7 @@ Bocadillo De Atun Paso A Paso
       document.getElementById('metric-time').textContent = `${elapsed}ms`;
 
       // Restaurar tema visual preferido por el usuario
-      const activeTheme = localStorage.getItem('fa_theme_mode') || 'light';
+      const activeTheme = backupStorage['fa_theme_mode'] || 'light';
       document.documentElement.setAttribute('data-theme', activeTheme);
       const btn = document.getElementById('btn-theme-toggle');
       if (btn) {
