@@ -1444,7 +1444,7 @@ const RecipeParser = {
 };
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.24';
+  window.APP_VERSION = 'v0.25';
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
   window.getMondayOfWeek = getMondayOfWeek;
@@ -1456,7 +1456,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.24';
+    this.appVersion = 'v0.25';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -2143,10 +2143,9 @@ class FoodAssistantApp {
 
     const addExtraHtml = `
       <div class="today-add-slot-wrap">
-        <button type="button" class="btn btn-tonal today-add-slot-btn" onclick="app.openAddCustomSlotModal('${todayStr}')">
-          <span class="material-symbols-outlined icon-sm">add_circle</span>
+        <button type="button" class="btn today-add-slot-btn" onclick="app.openAddCustomSlotModal('${todayStr}')">
+          <span class="material-symbols-outlined icon-sm">add</span>
           <span>Añadir otra comida</span>
-          <span class="today-add-slot-hint">(snack, post-entreno, merienda...)</span>
         </button>
       </div>
     `;
