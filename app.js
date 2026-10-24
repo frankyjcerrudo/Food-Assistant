@@ -2145,7 +2145,8 @@ class FoodAssistantApp {
       <div class="today-add-slot-wrap">
         <button type="button" class="btn btn-tonal today-add-slot-btn" onclick="app.openAddCustomSlotModal('${todayStr}')">
           <span class="material-symbols-outlined icon-sm">add_circle</span>
-          <span>Añadir otra comida para hoy (snack, post-entreno, merienda...)</span>
+          <span>Añadir otra comida</span>
+          <span class="today-add-slot-hint">(snack, post-entreno, merienda...)</span>
         </button>
       </div>
     `;

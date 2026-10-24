@@ -750,7 +750,8 @@ body {
 
 .today-add-slot-wrap {
   grid-column: 1 / -1;
-  margin-top: 6px;
+  margin-top: 8px;
+  width: 100%;
 }
 
 .today-add-slot-btn {
@@ -759,14 +760,18 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   border-radius: var(--radius-lg);
-  padding: 12px 16px;
+  padding: 10px 14px;
   font-size: 13px;
   font-weight: 500;
-  gap: 8px;
+  gap: 6px;
   border: 1px dashed var(--m3-outline);
   background-color: var(--m3-surface-container-low);
   color: var(--m3-primary);
+  white-space: normal;
+  text-align: center;
+  line-height: 1.35;
   transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
   cursor: pointer;
   box-sizing: border-box;
@@ -780,6 +785,18 @@ body {
 
 .today-add-slot-btn:active {
   transform: scale(0.98);
+}
+
+.today-add-slot-hint {
+  font-size: 12px;
+  color: var(--m3-on-surface-variant);
+  font-weight: 400;
+}
+
+@media (max-width: 480px) {
+  .today-add-slot-hint {
+    display: none;
+  }
 }
 
 /* Meal Slots */
