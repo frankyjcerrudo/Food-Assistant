@@ -328,7 +328,7 @@ class StateStore {
       defaultServings: 2,
       geminiModel: 'gemini-2.5-flash'
     });
-    this.theme = localStorage.getItem('fa_theme_mode') || 'system';
+    this.theme = localStorage.getItem('fa_theme_mode') || 'light';
     this.cloudUser = this.load('fa_cloud_user', null);
     this.supabaseConfig = {
       url: window.APP_CONFIG?.supabaseUrl || localStorage.getItem('fa_sb_url') || '',
@@ -1444,7 +1444,7 @@ const RecipeParser = {
 };
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.26';
+  window.APP_VERSION = 'v0.27';
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
   window.getMondayOfWeek = getMondayOfWeek;
@@ -1456,7 +1456,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.26';
+    this.appVersion = 'v0.27';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;

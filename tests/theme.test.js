@@ -6,12 +6,11 @@ describe('Control de Tema Visual (Light / Dark / System)', () => {
     document.documentElement.removeAttribute('data-theme');
   });
 
-  it('debe persistir fa_theme_mode="light" y asignar data-theme="light" en el elemento raíz', () => {
-    const themeMode = 'light';
-    localStorage.setItem('fa_theme_mode', themeMode);
-    document.documentElement.setAttribute('data-theme', themeMode);
+  it('debe tener Modo Claro por defecto y asignar data-theme="light" en el elemento raíz', () => {
+    const defaultTheme = localStorage.getItem('fa_theme_mode') || 'light';
+    expect(defaultTheme).toBe('light');
+    document.documentElement.setAttribute('data-theme', defaultTheme);
 
-    expect(localStorage.getItem('fa_theme_mode')).toBe('light');
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
   });
 

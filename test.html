@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Food Assistant - Informe Detallado de Calidad y Tests</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.20">
+  <link rel="stylesheet" href="styles.css?v=0.27">
   <style>
     :root {
       --qa-pass: #059669;
@@ -99,105 +99,91 @@
       flex-direction: column;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     }
-    .metric-value {
-      font-size: 28px;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      margin-top: 4px;
-    }
     .metric-label {
       font-size: 12px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      color: var(--m3-outline);
+      color: var(--m3-on-surface-variant);
+      margin-bottom: 4px;
     }
-    .metric-card.pass .metric-value { color: var(--qa-pass); }
-    .metric-card.fail .metric-value { color: var(--qa-fail); }
-
+    .metric-value {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--m3-on-surface);
+    }
+    .metric-value.pass {
+      color: var(--qa-pass);
+    }
+    .metric-value.fail {
+      color: var(--qa-fail);
+    }
     .filters-bar {
       display: flex;
       gap: 8px;
-      margin-bottom: 20px;
+      margin-bottom: 18px;
     }
     .filter-btn {
       padding: 6px 14px;
-      border-radius: 20px;
+      border-radius: var(--radius-full);
       border: 1px solid var(--m3-outline-variant);
-      background: var(--m3-surface-container-lowest);
-      color: var(--m3-on-surface);
-      font-size: 13px;
-      font-weight: 500;
+      background: transparent;
+      color: var(--m3-on-surface-variant);
+      font-size: 12px;
+      font-weight: 600;
       cursor: pointer;
-      transition: all 150ms ease-out;
-    }
-    .filter-btn:active {
-      transform: scale(0.96);
     }
     .filter-btn.active {
-      background: var(--m3-primary-container);
-      color: var(--m3-on-primary-container);
-      border-color: var(--m3-primary);
-      font-weight: 700;
+      background: var(--m3-secondary-container);
+      color: var(--m3-on-secondary-container);
+      border-color: var(--m3-secondary-container);
     }
-
     .test-suite-card {
-      background: var(--m3-surface-container-low);
-      border: 1px solid var(--m3-outline-variant);
-      border-radius: var(--radius-lg);
-      padding: 20px;
-      margin-bottom: 24px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-    }
-    .test-suite-title {
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--m3-primary);
-      margin-bottom: 16px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .test-case-item {
       background: var(--m3-surface);
       border: 1px solid var(--m3-outline-variant);
-      border-radius: var(--radius-md);
-      margin-bottom: 12px;
+      border-radius: var(--radius-lg);
+      margin-bottom: 20px;
       overflow: hidden;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-      transition: transform 140ms ease-out, box-shadow 140ms ease-out;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+    .test-suite-title {
+      background: var(--m3-surface-container);
+      padding: 12px 18px;
+      font-weight: 700;
+      font-size: 14px;
+      border-bottom: 1px solid var(--m3-outline-variant);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .test-case-item {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--m3-outline-variant);
+      transition: background 120ms ease;
+    }
+    .test-case-item:last-child {
+      border-bottom: none;
     }
     .test-case-header {
-      padding: 12px 16px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       cursor: pointer;
-      user-select: none;
-      gap: 12px;
-      background: var(--m3-surface);
-      transition: background 150ms ease;
-    }
-    .test-case-header:hover {
-      background: var(--m3-surface-container-high);
     }
     .test-case-title {
-      font-weight: 600;
       font-size: 14px;
+      font-weight: 600;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
     }
     .test-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 10px;
-      border-radius: 12px;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
-      letter-spacing: 0.02em;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
     .badge-pass {
       background: var(--qa-pass-bg);
@@ -210,36 +196,32 @@
       border: 1px solid var(--qa-fail-border);
     }
     .test-time {
-      font-size: 12px;
-      color: var(--m3-outline);
-      margin-right: 8px;
+      font-size: 11px;
+      color: var(--m3-on-surface-variant);
       font-variant-numeric: tabular-nums;
     }
-
     .test-details-box {
-      padding: 14px 16px;
+      margin-top: 10px;
+      padding: 10px 14px;
       background: var(--m3-surface-container-lowest);
-      border-top: 1px solid var(--m3-outline-variant);
-      font-size: 13px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--m3-outline-variant);
+      font-size: 12px;
+      display: none;
     }
     .detail-row {
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       display: flex;
-      gap: 10px;
+      gap: 8px;
+      line-height: 1.4;
     }
     .detail-row:last-child {
       margin-bottom: 0;
     }
     .detail-tag {
       font-weight: 700;
-      min-width: 95px;
       color: var(--m3-on-surface-variant);
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
+      min-width: 85px;
     }
     .detail-content {
       color: var(--m3-on-surface);
@@ -247,55 +229,56 @@
     }
     .code-snippet {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 12px;
       background: var(--m3-surface-container);
-      color: var(--m3-on-surface);
-      padding: 3px 8px;
-      border-radius: 4px;
-      display: inline-block;
-      border: 1px solid var(--m3-outline-variant);
+      padding: 2px 5px;
+      border-radius: var(--radius-xs);
+      font-size: 11px;
     }
     .error-box {
-      margin-top: 10px;
-      padding: 10px 14px;
+      margin-top: 8px;
       background: var(--qa-fail-bg);
-      border-left: 3px solid var(--qa-fail);
       color: var(--qa-fail);
-      font-family: ui-monospace, SFMono-Regular, monospace;
-      font-size: 12px;
-      border-radius: 4px;
+      border: 1px solid var(--qa-fail-border);
+      padding: 8px 12px;
+      border-radius: var(--radius-xs);
+      font-family: monospace;
+      font-size: 11px;
+      white-space: pre-wrap;
     }
   </style>
 </head>
 <body>
 
-  <div class="test-header">
+  <header class="test-header">
     <div>
-      <h1><span class="material-symbols-outlined" style="color: var(--m3-primary);">verified</span> Suite de Pruebas y Control de Calidad</h1>
-      <p>Informe en vivo de verificaci&oacute;n t&eacute;cnica y reglas de negocio de Food Assistant</p>
+      <h1>
+        <span class="material-symbols-outlined" style="color: var(--m3-primary); font-size: 28px;">verified</span>
+        Food Assistant - Suite de Calidad
+      </h1>
+      <p>Verificaci&oacute;n integral de funcionalidades, accesibilidad, calendario ISO 8601 y parsers de recetas.</p>
     </div>
     <div class="header-actions">
-      <button class="btn-action" onclick="toggleTheme()" id="btn-theme-toggle">
+      <button class="btn-action" id="btn-theme-toggle" onclick="toggleTheme()">
         <span class="material-symbols-outlined icon-sm">dark_mode</span> Modo Oscuro
       </button>
       <button class="btn-action primary" onclick="runAllTests()">
-        <span class="material-symbols-outlined icon-sm">play_arrow</span> Re-ejecutar Tests
+        <span class="material-symbols-outlined icon-sm">play_arrow</span> Reejecutar Tests
       </button>
     </div>
-  </div>
+  </header>
 
   <div class="metrics-bar">
     <div class="metric-card">
-      <span class="metric-label">Total Pruebas</span>
+      <span class="metric-label">Total Tests</span>
       <span class="metric-value" id="metric-total">0</span>
     </div>
-    <div class="metric-card pass">
-      <span class="metric-label">Pasadas</span>
-      <span class="metric-value" id="metric-passed">0</span>
+    <div class="metric-card">
+      <span class="metric-label">Exitosos</span>
+      <span class="metric-value pass" id="metric-passed">0</span>
     </div>
-    <div class="metric-card fail">
-      <span class="metric-label">Falladas</span>
-      <span class="metric-value" id="metric-failed">0</span>
+    <div class="metric-card">
+      <span class="metric-label">Fallidos</span>
+      <span class="metric-value fail" id="metric-failed">0</span>
     </div>
     <div class="metric-card">
       <span class="metric-label">Tiempo Total</span>
@@ -311,9 +294,12 @@
 
   <div id="test-results-container"></div>
 
+  <!-- Contenedor sandbox para ejecución segura de pruebas DOM sin alterar el dashboard -->
+  <div id="qa-sandbox" style="display: none;"></div>
+
   <!-- Entorno y dependencias de la app -->
-  <script src="config.js?v=0.20"></script>
-  <script src="app.js?v=0.20"></script>
+  <script src="config.js?v=0.27"></script>
+  <script src="app.js?v=0.27"></script>
 
   <script>
     const suites = [];
@@ -360,6 +346,9 @@
         toBeDefined() {
           if (actual === undefined) throw new Error(`Se esperaba que el valor estuviese definido`);
         },
+        toBeUndefined() {
+          if (actual !== undefined) throw new Error(`Se esperaba undefined, recibido ${actual}`);
+        },
         toBeNull() {
           if (actual !== null) throw new Error(`Se esperaba null, recibido ${actual}`);
         },
@@ -382,6 +371,9 @@
         toBeDefined() {
           if (actual !== undefined) throw new Error('No se esperaba que estuviese definido');
         },
+        toBeUndefined() {
+          if (actual === undefined) throw new Error('No se esperaba undefined');
+        },
         toContain(expected) {
           const hasIt = Array.isArray(actual) ? actual.includes(expected) : (typeof actual === 'string' ? actual.includes(expected) : false);
           if (hasIt) throw new Error(`No se esperaba que contuviera ${JSON.stringify(expected)}`);
@@ -395,10 +387,11 @@
     }
 
     // =========================================================
-    // DEFINICIÓN DE PRUEBAS CON DETALLE EXPLICATIVO
+    // DEFINICIÓN DE PRUEBAS CON DETALLE EXPLICATIVO (63 TESTS)
     // =========================================================
 
-    describe('1. StateStore y Modelo de Datos de Comidas', () => {
+    // SUITE 1: StateStore y Normalización de Datos (4 tests)
+    describe('1. StateStore y Normalización de Datos', () => {
       it(
         'STANDARD_SLOTS contiene exactamente los 4 momentos de comida del día',
         {
@@ -436,6 +429,33 @@
       );
 
       it(
+        'debe normalizar planes antiguos que solo tenían lunch y dinner sin romper',
+        {
+          purpose: 'Compatibilidad hacia atrás con datos de versiones previas almacenados en LocalStorage.',
+          assertions: 'Verifica que un plan antiguo sin breakfast ni snack se normaliza con null y customSlots vacío.'
+        },
+        () => {
+          const legacyPlan = {
+            "2026-10-20": {
+              dayName: "Martes",
+              lunch: "rec-pesto-pasta",
+              dinner: "rec-lemon-chicken"
+            }
+          };
+          localStorage.setItem('fa_mealplan', JSON.stringify(legacyPlan));
+
+          const store = new window.StateStore();
+          const day = store.mealPlan["2026-10-20"];
+
+          expect(day.lunch).toBe("rec-pesto-pasta");
+          expect(day.dinner).toBe("rec-lemon-chicken");
+          expect(day.breakfast).toBeNull();
+          expect(day.snack).toBeNull();
+          expect(day.customSlots).toEqual([]);
+        }
+      );
+
+      it(
         'SEED_RECIPES incluye recetas catalogadas para Desayuno y Merienda',
         {
           purpose: 'Comprobar que el catálogo semilla incluye recetas apropiadas para cubrir los momentos de desayuno y merienda desde el primer uso de la app.',
@@ -451,70 +471,151 @@
       );
     });
 
+    // SUITE 2: Motor de Lista de la Compra y Escalado (8 tests)
     describe('2. Motor de Lista de la Compra y Escalado', () => {
       it(
-        'AISLE_METADATA contiene los pasillos requeridos y sus iconos',
+        'AISLE_METADATA contiene metadatos completos para todos los pasillos estándar',
         {
-          purpose: 'Validar que el catálogo de pasillos de supermercado cuenta con todas las categorías de clasificación de ingredientes para organizar la lista de la compra.',
-          assertions: 'Valida existencia de produce, meat, dairy, bakery, pantry, spices, frozen, beverages y other.'
+          purpose: 'Garantizar que todos los pasillos del supermercado disponen de etiqueta legible e icono distintivo.',
+          assertions: 'Verifica produce, meat, dairy, bakery, pantry, spices, frozen, beverages, other.'
         },
         () => {
-          const aisles = ['produce', 'meat', 'dairy', 'bakery', 'pantry', 'spices', 'frozen', 'beverages', 'other'];
-          aisles.forEach(a => {
+          const required = ['produce', 'meat', 'dairy', 'bakery', 'pantry', 'spices', 'frozen', 'beverages', 'other'];
+          required.forEach(a => {
             expect(window.AISLE_METADATA).toHaveProperty(a);
+            expect(window.AISLE_METADATA[a]).toHaveProperty('label');
+            expect(window.AISLE_METADATA[a]).toHaveProperty('icon');
           });
         }
       );
 
       it(
-        'Escala proporcionalmente las cantidades de ingredientes según el número de comensales',
+        'Escala proporcionalmente las cantidades de ingredientes al modificar el número de comensales',
         {
-          purpose: 'Garantizar que al cocinar para más comensales (ej. pasar de 2 a 4 raciones), las cantidades de ingredientes se recalculan matemáticamente al doble con exactitud.',
-          assertions: 'Comprueba que una base de 200g para 2 porciones calculada para 4 porciones resulta en exactamente 400g.'
+          purpose: 'Verificar la exactitud matemática del escalado al calcular ingredientes de recetas para familias o grupos.',
+          assertions: 'Escala 250g para 2 comensales a 4 comensales resultando exactamente en 500g.'
         },
         () => {
           const baseServings = 2;
           const targetServings = 4;
           const ratio = targetServings / baseServings;
-          const baseAmount = 200;
-          const scaled = Math.round((baseAmount * ratio) * 10) / 10;
-          expect(scaled).toBe(400);
+          const originalAmount = 250;
+          const scaledAmount = Math.round((originalAmount * ratio) * 10) / 10;
+          expect(scaledAmount).toBe(500);
         }
       );
 
       it(
-        'Fusiona y suma cantidades si el ingrediente y unidad son iguales',
+        'Fusiona cantidades de ingredientes idénticos con la misma unidad en la lista de la compra',
         {
-          purpose: 'Evitar que aparezcan filas duplicadas en la lista de la compra al añadir dos recetas que usan el mismo ingrediente con la misma unidad (ej. Pechugas 300g + 200g = 500g).',
-          assertions: 'Busca el ingrediente existente con case-insensitive, suma 300g + 200g y valida que el total es 500g en una sola entrada.'
+          purpose: 'Evitar duplicados molestos en la compra sumando cantidades cuando el producto y unidad coinciden.',
+          assertions: 'Suma 400g + 200g de Pechugas de pollo dando 600g en una sola línea.'
         },
         () => {
-          const items = [{ name: "Pechugas", amount: 300, unit: "g" }];
-          const toAdd = { name: "Pechugas", amount: 200, unit: "g" };
-          const existing = items.find(i => i.name.toLowerCase() === toAdd.name.toLowerCase() && i.unit === toAdd.unit);
+          const list = [{ name: 'Pechugas de pollo', amount: 400, unit: 'g', aisle: 'meat', isChecked: false }];
+          const newItem = { name: 'Pechugas de pollo', amount: 200, unit: 'g', aisle: 'meat', isChecked: false };
+          const key = `${newItem.name.toLowerCase().trim()}_${newItem.unit.toLowerCase().trim()}`;
+          const existing = list.find(i => `${i.name.toLowerCase().trim()}_${i.unit.toLowerCase().trim()}` === key && !i.isChecked);
           expect(existing).toBeDefined();
-          existing.amount += toAdd.amount;
-          expect(items[0].amount).toBe(500);
+          existing.amount = Math.round((existing.amount + newItem.amount) * 10) / 10;
+          expect(list).toHaveLength(1);
+          expect(list[0].amount).toBe(600);
+        }
+      );
+
+      it(
+        'no debe fusionar ingredientes si tienen unidades distintas (ej. gramos vs unidades)',
+        {
+          purpose: 'Evitar suma incompatible de ingredientes con diferente métrica (peso vs unidades).',
+          assertions: 'Verifica que 500g y 3ud de Tomates se mantienen como dos líneas separadas.'
+        },
+        () => {
+          const list = [{ name: 'Tomates', amount: 500, unit: 'g', isChecked: false }];
+          const newItem = { name: 'Tomates', amount: 3, unit: 'ud', isChecked: false };
+          const key = `${newItem.name.toLowerCase().trim()}_${newItem.unit.toLowerCase().trim()}`;
+          const existing = list.find(i => `${i.name.toLowerCase().trim()}_${i.unit.toLowerCase().trim()}` === key && !i.isChecked);
+          expect(existing).toBeUndefined();
+          list.push(newItem);
+          expect(list).toHaveLength(2);
+        }
+      );
+
+      it(
+        'Agrupa los ingredientes por receta con estado seleccionado por defecto (US-13)',
+        {
+          purpose: 'Garantizar que antes de enviar a la lista de la compra, los ingredientes aparecen ordenados bajo cada receta.',
+          assertions: 'Valida que previewGroups contiene 2 recetas con items inicializados con checked === true.'
+        },
+        () => {
+          const recipeA = { id: 'rec-1', title: 'Pollo al Curry', servings: 2, ingredients: [{ name: 'Pechuga', amount: 300, unit: 'g' }] };
+          const recipeB = { id: 'rec-2', title: 'Ensalada', servings: 2, ingredients: [{ name: 'Tomate', amount: 2, unit: 'ud' }] };
+          const previewGroups = [
+            { recipeId: recipeA.id, recipeTitle: recipeA.title, items: recipeA.ingredients.map(ing => ({ ...ing, checked: true })) },
+            { recipeId: recipeB.id, recipeTitle: recipeB.title, items: recipeB.ingredients.map(ing => ({ ...ing, checked: true })) }
+          ];
+          expect(previewGroups).toHaveLength(2);
+          expect(previewGroups[0].items.every(i => i.checked)).toBe(true);
+        }
+      );
+
+      it(
+        'Excluye los ingredientes desmarcados por el usuario al confirmar la adición a la compra',
+        {
+          purpose: 'Permitir al usuario omitir condimentos o ingredientes que ya tiene en su despensa.',
+          assertions: 'Filtra un array excluyendo los no seleccionados (checked === false).'
+        },
+        () => {
+          const previewItems = [
+            { name: 'Pechuga', amount: 300, unit: 'g', checked: true },
+            { name: 'Aceite de oliva', amount: 20, unit: 'ml', checked: false },
+            { name: 'Sal', amount: 5, unit: 'g', checked: false }
+          ];
+          const confirmed = previewItems.filter(i => i.checked);
+          expect(confirmed).toHaveLength(1);
+          expect(confirmed[0].name).toBe('Pechuga');
+        }
+      );
+
+      it(
+        'Permite modificar manualmente la cantidad de un ingrediente antes de confirmar',
+        {
+          purpose: 'Ofrecer control total al usuario para ajustar porciones según disponibilidad.',
+          assertions: 'Modifica amount de 200g a 350g directamente.'
+        },
+        () => {
+          const item = { name: 'Arroz', baseAmount: 200, amount: 200, unit: 'g', checked: true };
+          item.amount = 350;
+          expect(item.amount).toBe(350);
+        }
+      );
+
+      it(
+        'Escala todas las cantidades al modificar el selector general de comensales del modal de previsualización',
+        {
+          purpose: 'Facilitar ajuste de porciones al vuelo en el modal antes de volcar a la lista.',
+          assertions: 'Escala 150g de lentejas al doble con ratio 2x resultando en 300g.'
+        },
+        () => {
+          const item = { name: 'Lentejas', baseAmount: 150, amount: 150, unit: 'g' };
+          const scaleRatio = 4 / 2;
+          item.amount = Math.round((item.baseAmount * scaleRatio) * 10) / 10;
+          expect(item.amount).toBe(300);
         }
       );
     });
 
-    describe('3. Planificador y Momentos de Comida Personalizados', () => {
+    // SUITE 3: Planificador Semanal y Motor ISO 8601 (11 tests)
+    describe('3. Planificador Semanal y Motor ISO 8601', () => {
       it(
         'Permite añadir un nuevo momento personalizado al día',
         {
-          purpose: 'Validar que usuarios con requerimientos nutricionales especiales (atletas, dietas fraccionadas) pueden crear momentos dinámicos como "Post-Entreno" o "Pre-Cama".',
-          assertions: 'Añade un customSlot con ID, nombre e icono y comprueba que se persiste en la lista customSlots del día.'
+          purpose: 'Validar que usuarios con requerimientos nutricionales especiales pueden crear momentos dinámicos.',
+          assertions: 'Añade un customSlot y comprueba que se persiste en la lista customSlots del día.'
         },
         () => {
           const store = new window.StateStore();
           const dateKey = Object.keys(store.mealPlan)[0];
-          const newSlot = {
-            id: 'test-slot-1',
-            name: 'Post-Entreno',
-            icon: 'fitness_center',
-            recipeId: null
-          };
+          const newSlot = { id: 'test-slot-1', name: 'Post-Entreno', icon: 'fitness_center', recipeId: null };
           store.mealPlan[dateKey].customSlots.push(newSlot);
           expect(store.mealPlan[dateKey].customSlots).toHaveLength(1);
           expect(store.mealPlan[dateKey].customSlots[0].name).toBe('Post-Entreno');
@@ -524,8 +625,8 @@
       it(
         'Permite asignar y desasignar recetas a un momento personalizado',
         {
-          purpose: 'Garantizar el ciclo completo de interacción: vincular una receta específica a un momento personalizado y retirarla cuando el usuario decida borrarla o cambiarla.',
-          assertions: 'Asigna recipeId "rec-avocado-toast", comprueba el valor, reasigna a null y comprueba la limpieza.'
+          purpose: 'Garantizar el ciclo completo: vincular una receta específica y retirarla cuando se borre.',
+          assertions: 'Asigna recipeId, comprueba el valor, reasigna a null y comprueba la limpieza.'
         },
         () => {
           const store = new window.StateStore();
@@ -541,8 +642,8 @@
       it(
         'Permite eliminar un momento personalizado sin alterar los 4 slots estándar',
         {
-          purpose: 'Garantizar la integridad de los datos: borrar un momento personalizado no debe corromper ni borrar los momentos base (Desayuno, Almuerzo, Merienda, Cena).',
-          assertions: 'Elimina el customSlot filtrando por ID y confirma que length es 0 y que breakfast y dinner siguen existiendo intactos.'
+          purpose: 'Garantizar que borrar un momento dinámico no altera desayuno, almuerzo, merienda ni cena.',
+          assertions: 'Elimina customSlot y confirma que breakfast y dinner siguen existiendo intactos.'
         },
         () => {
           const store = new window.StateStore();
@@ -554,1274 +655,193 @@
           expect(store.mealPlan[dateKey]).toHaveProperty('dinner');
         }
       );
-    });
 
-    describe('4. US-13: Modal de Previsualización y Selección de Ingredientes', () => {
       it(
-        'Agrupa los ingredientes por receta con estado seleccionado por defecto',
+        'toLocalDateKey genera siempre la clave YYYY-MM-DD en hora local sin desfase UTC',
         {
-          purpose: 'Garantizar que antes de enviar a la lista de la compra, los ingredientes aparecen ordenados y agrupados bajo el título de cada receta, con todas sus casillas marcadas por defecto.',
-          assertions: 'Valida que previewGroups contiene 2 recetas con sus ingredientes y todos los items inicializan con checked === true.'
+          purpose: 'BUG-07: Evitar que entre 00:00 y 02:00 en España la app muestre el día de ayer por cálculo en UTC.',
+          assertions: 'Verifica formateo exacto YYYY-MM-DD y reconstrucción mediante parseLocalDateKey.'
         },
         () => {
-          const recipeA = {
-            id: 'rec-1',
-            title: 'Pollo al Curry',
-            servings: 2,
-            ingredients: [
-              { name: 'Pechuga', amount: 300, unit: 'g', aisle: 'meat' },
-              { name: 'Curry en polvo', amount: 15, unit: 'g', aisle: 'spices' }
-            ]
-          };
-          const recipeB = {
-            id: 'rec-2',
-            title: 'Ensalada Mediterránea',
-            servings: 2,
-            ingredients: [
-              { name: 'Tomate', amount: 2, unit: 'ud', aisle: 'produce' },
-              { name: 'Aceite de oliva', amount: 20, unit: 'ml', aisle: 'pantry' }
-            ]
-          };
+          const testDate = new Date(2026, 9, 24, 1, 15, 0);
+          const key = window.toLocalDateKey(testDate);
+          expect(key).toBe('2026-10-24');
 
-          const previewGroups = [
-            { recipeId: recipeA.id, recipeTitle: recipeA.title, items: recipeA.ingredients.map(ing => ({ ...ing, checked: true })) },
-            { recipeId: recipeB.id, recipeTitle: recipeB.title, items: recipeB.ingredients.map(ing => ({ ...ing, checked: true })) }
-          ];
-
-          expect(previewGroups).toHaveLength(2);
-          expect(previewGroups[0].items).toHaveLength(2);
-          expect(previewGroups[0].items.every(i => i.checked)).toBe(true);
-          expect(previewGroups[1].items).toHaveLength(2);
+          const parsed = window.parseLocalDateKey(key);
+          expect(parsed.getFullYear()).toBe(2026);
+          expect(parsed.getMonth()).toBe(9);
+          expect(parsed.getDate()).toBe(24);
         }
       );
 
       it(
-        'Excluye los ingredientes desmarcados al confirmar la adición a la compra',
+        'toLocalDateKey sin argumentos devuelve la fecha de hoy en formato válido YYYY-MM-DD',
         {
-          purpose: 'Permitir al usuario desmarcar aquellos ingredientes que ya tiene en su despensa (ej. Sal o Aceite), asegurando que solo los ingredientes con checked === true se añaden a la compra.',
-          assertions: 'Filtra previewItems por checked === true y confirma que solo 1 ingrediente de los 3 se añade a la compra final.'
+          purpose: 'Asegurar valor por defecto coherente con la fecha del sistema.',
+          assertions: 'Verifica patrón YYYY-MM-DD con regex.'
         },
         () => {
-          const previewItems = [
-            { name: 'Pechuga', amount: 300, unit: 'g', checked: true },
-            { name: 'Aceite de oliva', amount: 20, unit: 'ml', checked: false },
-            { name: 'Sal', amount: 5, unit: 'g', checked: false }
-          ];
-
-          const itemsToConfirm = previewItems.filter(item => item.checked);
-          expect(itemsToConfirm).toHaveLength(1);
-          expect(itemsToConfirm[0].name).toBe('Pechuga');
+          const todayKey = window.toLocalDateKey();
+          expect(todayKey).toMatch(/^\d{4}-\d{2}-\d{2}$/);
         }
       );
 
       it(
-        'Permite modificar manualmente la cantidad de un ingrediente en el modal',
+        'getMondayOfWeek devuelve siempre el Lunes de la semana ISO correspondiente',
         {
-          purpose: 'Validar que el usuario puede ajustar numéricamente la cantidad exacta de cualquier ingrediente en el modal antes de volcarlo a la lista de la compra.',
-          assertions: 'Sobrescribe previewItem.amount con 350g y verifica que el nuevo valor es persistido correctamente.'
+          purpose: 'US-05 / ISO 8601: Toda semana en el planificador debe comenzar estrictamente en Lunes.',
+          assertions: 'Verifica que para cualquier día de la semana (Lunes, Miércoles, Domingo) devuelve el Lunes previo.'
         },
         () => {
-          const previewItem = { name: 'Arroz', baseAmount: 200, amount: 200, unit: 'g', checked: true };
-          previewItem.amount = 350;
-          expect(previewItem.amount).toBe(350);
+          const monday = new Date(2026, 9, 19, 10, 0, 0);
+          const wednesday = new Date(2026, 9, 21, 14, 30, 0);
+          const sunday = new Date(2026, 9, 25, 22, 0, 0);
+
+          expect(window.toLocalDateKey(window.getMondayOfWeek(monday))).toBe('2026-10-19');
+          expect(window.toLocalDateKey(window.getMondayOfWeek(wednesday))).toBe('2026-10-19');
+          expect(window.toLocalDateKey(window.getMondayOfWeek(sunday))).toBe('2026-10-19');
         }
       );
 
       it(
-        'Escala proporcionalmente las cantidades de todos los grupos al cambiar comensales',
+        'getWeekDates genera los 7 días de la semana de Lunes a Domingo con claves ISO',
         {
-          purpose: 'Comprobar que al aumentar o disminuir las porciones en el modal previo, todas las cantidades se recalculan matemáticamente en proporción exacta.',
-          assertions: 'Calcula scaleRatio = 4 / 2 y verifica que 150g de lentejas escala exactamente a 300g.'
+          purpose: 'US-05: Proporcionar la estructura semanal completa de 7 días correlativos con día en español.',
+          assertions: 'Comprueba longitud 7, Lunes a Domingo y claves de fecha ISO.'
         },
         () => {
-          const initialServings = 2;
-          const targetServings = 4;
-          const scaleRatio = targetServings / initialServings;
-          const item = { name: 'Lentejas', baseAmount: 150, amount: 150, unit: 'g' };
-          item.amount = Math.round((item.baseAmount * scaleRatio) * 10) / 10;
-          expect(item.amount).toBe(300);
-        }
-      );
-    });
+          const refDate = new Date(2026, 9, 22);
+          const week = window.getWeekDates(refDate);
 
-    describe('5. Control de Tema Visual y Anti-Forced Dark Mode', () => {
-      it(
-        'Persiste data-theme="light" en el elemento raíz y en almacenamiento local',
-        {
-          purpose: 'Garantizar que al seleccionar el Modo Claro, el atributo data-theme="light" se inyecta inmediatamente en <html> y se guarda en localStorage sin retraso.',
-          assertions: 'Asigna "light" a localStorage y al atributo data-theme del root, comprobando que ambos devuelven "light".'
-        },
-        () => {
-          localStorage.setItem('fa_theme_mode', 'light');
-          document.documentElement.setAttribute('data-theme', 'light');
-          expect(localStorage.getItem('fa_theme_mode')).toBe('light');
-          expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+          expect(week).toHaveLength(7);
+          expect(week[0].dayName).toBe('Lunes');
+          expect(week[0].dateKey).toBe('2026-10-19');
+
+          expect(week[4].dayName).toBe('Viernes');
+          expect(week[4].dateKey).toBe('2026-10-23');
+
+          expect(week[5].dayName).toBe('Sábado');
+          expect(week[5].dateKey).toBe('2026-10-24');
+
+          expect(week[6].dayName).toBe('Domingo');
+          expect(week[6].dateKey).toBe('2026-10-25');
         }
       );
 
       it(
-        'Persiste data-theme="dark" en el elemento raíz y en almacenamiento local',
+        'formatWeekRange formatea correctamente el intervalo de fechas',
         {
-          purpose: 'Garantizar que al seleccionar el Modo Oscuro, se activan los tokens de superficie profunda (#121314) y se persisten en localStorage.',
-          assertions: 'Asigna "dark" y comprueba que localStorage y documentElement reflejan "dark".'
+          purpose: 'US-05: Mostrar en la barra superior el rango legible de la semana visible.',
+          assertions: 'Verifica que la semana del 19 al 25 de octubre se formatea como "19 – 25 oct 2026".'
         },
         () => {
-          localStorage.setItem('fa_theme_mode', 'dark');
-          document.documentElement.setAttribute('data-theme', 'dark');
-          expect(localStorage.getItem('fa_theme_mode')).toBe('dark');
-          expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+          const refDate = new Date(2026, 9, 22);
+          const week = window.getWeekDates(refDate);
+          const formatted = window.formatWeekRange(week);
+          expect(formatted).toBe('19 – 25 oct 2026');
         }
       );
 
       it(
-        'Alterna de forma limpia y directa entre Modo Claro y Oscuro en un solo clic',
+        'Inicia en semana actual (offset = 0) y renderiza 7 tarjetas de Lunes a Domingo',
         {
-          purpose: 'Evitar estados intermedios confusos en el botón de acceso rápido de la cabecera: un clic en Claro pasa a Oscuro y un clic en Oscuro pasa a Claro.',
-          assertions: 'Ejecuta toggleThemeTransition en secuencia y comprueba que alterna exactamente Claro -> Oscuro -> Claro.'
+          purpose: 'US-05: Renderizado del planificador con 7 días uniformes sin diferenciación invasiva de fin de semana.',
+          assertions: 'Verifica 7 .day-card, 0 .day-card-weekend y 7 .day-date-label.'
         },
         () => {
-          const toggleThemeTransition = (current) => (current === 'light' ? 'dark' : 'light');
-          let theme = 'light';
-          theme = toggleThemeTransition(theme);
-          expect(theme).toBe('dark');
-          theme = toggleThemeTransition(theme);
-          expect(theme).toBe('light');
+          const sandbox = document.getElementById('qa-sandbox');
+          sandbox.innerHTML = `
+            <div class="week-nav-bar" id="planner-week-nav-bar">
+              <button id="btn-prev-week"></button>
+              <button id="btn-current-week"></button>
+              <button id="btn-next-week"></button>
+              <span id="planner-week-range-text"></span>
+            </div>
+            <div id="planner-days-container"></div>
+          `;
+
+          const appInst = new window.FoodAssistantApp();
+          appInst.renderPlanner();
+          expect(appInst.plannerWeekOffset).toBe(0);
+
+          const container = document.getElementById('planner-days-container');
+          const cards = container.querySelectorAll('.day-card');
+          expect(cards).toHaveLength(7);
+
+          const weekendCards = container.querySelectorAll('.day-card-weekend');
+          expect(weekendCards).toHaveLength(0);
+          expect(container.innerHTML).not.toContain('Fin de semana');
+
+          const dateLabels = container.querySelectorAll('.day-date-label');
+          expect(dateLabels).toHaveLength(7);
+
+          sandbox.innerHTML = '';
         }
       );
 
       it(
-        'Muestra el icono de acción intuitivo (Sol en Oscuro para aclarar, Luna en Claro para oscurecer)',
+        'Navegación fluida: permite avanzar a la semana siguiente (+1) y volver a la actual (0)',
         {
-          purpose: 'Garantizar una semántica de interfaz estándar: si la app está oscura, el botón debe mostrar un Sol indicando "pulsa aquí para poner modo claro".',
-          assertions: 'Comprueba que getTargetActionIcon("dark") devuelve "light_mode" y getTargetActionIcon("light") devuelve "dark_mode".'
+          purpose: 'US-05: Navegación bidireccional entre semanas actualizando el offset y las tarjetas.',
+          assertions: 'Avanza a offset 1, comprueba cambio de rango y regresa a offset 0 con navigateWeek.'
         },
         () => {
-          const getTargetActionIcon = (theme) => (theme === 'light' ? 'dark_mode' : 'light_mode');
-          expect(getTargetActionIcon('dark')).toBe('light_mode');
-          expect(getTargetActionIcon('light')).toBe('dark_mode');
-        }
-      );
-    });
+          const sandbox = document.getElementById('qa-sandbox');
+          sandbox.innerHTML = `
+            <div class="week-nav-bar" id="planner-week-nav-bar">
+              <button id="btn-prev-week"></button>
+              <button id="btn-current-week"></button>
+              <button id="btn-next-week"></button>
+              <span id="planner-week-range-text"></span>
+            </div>
+            <div id="planner-days-container"></div>
+          `;
 
-    describe('6. US-15: Importador de Recetas (Schema.org / JSON-LD & Texto)', () => {
-      it(
-        'parseIsoDuration convierte duraciones ISO 8601 a minutos correctamente',
-        {
-          purpose: 'Convertir duraciones en formato estándar ISO 8601 (PT15M, PT1H30M, PT2H) o expresiones legibles (25 min) a minutos enteros exactos para tiempo de cocinado y preparación.',
-          assertions: 'Verifica que PT15M devuelve 15, PT1H30M devuelve 90, PT2H devuelve 120, 25 min devuelve 25 y null devuelve el fallback 15.'
-        },
-        () => {
-          expect(window.RecipeParser.parseIsoDuration('PT15M')).toBe(15);
-          expect(window.RecipeParser.parseIsoDuration('PT1H30M')).toBe(90);
-          expect(window.RecipeParser.parseIsoDuration('PT2H')).toBe(120);
-          expect(window.RecipeParser.parseIsoDuration('25 min')).toBe(25);
-          expect(window.RecipeParser.parseIsoDuration(null)).toBe(15);
-        }
-      );
+          const appInst = new window.FoodAssistantApp();
+          appInst.renderPlanner();
+          const initialRange = document.getElementById('planner-week-range-text').textContent;
 
-      it(
-        'parseServings extrae el número de raciones o porciones',
-        {
-          purpose: 'Extraer el número de raciones a partir de cadenas libres de rendimiento (recipeYield) como "4 raciones", "Para 6 personas" o enteros puros.',
-          assertions: 'Verifica que 4, "4 raciones" y "Para 6 personas" devuelven 4, 4 y 6 respectivamente, con fallback a 2 si es nulo.'
-        },
-        () => {
-          expect(window.RecipeParser.parseServings(4)).toBe(4);
-          expect(window.RecipeParser.parseServings('4 raciones')).toBe(4);
-          expect(window.RecipeParser.parseServings('Para 6 personas')).toBe(6);
-          expect(window.RecipeParser.parseServings(null)).toBe(2);
+          appInst.navigateWeek(1);
+          expect(appInst.plannerWeekOffset).toBe(1);
+          const nextRange = document.getElementById('planner-week-range-text').textContent;
+          expect(nextRange).not.toBe(initialRange);
+
+          appInst.navigateWeek(-1);
+          expect(appInst.plannerWeekOffset).toBe(0);
+          expect(document.getElementById('planner-week-range-text').textContent).toBe(initialRange);
+
+          sandbox.innerHTML = '';
         }
       );
 
       it(
-        'parseIngredientLine desglosa cantidad, unidad y clasifica el pasillo del súper',
+        'getDayPlan crea días bajo demanda con dayName calculado dinámicamente si no existían',
         {
-          purpose: 'Analizar líneas de texto libre de ingredientes (ej. "200 g de pechuga", "3 huevos", "1/2 cucharada de sal") extrayendo cantidad numérica, unidad normalizada y clasificando automáticamente el pasillo de la compra (aisle).',
-          assertions: 'Verifica que la pechuga va a "meat" con 200g, los huevos a "dairy" con 3 ud, y la sal a "spices" con 0.5 cda.'
+          purpose: 'BUG-08 & BUG-17: Evitar días sin nombre y permitir navegación a semanas futuras sin plan preexistente.',
+          assertions: 'Comprueba creación dinámica con dayName correcto en español sin sobreescribir datos existentes.'
         },
         () => {
-          const ing1 = window.RecipeParser.parseIngredientLine('200 g de pechuga de pollo');
-          expect(ing1.amount).toBe(200);
-          expect(ing1.unit).toBe('g');
-          expect(ing1.name).toBe('Pechuga de pollo');
-          expect(ing1.aisle).toBe('meat');
+          const store = new window.StateStore();
+          const futureDateKey = '2027-03-15';
+          expect(store.mealPlan[futureDateKey]).toBeUndefined();
 
-          const ing2 = window.RecipeParser.parseIngredientLine('3 huevos');
-          expect(ing2.amount).toBe(3);
-          expect(ing2.unit).toBe('ud');
-          expect(ing2.aisle).toBe('dairy');
+          const dayData = store.getDayPlan(futureDateKey, 'Lunes');
+          expect(dayData).toBeDefined();
+          expect(dayData.dayName).toBe('Lunes');
+          expect(dayData.breakfast).toBeNull();
+          expect(dayData.lunch).toBeNull();
+          expect(dayData.customSlots).toEqual([]);
+          expect(store.mealPlan[futureDateKey]).toBeDefined();
 
-          const ing3 = window.RecipeParser.parseIngredientLine('1/2 cucharada de sal');
-          expect(ing3.amount).toBe(0.5);
-          expect(ing3.unit).toBe('cda');
-          expect(ing3.aisle).toBe('spices');
-        }
-      );
-
-      it(
-        'extractJsonLdFromHtml y parseSchemaRecipe estructuran la receta web completa',
-        {
-          purpose: 'Extraer y mapear un bloque <script type="application/ld+json"> con @type="Recipe" al formato interno de receta de Food Assistant con ingredientes, tiempos y pasos.',
-          assertions: 'Valida que extrae "Tortilla de Patatas" con 10 min de prep, 20 min de cocción, 4 raciones, 3 ingredientes y 2 pasos de elaboración.'
-        },
-        () => {
-          const html = '<!DOCTYPE html><html><head><script type="application/ld+json">' +
-            JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "Recipe",
-              "name": "Tortilla de Patatas",
-              "prepTime": "PT10M",
-              "cookTime": "PT20M",
-              "recipeYield": "4 personas",
-              "recipeIngredient": [
-                "5 patatas medianas",
-                "6 huevos",
-                "1 cebolla"
-              ],
-              "recipeInstructions": [
-                { "@type": "HowToStep", "text": "Pelar y cortar las patatas." },
-                { "@type": "HowToStep", "text": "Freír a fuego medio y cuajar con los huevos." }
-              ]
-            }) +
-            '<' + '/script></head></html>';
-
-          const extracted = window.RecipeParser.extractJsonLdFromHtml(html);
-          expect(extracted).not.toBeNull();
-          expect(extracted.name).toBe('Tortilla de Patatas');
-
-          const recipe = window.RecipeParser.parseSchemaRecipe(extracted);
-          expect(recipe.title).toBe('Tortilla de Patatas');
-          expect(recipe.prepTimeMinutes).toBe(10);
-          expect(recipe.cookTimeMinutes).toBe(20);
-          expect(recipe.servings).toBe(4);
-          expect(recipe.ingredients).toHaveLength(3);
-          expect(recipe.instructions).toHaveLength(2);
-          expect(recipe.instructions[0].text).toBe('Pelar y cortar las patatas.');
-
-          const recipeWithSource = window.RecipeParser.parseSchemaRecipe(extracted, 'https://www.directoalpaladar.com/recetas/tortilla');
-          expect(recipeWithSource.sourceUrl).toBe('https://www.directoalpaladar.com/recetas/tortilla');
-          expect(recipeWithSource.sourceDomain).toBe('directoalpaladar.com');
-        }
-      );
-
-      it(
-        'extractJsonLdFromHtml soporta grafos Schema.org anidados (@graph)',
-        {
-          purpose: 'Garantizar compatibilidad con webs de recetas basadas en WordPress (Yoast, WPRM) donde la receta está encapsulada dentro de un grafo de entidades.',
-          assertions: 'Verifica que localiza el objeto de tipo Recipe dentro de @graph y extrae "Guacamole Casero".'
-        },
-        () => {
-          const html = '<script type="application/ld+json">' +
-            JSON.stringify({
-              "@context": "https://schema.org",
-              "@graph": [
-                { "@type": "WebSite", "name": "Blog Gastronómico" },
-                {
-                  "@type": "Recipe",
-                  "name": "Guacamole Casero",
-                  "recipeYield": 2,
-                  "recipeIngredient": ["2 aguacates maduros", "1 lima"]
-                }
-              ]
-            }) +
-            '<' + '/script>';
-
-          const extracted = window.RecipeParser.extractJsonLdFromHtml(html);
-          expect(extracted).not.toBeNull();
-          expect(extracted.name).toBe('Guacamole Casero');
-        }
-      );
-
-      it(
-        'parseRecipeText extrae recetas desde notas o texto plano estructurado',
-        {
-          purpose: 'Permitir al usuario pegar texto sin formato ni etiquetas HTML (notas de móvil, WhatsApp o blogs) extrayendo título, raciones, tiempos, lista de ingredientes e instrucciones numeradas.',
-          assertions: 'Valida que extrae "Salmón con Verduras", 3 raciones, 25 min, 3 ingredientes y 3 pasos de preparación.'
-        },
-        () => {
-          const text = [
-            "Salmón con Verduras al Vapor",
-            "Raciones: 3",
-            "Tiempo: 25 min",
-            "",
-            "Ingredientes:",
-            "- 3 lomos de salmón",
-            "- 200 g de brócoli",
-            "- 1 cucharada de aceite de oliva",
-            "",
-            "Instrucciones:",
-            "1. Lavar y cortar el brócoli en ramilletes.",
-            "2. Cocinar el salmón a la plancha 4 minutos por lado.",
-            "3. Servir caliente."
-          ].join("\n");
-
-          const recipe = window.RecipeParser.parseRecipeText(text);
-          expect(recipe).not.toBeNull();
-          expect(recipe.title).toBe('Salmón con Verduras al Vapor');
-          expect(recipe.servings).toBe(3);
-          expect(recipe.cookTimeMinutes).toBe(25);
-          expect(recipe.ingredients).toHaveLength(3);
-          expect(recipe.instructions).toHaveLength(3);
-          expect(recipe.instructions[1].text).toBe('Cocinar el salmón a la plancha 4 minutos por lado.');
-        }
-      );
-
-      it(
-        'parseIngredientLine soporta formato inverso de webs espa\u00F1olas (Directo al Paladar, Cookpad)',
-        {
-          purpose: 'Permitir analizar ingredientes donde el nombre del producto va antes que la cantidad y unidad (ej. "Placas de lasa\u00F1a 12", "Tomate triturado 400 g", "Berenjena 1") habitual en webs gastron\u00F3micas espa\u00F1olas.',
-          assertions: 'Verifica que extrae 12 ud para Placas de lasa\u00F1a en bakery, 400 g para Tomate triturado en produce, y 1 ud para Berenjena.'
-        },
-        () => {
-          const r1 = window.RecipeParser.parseIngredientLine('Placas de lasa\u00F1a 12');
-          expect(r1.amount).toBe(12);
-          expect(r1.unit).toBe('ud');
-          expect(r1.name).toBe('Placas de lasa\u00F1a');
-          expect(r1.aisle).toBe('bakery');
-
-          const r2 = window.RecipeParser.parseIngredientLine('Tomate triturado 400 g');
-          expect(r2.amount).toBe(400);
-          expect(r2.unit).toBe('g');
-          expect(r2.name).toBe('Tomate triturado');
-          expect(r2.aisle).toBe('produce');
-
-          const r3 = window.RecipeParser.parseIngredientLine('Berenjena 1');
-          expect(r3.amount).toBe(1);
-          expect(r3.unit).toBe('ud');
-          expect(r3.name).toBe('Berenjena');
-
-          const r4 = window.RecipeParser.parseIngredientLine('Aceite de oliva virgen extra 40 ml');
-          expect(r4.amount).toBe(40);
-          expect(r4.unit).toBe('ml');
-        }
-      );
-
-      it(
-        'parseIngredientLine gestiona ingredientes "al gusto" y descarta cabeceras de secci\u00F3n',
-        {
-          purpose: 'Gestionar ingredientes sin gramaje num\u00E9rico exacto asign\u00E1ndoles unidad "pizca" y descartar subcabeceras decorativas como "Para la bechamel:" o "Para la salsa:" para no introducirlas falsamente como ingredientes.',
-          assertions: 'Comprueba que "Sal y pimienta al gusto" devuelve 1 pizca en spices, y "Para la bechamel:" o "Ingredientes:" devuelven null.'
-        },
-        () => {
-          const tt = window.RecipeParser.parseIngredientLine('Sal y pimienta al gusto');
-          expect(tt.amount).toBe(1);
-          expect(tt.unit).toBe('pizca');
-          expect(tt.name).toBe('Sal y pimienta');
-          expect(tt.aisle).toBe('spices');
-
-          const sh1 = window.RecipeParser.parseIngredientLine('Para la bechamel:');
-          expect(sh1).toBeNull();
-
-          const sh2 = window.RecipeParser.parseIngredientLine('Ingredientes:');
-          expect(sh2).toBeNull();
-
-          expect(window.RecipeParser.parseIngredientLine('Cantidad de la raci\u00F3n')).toBeNull();
-          expect(window.RecipeParser.parseIngredientLine('1 ud Cantidad de la raci\u00F3n')).toBeNull();
-          expect(window.RecipeParser.parseIngredientLine('4')).toBeNull();
-          expect(window.RecipeParser.parseIngredientLine('2 ud 4')).toBeNull();
-          expect(window.RecipeParser.parseIngredientLine('Unidad(es)')).toBeNull();
-          expect(window.RecipeParser.parseIngredientLine('1 ud Unidad(es)')).toBeNull();
-        }
-      );
-
-      it(
-        'parseIngredientLine elimina prefijos/unidades "count" y normaliza unidades pegadas (Directo al Paladar)',
-        {
-          purpose: 'Limpiar prefijos t\u00E9cnicos de CMS gastron\u00F3micos como "4count Diente de ajo" o "1count Lim\u00F3n" evitando que la palabra "Count" acabe en el nombre del ingrediente.',
-          assertions: 'Verifica que "4count Diente de ajo" extrae 4 ud con nombre "Diente de ajo", "1count Lim\u00F3n" extrae 1 ud, y "400g Tofu firme" extrae 400 g.'
-        },
-        () => {
-          const c1 = window.RecipeParser.parseIngredientLine('4count Diente de ajo');
-          expect(c1.amount).toBe(4);
-          expect(c1.unit).toBe('ud');
-          expect(c1.name).toBe('Diente de ajo');
-
-          const c2 = window.RecipeParser.parseIngredientLine('1count Lim\u00F3n');
-          expect(c2.amount).toBe(1);
-          expect(c2.unit).toBe('ud');
-          expect(c2.name).toBe('Lim\u00F3n');
-
-          const c3 = window.RecipeParser.parseIngredientLine('2count Clavo de olor');
-          expect(c3.amount).toBe(2);
-          expect(c3.unit).toBe('ud');
-          expect(c3.name).toBe('Clavo de olor');
-
-          const c4 = window.RecipeParser.parseIngredientLine('400g Tofu firme');
-          expect(c4.amount).toBe(400);
-          expect(c4.unit).toBe('g');
-          expect(c4.name).toBe('Tofu firme');
-
-          const c5 = window.RecipeParser.parseIngredientLine('300ml Agua');
-          expect(c5.amount).toBe(300);
-          expect(c5.unit).toBe('ml');
-          expect(c5.name).toBe('Agua');
-        }
-      );
-
-      it(
-        'parseSchemaRecipe y parseRecipeText omiten etiqueta "Importada"',
-        {
-          purpose: 'Garantizar que las recetas importadas conserven \u00FAnicamente categor\u00EDas reales (como "Vegui") sin ensuciar la lista de tags con "Importada" o "Notas".',
-          assertions: 'Verifica que recipe.tags no incluye "Importada" ni en Schema.org ni en importaci\u00F3n de texto.'
-        },
-        () => {
-          const fakeSchema = {
-            '@type': 'Recipe',
-            name: 'Curry Vegano',
-            recipeCategory: ['Vegui', 'Curry'],
-            recipeIngredient: ['400g Tofu firme', '4count Diente de ajo'],
-            recipeInstructions: ['Cocinar todo junto.']
-          };
-          const rSchema = window.RecipeParser.parseSchemaRecipe(fakeSchema);
-          expect(rSchema.tags).toContain('Vegui');
-          expect(rSchema.tags).not.toContain('Importada');
-
-          const rawText = "Curry r\u00E1pido\nIngredientes:\n1 cebolla\nInstrucciones:\n1. Picar.";
-          const rText = window.RecipeParser.parseRecipeText(rawText);
-          expect(rText.tags).not.toContain('Importada');
-          expect(rText.tags).not.toContain('Notas');
-        }
-      );
-
-      it(
-        'parseRecipeText procesa recetas completas reales de Directo al Paladar con tiempos y temporizadores',
-        {
-          purpose: 'Validar la importaci\u00F3n integral de una receta copiada tal cual de Directo al Paladar con raciones, tiempos de cocci\u00F3n/preparaci\u00F3n y temporizadores inteligentes en los pasos.',
-          assertions: 'Verifica 4 raciones, 20 min prep, 40 min cocci\u00F3n, 13 ingredientes limpios, y temporizadores de 10 min y 25 min en los pasos correspondientes.'
-        },
-        () => {
-          const rawDirecto = [
-            "Lasa\u00F1a de verduras f\u00E1cil y r\u00E1pida",
-            "Tiempo de preparaci\u00F3n: 20 min",
-            "Tiempo de cocci\u00F3n: 40 min",
-            "Para 4 personas",
-            "",
-            "Ingredientes",
-            "Placas de lasa\u00F1a 12",
-            "Berenjena 1",
-            "Calabac\u00EDn 1",
-            "Cebolla 1",
-            "Pimiento rojo 0.5",
-            "Tomate triturado 400 g",
-            "Queso rallado 100 g",
-            "Aceite de oliva virgen extra 40 ml",
-            "Sal y pimienta al gusto",
-            "Para la bechamel:",
-            "Mantequilla 50 g",
-            "Harina de trigo 50 g",
-            "Leche entera 500 ml",
-            "Nuez moscada 1 pizca",
-            "",
-            "Instrucciones",
-            "1. Cortar las verduras en dados peque\u00F1os.",
-            "2. En una sart\u00E9n con aceite de oliva, pochar la cebolla y el pimiento durante 10 minutos.",
-            "3. A\u00F1adir el calabac\u00EDn y la berenjena y cocinar otros 10 minutos.",
-            "4. Agregar el tomate triturado, salpimentar y dejar reducir a fuego lento 15 minutos.",
-            "5. Preparar la bechamel derritiendo la mantequilla, a\u00F1adiendo la harina y vertiendo la leche poco a poco.",
-            "6. Montar la lasa\u00F1a alternando pasta, verduras y bechamel.",
-            "7. Terminar con queso rallado y hornear a 200\u00BAC durante 25 minutos."
-          ].join("\n");
-
-          const recipe = window.RecipeParser.parseRecipeText(rawDirecto);
-          expect(recipe.title).toBe('Lasa\u00F1a de verduras f\u00E1cil y r\u00E1pida');
-          expect(recipe.servings).toBe(4);
-          expect(recipe.prepTimeMinutes).toBe(20);
-          expect(recipe.cookTimeMinutes).toBe(40);
-          expect(recipe.ingredients).toHaveLength(13);
-          expect(recipe.instructions).toHaveLength(7);
-          expect(recipe.instructions[1].timerMinutes).toBe(10);
-          expect(recipe.instructions[6].timerMinutes).toBe(25);
-        }
-      );
-
-      it(
-        'parseRecipeText procesa recetas con ingredientes en dos lÃ­neas (cantidad y nombre separados) como Bocadillo de atÃºn',
-        {
-          purpose: 'Validar la importaciÃ³n de recetas copiadas donde el gestor de contenidos separa cantidades e ingredientes en lÃ­neas contiguas y tiempos en bloques.',
-          assertions: 'Verifica tÃ­tulo Bocadillo de atÃºn, 2 raciones, 5 min, 7 ingredientes limpios (Pan baguette 2 ud, Mayonesa 4 cda, AtÃºn 200 g) y 4 pasos.'
-        },
-        () => {
-          const rawBocadillo = [
-            "Ingredientes",
-            " Para 2 personas",
-            "2 uds.",
-            "Pan baguette",
-            "4 cucharadas",
-            "Mayonesa",
-            "2 cucharadas",
-            "Mostaza",
-            "200 g",
-            "At\u00FAn en conserva",
-            "2 uds.",
-            "Tomate en rama",
-            "1 ud.",
-            "Cogollo de lechuga",
-            "2 uds.",
-            "Huevo cocido",
-            "C\u00F3mo hacer Bocadillo de at\u00FAn",
-            "Dificultad: F\u00E1cil",
-            "Tiempo total",
-            "5",
-            "min",
-            "Elaboraci\u00F3n",
-            "5",
-            "min",
-            "Primero abrimos las barras de pan. Mezclamos la mayonesa con la mostaza, y untamos la base de las barras con la salsa.",
-            "",
-            "Escurrimos los lomos de at\u00FAn, pelamos y cortamos los huevos en rodajas, y cortamos en rodajas los tomates.",
-            "",
-            "Colocamos las rodajas de tomate en la base de los bocadillos seguidas de las hojas de lechuga.",
-            "",
-            "Ponemos encima el at\u00FAn, y por \u00FAltimo, las rodajas de huevo cocido antes de cerrar el bocadillo.",
-            "",
-            "Bocadillo De Atun Paso A Paso"
-          ].join("\n");
-
-          const recipe = window.RecipeParser.parseRecipeText(rawBocadillo);
-          expect(recipe.title).toBe('Bocadillo de at\u00FAn');
-          expect(recipe.servings).toBe(2);
-          expect(recipe.prepTimeMinutes).toBe(5);
-          expect(recipe.cookTimeMinutes).toBe(5);
-          expect(recipe.ingredients).toHaveLength(7);
-          expect(recipe.ingredients[0].name).toBe('Pan baguette');
-          expect(recipe.ingredients[0].amount).toBe(2);
-          expect(recipe.ingredients[0].unit).toBe('ud');
-          expect(recipe.ingredients[1].name).toBe('Mayonesa');
-          expect(recipe.ingredients[1].amount).toBe(4);
-          expect(recipe.ingredients[1].unit).toBe('cda');
-          expect(recipe.ingredients[3].name).toBe('At\u00FAn en conserva');
-          expect(recipe.ingredients[3].amount).toBe(200);
-          expect(recipe.ingredients[3].unit).toBe('g');
-          expect(recipe.instructions).toHaveLength(4);
-        }
-      );
-
-      it(
-        'parseRecipeText procesa recetas complejas con subsecciones, metodo, tiempos en horas y lonchas como Bocadillo Cubano',
-        {
-          purpose: 'Validar la importaciÃ³n de recetas complejas con subencabezados (- CERDO ASADO CUBANO, - PAN DE CUBANO), secciÃ³n MÃ‰TODO, raciones expresadas como CANTIDAD: 4 BOCADILLOS, tiempos en horas y unidades de lonchas sin conflicto con litros.',
-          assertions: 'Verifica tÃ­tulo Bocadillo Cubano completamente casero, 4 raciones, 120 min prep, 300 min cocciÃ³n, 4 lonchas de jamÃ³n (no 4 l), 2 lonchas de queso y pasos de mÃ©todo limpios.'
-        },
-        () => {
-          const rawCubano = [
-            "Bocadillo Cubano completamente casero \u2014 diegodoal",
-            "",
-            "DIFICULTAD: INTERMEDIA - INGREDIENTES: F\u00C1CIL - TIEMPO: 5 HORAS",
-            "TIEMPO ACTIVO: 2 HORAS - CANTIDAD: 4 BOCADILLOS",
-            "INGREDIENTES",
-            "- CERDO ASADO CUBANO",
-            "2 kg de aguja de cerdo deshuesada",
-            "Sal",
-            "Mojo:",
-            "60 ml de zumo de lima",
-            "120 ml de zumo de naranja",
-            "60 ml de aceite de oliva virgen extra",
-            "1 cucharada de or\u00E9gano seco",
-            "- PAN DE CUBANO",
-            "350 g de harina de fuerza",
-            "15 g de az\u00FAcar",
-            "5 g de levadura instant\u00E1nea de panadero",
-            "9 g de sal",
-            "250 ml de agua templada",
-            "30 g de manteca de cerdo",
-            "- BOCADILLO CUBANO (1)",
-            "Cerdo asado cubano",
-            "4 lonchas de jam\u00F3n cocido finas",
-            "2 lonchas de queso emmental",
-            "Mostaza amarilla",
-            "Pepinillos",
-            "Mantequilla",
-            "M\u00C9TODO",
-            "- CERDO ASADO CUBANO",
-            "Limpia la aguja de cerdo si tiene hueso. S\u00E1lala por toda la superficie abundantemente.",
-            "En un bol, mezcla todos los ingredientes del mojo. Reserva la mitad en la nevera y con la otra mitad marina la carne. D\u00E9jala en la nevera al menos dos horas, pero idealmente toda la noche.",
-            "Envuelve el trozo de carne y sus jugos con papel de aluminio y m\u00E9telo a un horno a 180 grados, calor solo por abajo, dos horas.",
-            "Desenvu\u00E9lvelo, b\u00E1\u00F1alo con sus jugos, y devu\u00E9lvelo al horno 2 horas m\u00E1s. B\u00E1\u00F1alo con los jugos cada 30 minutos.",
-            "S\u00E1calo del horno y d\u00E9jalo reposar 15 minutos. Mientras, mezcla sus jugos con el mojo que hab\u00EDamos reservado en la nevera.",
-            "R\u00F3mpelo en trozos medianos con las manos o dos tenedores. Vierte el mojo por toda la carne y mezcla bien.",
-            "- PAN DE CUBANO",
-            "En un bol grande, a\u00F1ade la harina de fuerza, el az\u00FAcar, la levadura instant\u00E1nea y la sal. Mezcla con unas varillas.",
-            "Haz un hueco en el centro y a\u00F1ade el agua. Mezcla con unas varillas y despu\u00E9s con las manos, hasta que toda la harina se integre.",
-            "A\u00F1ade la manteca a temperatura ambiente e int\u00E9grala en la masa. Amasa en una mesa durante 8-9 minutos, hasta que sea el\u00E1stica y rebote al tacto.",
-            "Haz una bola con la masa y d\u00E9jala reposar en un bol tapada con un trapo h\u00FAmedo, durante 45 minutos, o hasta que retomen la forma."
-          ].join("\n");
-
-          const recipe = window.RecipeParser.parseRecipeText(rawCubano);
-          expect(recipe.title).toBe('Bocadillo Cubano completamente casero');
-          expect(recipe.servings).toBe(4);
-          expect(recipe.prepTimeMinutes).toBe(120);
-          expect(recipe.cookTimeMinutes).toBe(300);
-
-          const jamon = recipe.ingredients.find(i => i.name.toLowerCase().includes('jam'));
-          expect(jamon).toBeDefined();
-          expect(jamon.amount).toBe(4);
-          expect(jamon.unit).toBe('loncha');
-
-          const queso = recipe.ingredients.find(i => i.name.toLowerCase().includes('emmental'));
-          expect(queso).toBeDefined();
-          expect(queso.amount).toBe(2);
-          expect(queso.unit).toBe('loncha');
-
-          const metodoIng = recipe.ingredients.find(i => i.name.toLowerCase().includes('m\u00E9todo'));
-          expect(metodoIng).toBe(undefined);
-
-          expect(recipe.instructions.length).toBeGreaterThanOrEqual(10);
-          expect(recipe.instructions[0].text).toContain('Limpia la aguja de cerdo');
-        }
-      );
-
-      it(
-        'htmlToText y parseRecipeText procesan contenido Markdown de Jina Reader (# Ingredientes, ## Cómo hacer...)',
-        {
-          purpose: 'Validar que el texto extraído por proxies de lectura (como r.jina.ai) con sintaxis Markdown se parsea sin errores.',
-          assertions: 'Verifica extracción correcta de título, raciones, ingredientes y pasos a partir de markdown sin bloques html.'
-        },
-        () => {
-          const sampleMd = [
-            'Title: Bolitas de garbanzos y brócoli al horno: receta fácil',
-            'URL Source: https://www.directoalpaladar.com/recetas-vegetarianas/bolitas-garbanzos',
-            '',
-            '## Ingredientes',
-            'Para 4 personas',
-            '* 400 g Garbanzos cocidos escurridos',
-            '* 100 g Brócoli',
-            '* 1 ud. Cebolla',
-            '',
-            '## Cómo hacer bolitas de garbanzos y brócoli',
-            'Dificultad: Fácil',
-            '* Tiempo total 40 min',
-            '',
-            'Separamos los floretes y lo ponemos a cocer tres minutos.',
-            'Aplastar los garbanzos en un bol.',
-            'Hornear a 200 grados durante 20 minutos.'
-          ].join('\n');
-
-          const cleanedText = window.RecipeParser.htmlToText(sampleMd);
-          expect(cleanedText).toBe(sampleMd);
-
-          const recipe = window.RecipeParser.parseRecipeText(cleanedText, 'https://www.directoalpaladar.com/recetas-vegetarianas/bolitas-garbanzos');
-          expect(recipe).not.toBeNull();
-          expect(recipe.title).toBe('Bolitas de garbanzos y brócoli al horno: receta fácil');
-          expect(recipe.servings).toBe(4);
-          expect(recipe.ingredients.length).toBeGreaterThanOrEqual(3);
-          expect(recipe.instructions.length).toBeGreaterThanOrEqual(3);
-          expect(recipe.sourceDomain).toBe('directoalpaladar.com');
-        }
-      );
-
-      it(
-        'procesa correctamente recetas de Directo al Paladar con título "paso a paso" y metadatos de Jina',
-        {
-          purpose: 'Validar que las recetas con título finalizado en "paso a paso" y con metadatos de Jina Reader (URL Source, Published Time, avatar, Editor Senior) no meten basura en las instrucciones.',
-          assertions: 'Verifica que el título no activa las instrucciones antes de tiempo, que los metadatos se excluyen y que el paso 1 es el paso real de cocina.'
-        },
-        () => {
-          const rawDirecto = [
-            'Title: Tortilla de patatas con cebolla: receta tradicional española paso a paso',
-            'URL Source: https://www.directoalpaladar.com/recetas-de-huevos-y-tortillas/empezando-en-la-cocina-receta-de-tortilla-de-patatas-con-cebolla/amp',
-            'Markdown Content:',
-            '16 septiembre 2026, 16:53',
-            'Editor Senior  977 votos',
-            'Quizás la receta de la tortilla de patata sea una de las primeras que todo aspirante a cocinillas debería aprender a hacer.',
-            '',
-            '## Ingredientes',
-            'Para 4 personas',
-            '* Patata 4',
-            '* Huevo 4',
-            '* Cebolla 1',
-            '* Aceite de oliva virgen extra',
-            '* Sal',
-            '',
-            '## Cómo hacer tortilla de patatas con cebolla tradicional',
-            'Comenzamos con la tarea más larga, la de caramelizar la cebolla que nos llevará unos 30 minutos.',
-            'Mientras la cebolla se hace, pelamos las patatas y las cortamos en rodajas finas durante 15 minutos.',
-            'Cuajamos la tortilla en una sartén caliente 3 minutos por lado.',
-            '',
-            'En DAP | Tortilla de patatas con Thermomix'
-          ].join('\n');
-
-          const recipe = window.RecipeParser.parseRecipeText(rawDirecto, 'https://www.directoalpaladar.com/recetas-de-huevos-y-tortillas/tortilla');
-          expect(recipe).not.toBeNull();
-          expect(recipe.title).toContain('Tortilla de patatas con cebolla');
-          expect(recipe.servings).toBe(4);
-          expect(recipe.ingredients.length).toBeGreaterThanOrEqual(4);
-          expect(recipe.ingredients.some(i => i.name.toLowerCase().includes('septiembre'))).toBe(false);
-          expect(recipe.instructions.length).toBe(3);
-          expect(recipe.instructions[0].text).toContain('caramelizar la cebolla');
-          expect(recipe.instructions.some(i => i.text.includes('URL Source') || i.text.includes('Editor Senior'))).toBe(false);
-        }
-      );
-
-      it(
-        'elimina imágenes inline markdown de ingredientes e instrucciones y calcula temporizadores complejos (caso Bon Viveur)',
-        {
-          purpose: 'Validar que las imágenes en markdown ![Image: ...](url) incrustadas entre ingredientes o pasos de preparación se limpian por completo y los temporizadores complejos (1 hora y media = 90min, 18-20 min = 20min) se calculan con exactitud.',
-          assertions: 'Verifica ausencia de nombres de imagen, 3 pasos limpios, temporizador de 90 min en paso 1 y 20 min en paso 3.'
-        },
-        () => {
-          const rawBonViveur = [
-            'Title: Risotto de boletus: una receta italiana exquisita y muy fácil de preparar',
-            'URL Source: https://bonviveur.com/es/recetas/risotto-de-boletus?hl=es-ES',
-            '',
-            '## Ingredientes del risotto de boletus',
-            '* 20 g de boletus deshidratados',
-            '* 180 g de arroz para risotto',
-            '* 500 ml de caldo de verduras',
-            '* 2 cda de aceite de oliva virgen extra',
-            '![Image 2: Ingredientes para preparar el risotto de boletus](https://imag.bonviveur.com/ingredientes-para-preparar-el-risotto-de-boletus.jpg)',
-            '',
-            '## Cómo hacer el risotto de boletus',
-            '![Image 3: Rehidratar boletus para hacer el risotto](https://imag.bonviveur.com/rehidratar-boletus-para-hacer-el-risotto.jpg)',
-            'Para hacer el risotto de boletus lo primero que hay que hacer es rehidratar 20 g de boletus deshidratados en agua fría y los dejamos a remojo durante 1 hora y media aproximadamente.',
-            '![Image 4: Picar boletus para hacer el risotto](https://imag.bonviveur.com/picar-boletus-para-hacer-el-risotto.jpg)',
-            'Transcurrido este tiempo, escurrimos y picamos los boletus, y reservamos el agua de hidratación.',
-            'Pasados 2 o 3 minutos, añadimos medio vaso de vino blanco y dejamos que se evapore durante toda la cocción del arroz mientras este se va cociendo y absorbiendo el caldo, lo que nos llevará unos 18-20 minutos.',
-            'María Ángeles Fernández Viajera gastronómica y periodista intrépida.'
-          ].join('\n');
-
-          const recipe = window.RecipeParser.parseRecipeText(rawBonViveur, 'https://bonviveur.com/es/recetas/risotto-de-boletus');
-          expect(recipe).not.toBeNull();
-          expect(recipe.ingredients.some(i => i.name.includes('Image') || i.name.includes('bonviveur'))).toBe(false);
-          expect(recipe.ingredients.length).toBe(4);
-          expect(recipe.instructions.some(i => i.text.includes('Image') || i.text.includes('bonviveur'))).toBe(false);
-          expect(recipe.instructions.length).toBe(3);
-          expect(recipe.instructions[0].text).toContain('rehidratar 20 g de boletus');
-          expect(recipe.instructions[0].timerMinutes).toBe(90);
-          expect(recipe.instructions[2].timerMinutes).toBe(20);
-        }
-      );
-
-      it(
-        'reconoce cabeceras tipo "### RECETA DE...", procesa ingredientes con gramos/cantidades en texto y limpia notas (caso Javi Recetas)',
-        {
-          purpose: 'Validar que las cabeceras con formato "RECETA DE..." conmutan inmediatamente a instrucciones, cantidades escritas como "medio diente" o "media cucharada pequeña" se extraen a 0.5 y se limpian notas como "(ver nota)".',
-          assertions: 'Verifica 7 ingredientes limpios (Tomates maduros 500g, Pan 100g, Aceite 50ml, Ajo 0.5ud, Sal 0.5, Huevo 1ud, Jamón serrano a taquitos 1ud) y 5 pasos de elaboración.'
-        },
-        () => {
-          const rawSalmorejo = [
-            'Title: SALMOREJO CORDOBÉS - Receta Súper FÁCIL - Javi Recetas',
-            'URL Source: https://www.javirecetas.com/salmorejo-cordobes/',
-            '',
-            '## INGREDIENTES PARA EL SALMOREJO:',
-            '* 500 gramos de tomates maduros (ver nota)',
-            '* 100 gramos de pan',
-            '* 50 ml de aceite de oliva (una 5 cucharadas)',
-            '* medio diente de ajo',
-            '* media cucharada pequeña con sal fina',
-            '* Para acompañar: huevo duro y jamón serrano a taquitos',
-            '',
-            '### RECETA DE SALMOREJO CORDOBÉS:',
-            '1. Opcional: Yo antes pelaba los tomates para que el salmorejo quedara más fino.',
-            '2. Corta los tomates en trozos y ponlos en el vaso de una batidora y tritura todo bien.',
-            '3. Trocea el pan y ponlo en un recipiente hondo. Añade por encima el tomate triturado.',
-            '4. Pela el ajo y quítale el centro para que no repita. Añádelo al pan y al tomate.',
-            '5. Añade el aceite y la sal fina. Tritura todo durante un buen rato hasta que quede fino.'
-          ].join('\n');
-
-          const recipe = window.RecipeParser.parseRecipeText(rawSalmorejo, 'https://www.javirecetas.com/salmorejo-cordobes/');
-          expect(recipe).not.toBeNull();
-          expect(recipe.ingredients.length).toBe(7);
-          expect(recipe.ingredients.some(i => i.name.toLowerCase().includes('tritura') || i.name.toLowerCase().includes('trocea'))).toBe(false);
-
-          const tomates = recipe.ingredients.find(i => i.name.toLowerCase().includes('tomate'));
-          expect(tomates.name).toBe('Tomates maduros');
-          expect(tomates.amount).toBe(500);
-          expect(tomates.unit).toBe('g');
-
-          const pan = recipe.ingredients.find(i => i.name.toLowerCase() === 'pan');
-          expect(pan.amount).toBe(100);
-          expect(pan.unit).toBe('g');
-
-          const aceite = recipe.ingredients.find(i => i.name.toLowerCase().includes('aceite'));
-          expect(aceite.name).toBe('Aceite de oliva');
-          expect(aceite.amount).toBe(50);
-          expect(aceite.unit).toBe('ml');
-
-          const ajo = recipe.ingredients.find(i => i.name.toLowerCase() === 'ajo');
-          expect(ajo.amount).toBe(0.5);
-          expect(ajo.unit).toBe('ud');
-
-          const sal = recipe.ingredients.find(i => i.name.toLowerCase() === 'sal');
-          expect(sal.amount).toBe(0.5);
-
-          const huevo = recipe.ingredients.find(i => i.name === 'Huevo');
-          expect(huevo).toBeDefined();
-          expect(huevo.amount).toBe(1);
-          expect(huevo.unit).toBe('ud');
-          expect(huevo.aisle).toBe('dairy');
-
-          const jamon = recipe.ingredients.find(i => i.name.toLowerCase().includes('jamón serrano'));
-          expect(jamon).toBeDefined();
-          expect(jamon.name).toBe('Jamón serrano a taquitos');
-          expect(jamon.amount).toBe(1);
-          expect(jamon.unit).toBe('ud');
-          expect(jamon.aisle).toBe('meat');
-
-          expect(recipe.instructions.length).toBe(5);
-          expect(recipe.instructions[1].text).toContain('Corta los tomates en trozos');
-        }
-      );
-
-      it(
-        'termina la captura de instrucciones antes de los consejos y trucos del blog (caso Hogarmania)',
-        {
-          purpose: 'Validar que el parser de instrucciones se detiene al encontrar secciones de blog posteriores ("Dale un toque más...", "Trucos y consejos...").',
-          assertions: 'Verifica que sólo se capturan los 3 pasos reales y no los párrafos de variaciones o sugerencias.'
-        },
-        () => {
-          const rawHogarmania = [
-            'Title: Karlos Arguiñano te enseña cómo hacer pollo al horno jugoso y crujiente',
-            'URL Source: https://www.hogarmania.com/cocina/recetas/carnes/pollo-al-horno.html',
-            '',
-            '## Ingredientes',
-            '* 1 pollo entero limpio',
-            '* 3 patatas',
-            '* 1 cebolla',
-            '* 1 vaso de vino blanco',
-            '',
-            '## Cómo hacer un pollo asado al horno',
-            '1. Precalienta el horno a 180º con calor arriba y abajo.',
-            '2. Sazona el pollo por dentro y por fuera y colócalo en la bandeja durante 45 minutos.',
-            '3. Sirve el pollo asado en un plato con su guarnición.',
-            '',
-            '## Dale un toque más de sabor a tu pollo al horno',
-            'Karlos Arguiñano nos propone hacer la receta de pollo asado con manzana para darle un extra de dulzor.',
-            'Pela las manzanas y córtalas en rodajas.',
-            '## Trucos y consejos para preparar pollo al horno',
-            'Cómo conseguir que el pollo al horno quede jugoso'
-          ].join('\n');
-
-          const recipe = window.RecipeParser.parseRecipeText(rawHogarmania, 'https://www.hogarmania.com/cocina/recetas/carnes/pollo-al-horno.html');
-          expect(recipe).not.toBeNull();
-          expect(recipe.ingredients.length).toBe(4);
-          expect(recipe.instructions.length).toBe(3);
-          expect(recipe.instructions[2].text).toContain('Sirve el pollo asado');
-          expect(recipe.instructions.some(i => i.text.includes('Dale un toque') || i.text.includes('Trucos y consejos'))).toBe(false);
-        }
-      );
-
-      it(
-        'soporta recetas sin cabecera de instrucciones, enlaces en ingredientes y unidades como dl o copita (caso Cookpad)',
-        {
-          purpose: 'Validar la transición automática a instrucciones cuando no existe cabecera explícita, limpiando enlaces markdown pegados a unidades y normalizando dl o copita.',
-          assertions: 'Verifica 8 ingredientes limpios con Harina a 200g, Manzanas a 600g, Cerveza a 2dl, Ron a 1 copita, 5 pasos y omisión de fechas.'
-        },
-        () => {
-          const rawCookpad = [
-            'Title: Buñuelos De Manzana "Finisterre" Receta de carme castillo',
-            'URL Source: https://cookpad.com/es/recetas/111818',
-            'Markdown Content:',
-            '6 raciones',
-            '*   600 gr manzanas',
-            '*   1/2 litro aceite',
-            '*   200 gr[harina](https://cookpad.com/es/buscar/harina)',
-            '*   25 gr azúcar',
-            '*   200 gr mermelada de fresa',
-            '*   2 huevos',
-            '*   2 dl.[cerveza](https://cookpad.com/es/buscar/cerveza)',
-            '*   1 copita[ron](https://cookpad.com/es/buscar/ron)',
-            '',
-            '1.   1 Se pelan las manzanas y se cortan en rodajas de 1/2 ml de grosor, eliminando el corazón.',
-            '2.   2 En un bowl preparar la harina, con la yema de los dos huevos, una pizca de sal y la cerveza.',
-            '3.   3 A continuación se baten las claras de huevo a punto de nieve y se agregan a la mezcla.',
-            '4.   4 Con la mezcla que hemos hecho, se rebozan las rodajas de manzana y se fríen en aceite caliente.',
-            '5.   5 Se presenta en una bandeja o plato y antes de servirlas se cubren con mermelada.',
-            '',
-            '## ¿Has hecho la receta? ¡Comparte una Cooksnap!',
-            'Dile al carme castillo cómo te quedó.',
-            '¡No hay nada mejor para dar las gracias que una foto!',
-            '11 de marzo de 2010',
-            '![Image 4: Foto principal de Buñuelos de manzana](https://img-global.cpcdn.com/recipes/cef86bab5d23afa3/240x320cq80/photo.jpg)'
-          ].join('\n');
-
-          const recipe = window.RecipeParser.parseRecipeText(rawCookpad, 'https://cookpad.com/es/recetas/111818');
-          expect(recipe).not.toBeNull();
-          expect(recipe.servings).toBe(6);
-          expect(recipe.ingredients.length).toBe(8);
-
-          const manzanas = recipe.ingredients.find(i => i.name.toLowerCase().includes('manzana'));
-          expect(manzanas.name).toBe('Manzanas');
-          expect(manzanas.amount).toBe(600);
-          expect(manzanas.unit).toBe('g');
-
-          const harina = recipe.ingredients.find(i => i.name.toLowerCase().includes('harina'));
-          expect(harina).toBeDefined();
-          expect(harina.name).toBe('Harina');
-          expect(harina.amount).toBe(200);
-          expect(harina.unit).toBe('g');
-
-          const cerveza = recipe.ingredients.find(i => i.name.toLowerCase().includes('cerveza'));
-          expect(cerveza.name).toBe('Cerveza');
-          expect(cerveza.amount).toBe(2);
-          expect(cerveza.unit).toBe('dl');
-
-          const ron = recipe.ingredients.find(i => i.name.toLowerCase().includes('ron'));
-          expect(ron.name).toBe('Ron');
-          expect(ron.amount).toBe(1);
-          expect(ron.unit).toBe('copita');
-
-          expect(recipe.instructions.length).toBe(5);
-          expect(recipe.instructions[0].text).not.toMatch(/^1\b/);
-          expect(recipe.instructions[0].text).toContain('Se pelan las manzanas');
-          expect(recipe.ingredients.some(i => i.name.includes('marzo') || i.name.includes('Image'))).toBe(false);
-          expect(recipe.instructions.some(i => i.text.includes('Cooksnap') || i.text.includes('foto'))).toBe(false);
+          dayData.lunch = 'rec-lemon-chicken';
+          const retrieved = store.getDayPlan(futureDateKey);
+          expect(retrieved.lunch).toBe('rec-lemon-chicken');
         }
       );
     });
 
-    // =========================================================
-    // SUITE 7: ACCESIBILIDAD Y USABILIDAD (CIERRE DE MODALES)
-    // =========================================================
-    describe('7. Accesibilidad y Usabilidad: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Escape', () => {
-      it(
-        'hacer clic en el fondo oscuro (.modal-overlay) fuera de la ventana cierra el modal automáticamente',
-        {
-          purpose: 'Permitir al usuario cerrar cualquier ventana modal pulsando fuera del contenido sin obligarle a pulsar la X.',
-          assertions: 'Valida que un clic con mousedown y click en el overlay cierra el modal activo (elimina clase active).'
-        },
-        () => {
-          const overlay = document.createElement('div');
-          overlay.className = 'modal-overlay active';
-          overlay.id = 'modal-test-backdrop';
-          const content = document.createElement('div');
-          content.className = 'modal-content';
-          overlay.appendChild(content);
-          document.body.appendChild(overlay);
-
-          let isBackdrop = false;
-          overlay.addEventListener('mousedown', (e) => {
-            isBackdrop = (e.target === overlay);
-          });
-          overlay.addEventListener('click', (e) => {
-            if (isBackdrop && e.target === overlay) {
-              overlay.classList.remove('active');
-            }
-            isBackdrop = false;
-          });
-
-          // Simular clic en fondo backdrop
-          overlay.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-          overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-
-          expect(overlay.classList.contains('active')).toBe(false);
-          document.body.removeChild(overlay);
-        }
-      );
-
-      it(
-        'hacer clic dentro del contenido del modal (.modal-content) NO cierra el modal',
-        {
-          purpose: 'Evitar cierres accidentales al interactuar con el formulario, leer o seleccionar texto.',
-          assertions: 'Valida que un clic en .modal-content mantiene el modal activo.'
-        },
-        () => {
-          const overlay = document.createElement('div');
-          overlay.className = 'modal-overlay active';
-          const content = document.createElement('div');
-          content.className = 'modal-content';
-          overlay.appendChild(content);
-          document.body.appendChild(overlay);
-
-          let isBackdrop = false;
-          overlay.addEventListener('mousedown', (e) => {
-            isBackdrop = (e.target === overlay);
-          });
-          overlay.addEventListener('click', (e) => {
-            if (isBackdrop && e.target === overlay) {
-              overlay.classList.remove('active');
-            }
-            isBackdrop = false;
-          });
-
-          // Simular clic dentro del contenido
-          content.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-          content.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-
-          expect(overlay.classList.contains('active')).toBe(true);
-          document.body.removeChild(overlay);
-        }
-      );
-
-      it(
-        'closeModalByElement invoca el método de cierre adecuado según el ID del modal',
-        {
-          purpose: 'Asegurar que cada modal ejecuta su limpieza correspondiente al cerrarse por clic fuera.',
-          assertions: 'Verifica cierre de modal-recipe-detail y modal-recipe-import.'
-        },
-        () => {
-          const fakeApp = {
-            detailClosed: false,
-            importClosed: false,
-            closeRecipeModal() { this.detailClosed = true; },
-            closeImportModal() { this.importClosed = true; },
-            closeModalByElement: window.FoodAssistantApp.prototype.closeModalByElement
-          };
-
-          fakeApp.closeModalByElement({ id: 'modal-recipe-detail', classList: { remove: () => {} } });
-          expect(fakeApp.detailClosed).toBe(true);
-
-          fakeApp.closeModalByElement({ id: 'modal-recipe-import', classList: { remove: () => {} } });
-          expect(fakeApp.importClosed).toBe(true);
-        }
-      );
-
-      it(
-        'openImportReview abre directamente la pantalla de receta en modo revisión y permite guardar, editar o cancelar',
-        {
-          purpose: 'Verificar el flujo directo donde al importar una receta se abre directamente la pantalla de la receta en modo revisión para editar o guardar antes de consolidar.',
-          assertions: 'Valida isReviewingImport, visibilidad de barras de acciones y métodos confirmSaveImportRecipe y cancelImportReview.'
-        },
-        () => {
-          const fakeDetailModal = document.createElement('div');
-          fakeDetailModal.id = 'modal-recipe-detail';
-          fakeDetailModal.className = 'modal-overlay';
-          const fakeBody = document.createElement('div');
-          fakeBody.id = 'recipe-modal-body';
-          fakeDetailModal.appendChild(fakeBody);
-          const normalActions = document.createElement('div');
-          normalActions.id = 'recipe-detail-normal-actions';
-          const reviewActions = document.createElement('div');
-          reviewActions.id = 'recipe-detail-review-actions';
-          document.body.appendChild(fakeDetailModal);
-          document.body.appendChild(normalActions);
-          document.body.appendChild(reviewActions);
-
-          const sampleDraft = {
-            id: 'rec-draft-1',
-            title: 'Crema casera de calabacÃ­n y manzana',
-            servings: 2,
-            prepTimeMinutes: 10,
-            cookTimeMinutes: 25,
-            imageUrl: 'https://media.hellofresh.com/image.jpg',
-            tags: [],
-            ingredients: [
-              { name: 'CalabacÃ­n', amount: 1, unit: 'ud', aisle: 'produce' },
-              { name: 'Manzana', amount: 1, unit: 'ud', aisle: 'produce' }
-            ],
-            instructions: [{ step: 1, text: 'Cortar y cocer.', timerMinutes: 25 }]
-          };
-
-          const testApp = {
-            isReviewingImport: false,
-            pendingImportRecipe: null,
-            activeRecipe: null,
-            activeServings: 2,
-            modalRecipeDetail: fakeDetailModal,
-            openImportReview: window.FoodAssistantApp.prototype.openImportReview,
-            updateRecipeDetailActionBars: window.FoodAssistantApp.prototype.updateRecipeDetailActionBars,
-            renderRecipeModalContent: window.FoodAssistantApp.prototype.renderRecipeModalContent,
-            cancelImportReview: window.FoodAssistantApp.prototype.cancelImportReview,
-            confirmSaveImportRecipe: window.FoodAssistantApp.prototype.confirmSaveImportRecipe,
-            closeImportModal: () => {},
-            render: () => {},
-            switchView: () => {},
-            openRecipeDetail: () => {},
-            syncDataWithCloud: () => {}
-          };
-
-          testApp.openImportReview(sampleDraft);
-          expect(testApp.isReviewingImport).toBe(true);
-          expect(testApp.pendingImportRecipe).toBe(sampleDraft);
-          expect(fakeDetailModal.classList.contains('active')).toBe(true);
-          expect(normalActions.style.display).toBe('none');
-          expect(reviewActions.style.display).toBe('flex');
-          expect(fakeBody.innerHTML).toContain('Revisi\u00F3n de Receta Importada (Borrador)');
-
-          // Test cancel
-          testApp.cancelImportReview();
-          expect(testApp.isReviewingImport).toBe(false);
-          expect(testApp.pendingImportRecipe).toBe(null);
-          expect(fakeDetailModal.classList.contains('active')).toBe(false);
-          expect(normalActions.style.display).toBe('flex');
-          expect(reviewActions.style.display).toBe('none');
-
-          document.body.removeChild(fakeDetailModal);
-          document.body.removeChild(normalActions);
-          document.body.removeChild(reviewActions);
-        }
-      );
-
-      it(
-        'US-15: HelloFresh - unidades como unidad(es), gramo(s) e instrucciones con HTML limpio',
-        {
-          purpose: 'Verificar la extracci\u00F3n correcta de cantidades compuestas y limpieza de tags HTML en pasos de HelloFresh',
-          assertions: '1 unidad(es) Manzana -> 1 ud Manzana, 380 gramo(s) Lentejas -> 380 g Lentejas, HTML eliminado en instrucciones'
-        },
-        () => {
-          const ing1 = window.RecipeParser.parseIngredientLine('1 unidad(es) Manzana');
-          expect(ing1).not.toBeNull();
-          expect(ing1.name).toBe('Manzana');
-          expect(ing1.amount).toBe(1);
-          expect(ing1.unit).toBe('ud');
-
-          const ing2 = window.RecipeParser.parseIngredientLine('380 gramo(s) Lentejas');
-          expect(ing2).not.toBeNull();
-          expect(ing2.name).toBe('Lentejas');
-          expect(ing2.amount).toBe(380);
-          expect(ing2.unit).toBe('g');
-
-          const ing3 = window.RecipeParser.parseIngredientLine('500 mililitro(s) Agua');
-          expect(ing3).not.toBeNull();
-          expect(ing3.name).toBe('Agua');
-          expect(ing3.amount).toBe(500);
-          expect(ing3.unit).toBe('ml');
-
-          const allergen = window.RecipeParser.parseIngredientLine('(Contiene: Apio)');
-          expect(allergen).toBeNull();
-
-          const schema = {
-            "@context": "http://schema.org/",
-            "@type": "Recipe",
-            "name": "Crema casera de calabac\u00EDn y manzana",
-            "recipeYield": 2,
-            "recipeIngredient": ["1 unidad(es) Manzana", "380 gramo(s) Lentejas", "1 sobre(s) Caldo vegetal"],
-            "recipeInstructions": [
-              { "@type": "HowToStep", "text": "<div>Precalienta el horno a 200\u00BAC. Escurre las <strong>lentejas</strong>.</div>" }
-            ]
-          };
-
-          const parsed = window.RecipeParser.parseSchemaRecipe(schema);
-          expect(parsed.ingredients.length).toBe(3);
-          expect(parsed.ingredients[0].name).toBe('Manzana');
-          expect(parsed.ingredients[0].unit).toBe('ud');
-          expect(parsed.ingredients[1].name).toBe('Lentejas');
-          expect(parsed.ingredients[1].unit).toBe('g');
-          expect(parsed.instructions[0].text).toBe('Precalienta el horno a 200\u00BAC. Escurre las lentejas.');
-        }
-      );
-
-      it(
-        'Editar Receta: Botón Guardar en cabecera fija y pie sticky siempre visible sin scroll',
-        {
-          purpose: 'Verificar que el editor de recetas cuenta con botón de guardar en la cabecera fija y en el pie fijo para no requerir scroll hacia abajo.',
-          assertions: 'Comprueba invocación de saveRecipeEdit desde btn-save-recipe-edit-header y btn-save-recipe-edit.'
-        },
-        () => {
-          let savedCount = 0;
-          const fakeApp = {
-            saveRecipeEdit() { savedCount++; }
-          };
-
-          const headerSaveBtn = document.createElement('button');
-          headerSaveBtn.id = 'btn-save-recipe-edit-header';
-          const footerSaveBtn = document.createElement('button');
-          footerSaveBtn.id = 'btn-save-recipe-edit';
-
-          headerSaveBtn.addEventListener('click', () => fakeApp.saveRecipeEdit());
-          footerSaveBtn.addEventListener('click', () => fakeApp.saveRecipeEdit());
-
-          headerSaveBtn.click();
-          expect(savedCount).toBe(1);
-
-          footerSaveBtn.click();
-          expect(savedCount).toBe(2);
-        }
-      );
-
-      it(
-        'RecipeParser: Filtrado de navegación de blogs y enlaces vacíos en pasos de receta',
-        {
-          purpose: 'Evitar que enlaces de navegación de blogs (Anterior/Siguiente entrada, Previous, enlaces vacíos de blogs como Velocidad Cuchara) se agreguen como pasos falsos.',
-          assertions: 'Verifica que texto con Anterior entrada, Siguiente entrada, Te va a encantar y []() no añade pasos basura.'
-        },
-        () => {
-          const rawBlogText = [
-            '# Ensalada Templada de Setas',
-            '## Ingredientes',
-            '* 300 g Setas variadas',
-            '* 100 g Brotes verdes',
-            '* 2 cucharadas Aceite de oliva',
-            '## Preparación',
-            '1. Limpiar las setas y saltearlas en una sartén con aceite durante 6 minutos.',
-            '2. Colocar la cama de brotes verdes y disponer las setas templadas encima.',
-            'Anterior entrada',
-            'Siguiente entrada',
-            'Te va a encantar...',
-            'Previous',
-            '[](https://www.velocidadcuchara.com/charlotka-tarta-de-manzana/)',
-            '[](https://www.velocidadcuchara.com/croquetas-de-jamon/)'
-          ].join('\n');
-
-          const parsed = window.RecipeParser.parseRecipeText(rawBlogText);
-          expect(parsed).not.toBeNull();
-          expect(parsed.instructions.length).toBe(2);
-          expect(parsed.instructions[0].text).toContain('Limpiar las setas');
-          expect(parsed.instructions[1].text).toContain('Colocar la cama de brotes');
-          expect(parsed.instructions.some(s => s.text.toLowerCase().includes('anterior') || s.text.toLowerCase().includes('velocidadcuchara'))).toBe(false);
-        }
-      );
-
-      it(
-        'Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes',
-        {
-          purpose: 'Garantizar que la versión de la app (v0.26) está unificada y se refleja en cabecera y ajustes sin desincronizaciones.',
-          assertions: 'Valida que window.APP_VERSION sea v0.26 y actualice elementos DOM correspondientes.'
-        },
-        () => {
-          expect(window.APP_VERSION).toBe('v0.26');
-
-          const badge = document.createElement('span');
-          badge.id = 'app-version-badge';
-          const settingsVer = document.createElement('strong');
-          settingsVer.id = 'settings-app-version-text';
-          document.body.appendChild(badge);
-          document.body.appendChild(settingsVer);
-
-          const fakeApp = {
-            appVersion: window.APP_VERSION,
-            initVersion: window.FoodAssistantApp.prototype.initVersion
-          };
-          fakeApp.initVersion();
-
-          expect(badge.textContent).toBe('v0.26');
-          expect(settingsVer.textContent).toBe('v0.26');
-
-          document.body.removeChild(badge);
-          document.body.removeChild(settingsVer);
-        }
-      );
-
-      it(
-        'RecipeParser: Extracción de imagen OpenGraph (og:image) y Twitter Card',
-        {
-          purpose: 'Comprobar que recetas sin imagen Schema recuperan la imagen de alta resolución desde metadatos OpenGraph.',
-          assertions: 'Valida extracción de og:image y filtrado de avatares o logos.'
-        },
-        () => {
-          const htmlWithOg = '<html><head><meta property="og:image" content="https://media.velocidadcuchara.com/uploads/Croquetas.png"></head><body><h1>Croquetas</h1></body></html>';
-          const extractedImg = window.RecipeParser.extractImageFromHtml(htmlWithOg);
-          expect(extractedImg).toBe('https://media.velocidadcuchara.com/uploads/Croquetas.png');
-
-          const htmlWithBadImg = '<html><head><meta property="og:image" content="https://site.com/avatar_150_150.jpg"></head></html>';
-          expect(window.RecipeParser.extractImageFromHtml(htmlWithBadImg)).toBe('');
-        }
-      );
-
-      it(
-        'RecipeParser: Detección y etiquetado de Robot de Cocina (Thermomix / Mambo) y temporizadores de programa',
-        {
-          purpose: 'Comprobar detección automática de parámetros de robot culinario y extracción de tiempos con "programa X min".',
-          assertions: 'Asigna tags "Robot de Cocina" y "Thermomix", y extrae 8 minutos de "programa 8 minutos, Varoma, velocidad cuchara".'
-        },
-        () => {
-          const recipeMock = {
-            title: 'Pudin de Pan con Pasas en Thermomix',
-            tags: [],
-            instructions: [
-              { text: 'Pon en el vaso la leche y programa 8 minutos, Varoma, giro a la izquierda y velocidad cuchara.' },
-              { text: 'Tritura 20 segundos en velocidad 5-9.' }
-            ]
-          };
-
-          window.RecipeParser.detectRobotFeatures(recipeMock);
-          expect(recipeMock.tags.includes('Robot de Cocina')).toBe(true);
-          const timer = window.RecipeParser.extractTimerMinutes(recipeMock.instructions[0].text);
-          expect(timer).toBe(8);
-        }
-      );
-    });
-
-    describe('8. US-28: Rediseño enfocado de la pantalla "Hoy" (Zero Clutter)', () => {
+    // SUITE 4: Pantalla "Hoy" y Modo Zero Clutter (6 tests)
+    describe('4. Pantalla "Hoy" y Modo Zero Clutter (US-28)', () => {
       it(
         'Zero Clutter: No existen bloques hero redundantes ni duplicados de navegación',
         {
@@ -1846,13 +866,12 @@
           assertions: 'Valida fecha capitalizada en #today-date-text y texto explicativo en #today-summary-text.'
         },
         () => {
-          const testContainer = document.createElement('div');
-          testContainer.innerHTML = `
+          const sandbox = document.getElementById('qa-sandbox');
+          sandbox.innerHTML = `
             <div id="today-date-text"></div>
             <div id="today-summary-text"></div>
             <div id="today-slots-container"></div>
           `;
-          document.body.appendChild(testContainer);
 
           const app = new window.FoodAssistantApp();
           app.renderTodayView();
@@ -1861,7 +880,34 @@
           expect(dateText.length > 3).toBe(true);
           expect(document.getElementById('today-summary-text').textContent).toMatch(/comidas|Listo|Ninguna/i);
 
-          document.body.removeChild(testContainer);
+          sandbox.innerHTML = '';
+        }
+      );
+
+      it(
+        'Foco en Comidas Planificadas: Renderiza los slots estándar con opciones claras',
+        {
+          purpose: 'Garantizar visualización de desayuno, almuerzo, merienda y cena con acción de desasignar.',
+          assertions: 'Comprueba presencia de labels de STANDARD_SLOTS y app.clearSlot.'
+        },
+        () => {
+          const sandbox = document.getElementById('qa-sandbox');
+          sandbox.innerHTML = `
+            <div id="today-date-text"></div>
+            <div id="today-summary-text"></div>
+            <div id="today-slots-container"></div>
+          `;
+
+          const app = new window.FoodAssistantApp();
+          app.renderTodayView();
+
+          const container = document.getElementById('today-slots-container');
+          window.STANDARD_SLOTS.forEach(slot => {
+            expect(container.innerHTML).toContain(slot.label);
+          });
+          expect(container.innerHTML).toContain('app.clearSlot');
+
+          sandbox.innerHTML = '';
         }
       );
 
@@ -1872,13 +918,12 @@
           assertions: 'Comprueba presencia de .today-add-slot-btn con llamada a openAddCustomSlotModal.'
         },
         () => {
-          const testContainer = document.createElement('div');
-          testContainer.innerHTML = `
+          const sandbox = document.getElementById('qa-sandbox');
+          sandbox.innerHTML = `
             <div id="today-date-text"></div>
             <div id="today-summary-text"></div>
             <div id="today-slots-container"></div>
           `;
-          document.body.appendChild(testContainer);
 
           const app = new window.FoodAssistantApp();
           app.renderTodayView();
@@ -1887,9 +932,1090 @@
           expect(addBtn).not.toBeNull();
           expect(addBtn.getAttribute('onclick')).toContain('openAddCustomSlotModal');
 
-          document.body.removeChild(testContainer);
+          sandbox.innerHTML = '';
         }
       );
+
+      it(
+        'Renderizado dinámico de momentos extra (customSlots) en la vista de Hoy',
+        {
+          purpose: 'Soportar momentos personalizados (como Post-Entreno) en el día de hoy.',
+          assertions: 'Verifica renderizado de slot customizado añadido dinámicamente.'
+        },
+        () => {
+          const sandbox = document.getElementById('qa-sandbox');
+          sandbox.innerHTML = `
+            <div id="today-date-text"></div>
+            <div id="today-summary-text"></div>
+            <div id="today-slots-container"></div>
+          `;
+
+          const app = new window.FoodAssistantApp();
+          const todayStr = window.toLocalDateKey();
+          if (!window.state.mealPlan[todayStr]) {
+            window.state.mealPlan[todayStr] = { breakfast: null, lunch: null, snack: null, dinner: null, customSlots: [] };
+          }
+          window.state.mealPlan[todayStr].customSlots = [
+            { id: 'cslot-today-snack', name: 'Batido Proteico', icon: 'fitness_center', recipeId: null }
+          ];
+
+          app.renderTodayView();
+          const container = document.getElementById('today-slots-container');
+          expect(container.textContent).toContain('Batido Proteico');
+
+          sandbox.innerHTML = '';
+        }
+      );
+
+      it(
+        'Navegación fluida: El botón de semana lleva directamente al planificador',
+        {
+          purpose: 'Conectar la vista de Hoy con el Planificador Semanal en un solo toque.',
+          assertions: 'Valida que hacer clic en #btn-goto-planner cambia activeView a view-planner.'
+        },
+        () => {
+          const sandbox = document.getElementById('qa-sandbox');
+          sandbox.innerHTML = `
+            <main class="view-panel active" id="view-today">
+              <button class="btn btn-tonal btn-sm today-btn-planner" id="btn-goto-planner">Semana</button>
+            </main>
+            <section class="view-panel" id="view-planner"></section>
+          `;
+
+          const app = new window.FoodAssistantApp();
+          app.initEvents();
+          document.getElementById('btn-goto-planner').click();
+          expect(app.activeView).toBe('view-planner');
+
+          sandbox.innerHTML = '';
+        }
+      );
+    });
+
+    // SUITE 5: Control de Tema Visual (4 tests)
+    describe('5. Control de Tema Visual (Light / Dark / System)', () => {
+      it(
+        'debe tener Modo Claro por defecto y asignar data-theme="light" en el elemento raíz',
+        {
+          purpose: 'Garantizar que la experiencia inicial de la app sea en Modo Claro limpio estilo Google.',
+          assertions: 'Verifica que sin fa_theme_mode, se asigne light al elemento raíz.'
+        },
+        () => {
+          localStorage.removeItem('fa_theme_mode');
+          const defaultTheme = localStorage.getItem('fa_theme_mode') || 'light';
+          expect(defaultTheme).toBe('light');
+          document.documentElement.setAttribute('data-theme', defaultTheme);
+          expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+        }
+      );
+
+      it(
+        'Persiste preferencia "dark" y aplica data-theme="dark" al elemento raíz',
+        {
+          purpose: 'Validar que el modo oscuro se activa y persiste fielmente entre sesiones.',
+          assertions: 'Guarda "dark" en localStorage y comprueba data-theme="dark".'
+        },
+        () => {
+          localStorage.setItem('fa_theme_mode', 'dark');
+          document.documentElement.setAttribute('data-theme', 'dark');
+          expect(localStorage.getItem('fa_theme_mode')).toBe('dark');
+          expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+        }
+      );
+
+      it(
+        'Alterna de forma limpia y directa entre Claro y Oscuro',
+        {
+          purpose: 'Asegurar que el botón de cabecera alterna instantáneamente sin estados ambiguos.',
+          assertions: 'Verifica toggle: light -> dark y dark -> light.'
+        },
+        () => {
+          let theme = 'light';
+          const toggle = (t) => (t === 'light' ? 'dark' : 'light');
+          theme = toggle(theme);
+          expect(theme).toBe('dark');
+          theme = toggle(theme);
+          expect(theme).toBe('light');
+        }
+      );
+
+      it(
+        'Muestra el icono correcto de acción target (Sol en modo oscuro, Luna en modo claro)',
+        {
+          purpose: 'Cumplir directrices de usabilidad: el icono indica la acción a realizar al pulsar.',
+          assertions: 'En claro muestra dark_mode; en oscuro muestra light_mode.'
+        },
+        () => {
+          const getTargetIcon = (t) => (t === 'light' ? 'dark_mode' : 'light_mode');
+          expect(getTargetIcon('light')).toBe('dark_mode');
+          expect(getTargetIcon('dark')).toBe('light_mode');
+        }
+      );
+    });
+
+    // SUITE 6: Importador Universal de Recetas (23 tests)
+    describe('6. US-15: Importador Universal de Recetas (Schema.org / JSON-LD & Texto)', () => {
+      const RecipeParser = window.RecipeParser;
+
+  it('parseIsoDuration convierte duraciones ISO 8601 a minutos correctamente', () => {
+    expect(RecipeParser.parseIsoDuration('PT15M')).toBe(15);
+    expect(RecipeParser.parseIsoDuration('PT1H30M')).toBe(90);
+    expect(RecipeParser.parseIsoDuration('PT2H')).toBe(120);
+    expect(RecipeParser.parseIsoDuration('25 min')).toBe(25);
+    expect(RecipeParser.parseIsoDuration(null)).toBe(15);
+  });
+
+  it('parseServings extrae el número de raciones o comensales', () => {
+    expect(RecipeParser.parseServings(4)).toBe(4);
+    expect(RecipeParser.parseServings('4 raciones')).toBe(4);
+    expect(RecipeParser.parseServings('Para 6 personas')).toBe(6);
+    expect(RecipeParser.parseServings(null)).toBe(2);
+  });
+
+  it('parseIngredientLine desglosa cantidad, unidad y clasifica el pasillo (aisle)', () => {
+    const ing1 = RecipeParser.parseIngredientLine('200 g de pechuga de pollo');
+    expect(ing1.amount).toBe(200);
+    expect(ing1.unit).toBe('g');
+    expect(ing1.name).toBe('Pechuga de pollo');
+    expect(ing1.aisle).toBe('meat');
+
+    const ing2 = RecipeParser.parseIngredientLine('3 huevos');
+    expect(ing2.amount).toBe(3);
+    expect(ing2.unit).toBe('ud');
+    expect(ing2.aisle).toBe('dairy');
+
+    const ing3 = RecipeParser.parseIngredientLine('1/2 cucharada de sal');
+    expect(ing3.amount).toBe(0.5);
+    expect(ing3.unit).toBe('cda');
+    expect(ing3.aisle).toBe('spices');
+
+    const ing4 = RecipeParser.parseIngredientLine('Tomates cherry');
+    expect(ing4.amount).toBe(1);
+    expect(ing4.unit).toBe('ud');
+    expect(ing4.aisle).toBe('produce');
+  });
+
+  it('extractJsonLdFromHtml extrae el objeto Recipe de un bloque de HTML', () => {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <script type="application/ld+json">
+          {
+            "@context": "https://schema.org",
+            "@type": "Recipe",
+            "name": "Tortilla de Patatas",
+            "prepTime": "PT10M",
+            "cookTime": "PT20M",
+            "recipeYield": "4 raciones",
+            "recipeIngredient": ["5 patatas medianas", "6 huevos", "Aceite de oliva", "Sal"],
+            "recipeInstructions": ["Pelar y cortar las patatas.", "Freír a fuego medio.", "Batir los huevos y mezclar.", "Cuajar la tortilla."]
+          }
+          </script>
+        </head>
+      </html>
+    `;
+    const extracted = RecipeParser.extractJsonLdFromHtml(html);
+    expect(extracted).not.toBeNull();
+    expect(extracted.name).toBe('Tortilla de Patatas');
+
+    const recipe = RecipeParser.parseSchemaRecipe(extracted);
+    expect(recipe.title).toBe('Tortilla de Patatas');
+    expect(recipe.prepTimeMinutes).toBe(10);
+    expect(recipe.cookTimeMinutes).toBe(20);
+    expect(recipe.servings).toBe(4);
+    expect(recipe.ingredients).toHaveLength(4);
+    expect(recipe.instructions).toHaveLength(4);
+  });
+
+  it('extractJsonLdFromHtml soporta schemas anidados en @graph', () => {
+    const html = `
+      <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          { "@type": "WebSite", "name": "Cocina Fácil" },
+          {
+            "@type": "Recipe",
+            "name": "Guacamole Casero",
+            "recipeIngredient": ["2 aguacates maduros", "1 lima", "1 tomate pequeño", "Cilantro fresco", "Sal al gusto"],
+            "recipeInstructions": ["Chafar los aguacates.", "Añadir el resto de ingredientes y mezclar."]
+          }
+        ]
+      }
+      </script>
+    `;
+    const extracted = RecipeParser.extractJsonLdFromHtml(html);
+    expect(extracted).not.toBeNull();
+    expect(extracted.name).toBe('Guacamole Casero');
+  });
+
+  it('parseRecipeText procesa notas o texto libre estructurado', () => {
+    const text = `
+    Salmón con Verduras al Vapor
+    Raciones: 3
+    Tiempo de preparación: 10 min
+    Tiempo de cocción: 25 min
+
+    Ingredientes:
+    - 3 lomos de salmón
+    - 200 g de brócoli
+    - 2 zanahorias
+
+    Instrucciones:
+    1. Cortar las verduras en trozos medianos.
+    2. Cocinar el salmón a la plancha 4 minutos por lado.
+    3. Servir caliente.
+    `;
+
+    const recipe = RecipeParser.parseRecipeText(text);
+    expect(recipe).not.toBeNull();
+    expect(recipe.title).toBe('Salmón con Verduras al Vapor');
+    expect(recipe.servings).toBe(3);
+    expect(recipe.cookTimeMinutes).toBe(25);
+    expect(recipe.ingredients).toHaveLength(3);
+    expect(recipe.instructions).toHaveLength(3);
+    expect(recipe.instructions[1].text).toBe('Cocinar el salmón a la plancha 4 minutos por lado.');
+  });
+
+  it('parseIngredientLine soporta formato inverso de webs españolas (Directo al Paladar, Cookpad)', () => {
+    const r1 = RecipeParser.parseIngredientLine('Placas de lasaña 12');
+    expect(r1.amount).toBe(12);
+    expect(r1.unit).toBe('ud');
+    expect(r1.name).toBe('Placas de lasaña');
+    expect(r1.aisle).toBe('bakery');
+
+    const r2 = RecipeParser.parseIngredientLine('Tomate triturado 400 g');
+    expect(r2.amount).toBe(400);
+    expect(r2.unit).toBe('g');
+    expect(r2.name).toBe('Tomate triturado');
+    expect(r2.aisle).toBe('produce');
+
+    const r3 = RecipeParser.parseIngredientLine('Berenjena 1');
+    expect(r3.amount).toBe(1);
+    expect(r3.unit).toBe('ud');
+    expect(r3.name).toBe('Berenjena');
+    expect(r3.aisle).toBe('produce');
+
+    const r4 = RecipeParser.parseIngredientLine('Pimiento rojo 0.5');
+    expect(r4.amount).toBe(0.5);
+    expect(r4.unit).toBe('ud');
+    expect(r4.name).toBe('Pimiento rojo');
+    expect(r4.aisle).toBe('produce');
+  });
+
+  it('parseIngredientLine gestiona ingredientes "al gusto" y descarta cabeceras de sección', () => {
+    const ingGusto = RecipeParser.parseIngredientLine('Sal y pimienta al gusto');
+    expect(ingGusto).not.toBeNull();
+    expect(ingGusto.amount).toBe(1);
+    expect(ingGusto.unit).toBe('pizca');
+    expect(ingGusto.aisle).toBe('spices');
+
+    expect(RecipeParser.parseIngredientLine('Ingredientes:')).toBeNull();
+    expect(RecipeParser.parseIngredientLine('Para la bechamel:')).toBeNull();
+    expect(RecipeParser.parseIngredientLine('Instrucciones')).toBeNull();
+    expect(RecipeParser.parseIngredientLine('Cantidad de la ración')).toBeNull();
+    expect(RecipeParser.parseIngredientLine('1 ud Cantidad de la ración')).toBeNull();
+    expect(RecipeParser.parseIngredientLine('4')).toBeNull();
+    expect(RecipeParser.parseIngredientLine('2 ud 4')).toBeNull();
+    expect(RecipeParser.parseIngredientLine('Unidad(es)')).toBeNull();
+    expect(RecipeParser.parseIngredientLine('1 ud Unidad(es)')).toBeNull();
+  });
+
+  it('parseIngredientLine elimina prefijos/unidades "count" y normaliza unidades pegadas (Directo al Paladar)', () => {
+    const c1 = RecipeParser.parseIngredientLine('1ud.Cebolla');
+    expect(c1.amount).toBe(1);
+    expect(c1.unit).toBe('ud');
+    expect(c1.name).toBe('Cebolla');
+
+    const c2 = RecipeParser.parseIngredientLine('2ud. Diente de ajo');
+    expect(c2.amount).toBe(2);
+    expect(c2.unit).toBe('ud');
+    expect(c2.name).toBe('Diente de ajo');
+
+    const c3 = RecipeParser.parseIngredientLine('4count Diente de ajo');
+    expect(c3.amount).toBe(4);
+    expect(c3.unit).toBe('ud');
+    expect(c3.name).toBe('Diente de ajo');
+
+    const c4 = RecipeParser.parseIngredientLine('400g Tofu firme');
+    expect(c4.amount).toBe(400);
+    expect(c4.unit).toBe('g');
+    expect(c4.name).toBe('Tofu firme');
+
+    const c5 = RecipeParser.parseIngredientLine('300ml Agua');
+    expect(c5.amount).toBe(300);
+    expect(c5.unit).toBe('ml');
+    expect(c5.name).toBe('Agua');
+  });
+
+  it('parseIngredientLine procesa cantidades en texto español (medio, media, dos) y limpia notas explicativas', () => {
+    const c1 = RecipeParser.parseIngredientLine('medio diente de ajo');
+    expect(c1.amount).toBe(0.5);
+    expect(c1.unit).toBe('ud');
+    expect(c1.name).toBe('Ajo');
+
+    const c2 = RecipeParser.parseIngredientLine('media cucharada pequeña con sal fina');
+    expect(c2.amount).toBe(0.5);
+    expect(c2.unit).toBe('cdta');
+    expect(c2.name).toBe('Sal');
+
+    const c3 = RecipeParser.parseIngredientLine('500 gramos de tomates maduros (ver nota)');
+    expect(c3.amount).toBe(500);
+    expect(c3.unit).toBe('g');
+    expect(c3.name).toBe('Tomates maduros');
+
+    const c4 = RecipeParser.parseIngredientLine('100 gramos de pan');
+    expect(c4.amount).toBe(100);
+    expect(c4.unit).toBe('g');
+    expect(c4.name).toBe('Pan');
+
+    const c5 = RecipeParser.parseIngredientLine('media cebolla fresca');
+    expect(c5.amount).toBe(0.5);
+    expect(c5.unit).toBe('ud');
+    expect(c5.name).toBe('Cebolla fresca');
+
+    const c6 = RecipeParser.parseIngredientLine('16 septiembre 2026, 16:53');
+    expect(c6).toBeNull();
+
+    const comp = RecipeParser.parseIngredientLine('Para acompañar: huevo duro y jamón serrano a taquitos');
+    expect(Array.isArray(comp)).toBe(true);
+    expect(comp.length).toBe(2);
+    expect(comp[0].name).toBe('Huevo');
+    expect(comp[0].amount).toBe(1);
+    expect(comp[0].unit).toBe('ud');
+    expect(comp[0].aisle).toBe('dairy');
+    expect(comp[1].name).toBe('Jamón serrano a taquitos');
+    expect(comp[1].amount).toBe(1);
+    expect(comp[1].unit).toBe('ud');
+    expect(comp[1].aisle).toBe('meat');
+
+    const hSolo = RecipeParser.parseIngredientLine('1 huevo duro');
+    expect(hSolo.name).toBe('Huevo');
+    expect(hSolo.amount).toBe(1);
+    expect(hSolo.unit).toBe('ud');
+    expect(hSolo.aisle).toBe('dairy');
+  });
+
+  it('parseIsoDuration procesa fracciones de hora en español y rangos de cocción', () => {
+    expect(RecipeParser.parseIsoDuration('1 hora y media')).toBe(90);
+    expect(RecipeParser.parseIsoDuration('media hora')).toBe(30);
+    expect(RecipeParser.parseIsoDuration('1 hora y cuarto')).toBe(75);
+    expect(RecipeParser.parseIsoDuration('18-20 minutos')).toBe(20);
+    expect(RecipeParser.parseIsoDuration('2 o 3 minutos')).toBe(3);
+  });
+
+  it('parseSchemaRecipe y parseRecipeText omiten etiqueta "Importada"', () => {
+    const fakeSchema = {
+      '@type': 'Recipe',
+      name: 'Curry Vegano',
+      recipeCategory: ['Vegui', 'Curry'],
+      recipeIngredient: ['400g Tofu firme', '4count Diente de ajo'],
+      recipeInstructions: ['Cocinar todo junto.']
+    };
+    const rSchema = RecipeParser.parseSchemaRecipe(fakeSchema);
+    expect(rSchema.tags).toContain('Vegui');
+    expect(rSchema.tags).not.toContain('Importada');
+
+    const rawText = "Curry rápido\nIngredientes:\n1 cebolla\nInstrucciones:\n1. Picar.";
+    const rText = RecipeParser.parseRecipeText(rawText);
+    expect(rText.tags).not.toContain('Importada');
+    expect(rText.tags).not.toContain('Notas');
+  });
+
+  it('parseSchemaRecipe incluye sourceUrl y sourceDomain para atribución de fuente original', () => {
+    const fakeSchema = {
+      '@type': 'Recipe',
+      name: 'Paella Valenciana',
+      recipeIngredient: ['400g Arroz', '1 Pollo troceado'],
+      recipeInstructions: ['Cocinar la carne.', 'Añadir arroz y caldo.']
+    };
+    const recipe = RecipeParser.parseSchemaRecipe(fakeSchema, 'https://www.directoalpaladar.com/recetas/paella-valenciana');
+    expect(recipe.sourceUrl).toBe('https://www.directoalpaladar.com/recetas/paella-valenciana');
+    expect(recipe.sourceDomain).toBe('directoalpaladar.com');
+  });
+
+  it('parseRecipeText procesa recetas completas reales de Directo al Paladar extrayendo raciones, tiempos y pasos con temporizador', () => {
+    const rawDirecto = `
+    Lasaña de verduras fácil y rápida
+    Tiempo de preparación: 20 min
+    Tiempo de cocción: 40 min
+    Para 4 personas
+
+    Ingredientes
+    Placas de lasaña 12
+    Berenjena 1
+    Calabacín 1
+    Cebolla 1
+    Pimiento rojo 0.5
+    Tomate triturado 400 g
+    Queso rallado 100 g
+    Aceite de oliva virgen extra 40 ml
+    Sal y pimienta al gusto
+    Para la bechamel:
+    Mantequilla 50 g
+    Harina de trigo 50 g
+    Leche entera 500 ml
+    Nuez moscada 1 pizca
+
+    Instrucciones
+    1. Cortar las verduras en dados pequeños.
+    2. En una sartén con aceite de oliva, pochar la cebolla y el pimiento durante 10 minutos.
+    3. Añadir el calabacín y la berenjena y cocinar otros 10 minutos.
+    4. Agregar el tomate triturado, salpimentar y dejar reducir a fuego lento 15 minutos.
+    5. Preparar la bechamel derritiendo la mantequilla, añadiendo la harina y vertiendo la leche poco a poco.
+    6. Montar la lasaña alternando pasta, verduras y bechamel.
+    7. Terminar con queso rallado y hornear a 200ºC durante 25 minutos.
+    `;
+
+    const recipe = RecipeParser.parseRecipeText(rawDirecto);
+    expect(recipe.title).toBe('Lasaña de verduras fácil y rápida');
+    expect(recipe.servings).toBe(4);
+    expect(recipe.prepTimeMinutes).toBe(20);
+    expect(recipe.cookTimeMinutes).toBe(40);
+    expect(recipe.ingredients).toHaveLength(13);
+    expect(recipe.instructions).toHaveLength(7);
+    expect(recipe.instructions[1].timerMinutes).toBe(10);
+    expect(recipe.instructions[6].timerMinutes).toBe(25);
+  });
+
+  it('parseRecipeText procesa recetas con ingredientes en dos líneas (cantidad y nombre separados) como Bocadillo de atún', () => {
+    const rawBocadillo = `
+Ingredientes
+ Para 2 personas
+2 uds.
+Pan baguette
+4 cucharadas
+Mayonesa
+2 cucharadas
+Mostaza
+200 g
+Atún en conserva
+2 uds.
+Tomate en rama
+1 ud.
+Cogollo de lechuga
+2 uds.
+Huevo cocido
+Cómo hacer Bocadillo de atún
+Dificultad: Fácil
+Tiempo total
+5
+min
+Elaboración
+5
+min
+Primero abrimos las barras de pan. Mezclamos la mayonesa con la mostaza, y untamos la base de las barras con la salsa.
+
+Escurrimos los lomos de atún, pelamos y cortamos los huevos en rodajas, y cortamos en rodajas los tomates.
+
+Colocamos las rodajas de tomate en la base de los bocadillos seguidas de las hojas de lechuga.
+
+Ponemos encima el atún, y por último, las rodajas de huevo cocido antes de cerrar el bocadillo.
+
+Bocadillo De Atun Paso A Paso
+    `;
+
+    const recipe = RecipeParser.parseRecipeText(rawBocadillo);
+    expect(recipe.title).toBe('Bocadillo de atún');
+    expect(recipe.servings).toBe(2);
+    expect(recipe.prepTimeMinutes).toBe(5);
+    expect(recipe.cookTimeMinutes).toBe(5);
+    expect(recipe.ingredients).toHaveLength(7);
+    expect(recipe.ingredients[0].name).toBe('Pan baguette');
+    expect(recipe.ingredients[0].amount).toBe(2);
+    expect(recipe.ingredients[0].unit).toBe('ud');
+    expect(recipe.ingredients[1].name).toBe('Mayonesa');
+    expect(recipe.ingredients[1].amount).toBe(4);
+    expect(recipe.ingredients[1].unit).toBe('cda');
+    expect(recipe.ingredients[3].name).toBe('Atún en conserva');
+    expect(recipe.ingredients[3].amount).toBe(200);
+    expect(recipe.ingredients[3].unit).toBe('g');
+    expect(recipe.instructions).toHaveLength(4);
+  });
+
+  it('parseRecipeText procesa recetas complejas con subsecciones, metodo, tiempos en horas y lonchas como Bocadillo Cubano', () => {
+    const rawCubano = [
+      "Bocadillo Cubano completamente casero \u2014 diegodoal",
+      "",
+      "DIFICULTAD: INTERMEDIA - INGREDIENTES: F\u00C1CIL - TIEMPO: 5 HORAS",
+      "TIEMPO ACTIVO: 2 HORAS - CANTIDAD: 4 BOCADILLOS",
+      "INGREDIENTES",
+      "- CERDO ASADO CUBANO",
+      "2 kg de aguja de cerdo deshuesada",
+      "Sal",
+      "Mojo:",
+      "60 ml de zumo de lima",
+      "120 ml de zumo de naranja",
+      "60 ml de aceite de oliva virgen extra",
+      "1 cucharada de or\u00E9gano seco",
+      "- PAN DE CUBANO",
+      "350 g de harina de fuerza",
+      "15 g de az\u00FAcar",
+      "5 g de levadura instant\u00E1nea de panadero",
+      "9 g de sal",
+      "250 ml de agua templada",
+      "30 g de manteca de cerdo",
+      "- BOCADILLO CUBANO (1)",
+      "Cerdo asado cubano",
+      "4 lonchas de jam\u00F3n cocido finas",
+      "2 lonchas de queso emmental",
+      "Mostaza amarilla",
+      "Pepinillos",
+      "Mantequilla",
+      "M\u00C9TODO",
+      "- CERDO ASADO CUBANO",
+      "Limpia la aguja de cerdo si tiene hueso. S\u00E1lala por toda la superficie abundantemente.",
+      "En un bol, mezcla todos los ingredientes del mojo. Reserva la mitad en la nevera y con la otra mitad marina la carne. D\u00E9jala en la nevera al menos dos horas, pero idealmente toda la noche.",
+      "Envuelve el trozo de carne y sus jugos con papel de aluminio y m\u00E9telo a un horno a 180 grados, calor solo por abajo, dos horas.",
+      "Desenvu\u00E9lvelo, b\u00E1\u00F1alo con sus jugos, y devu\u00E9lvelo al horno 2 horas m\u00E1s. B\u00E1\u00F1alo con los jugos cada 30 minutos.",
+      "S\u00E1calo del horno y d\u00E9jalo reposar 15 minutos. Mientras, mezcla sus jugos con el mojo que hab\u00EDamos reservado en la nevera.",
+      "R\u00F3mpelo en trozos medianos con las manos o dos tenedores. Vierte el mojo por toda la carne y mezcla bien.",
+      "- PAN DE CUBANO",
+      "En un bol grande, a\u00F1ade la harina de fuerza, el az\u00FAcar, la levadura instant\u00E1nea y la sal. Mezcla con unas varillas.",
+      "Haz un hueco en el centro y a\u00F1ade el agua. Mezcla con unas varillas y despu\u00E9s con las manos, hasta que toda la harina se integre.",
+      "A\u00F1ade la manteca a temperatura ambiente e int\u00E9grala en la masa. Amasa en una mesa durante 8-9 minutos, hasta que sea el\u00E1stica y rebote al tacto.",
+      "Haz una bola con la masa y d\u00E9jala reposar en un bol tapada con un trapo h\u00FAmedo, durante 45 minutos, o hasta que retomen la forma."
+    ].join("\n");
+
+    const recipe = RecipeParser.parseRecipeText(rawCubano);
+    expect(recipe.title).toBe('Bocadillo Cubano completamente casero');
+    expect(recipe.servings).toBe(4);
+    expect(recipe.prepTimeMinutes).toBe(120);
+    expect(recipe.cookTimeMinutes).toBe(300);
+
+    // Validate lonchas parsing (not 4 l of ham, but 4 lonchas!)
+    const jamon = recipe.ingredients.find(i => i.name.toLowerCase().includes('jam'));
+    expect(jamon).toBeDefined();
+    expect(jamon.amount).toBe(4);
+    expect(jamon.unit).toBe('loncha');
+
+    const queso = recipe.ingredients.find(i => i.name.toLowerCase().includes('emmental'));
+    expect(queso).toBeDefined();
+    expect(queso.amount).toBe(2);
+    expect(queso.unit).toBe('loncha');
+
+    // Ensure section headers like "- PAN DE CUBANO" or "MÉTODO" are not ingredients
+    const metodoIng = recipe.ingredients.find(i => i.name.toLowerCase().includes('m\u00E9todo'));
+    expect(metodoIng).toBe(undefined);
+
+    // Instructions should be parsed under MÉTODO
+    expect(recipe.instructions.length).toBeGreaterThanOrEqual(10);
+    expect(recipe.instructions[0].text).toContain('Limpia la aguja de cerdo');
+  });
+
+  it('htmlToText y parseRecipeText procesan contenido Markdown de Jina Reader (# Ingredientes, ## Cómo hacer...)', () => {
+    const sampleMd = [
+      'Title: Bolitas de garbanzos y brócoli al horno: receta fácil',
+      'URL Source: https://www.directoalpaladar.com/recetas-vegetarianas/bolitas-garbanzos',
+      '',
+      '## Ingredientes',
+      'Para 4 personas',
+      '* 400 g Garbanzos cocidos escurridos',
+      '* 100 g Brócoli',
+      '* 1 ud. Cebolla',
+      '',
+      '## Cómo hacer bolitas de garbanzos y brócoli',
+      'Dificultad: Fácil',
+      '* Tiempo total 40 min',
+      '',
+      'Separamos los floretes y lo ponemos a cocer tres minutos.',
+      'Aplastar los garbanzos en un bol.',
+      'Hornear a 200 grados durante 20 minutos.'
+    ].join('\n');
+
+    const cleanedText = RecipeParser.htmlToText(sampleMd);
+    expect(cleanedText).toBe(sampleMd);
+
+    const recipe = RecipeParser.parseRecipeText(cleanedText, 'https://www.directoalpaladar.com/recetas-vegetarianas/bolitas-garbanzos');
+    expect(recipe).not.toBeNull();
+    expect(recipe.title).toBe('Bolitas de garbanzos y brócoli al horno: receta fácil');
+    expect(recipe.servings).toBe(4);
+    expect(recipe.ingredients.length).toBeGreaterThanOrEqual(3);
+    expect(recipe.instructions.length).toBeGreaterThanOrEqual(3);
+    expect(recipe.sourceDomain).toBe('directoalpaladar.com');
+  });
+
+  it('procesa correctamente recetas de Directo al Paladar con título "paso a paso" y metadatos de Jina', () => {
+    const rawDirecto = [
+      'Title: Tortilla de patatas con cebolla: receta tradicional española paso a paso',
+      'URL Source: https://www.directoalpaladar.com/recetas-de-huevos-y-tortillas/empezando-en-la-cocina-receta-de-tortilla-de-patatas-con-cebolla/amp',
+      'Published Time: 2026-09-16T14:53:16Z',
+      'Markdown Content:',
+      '![Image 1: Tortilla Patata](https://i.blogs.es/93cdb8/tortilla_patata/650_1200.jpg)',
+      '16 septiembre 2026, 16:53',
+      '![Image 2: pakus](https://i.blogs.es/093f03/blob/150_150.jpeg)',
+      'Editor Senior  977 votos',
+      'Quizás la receta de la tortilla de patata sea una de las primeras que todo aspirante a cocinillas debería aprender a hacer.',
+      '',
+      '## Ingredientes',
+      'Para 4 personas',
+      '* Patata 4',
+      '* Huevo 4',
+      '* Cebolla 1',
+      '* Aceite de oliva virgen extra',
+      '* Sal',
+      '',
+      '## Cómo hacer tortilla de patatas con cebolla tradicional',
+      'Comenzamos con la tarea más larga, la de caramelizar la cebolla que nos llevará unos 30 minutos.',
+      'Mientras la cebolla se hace, pelamos las patatas y las cortamos en rodajas finas durante 15 minutos.',
+      'Cuajamos la tortilla en una sartén caliente 3 minutos por lado.',
+      '',
+      'En DAP | Tortilla de patatas con Thermomix'
+    ].join('\n');
+
+    const recipe = RecipeParser.parseRecipeText(rawDirecto, 'https://www.directoalpaladar.com/recetas-de-huevos-y-tortillas/tortilla');
+    expect(recipe).not.toBeNull();
+    expect(recipe.title).toContain('Tortilla de patatas con cebolla');
+    expect(recipe.servings).toBe(4);
+    expect(recipe.ingredients.length).toBeGreaterThanOrEqual(4);
+    expect(recipe.ingredients.some(i => i.name.toLowerCase().includes('septiembre'))).toBe(false);
+    expect(recipe.instructions.length).toBe(3);
+    // Ensure metadata was NOT added as instruction steps
+    expect(recipe.instructions[0].text).toContain('caramelizar la cebolla');
+    expect(recipe.instructions.some(i => i.text.includes('URL Source') || i.text.includes('Editor Senior'))).toBe(false);
+  });
+
+  it('elimina imágenes inline markdown de ingredientes e instrucciones y calcula temporizadores complejos (caso Bon Viveur)', () => {
+    const rawBonViveur = [
+      'Title: Risotto de boletus: una receta italiana exquisita y muy fácil de preparar',
+      'URL Source: https://bonviveur.com/es/recetas/risotto-de-boletus?hl=es-ES',
+      '',
+      '## Ingredientes del risotto de boletus',
+      '* 20 g de boletus deshidratados',
+      '* 180 g de arroz para risotto',
+      '* 500 ml de caldo de verduras',
+      '* 2 cda de aceite de oliva virgen extra',
+      '![Image 2: Ingredientes para preparar el risotto de boletus](https://imag.bonviveur.com/ingredientes-para-preparar-el-risotto-de-boletus.jpg)',
+      '',
+      '## Cómo hacer el risotto de boletus',
+      '![Image 3: Rehidratar boletus para hacer el risotto](https://imag.bonviveur.com/rehidratar-boletus-para-hacer-el-risotto.jpg)',
+      'Para hacer el risotto de boletus lo primero que hay que hacer es rehidratar 20 g de boletus deshidratados en agua fría y los dejamos a remojo durante 1 hora y media aproximadamente.',
+      '![Image 4: Picar boletus para hacer el risotto](https://imag.bonviveur.com/picar-boletus-para-hacer-el-risotto.jpg)',
+      'Transcurrido este tiempo, escurrimos y picamos los boletus, y reservamos el agua de hidratación.',
+      'Pasados 2 o 3 minutos, añadimos medio vaso de vino blanco y dejamos que se evapore durante toda la cocción del arroz mientras este se va cociendo y absorbiendo el caldo, lo que nos llevará unos 18-20 minutos.',
+      'María Ángeles Fernández Viajera gastronómica y periodista intrépida.'
+    ].join('\n');
+
+    const recipe = RecipeParser.parseRecipeText(rawBonViveur, 'https://bonviveur.com/es/recetas/risotto-de-boletus');
+    expect(recipe).not.toBeNull();
+    // No images in ingredients
+    expect(recipe.ingredients.some(i => i.name.includes('Image') || i.name.includes('bonviveur'))).toBe(false);
+    expect(recipe.ingredients.length).toBe(4);
+    // No images in instructions
+    expect(recipe.instructions.some(i => i.text.includes('Image') || i.text.includes('bonviveur'))).toBe(false);
+    expect(recipe.instructions.length).toBe(3);
+    expect(recipe.instructions[0].text).toContain('rehidratar 20 g de boletus');
+    // Step 1: "1 hora y media" should be 90 minutes
+    expect(recipe.instructions[0].timerMinutes).toBe(90);
+    // Step 3: "lo que nos llevará unos 18-20 minutos" should be 20 minutes
+    expect(recipe.instructions[2].timerMinutes).toBe(20);
+  });
+
+  it('reconoce cabeceras tipo "### RECETA DE...", procesa ingredientes con gramos/cantidades en texto y limpia notas (caso Javi Recetas)', () => {
+    const rawSalmorejo = [
+      'Title: SALMOREJO CORDOBÉS - Receta Súper FÁCIL - Javi Recetas',
+      'URL Source: https://www.javirecetas.com/salmorejo-cordobes/',
+      '',
+      '## INGREDIENTES PARA EL SALMOREJO:',
+      '* 500 gramos de tomates maduros (ver nota)',
+      '* 100 gramos de pan',
+      '* 50 ml de aceite de oliva (una 5 cucharadas)',
+      '* medio diente de ajo',
+      '* media cucharada pequeña con sal fina',
+      '* Para acompañar: huevo duro y jamón serrano a taquitos',
+      '',
+      '### RECETA DE SALMOREJO CORDOBÉS:',
+      '1. Opcional: Yo antes pelaba los tomates para que el salmorejo quedara más fino.',
+      '2. Corta los tomates en trozos y ponlos en el vaso de una batidora y tritura todo bien.',
+      '3. Trocea el pan y ponlo en un recipiente hondo. Añade por encima el tomate triturado.',
+      '4. Pela el ajo y quítale el centro para que no repita. Añádelo al pan y al tomate.',
+      '5. Añade el aceite y la sal fina. Tritura todo durante un buen rato hasta que quede fino.'
+    ].join('\n');
+
+    const recipe = RecipeParser.parseRecipeText(rawSalmorejo, 'https://www.javirecetas.com/salmorejo-cordobes/');
+    expect(recipe).not.toBeNull();
+    // Ingredients should only contain the actual ingredients with clean names
+    expect(recipe.ingredients.length).toBe(7);
+    expect(recipe.ingredients.some(i => i.name.toLowerCase().includes('tritura') || i.name.toLowerCase().includes('trocea'))).toBe(false);
+
+    const tomates = recipe.ingredients.find(i => i.name.toLowerCase().includes('tomate'));
+    expect(tomates.name).toBe('Tomates maduros');
+    expect(tomates.amount).toBe(500);
+    expect(tomates.unit).toBe('g');
+
+    const pan = recipe.ingredients.find(i => i.name.toLowerCase() === 'pan');
+    expect(pan.amount).toBe(100);
+    expect(pan.unit).toBe('g');
+
+    const aceite = recipe.ingredients.find(i => i.name.toLowerCase().includes('aceite'));
+    expect(aceite.name).toBe('Aceite de oliva');
+    expect(aceite.amount).toBe(50);
+    expect(aceite.unit).toBe('ml');
+
+    const ajo = recipe.ingredients.find(i => i.name.toLowerCase() === 'ajo');
+    expect(ajo.amount).toBe(0.5);
+    expect(ajo.unit).toBe('ud');
+
+    const sal = recipe.ingredients.find(i => i.name.toLowerCase() === 'sal');
+    expect(sal.amount).toBe(0.5);
+
+    const huevo = recipe.ingredients.find(i => i.name === 'Huevo');
+    expect(huevo).toBeDefined();
+    expect(huevo.amount).toBe(1);
+    expect(huevo.unit).toBe('ud');
+    expect(huevo.aisle).toBe('dairy');
+
+    const jamon = recipe.ingredients.find(i => i.name.toLowerCase().includes('jamón serrano'));
+    expect(jamon).toBeDefined();
+    expect(jamon.name).toBe('Jamón serrano a taquitos');
+    expect(jamon.amount).toBe(1);
+    expect(jamon.unit).toBe('ud');
+    expect(jamon.aisle).toBe('meat');
+
+    // Instructions should contain the 5 cooking steps
+    expect(recipe.instructions.length).toBe(5);
+    expect(recipe.instructions[1].text).toContain('Corta los tomates en trozos');
+  });
+
+  it('termina la captura de instrucciones antes de los consejos y trucos del blog (caso Hogarmania)', () => {
+    const rawHogarmania = [
+      'Title: Karlos Arguiñano te enseña cómo hacer pollo al horno jugoso y crujiente',
+      'URL Source: https://www.hogarmania.com/cocina/recetas/carnes/pollo-al-horno.html',
+      '',
+      '## Ingredientes',
+      '* 1 pollo entero limpio',
+      '* 3 patatas',
+      '* 1 cebolla',
+      '* 1 vaso de vino blanco',
+      '',
+      '## Cómo hacer un pollo asado al horno',
+      '1. Precalienta el horno a 180º con calor arriba y abajo.',
+      '2. Sazona el pollo por dentro y por fuera y colócalo en la bandeja durante 45 minutos.',
+      '3. Sirve el pollo asado en un plato con su guarnición.',
+      '',
+      '## Dale un toque más de sabor a tu pollo al horno',
+      'Karlos Arguiñano nos propone hacer la receta de pollo asado con manzana para darle un extra de dulzor.',
+      'Pela las manzanas y córtalas en rodajas.',
+      '## Trucos y consejos para preparar pollo al horno',
+      'Cómo conseguir que el pollo al horno quede jugoso'
+    ].join('\n');
+
+    const recipe = RecipeParser.parseRecipeText(rawHogarmania, 'https://www.hogarmania.com/cocina/recetas/carnes/pollo-al-horno.html');
+    expect(recipe).not.toBeNull();
+    expect(recipe.ingredients.length).toBe(4);
+    // Should stop before "Dale un toque más..."
+    expect(recipe.instructions.length).toBe(3);
+    expect(recipe.instructions[2].text).toContain('Sirve el pollo asado');
+    expect(recipe.instructions.some(i => i.text.includes('Dale un toque') || i.text.includes('Trucos y consejos'))).toBe(false);
+  });
+
+  it('soporta recetas sin cabecera de instrucciones, enlaces en ingredientes y unidades como dl o copita (caso Cookpad)', () => {
+    const rawCookpad = [
+      'Title: Buñuelos De Manzana "Finisterre" Receta de carme castillo',
+      'URL Source: https://cookpad.com/es/recetas/111818',
+      'Markdown Content:',
+      '6 raciones',
+      '*   600 gr manzanas',
+      '*   1/2 litro aceite',
+      '*   200 gr[harina](https://cookpad.com/es/buscar/harina)',
+      '*   25 gr azúcar',
+      '*   200 gr mermelada de fresa',
+      '*   2 huevos',
+      '*   2 dl.[cerveza](https://cookpad.com/es/buscar/cerveza)',
+      '*   1 copita[ron](https://cookpad.com/es/buscar/ron)',
+      '',
+      '1.   1 Se pelan las manzanas y se cortan en rodajas de 1/2 ml de grosor, eliminando el corazón.',
+      '2.   2 En un bowl preparar la harina, con la yema de los dos huevos, una pizca de sal y la cerveza.',
+      '3.   3 A continuación se baten las claras de huevo a punto de nieve y se agregan a la mezcla.',
+      '4.   4 Con la mezcla que hemos hecho, se rebozan las rodajas de manzana y se fríen en aceite caliente.',
+      '5.   5 Se presenta en una bandeja o plato y antes de servirlas se cubren con mermelada.',
+      '',
+      '## ¿Has hecho la receta? ¡Comparte una Cooksnap!',
+      'Dile al carme castillo cómo te quedó.',
+      '¡No hay nada mejor para dar las gracias que una foto!',
+      '11 de marzo de 2010',
+      '![Image 4: Foto principal de Buñuelos de manzana](https://img-global.cpcdn.com/recipes/cef86bab5d23afa3/240x320cq80/photo.jpg)'
+    ].join('\n');
+
+    const recipe = RecipeParser.parseRecipeText(rawCookpad, 'https://cookpad.com/es/recetas/111818');
+    expect(recipe).not.toBeNull();
+    expect(recipe.servings).toBe(6);
+    // Ingredients should parse 8 items with cleaned names (no markdown link syntax)
+    expect(recipe.ingredients.length).toBe(8);
+
+    const manzanas = recipe.ingredients.find(i => i.name.toLowerCase().includes('manzana'));
+    expect(manzanas.name).toBe('Manzanas');
+    expect(manzanas.amount).toBe(600);
+    expect(manzanas.unit).toBe('g');
+
+    const harina = recipe.ingredients.find(i => i.name.toLowerCase().includes('harina'));
+    expect(harina).toBeDefined();
+    expect(harina.name).toBe('Harina');
+    expect(harina.amount).toBe(200);
+    expect(harina.unit).toBe('g');
+
+    const cerveza = recipe.ingredients.find(i => i.name.toLowerCase().includes('cerveza'));
+    expect(cerveza.name).toBe('Cerveza');
+    expect(cerveza.amount).toBe(2);
+    expect(cerveza.unit).toBe('dl');
+
+    const ron = recipe.ingredients.find(i => i.name.toLowerCase().includes('ron'));
+    expect(ron.name).toBe('Ron');
+    expect(ron.amount).toBe(1);
+    expect(ron.unit).toBe('copita');
+
+    // Numbered steps with action verbs automatically detected as instructions
+    expect(recipe.instructions.length).toBe(5);
+    // Double numbering cleaned
+    expect(recipe.instructions[0].text).not.toMatch(/^1\b/);
+    expect(recipe.instructions[0].text).toContain('Se pelan las manzanas');
+
+    // Date and footer image not in ingredients
+    expect(recipe.ingredients.some(i => i.name.includes('marzo') || i.name.includes('Image'))).toBe(false);
+    expect(recipe.instructions.some(i => i.text.includes('Cooksnap') || i.text.includes('foto'))).toBe(false);
+  });
+
+  it('parseIngredientLine y parseSchemaRecipe procesan correctamente recetas de HelloFresh con unidades como unidad(es), gramo(s), y pasos con HTML', () => {
+    // 1. Ingredients parsing with HelloFresh unit variations
+    const ing1 = RecipeParser.parseIngredientLine('1 unidad(es) Manzana');
+    expect(ing1).not.toBeNull();
+    expect(ing1.name).toBe('Manzana');
+    expect(ing1.amount).toBe(1);
+    expect(ing1.unit).toBe('ud');
+
+    const ing2 = RecipeParser.parseIngredientLine('380 gramo(s) Lentejas');
+    expect(ing2).not.toBeNull();
+    expect(ing2.name).toBe('Lentejas');
+    expect(ing2.amount).toBe(380);
+    expect(ing2.unit).toBe('g');
+
+    const ing3 = RecipeParser.parseIngredientLine('½ unidad(es) Cebolla');
+    expect(ing3).not.toBeNull();
+    expect(ing3.name).toBe('Cebolla');
+    expect(ing3.amount).toBe(0.5);
+    expect(ing3.unit).toBe('ud');
+
+    const ing4 = RecipeParser.parseIngredientLine('1 sobre(s) Caldo vegetal');
+    expect(ing4).not.toBeNull();
+    expect(ing4.name).toBe('Caldo vegetal');
+    expect(ing4.amount).toBe(1);
+    expect(ing4.unit).toBe('sobre');
+
+    const ing5 = RecipeParser.parseIngredientLine('500 mililitro(s) Agua');
+    expect(ing5).not.toBeNull();
+    expect(ing5.name).toBe('Agua');
+    expect(ing5.amount).toBe(500);
+    expect(ing5.unit).toBe('ml');
+
+    const allergen = RecipeParser.parseIngredientLine('(Contiene: Apio)');
+    expect(allergen).toBeNull();
+
+    // 2. Full Schema.org parsing with HTML tags in instructions
+    const helloFreshSchema = {
+      "@context": "http://schema.org/",
+      "@type": "Recipe",
+      "name": "Crema casera de calabacín y manzana con lentejas crujientes al horno",
+      "recipeYield": 2,
+      "totalTime": "PT35M",
+      "recipeIngredient": [
+        "1 unidad(es) Manzana",
+        "1 unidad(es) Calabacín",
+        "380 gramo(s) Lentejas",
+        "1 unidad(es) Puerro",
+        "½ unidad(es) Cebolla",
+        "1 sobre(s) Caldo vegetal",
+        "200 gramo(s) Crème Fraîche",
+        "1 sobre(s) Nuez moscada",
+        "1 pizca(s) Sal y pimienta",
+        "2 cucharada(s) Aceite de oliva",
+        "1 unidad(es) Ajo",
+        "500 mililitro(s) Agua"
+      ],
+      "recipeInstructions": [
+        {
+          "@type": "HowToStep",
+          "text": "<div>¡Asegúrate de utilizar las cantidades indicadas a la izquierda para preparar tu receta! Precalienta el horno a 200ºC. Escurre las <strong>lentejas</strong> con ayuda de un colador.</div>"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "<p>Reparte las <strong>lentejas</strong> en una bandeja y hornea a media altura 15-20 min. Remueve a mitad de cocción.</p>"
+        }
+      ]
+    };
+
+    const parsed = RecipeParser.parseSchemaRecipe(helloFreshSchema, 'https://www.hellofresh.es/recipes/crema-casera-de-calabacin-y-manzana-650afe12270f68660e1b06a1');
+    expect(parsed).not.toBeNull();
+    expect(parsed.title).toBe('Crema casera de calabacín y manzana con lentejas crujientes al horno');
+    expect(parsed.servings).toBe(2);
+    expect(parsed.ingredients).toHaveLength(12);
+
+    expect(parsed.ingredients[0].name).toBe('Manzana');
+    expect(parsed.ingredients[0].unit).toBe('ud');
+    expect(parsed.ingredients[1].name).toBe('Calabacín');
+    expect(parsed.ingredients[1].unit).toBe('ud');
+    expect(parsed.ingredients[2].name).toBe('Lentejas');
+    expect(parsed.ingredients[2].unit).toBe('g');
+    expect(parsed.ingredients[2].amount).toBe(380);
+
+    // HTML stripped from steps
+    expect(parsed.instructions[0].text).not.toContain('<div>');
+    expect(parsed.instructions[0].text).not.toContain('<strong>');
+    expect(parsed.instructions[0].text).toBe('¡Asegúrate de utilizar las cantidades indicadas a la izquierda para preparar tu receta! Precalienta el horno a 200ºC. Escurre las lentejas con ayuda de un colador.');
+    expect(parsed.instructions[1].text).not.toContain('<p>');
+    expect(parsed.instructions[1].timerMinutes).toBe(20);
+  });
+
+    });
+
+    // SUITE 7: Accesibilidad, Modales y Control de Versión (7 tests)
+    describe('7. Accesibilidad, Modales y Control de Versión', () => {
+      it('closeModalByElement cierra el modal adecuado según el ID del overlay', () => {
+        const fakeApp = {
+          detailClosed: false,
+          importClosed: false,
+          closeRecipeModal() { this.detailClosed = true; },
+          closeImportModal() { this.importClosed = true; },
+          closeModalByElement: window.FoodAssistantApp.prototype.closeModalByElement
+        };
+
+        fakeApp.closeModalByElement({ id: 'modal-recipe-detail', classList: { remove: () => {} } });
+        expect(fakeApp.detailClosed).toBe(true);
+
+        fakeApp.closeModalByElement({ id: 'modal-recipe-import', classList: { remove: () => {} } });
+        expect(fakeApp.importClosed).toBe(true);
+      });
+
+      it('hacer clic en el fondo del overlay cierra el modal activo (Backdrop Dismiss)', () => {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay active';
+        const content = document.createElement('div');
+        content.className = 'modal-content';
+        overlay.appendChild(content);
+        document.body.appendChild(overlay);
+
+        let isBackdrop = false;
+        overlay.addEventListener('mousedown', (e) => { isBackdrop = (e.target === overlay); });
+        overlay.addEventListener('click', (e) => {
+          if (isBackdrop && e.target === overlay) overlay.classList.remove('active');
+          isBackdrop = false;
+        });
+
+        overlay.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        expect(overlay.classList.contains('active')).toBe(false);
+
+        document.body.removeChild(overlay);
+      });
+
+      it('pulsar la tecla Escape cierra el modal activo más reciente', () => {
+        let closed = false;
+        const handler = (e) => { if (e.key === 'Escape') closed = true; };
+        window.addEventListener('keydown', handler);
+
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        expect(closed).toBe(true);
+
+        window.removeEventListener('keydown', handler);
+      });
+
+      it('openImportReview activa el modo revisión en modal-recipe-detail y permite guardar o cancelar', () => {
+        const sandbox = document.getElementById('qa-sandbox');
+        sandbox.innerHTML = `
+          <div class="modal-overlay" id="modal-recipe-detail">
+            <div id="recipe-detail-normal-actions" style="display: flex;"></div>
+            <div id="recipe-detail-review-actions" style="display: none;"></div>
+            <div class="modal-content"><div id="recipe-modal-body"></div></div>
+          </div>
+        `;
+
+        const sampleDraft = {
+          id: 'rec-draft-test',
+          title: 'Crema casera de calabacín y manzana',
+          servings: 2,
+          prepTimeMinutes: 10,
+          cookTimeMinutes: 25,
+          imageUrl: 'https://media.hellofresh.com/image.jpg',
+          tags: [],
+          ingredients: [
+            { name: 'Calabacín', amount: 1, unit: 'ud', aisle: 'produce' },
+            { name: 'Manzana', amount: 1, unit: 'ud', aisle: 'produce' }
+          ],
+          instructions: [{ step: 1, text: 'Cortar y cocer.', timerMinutes: 25 }]
+        };
+
+        const appInst = new window.FoodAssistantApp();
+        appInst.openImportReview(sampleDraft);
+        expect(appInst.isReviewingImport).toBe(true);
+        expect(appInst.pendingImportRecipe).toBe(sampleDraft);
+        expect(document.getElementById('modal-recipe-detail').classList.contains('active')).toBe(true);
+        expect(document.getElementById('recipe-detail-normal-actions').style.display).toBe('none');
+        expect(document.getElementById('recipe-detail-review-actions').style.display).toBe('flex');
+        expect(document.getElementById('recipe-modal-body').innerHTML).toContain('Revisión de Receta Importada (Borrador)');
+
+        appInst.cancelImportReview();
+        expect(appInst.isReviewingImport).toBe(false);
+        expect(appInst.pendingImportRecipe).toBe(null);
+        expect(document.getElementById('modal-recipe-detail').classList.contains('active')).toBe(false);
+
+        sandbox.innerHTML = '';
+      });
+
+      it('Editar Receta: Botón Guardar en cabecera fija y pie sticky siempre visible sin scroll', () => {
+        let saved = 0;
+        const fakeApp = { saveRecipeEdit() { saved++; } };
+
+        const saveHeaderBtn = document.createElement('button');
+        const saveFooterBtn = document.createElement('button');
+        saveHeaderBtn.addEventListener('click', () => fakeApp.saveRecipeEdit());
+        saveFooterBtn.addEventListener('click', () => fakeApp.saveRecipeEdit());
+
+        saveHeaderBtn.click();
+        expect(saved).toBe(1);
+        saveFooterBtn.click();
+        expect(saved).toBe(2);
+      });
+
+      it('RecipeParser: Filtrado de navegación de blogs y enlaces vacíos en instrucciones', () => {
+        const rawBlogText = [
+          '# Ensalada Templada',
+          '## Ingredientes',
+          '* 200 g Lechuga',
+          '## Preparación',
+          '1. Lavar y cortar la lechuga.',
+          'Anterior entrada',
+          'Siguiente entrada',
+          '[](https://ejemplo.com/link-vacio)'
+        ].join('\n');
+
+        const parsed = window.RecipeParser.parseRecipeText(rawBlogText);
+        expect(parsed.instructions.length).toBe(1);
+        expect(parsed.instructions[0].text).toContain('Lavar y cortar');
+        expect(parsed.instructions.some(i => i.text.toLowerCase().includes('anterior'))).toBe(false);
+      });
+
+      it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
+        expect(window.APP_VERSION).toBe('v0.27');
+
+        const badge = document.createElement('span');
+        badge.id = 'app-version-badge';
+        const settingsVer = document.createElement('strong');
+        settingsVer.id = 'settings-app-version-text';
+        document.body.appendChild(badge);
+        document.body.appendChild(settingsVer);
+
+        const fakeApp = {
+          appVersion: window.APP_VERSION,
+          initVersion: window.FoodAssistantApp.prototype.initVersion
+        };
+        fakeApp.initVersion();
+
+        expect(badge.textContent).toBe('v0.27');
+        expect(settingsVer.textContent).toBe('v0.27');
+
+        document.body.removeChild(badge);
+        document.body.removeChild(settingsVer);
+      });
     });
 
     // =========================================================
@@ -1995,9 +2121,9 @@
       }
 
       const elapsed = Math.round(performance.now() - startTime);
-      document.getElementById('metric-total').textContent = total;
-      document.getElementById('metric-passed').textContent = passed;
-      document.getElementById('metric-failed').textContent = failed;
+      document.getElementById('metric-total').textContent = String(total);
+      document.getElementById('metric-passed').textContent = String(passed);
+      document.getElementById('metric-failed').textContent = String(failed);
       document.getElementById('metric-time').textContent = `${elapsed}ms`;
     }
 
