@@ -1444,7 +1444,7 @@ const RecipeParser = {
 };
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.25';
+  window.APP_VERSION = 'v0.26';
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
   window.getMondayOfWeek = getMondayOfWeek;
@@ -1456,7 +1456,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.25';
+    this.appVersion = 'v0.26';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -2781,17 +2781,16 @@ class FoodAssistantApp {
       const dateStr = wDay.dateKey;
       const dayData = state.getDayPlan(dateStr, wDay.dayName);
       const isToday = toLocalDateKey() === dateStr;
-      const isWeekend = wDay.isWeekend;
       const customSlots = Array.isArray(dayData.customSlots) ? dayData.customSlots : [];
+      const dayDateFormatted = `${wDay.date.getDate()} ${MONTHS_SHORT_ES[wDay.date.getMonth()]}`;
 
       return `
-        <div class="day-card ${isWeekend ? 'day-card-weekend' : ''} ${isToday ? 'day-card-today' : ''}">
+        <div class="day-card ${isToday ? 'day-card-today' : ''}">
           <div class="day-header">
             <div class="day-name">
-              <span>${wDay.dayName}</span>
-              <span style="font-size: 13px; font-weight: 500; color: var(--m3-on-surface-variant);">${dateStr}</span>
+              <span class="day-title">${wDay.dayName}</span>
+              <span class="day-date-label">${dayDateFormatted}</span>
               ${isToday ? `<span class="day-badge-today">HOY</span>` : ''}
-              ${isWeekend ? `<span class="day-badge-weekend">Fin de semana</span>` : ''}
             </div>
             <button type="button" class="btn btn-ghost btn-sm" onclick="app.openAddCustomSlotModal('${dateStr}')" style="font-size: 11px; padding: 4px 8px; color: var(--m3-primary);" title="Añadir momento de comida">
               <span class="material-symbols-outlined icon-sm">add</span> Añadir Comida

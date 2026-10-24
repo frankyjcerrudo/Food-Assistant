@@ -165,10 +165,14 @@ describe('US-05 & BUG-08 & BUG-17: Motor de Navegación Semanal y Persistencia D
     const cards = container.querySelectorAll('.day-card');
     expect(cards).toHaveLength(7);
 
-    // Fin de semana agrupado con clase y badge
+    // 7 tarjetas uniformes de Lunes a Domingo sin diferenciación invasiva de fin de semana
     const weekendCards = container.querySelectorAll('.day-card-weekend');
-    expect(weekendCards).toHaveLength(2); // Sábado y Domingo
-    expect(container.innerHTML).toContain('Fin de semana');
+    expect(weekendCards).toHaveLength(0);
+    expect(container.innerHTML).not.toContain('Fin de semana');
+
+    // Cada tarjeta cuenta con su etiqueta de fecha formateada (.day-date-label)
+    const dateLabels = container.querySelectorAll('.day-date-label');
+    expect(dateLabels).toHaveLength(7);
   });
 
   it('Navegación fluida: permite avanzar a la semana siguiente (+1) y volver a la actual (0)', () => {
