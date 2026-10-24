@@ -209,6 +209,79 @@ const AISLE_METADATA = {
   other: { label: "Otros / Varios", icon: "category" }
 };
 
+// ==========================================================================
+// DATE & CALENDAR UTILS (ISO 8601 & LOCAL DATES) - US-05, US-22, BUG-07
+// ==========================================================================
+const DAYS_OF_WEEK_ES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+const MONTHS_SHORT_ES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+function toLocalDateKey(date) {
+  const d = date ? (date instanceof Date ? date : new Date(date)) : new Date();
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseLocalDateKey(dateStr) {
+  if (!dateStr || typeof dateStr !== 'string') return new Date();
+  const parts = dateStr.split('-').map(Number);
+  if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+  return new Date();
+}
+
+/**
+ * Returns Monday (00:00:00 local time) of the ISO 8601 week containing `date`.
+ * In ISO 8601, Monday is the first day of the week (day 1), Sunday is day 7.
+ */
+function getMondayOfWeek(date) {
+  const d = date ? (date instanceof Date ? new Date(date) : new Date(date)) : new Date();
+  const day = d.getDay(); // 0: Sunday, 1: Monday, ..., 6: Saturday
+  const diff = day === 0 ? -6 : 1 - day;
+  const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() + diff, 0, 0, 0, 0);
+  return monday;
+}
+
+/**
+ * Returns the 7 days of the ISO 8601 week for a given reference date.
+ */
+function getWeekDates(referenceDate) {
+  const monday = getMondayOfWeek(referenceDate);
+  const week = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i, 0, 0, 0, 0);
+    week.push({
+      date: d,
+      dateKey: toLocalDateKey(d),
+      dayName: DAYS_OF_WEEK_ES[i],
+      isWeekend: i >= 5
+    });
+  }
+  return week;
+}
+
+/**
+ * Formats a week range in Spanish, e.g. "20 oct – 26 oct 2026"
+ */
+function formatWeekRange(weekDays) {
+  if (!weekDays || weekDays.length !== 7) return '';
+  const start = weekDays[0].date;
+  const end = weekDays[6].date;
+  const startDay = start.getDate();
+  const startMonth = MONTHS_SHORT_ES[start.getMonth()];
+  const endDay = end.getDate();
+  const endMonth = MONTHS_SHORT_ES[end.getMonth()];
+  const year = end.getFullYear();
+
+  if (start.getMonth() === end.getMonth()) {
+    return `${startDay} – ${endDay} ${startMonth} ${year}`;
+  }
+  return `${startDay} ${startMonth} – ${endDay} ${endMonth} ${year}`;
+}
+
 // Application State Store (Local First + Cloud Sync)
 class StateStore {
   constructor() {
@@ -235,6 +308,14 @@ class StateStore {
         if (!('snack' in day)) day.snack = null;
         if (!('dinner' in day)) day.dinner = null;
         if (!Array.isArray(day.customSlots)) day.customSlots = [];
+        if (!day.dayName && dateKey) {
+          const parts = dateKey.split('-').map(Number);
+          if (parts.length === 3) {
+            const d = new Date(parts[0], parts[1] - 1, parts[2]);
+            const dayIdx = (d.getDay() + 6) % 7;
+            day.dayName = DAYS_OF_WEEK_ES[dayIdx] || 'Día';
+          }
+        }
       });
       this.mealPlan = loadedPlan;
     } else {
@@ -273,24 +354,55 @@ class StateStore {
     }
   }
 
-  generateInitialMealPlan() {
-    const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-    const plan = {};
-    const today = new Date();
-    
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      const dateKey = d.toISOString().split('T')[0];
-      plan[dateKey] = {
-        dayName: days[(d.getDay() + 6) % 7],
-        breakfast: i === 0 ? "rec-avocado-toast" : (i === 1 ? "rec-porridge-bowl" : null),
-        lunch: i === 0 ? "rec-pesto-pasta" : (i === 1 ? "rec-lemon-chicken" : null),
-        snack: i === 0 ? "rec-healthy-snack" : null,
-        dinner: i === 0 ? "rec-salmon-bowl" : (i === 1 ? "rec-chickpea-salad" : null),
+  getDayPlan(dateStr, fallbackDayName) {
+    if (!this.mealPlan[dateStr]) {
+      let dayName = fallbackDayName;
+      if (!dayName && dateStr) {
+        const parts = dateStr.split('-').map(Number);
+        if (parts.length === 3) {
+          const d = new Date(parts[0], parts[1] - 1, parts[2]);
+          const dayIdx = (d.getDay() + 6) % 7;
+          dayName = DAYS_OF_WEEK_ES[dayIdx] || 'Día';
+        }
+      }
+      this.mealPlan[dateStr] = {
+        dayName: dayName || 'Día',
+        breakfast: null,
+        lunch: null,
+        snack: null,
+        dinner: null,
         customSlots: []
       };
+    } else {
+      const day = this.mealPlan[dateStr];
+      if (!day.dayName && dateStr) {
+        const parts = dateStr.split('-').map(Number);
+        if (parts.length === 3) {
+          const d = new Date(parts[0], parts[1] - 1, parts[2]);
+          const dayIdx = (d.getDay() + 6) % 7;
+          day.dayName = DAYS_OF_WEEK_ES[dayIdx] || 'Día';
+        }
+      }
+      if (!Array.isArray(day.customSlots)) day.customSlots = [];
     }
+    return this.mealPlan[dateStr];
+  }
+
+  generateInitialMealPlan() {
+    const plan = {};
+    const weekDays = getWeekDates(new Date());
+    const todayKey = toLocalDateKey(new Date());
+
+    weekDays.forEach((w, i) => {
+      plan[w.dateKey] = {
+        dayName: w.dayName,
+        breakfast: (i === 0 || w.dateKey === todayKey) ? "rec-avocado-toast" : (i === 1 ? "rec-porridge-bowl" : null),
+        lunch: (i === 0 || w.dateKey === todayKey) ? "rec-pesto-pasta" : (i === 1 ? "rec-lemon-chicken" : null),
+        snack: (i === 0 || w.dateKey === todayKey) ? "rec-healthy-snack" : null,
+        dinner: (i === 0 || w.dateKey === todayKey) ? "rec-salmon-bowl" : (i === 1 ? "rec-chickpea-salad" : null),
+        customSlots: []
+      };
+    });
     return plan;
   }
 }
@@ -1332,17 +1444,24 @@ const RecipeParser = {
 };
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.23';
+  window.APP_VERSION = 'v0.24';
+  window.toLocalDateKey = toLocalDateKey;
+  window.parseLocalDateKey = parseLocalDateKey;
+  window.getMondayOfWeek = getMondayOfWeek;
+  window.getWeekDates = getWeekDates;
+  window.formatWeekRange = formatWeekRange;
+  window.DAYS_OF_WEEK_ES = DAYS_OF_WEEK_ES;
 }
 
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.23';
+    this.appVersion = 'v0.24';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
     this.pickerTarget = null;
+    this.plannerWeekOffset = 0; // 0: current week, -1: previous, +1: next (US-05)
     
     // Cook mode state
     this.cookStepIndex = 0;
@@ -1930,12 +2049,12 @@ class FoodAssistantApp {
 
   renderTodayView() {
     const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
+    const todayStr = toLocalDateKey(today);
     const todayPlan = state.mealPlan[todayStr] || {
       breakfast: null,
-      lunch: state.recipes[0]?.id || null,
+      lunch: null,
       snack: null,
-      dinner: state.recipes[1]?.id || null,
+      dinner: null,
       customSlots: []
     };
 
@@ -2618,24 +2737,61 @@ class FoodAssistantApp {
     } catch (e) {}
   }
 
-  // PLANNER
+  // PLANNER - US-05, US-22, BUG-07, BUG-08, BUG-17
+  getPlannerWeekDates() {
+    const now = new Date();
+    const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (this.plannerWeekOffset * 7));
+    return getWeekDates(targetDate);
+  }
+
+  navigateWeek(direction) {
+    if (direction === 0) {
+      this.plannerWeekOffset = 0;
+    } else {
+      this.plannerWeekOffset += direction;
+    }
+    this.renderPlanner();
+  }
+
+  updatePlannerWeekLabel(weekDays) {
+    const labelElem = document.getElementById('planner-week-range-text');
+    if (labelElem) {
+      labelElem.textContent = formatWeekRange(weekDays);
+    }
+    const currentBtn = document.getElementById('btn-current-week');
+    if (currentBtn) {
+      if (this.plannerWeekOffset === 0) {
+        currentBtn.classList.remove('btn-ghost');
+        currentBtn.classList.add('btn-tonal');
+      } else {
+        currentBtn.classList.remove('btn-tonal');
+        currentBtn.classList.add('btn-ghost');
+      }
+    }
+  }
+
   renderPlanner() {
     const container = document.getElementById('planner-days-container');
     if (!container) return;
 
-    const daysEntries = Object.entries(state.mealPlan);
+    const weekDays = this.getPlannerWeekDates();
+    this.updatePlannerWeekLabel(weekDays);
 
-    container.innerHTML = daysEntries.map(([dateStr, dayData]) => {
-      const isToday = new Date().toISOString().split('T')[0] === dateStr;
+    container.innerHTML = weekDays.map((wDay) => {
+      const dateStr = wDay.dateKey;
+      const dayData = state.getDayPlan(dateStr, wDay.dayName);
+      const isToday = toLocalDateKey() === dateStr;
+      const isWeekend = wDay.isWeekend;
       const customSlots = Array.isArray(dayData.customSlots) ? dayData.customSlots : [];
 
       return `
-        <div class="day-card">
+        <div class="day-card ${isWeekend ? 'day-card-weekend' : ''} ${isToday ? 'day-card-today' : ''}">
           <div class="day-header">
             <div class="day-name">
-              <span>${dayData.dayName}</span>
+              <span>${wDay.dayName}</span>
               <span style="font-size: 13px; font-weight: 500; color: var(--m3-on-surface-variant);">${dateStr}</span>
               ${isToday ? `<span class="day-badge-today">HOY</span>` : ''}
+              ${isWeekend ? `<span class="day-badge-weekend">Fin de semana</span>` : ''}
             </div>
             <button type="button" class="btn btn-ghost btn-sm" onclick="app.openAddCustomSlotModal('${dateStr}')" style="font-size: 11px; padding: 4px 8px; color: var(--m3-primary);" title="Añadir momento de comida">
               <span class="material-symbols-outlined icon-sm">add</span> Añadir Comida
@@ -2803,7 +2959,7 @@ class FoodAssistantApp {
     const nameInput = document.getElementById('custom-slot-name');
     const iconSelect = document.getElementById('custom-slot-icon');
 
-    const dateStr = dateInput?.value || new Date().toISOString().split('T')[0];
+    const dateStr = dateInput?.value || toLocalDateKey();
     const name = (nameInput?.value || '').trim();
     const icon = iconSelect?.value || 'lunch_dining';
 
@@ -2812,21 +2968,7 @@ class FoodAssistantApp {
       return;
     }
 
-    if (!state.mealPlan[dateStr]) {
-      state.mealPlan[dateStr] = {
-        dayName: '',
-        breakfast: null,
-        lunch: null,
-        snack: null,
-        dinner: null,
-        customSlots: []
-      };
-    }
-
-    if (!Array.isArray(state.mealPlan[dateStr].customSlots)) {
-      state.mealPlan[dateStr].customSlots = [];
-    }
-
+    const dayData = state.getDayPlan(dateStr);
     const newSlot = {
       id: 'cslot-' + Date.now(),
       name: name,
@@ -2834,7 +2976,7 @@ class FoodAssistantApp {
       recipeId: null
     };
 
-    state.mealPlan[dateStr].customSlots.push(newSlot);
+    dayData.customSlots.push(newSlot);
     state.save('fa_mealplan', state.mealPlan);
     this.syncDataWithCloud(true);
     this.closeAddCustomSlotModal();
@@ -2882,27 +3024,15 @@ class FoodAssistantApp {
   selectRecipeForSlot(recipeId) {
     if (this.pickerTarget) {
       const { dateStr, slotKey, isCustom } = this.pickerTarget;
-      if (!state.mealPlan[dateStr]) {
-        state.mealPlan[dateStr] = {
-          dayName: '',
-          breakfast: null,
-          lunch: null,
-          snack: null,
-          dinner: null,
-          customSlots: []
-        };
-      }
+      const dayData = state.getDayPlan(dateStr);
 
       if (isCustom) {
-        if (!Array.isArray(state.mealPlan[dateStr].customSlots)) {
-          state.mealPlan[dateStr].customSlots = [];
-        }
-        const cs = state.mealPlan[dateStr].customSlots.find(c => c.id === slotKey);
+        const cs = dayData.customSlots.find(c => c.id === slotKey);
         if (cs) {
           cs.recipeId = recipeId;
         }
       } else {
-        state.mealPlan[dateStr][slotKey] = recipeId;
+        dayData[slotKey] = recipeId;
       }
 
       state.save('fa_mealplan', state.mealPlan);
@@ -3131,7 +3261,11 @@ class FoodAssistantApp {
     const recipeOccurrences = new Map();
     let plannedCount = 0;
 
-    Object.values(state.mealPlan).forEach(day => {
+    // Collect from the active planner week
+    const weekDays = this.getPlannerWeekDates();
+    weekDays.forEach(wDay => {
+      const day = state.mealPlan[wDay.dateKey];
+      if (!day) return;
       ['breakfast', 'lunch', 'snack', 'dinner'].forEach(slot => {
         const rId = day[slot];
         if (rId) {
@@ -3139,7 +3273,6 @@ class FoodAssistantApp {
           plannedCount++;
         }
       });
-
       if (Array.isArray(day.customSlots)) {
         day.customSlots.forEach(cs => {
           if (cs.recipeId) {
@@ -3149,6 +3282,28 @@ class FoodAssistantApp {
         });
       }
     });
+
+    // Fallback to all plan entries if the current visible week is empty
+    if (recipeOccurrences.size === 0) {
+      Object.values(state.mealPlan).forEach(day => {
+        ['breakfast', 'lunch', 'snack', 'dinner'].forEach(slot => {
+          const rId = day[slot];
+          if (rId) {
+            recipeOccurrences.set(rId, (recipeOccurrences.get(rId) || 0) + 1);
+            plannedCount++;
+          }
+        });
+
+        if (Array.isArray(day.customSlots)) {
+          day.customSlots.forEach(cs => {
+            if (cs.recipeId) {
+              recipeOccurrences.set(cs.recipeId, (recipeOccurrences.get(cs.recipeId) || 0) + 1);
+              plannedCount++;
+            }
+          });
+        }
+      });
+    }
 
     if (recipeOccurrences.size === 0) {
       alert("No hay recetas asignadas en el plan semanal para generar la lista.");
@@ -3555,11 +3710,13 @@ class FoodAssistantApp {
     const all = state.recipes;
 
     let i = 0;
-    Object.keys(state.mealPlan).forEach(dateKey => {
-      state.mealPlan[dateKey].breakfast = (breakfastRecipes[i % breakfastRecipes.length] || all[i % all.length])?.id || null;
-      state.mealPlan[dateKey].lunch = (lunchRecipes[i % lunchRecipes.length] || all[(i + 1) % all.length])?.id || null;
-      state.mealPlan[dateKey].snack = (snackRecipes[i % snackRecipes.length] || all[(i + 2) % all.length])?.id || null;
-      state.mealPlan[dateKey].dinner = (dinnerRecipes[i % dinnerRecipes.length] || all[(i + 3) % all.length])?.id || null;
+    const weekDays = this.getPlannerWeekDates();
+    weekDays.forEach(wDay => {
+      const dayData = state.getDayPlan(wDay.dateKey, wDay.dayName);
+      dayData.breakfast = (breakfastRecipes[i % breakfastRecipes.length] || all[i % all.length])?.id || null;
+      dayData.lunch = (lunchRecipes[i % lunchRecipes.length] || all[(i + 1) % all.length])?.id || null;
+      dayData.snack = (snackRecipes[i % snackRecipes.length] || all[(i + 2) % all.length])?.id || null;
+      dayData.dinner = (dinnerRecipes[i % dinnerRecipes.length] || all[(i + 3) % all.length])?.id || null;
       i++;
     });
     state.save('fa_mealplan', state.mealPlan);
@@ -3924,7 +4081,7 @@ class FoodAssistantApp {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `food-assistant-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `food-assistant-backup-${toLocalDateKey()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }

@@ -993,6 +993,53 @@ body {
   border-radius: var(--radius-full);
 }
 
+.day-badge-weekend {
+  font-size: 10px;
+  font-weight: 600;
+  background-color: var(--m3-surface-container-high);
+  color: var(--m3-on-surface-variant);
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+}
+
+.day-card-weekend {
+  background-color: var(--m3-surface-container-low);
+  border-left: 3px solid var(--m3-outline);
+}
+
+.day-card-today {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 1px var(--color-brand);
+}
+
+.week-nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  background-color: var(--m3-surface-container);
+  border: 1px solid var(--m3-outline-variant);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+
+.week-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.week-nav-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--m3-primary);
+}
+
 /* Shopping List */
 .aisle-card {
   background-color: var(--m3-surface);

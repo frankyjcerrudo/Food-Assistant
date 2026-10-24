@@ -100,7 +100,7 @@ describe('US-28: Rediseño enfocado de la pantalla "Hoy" (Zero Clutter)', () => 
   });
 
   it('Renderizado dinámico de momentos extra (customSlots) en la vista de Hoy', () => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = window.toLocalDateKey();
     if (!window.state.mealPlan[todayStr]) {
       window.state.mealPlan[todayStr] = {
         breakfast: null,
