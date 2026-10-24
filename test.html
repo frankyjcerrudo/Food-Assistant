@@ -1754,11 +1754,11 @@
       it(
         'Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes',
         {
-          purpose: 'Garantizar que la versión de la app (v0.22) está unificada y se refleja en cabecera y ajustes sin desincronizaciones.',
-          assertions: 'Valida que window.APP_VERSION sea v0.22 y actualice elementos DOM correspondientes.'
+          purpose: 'Garantizar que la versión de la app (v0.23) está unificada y se refleja en cabecera y ajustes sin desincronizaciones.',
+          assertions: 'Valida que window.APP_VERSION sea v0.23 y actualice elementos DOM correspondientes.'
         },
         () => {
-          expect(window.APP_VERSION).toBe('v0.22');
+          expect(window.APP_VERSION).toBe('v0.23');
 
           const badge = document.createElement('span');
           badge.id = 'app-version-badge';
@@ -1773,8 +1773,8 @@
           };
           fakeApp.initVersion();
 
-          expect(badge.textContent).toBe('v0.22');
-          expect(settingsVer.textContent).toBe('v0.22');
+          expect(badge.textContent).toBe('v0.23');
+          expect(settingsVer.textContent).toBe('v0.23');
 
           document.body.removeChild(badge);
           document.body.removeChild(settingsVer);

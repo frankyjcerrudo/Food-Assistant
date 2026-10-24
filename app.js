@@ -1332,13 +1332,13 @@ const RecipeParser = {
 };
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.22';
+  window.APP_VERSION = 'v0.23';
 }
 
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.22';
+    this.appVersion = 'v0.23';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
