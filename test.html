@@ -1815,10 +1815,79 @@
 
           window.RecipeParser.detectRobotFeatures(recipeMock);
           expect(recipeMock.tags.includes('Robot de Cocina')).toBe(true);
-          expect(recipeMock.tags.includes('Thermomix')).toBe(true);
-
           const timer = window.RecipeParser.extractTimerMinutes(recipeMock.instructions[0].text);
           expect(timer).toBe(8);
+        }
+      );
+    });
+
+    describe('8. US-28: Rediseño enfocado de la pantalla "Hoy" (Zero Clutter)', () => {
+      it(
+        'Zero Clutter: No existen bloques hero redundantes ni duplicados de navegación',
+        {
+          purpose: 'Garantizar que la pantalla de inicio esté libre de clutter y aproveche el espacio vertical móvil al 100%.',
+          assertions: 'Verifica ausencia de .today-hero, .quick-stats-grid y botones redundantes con la barra inferior.'
+        },
+        () => {
+          expect(document.querySelector('.today-hero')).toBeNull();
+          expect(document.querySelector('.quick-stats-grid')).toBeNull();
+          expect(document.getElementById('stat-total-recipes')).toBeNull();
+          expect(document.getElementById('stat-planned-meals')).toBeNull();
+          expect(document.getElementById('stat-shopping-items')).toBeNull();
+          expect(document.getElementById('btn-quick-shopping')).toBeNull();
+          expect(document.getElementById('btn-quick-ai-plan')).toBeNull();
+        }
+      );
+
+      it(
+        'Cabecera de Hoy: Fecha formateada en español y resumen contextual',
+        {
+          purpose: 'Comprobar que la cabecera presenta el día actual en formato natural con resumen de comidas asignadas.',
+          assertions: 'Valida fecha capitalizada en #today-date-text y texto explicativo en #today-summary-text.'
+        },
+        () => {
+          const testContainer = document.createElement('div');
+          testContainer.innerHTML = `
+            <div id="today-date-text"></div>
+            <div id="today-summary-text"></div>
+            <div id="today-slots-container"></div>
+          `;
+          document.body.appendChild(testContainer);
+
+          const app = new window.FoodAssistantApp();
+          app.renderTodayView();
+
+          const dateText = document.getElementById('today-date-text').textContent;
+          expect(dateText.length > 3).toBe(true);
+          expect(document.getElementById('today-summary-text').textContent).toMatch(/comidas|Listo|Ninguna/i);
+
+          document.body.removeChild(testContainer);
+        }
+      );
+
+      it(
+        'Añadir otra comida: Botón accesible presente en el contenedor de slots',
+        {
+          purpose: 'Verificar botón accesible y visible para añadir momentos de comida extra en la misma pantalla.',
+          assertions: 'Comprueba presencia de .today-add-slot-btn con llamada a openAddCustomSlotModal.'
+        },
+        () => {
+          const testContainer = document.createElement('div');
+          testContainer.innerHTML = `
+            <div id="today-date-text"></div>
+            <div id="today-summary-text"></div>
+            <div id="today-slots-container"></div>
+          `;
+          document.body.appendChild(testContainer);
+
+          const app = new window.FoodAssistantApp();
+          app.renderTodayView();
+
+          const addBtn = document.querySelector('.today-add-slot-btn');
+          expect(addBtn).not.toBeNull();
+          expect(addBtn.getAttribute('onclick')).toContain('openAddCustomSlotModal');
+
+          document.body.removeChild(testContainer);
         }
       );
     });

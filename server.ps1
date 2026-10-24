@@ -1,7 +1,11 @@
+param(
+    [int]$port = 3000,
+    [switch]$NoBrowser
+)
+
 # Food Assistant - Servidor Local Ligero
 Add-Type -AssemblyName System.Net.Http -ErrorAction SilentlyContinue
 
-$port = 3000
 $root = $PSScriptRoot
 if (-not $root) { $root = Get-Location }
 
@@ -18,7 +22,9 @@ try {
     Write-Host " Presiona Ctrl+C para detener el servidor " -ForegroundColor Gray
     Write-Host "==========================================" -ForegroundColor Cyan
 
-    Start-Process "http://localhost:$port"
+    if (-not $NoBrowser) {
+        Start-Process "http://localhost:$port"
+    }
 
     while ($listener.IsListening) {
         $context = $listener.GetContext()

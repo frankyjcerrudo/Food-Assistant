@@ -1929,7 +1929,8 @@ class FoodAssistantApp {
   }
 
   renderTodayView() {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
     const todayPlan = state.mealPlan[todayStr] || {
       breakfast: null,
       lunch: state.recipes[0]?.id || null,
@@ -1938,26 +1939,36 @@ class FoodAssistantApp {
       customSlots: []
     };
 
-    const totalRecipesElem = document.getElementById('stat-total-recipes');
-    if (totalRecipesElem) totalRecipesElem.textContent = state.recipes.length;
-    
-    let plannedCount = 0;
-    Object.values(state.mealPlan).forEach(day => {
-      ['breakfast', 'lunch', 'snack', 'dinner'].forEach(k => {
-        if (day[k]) plannedCount++;
-      });
-      if (Array.isArray(day.customSlots)) {
-        day.customSlots.forEach(cs => {
-          if (cs.recipeId) plannedCount++;
-        });
-      }
-    });
-    const plannedElem = document.getElementById('stat-planned-meals');
-    if (plannedElem) plannedElem.textContent = plannedCount;
+    // Header dynamic date formatting (e.g., "Sábado, 24 de octubre")
+    const dateOptions = { weekday: 'long', day: 'numeric', month: 'long' };
+    const dateFormatted = today.toLocaleDateString('es-ES', dateOptions);
+    const dateCapitalized = dateFormatted ? (dateFormatted.charAt(0).toUpperCase() + dateFormatted.slice(1)) : 'Hoy';
 
-    const pendingItems = state.shoppingList.filter(i => !i.isChecked).length;
-    const shoppingElem = document.getElementById('stat-shopping-items');
-    if (shoppingElem) shoppingElem.textContent = pendingItems;
+    const dateElem = document.getElementById('today-date-text');
+    if (dateElem) {
+      dateElem.textContent = dateCapitalized;
+    }
+
+    const customSlots = Array.isArray(todayPlan.customSlots) ? todayPlan.customSlots : [];
+    const totalSlotsCount = STANDARD_SLOTS.length + customSlots.length;
+    let assignedCount = 0;
+    STANDARD_SLOTS.forEach(s => {
+      if (todayPlan[s.key]) assignedCount++;
+    });
+    customSlots.forEach(cs => {
+      if (cs.recipeId) assignedCount++;
+    });
+
+    const summaryElem = document.getElementById('today-summary-text');
+    if (summaryElem) {
+      if (assignedCount === 0) {
+        summaryElem.textContent = 'Ninguna comida asignada para hoy. Toca un momento para empezar.';
+      } else if (assignedCount === totalSlotsCount) {
+        summaryElem.textContent = `Todas las comidas planificadas (${assignedCount} de ${totalSlotsCount}). ¡Listo para cocinar!`;
+      } else {
+        summaryElem.textContent = `${assignedCount} de ${totalSlotsCount} comidas planificadas para hoy.`;
+      }
+    }
 
     const container = document.getElementById('today-slots-container');
     if (!container) return;
@@ -1969,15 +1980,27 @@ class FoodAssistantApp {
       if (recipe) {
         return `
           <div class="meal-slot has-meal" onclick="app.openRecipeDetail('${recipe.id}')">
-            <span class="slot-label">
-              <span class="material-symbols-outlined icon-sm">${s.icon}</span> ${s.label}
-            </span>
-            <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px; min-width: 0;">
-              <img src="${recipe.imageUrl}" alt="" style="width: 44px; height: 44px; border-radius: 8px; object-fit: cover; flex-shrink: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span class="slot-label">
+                <span class="material-symbols-outlined icon-sm">${s.icon}</span> ${s.label}
+              </span>
+              <button class="btn-ghost btn-sm" onclick="event.stopPropagation(); app.clearSlot('${todayStr}', '${s.key}')" title="Quitar plato" style="padding: 2px 4px; color: var(--m3-on-surface-variant);">
+                <span class="material-symbols-outlined icon-sm">close</span>
+              </button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px; min-width: 0;">
+              <img src="${recipe.imageUrl}" alt="" style="width: 48px; height: 48px; border-radius: 10px; object-fit: cover; flex-shrink: 0;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\\'http://www.w3.org/2000/svg\\\' viewBox=\\\'0 0 48 48\\\'><rect width=\\\'48\\\' height=\\\'48\\\' rx=\\\'10\\\' fill=\\\'%23f1f3f4\\\'/><text x=\\\'50%25\\\' y=\\\'55%25\\\' dominant-baseline=\\\'middle\\\' text-anchor=\\\'middle\\\' font-size=\\\'20\\\'>🍲</text></svg>'">
               <div style="flex: 1; min-width: 0; overflow: hidden;">
                 <div class="slot-recipe-name" title="${recipe.title}">${recipe.title}</div>
-                <div style="font-size: 11px; color: var(--m3-on-surface-variant); margin-top: 2px; display: flex; align-items: center; gap: 4px;">
-                  <span class="material-symbols-outlined icon-sm">schedule</span> ${recipe.prepTimeMinutes + recipe.cookTimeMinutes} min
+                <div style="font-size: 11px; color: var(--m3-on-surface-variant); margin-top: 3px; display: flex; align-items: center; gap: 8px;">
+                  <span style="display: inline-flex; align-items: center; gap: 3px;">
+                    <span class="material-symbols-outlined icon-sm">schedule</span> ${recipe.prepTimeMinutes + recipe.cookTimeMinutes} min
+                  </span>
+                  ${recipe.servings ? `
+                    <span style="display: inline-flex; align-items: center; gap: 3px;">
+                      <span class="material-symbols-outlined icon-sm">group</span> ${recipe.servings} p.
+                    </span>
+                  ` : ''}
                 </div>
               </div>
             </div>
@@ -1990,21 +2013,20 @@ class FoodAssistantApp {
               <span class="material-symbols-outlined icon-sm">${s.icon}</span> ${s.label}
             </span>
             <div class="slot-action-text">
-              <span class="material-symbols-outlined icon-sm">add</span> Asignar plato para hoy
+              <span class="material-symbols-outlined icon-sm">add_circle</span> Asignar plato
             </div>
           </div>
         `;
       }
     }).join('');
 
-    const customSlots = Array.isArray(todayPlan.customSlots) ? todayPlan.customSlots : [];
     const customHtml = customSlots.map(cs => this.renderCustomSlotCard(todayStr, cs)).join('');
 
     const addExtraHtml = `
-      <div style="grid-column: 1 / -1; margin-top: 4px;">
-        <button type="button" class="btn btn-tonal btn-sm" style="width: 100%; justify-content: center; border-radius: var(--radius-md); padding: 10px; white-space: normal; line-height: 1.35; text-align: center;" onclick="app.openAddCustomSlotModal('${todayStr}')">
+      <div class="today-add-slot-wrap">
+        <button type="button" class="btn btn-tonal today-add-slot-btn" onclick="app.openAddCustomSlotModal('${todayStr}')">
           <span class="material-symbols-outlined icon-sm">add_circle</span>
-          <span>Añadir otra comida para hoy (media mañana, post-entreno, merienda...)</span>
+          <span>Añadir otra comida para hoy (snack, post-entreno, merienda...)</span>
         </button>
       </div>
     `;
@@ -3964,6 +3986,7 @@ if (typeof window !== 'undefined') {
   window.STANDARD_SLOTS = STANDARD_SLOTS;
   window.AISLE_METADATA = AISLE_METADATA;
   window.StateStore = StateStore;
+  window.state = state;
   window.FoodAssistantApp = FoodAssistantApp;
 }
 

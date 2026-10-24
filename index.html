@@ -50,62 +50,25 @@
     </div>
   </header>
 
-  <!-- VIEW 1: TODAY / DASHBOARD -->
+  <!-- VIEW 1: TODAY / ZERO CLUTTER (US-28) -->
   <main class="view-panel active" id="view-today">
-    <div class="today-hero">
-      <div class="today-hero-title">
-        <span class="material-symbols-outlined" style="color: var(--m3-primary);">today</span>
-        <span id="today-date-text">Hoy</span>
-      </div>
-      <p class="section-subtitle">Tus comidas organizadas para el día.</p>
-      
-      <div class="quick-stats-grid">
-        <div class="stat-box">
-          <div class="stat-value" id="stat-total-recipes">0</div>
-          <div class="stat-label">Recetas</div>
+    <div class="today-header">
+      <div class="today-header-info">
+        <div class="today-date-badge">
+          <span class="material-symbols-outlined icon-sm" style="color: var(--m3-primary);">today</span>
+          <span id="today-date-text">Hoy</span>
         </div>
-        <div class="stat-box">
-          <div class="stat-value" id="stat-planned-meals">0</div>
-          <div class="stat-label">En Menú</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-value" id="stat-shopping-items">0</div>
-          <div class="stat-label">Por Comprar</div>
-        </div>
+        <h2 class="today-title">Comidas de Hoy</h2>
+        <p class="today-subtitle" id="today-summary-text">Tus comidas organizadas para el día.</p>
       </div>
-    </div>
-
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">Comidas de Hoy</h2>
-        <p class="section-subtitle">Toca un plato para ver la receta o cocinar.</p>
-      </div>
-      <button class="btn btn-ghost btn-sm" id="btn-goto-planner" style="color: var(--m3-primary);">
-        <span>Ver semana</span>
+      <button class="btn btn-tonal btn-sm today-btn-planner" id="btn-goto-planner" title="Ver planificador semanal">
+        <span>Semana</span>
         <span class="material-symbols-outlined icon-sm">arrow_forward</span>
       </button>
     </div>
 
     <div class="slots-grid" id="today-slots-container">
       <!-- Generated via JS -->
-    </div>
-
-    <div style="margin-top: 24px;">
-      <div class="section-header">
-        <h2 class="section-title">Acciones Frecuentes</h2>
-      </div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-        <button class="card btn" id="btn-quick-shopping" style="text-align: left; padding: 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px;">
-          <span class="material-symbols-outlined icon-lg" style="color: var(--m3-primary);">shopping_cart</span>
-          <strong style="font-size: 14px; color: var(--m3-on-surface);">Lista de la Compra</strong>
-          <span style="font-size: 12px; color: var(--m3-on-surface-variant);">Artículos por pasillos</span>
-        </button>
-        <button class="card btn" id="btn-quick-ai-plan" style="text-align: left; padding: 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px;">
-          <span class="material-symbols-outlined icon-lg" style="color: var(--m3-primary);">auto_awesome</span>
-          <strong style="font-size: 14px; color: var(--m3-on-surface);">Asistente Gemini</strong>
-          <span style="font-size: 12px; color: var(--m3-on-surface-variant);">Revisar o cambiar menú</span>
-        </button>
-      </div>
     </div>
   </main>
 

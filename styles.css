@@ -693,51 +693,93 @@ body {
   font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
 }
 
-/* Today / Dashboard View */
-.today-hero {
-  background-color: var(--m3-surface-container-low);
-  border-radius: var(--radius-xl);
-  padding: 20px;
-  margin-bottom: 20px;
-  border: 1px solid var(--m3-outline-variant);
+/* Today / Zero-Clutter Focused View (US-28) */
+.today-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  padding: 4px 2px 0 2px;
+  gap: 12px;
 }
 
-.today-hero-title {
+.today-header-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.today-date-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--m3-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 3px;
+}
+
+.today-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--m3-on-surface);
+  line-height: 1.25;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.today-subtitle {
+  font-size: 13px;
+  color: var(--m3-on-surface-variant);
+  margin: 4px 0 0 0;
+  line-height: 1.4;
+}
+
+.today-btn-planner {
+  align-self: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  gap: 6px;
+}
+
+.today-add-slot-wrap {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+}
+
+.today-add-slot-btn {
+  width: 100%;
+  min-height: 48px;
   display: flex;
   align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 500;
   gap: 8px;
-  font-size: 22px;
-  font-weight: 500;
-  color: var(--m3-on-surface);
-}
-
-.quick-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.stat-box {
-  background-color: var(--m3-surface);
-  border-radius: var(--radius-md);
-  padding: 12px;
-  text-align: center;
-  border: 1px solid var(--m3-outline-variant);
-}
-
-.stat-value {
-  font-size: 20px;
-  font-weight: 700;
+  border: 1px dashed var(--m3-outline);
+  background-color: var(--m3-surface-container-low);
   color: var(--m3-primary);
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  cursor: pointer;
+  box-sizing: border-box;
 }
 
-.stat-label {
-  font-size: 11px;
-  color: var(--m3-on-surface-variant);
-  margin-top: 2px;
-  text-transform: uppercase;
-  font-weight: 500;
+.today-add-slot-btn:hover {
+  background-color: var(--m3-surface-container);
+  border-color: var(--m3-primary);
+  border-style: solid;
+}
+
+.today-add-slot-btn:active {
+  transform: scale(0.98);
 }
 
 /* Meal Slots */
