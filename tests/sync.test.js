@@ -465,15 +465,28 @@ describe('US-35 & Bugs Bloqueantes: Sincronización Supabase, IDs Únicos y Esqu
   });
 
   // 7. Contador y ordenación consistente de recetas (multi-dispositivo)
-  describe('Consistencia de recetas: Contador visual y ordenación determinista A-Z', () => {
-    it('getSortedRecipes y renderRecipesGrid deben ordenar las recetas alfabéticamente (A-Z)', () => {
-      const unorderedRecipes = [
+  describe('Consistencia de recetas: Contador visual y ordenación por fecha de creación', () => {
+    it('getSortedRecipes debe ordenar las recetas por fecha de creación (más nuevas arriba, más viejas al final)', () => {
+      const recipesWithDates = [
+        { id: 'rec-old', title: 'Receta Antigua', createdAt: '2026-01-01T10:00:00Z', tags: [] },
+        { id: 'rec-new', title: 'Receta Recientísima', createdAt: '2026-10-25T12:00:00Z', tags: [] },
+        { id: 'rec-mid', title: 'Receta Intermedia', createdAt: '2026-05-15T10:00:00Z', tags: [] }
+      ];
+
+      const sorted = appInstance.getSortedRecipes(recipesWithDates);
+      expect(sorted[0].id).toBe('rec-new');
+      expect(sorted[1].id).toBe('rec-mid');
+      expect(sorted[2].id).toBe('rec-old');
+    });
+
+    it('getSortedRecipes debe desempatar alfabéticamente (A-Z) si las fechas son idénticas o no existen', () => {
+      const seeds = [
         { id: 'rec-z', title: 'Zumo de naranja', tags: [] },
         { id: 'rec-a', title: 'Arroz con verduras', tags: [] },
         { id: 'rec-m', title: 'Macarrones con queso', tags: [] }
       ];
 
-      const sorted = appInstance.getSortedRecipes(unorderedRecipes);
+      const sorted = appInstance.getSortedRecipes(seeds);
       expect(sorted[0].title).toBe('Arroz con verduras');
       expect(sorted[1].title).toBe('Macarrones con queso');
       expect(sorted[2].title).toBe('Zumo de naranja');

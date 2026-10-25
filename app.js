@@ -337,6 +337,13 @@ class StateStore {
         try { localStorage.setItem('fa_recipes_seeded', 'v8'); } catch (e) {}
       }
     }
+    if (Array.isArray(savedRecipes)) {
+      savedRecipes.forEach(r => {
+        if (!r.createdAt && r.updatedAt) {
+          r.createdAt = r.updatedAt;
+        }
+      });
+    }
     this.recipes = savedRecipes;
 
     const loadedPlan = this.load('fa_mealplan', null);
@@ -1512,7 +1519,7 @@ const RecipeParser = {
 };
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.32';
+  window.APP_VERSION = 'v0.33';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -1525,7 +1532,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.32';
+    this.appVersion = 'v0.33';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -2054,6 +2061,7 @@ class FoodAssistantApp {
             ingredients: Array.isArray(remoteRow.ingredients) ? remoteRow.ingredients : [],
             instructions: Array.isArray(remoteRow.instructions) ? remoteRow.instructions : [],
             isFavorite: !!remoteRow.is_favorite,
+            createdAt: remoteRow.created_at || remoteRow.updated_at || null,
             updatedAt: remoteRow.updated_at
           };
 
@@ -2306,6 +2314,7 @@ class FoodAssistantApp {
           ingredients: recipe.ingredients || [],
           instructions: recipe.instructions || [],
           is_favorite: !!recipe.isFavorite,
+          created_at: recipe.createdAt || recipe.updatedAt || new Date().toISOString(),
           updated_at: recipe.updatedAt || new Date().toISOString()
         }));
 
@@ -2677,6 +2686,15 @@ class FoodAssistantApp {
   getSortedRecipes(recipesList = state.recipes) {
     if (!Array.isArray(recipesList)) return [];
     return [...recipesList].sort((a, b) => {
+      // Orden por fecha de creación: las más nuevas arriba del todo y las más viejas al final
+      const timeA = new Date(a.createdAt || a.updatedAt || 0).getTime();
+      const timeB = new Date(b.createdAt || b.updatedAt || 0).getTime();
+
+      if (timeB !== timeA) {
+        return timeB - timeA;
+      }
+
+      // Desempate secundario alfabético determinista si tienen la misma fecha o son semillas
       const titleA = (a.title || '').trim();
       const titleB = (b.title || '').trim();
       return titleA.localeCompare(titleB, 'es', { sensitivity: 'base' });
@@ -3175,6 +3193,7 @@ class FoodAssistantApp {
       ...updatedRecipe,
       sourceUrl: existing?.sourceUrl || updatedRecipe.sourceUrl || '',
       sourceDomain: existing?.sourceDomain || updatedRecipe.sourceDomain || '',
+      createdAt: existing?.createdAt || existing?.updatedAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 
@@ -4604,9 +4623,12 @@ class FoodAssistantApp {
     if (!newRecipe.id) {
       newRecipe.id = generateId('rec-');
     }
+    const existingIdx = state.recipes.findIndex(r => r.id === newRecipe.id);
+    const existing = existingIdx >= 0 ? state.recipes[existingIdx] : null;
+
+    newRecipe.createdAt = newRecipe.createdAt || existing?.createdAt || existing?.updatedAt || new Date().toISOString();
     newRecipe.updatedAt = new Date().toISOString();
 
-    const existingIdx = state.recipes.findIndex(r => r.id === newRecipe.id);
     if (existingIdx >= 0) {
       state.recipes[existingIdx] = newRecipe;
     } else {
