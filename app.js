@@ -1899,7 +1899,7 @@ function renderAiQuota(quota) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.39';
+  window.APP_VERSION = 'v0.40';
   window.DEFAULT_AI_QUOTA = DEFAULT_AI_QUOTA;
   window.getMeterColor = getMeterColor;
   window.calculateDashOffset = calculateDashOffset;
@@ -1921,7 +1921,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.39';
+    this.appVersion = 'v0.40';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -3114,14 +3114,14 @@ class FoodAssistantApp {
     const badge = document.getElementById('recipes-count-badge');
     if (badge) {
       if (currentCount === totalCount) {
-        badge.textContent = `${totalCount} ${totalCount === 1 ? 'receta' : 'recetas'}`;
+        badge.textContent = `${totalCount}`;
       } else {
-        badge.textContent = `${currentCount} de ${totalCount} recetas`;
+        badge.textContent = `${currentCount} de ${totalCount}`;
       }
     }
     const subtitle = document.getElementById('recipes-count-subtitle');
     if (subtitle) {
-      subtitle.textContent = `Tu recetario personal (${totalCount} ${totalCount === 1 ? 'receta guardada' : 'recetas guardadas'}).`;
+      subtitle.textContent = 'Tu recetario personal.';
     }
 
     if (!recipesList.length) {

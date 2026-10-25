@@ -509,12 +509,12 @@ describe('US-35 & Bugs Bloqueantes: Sincronización Supabase, IDs Únicos y Esqu
       const badge = document.getElementById('recipes-count-badge');
       const subtitle = document.getElementById('recipes-count-subtitle');
 
-      expect(badge.textContent).toBe('2 recetas');
-      expect(subtitle.textContent).toContain('2 recetas guardadas');
+      expect(badge.textContent).toBe('2');
+      expect(subtitle.textContent).toBe('Tu recetario personal.');
 
       // Filtrado parcial
       appInstance.renderRecipesGrid([state.recipes[0]]);
-      expect(badge.textContent).toBe('1 de 2 recetas');
+      expect(badge.textContent).toBe('1 de 2');
     });
   });
 });

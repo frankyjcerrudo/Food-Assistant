@@ -2364,7 +2364,7 @@ Bocadillo De Atun Paso A Paso
       });
 
       it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-        expect(window.APP_VERSION).toBe('v0.39');
+        expect(window.APP_VERSION).toBe('v0.40');
 
         const badge = document.createElement('span');
         badge.id = 'app-version-badge';
@@ -2379,8 +2379,8 @@ Bocadillo De Atun Paso A Paso
         };
         fakeApp.initVersion();
 
-        expect(badge.textContent).toBe('v0.39');
-        expect(settingsVer.textContent).toBe('v0.39');
+        expect(badge.textContent).toBe('v0.40');
+        expect(settingsVer.textContent).toBe('v0.40');
 
         document.body.removeChild(badge);
         document.body.removeChild(settingsVer);
@@ -3015,12 +3015,12 @@ Bocadillo De Atun Paso A Paso
           appInst.renderRecipesGrid(window.state.recipes);
           const badge = document.getElementById('recipes-count-badge');
           const subtitle = document.getElementById('recipes-count-subtitle');
-          expect(badge.textContent).toBe('2 recetas');
-          expect(subtitle.textContent).toContain('2 recetas guardadas');
+          expect(badge.textContent).toBe('2');
+          expect(subtitle.textContent).toBe('Tu recetario personal.');
 
           // Filtrado parcial
           appInst.renderRecipesGrid([window.state.recipes[0]]);
-          expect(badge.textContent).toBe('1 de 2 recetas');
+          expect(badge.textContent).toBe('1 de 2');
 
           sandbox.innerHTML = '';
         }
