@@ -165,8 +165,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
   });
 
   it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-    expect(window.APP_VERSION).toBe('v0.40');
-    expect(appInstance.appVersion).toBe('v0.40');
+    expect(window.APP_VERSION).toBe('v0.41');
+    expect(appInstance.appVersion).toBe('v0.41');
 
     const badge = document.createElement('span');
     badge.id = 'app-version-badge';
@@ -176,11 +176,38 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     document.body.appendChild(settingsVer);
 
     appInstance.initVersion();
-    expect(badge.textContent).toBe('v0.40');
-    expect(settingsVer.textContent).toBe('v0.40');
+    expect(badge.textContent).toBe('v0.41');
+    expect(settingsVer.textContent).toBe('v0.41');
 
     document.body.removeChild(badge);
     document.body.removeChild(settingsVer);
+  });
+
+  it('Añadir Receta Unificada: Selector de modalidades (a mano, link, texto/notas)', () => {
+    const choiceModal = document.createElement('div');
+    choiceModal.className = 'modal-overlay';
+    choiceModal.id = 'modal-recipe-add-choice';
+    document.body.appendChild(choiceModal);
+    appInstance.modalRecipeAddChoice = choiceModal;
+
+    // Test open and close methods
+    appInstance.openAddRecipeChoiceModal();
+    expect(choiceModal.classList.contains('active')).toBe(true);
+
+    appInstance.closeAddRecipeChoiceModal();
+    expect(choiceModal.classList.contains('active')).toBe(false);
+
+    // Test closeModalByElement integration
+    choiceModal.classList.add('active');
+    appInstance.closeModalByElement(choiceModal);
+    expect(choiceModal.classList.contains('active')).toBe(false);
+
+    // Test openImportModal with default tabs
+    appInstance.openImportModal('text');
+    expect(document.getElementById('modal-recipe-import').classList.contains('active')).toBe(true);
+    appInstance.closeImportModal();
+
+    document.body.removeChild(choiceModal);
   });
 
   it('AI Quota Dashboard: renderAiQuota calcula offsets, colores y persiste cuota de modelos', () => {
@@ -237,5 +264,6 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     document.body.removeChild(container);
   });
 });
+
 
 

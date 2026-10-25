@@ -1439,3 +1439,72 @@ body {
   color: var(--m3-outline);
 }
 
+/* UNIFIED RECIPE ADD CHOICE MODAL */
+.recipe-choice-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--m3-surface);
+  border: 1px solid var(--m3-outline-variant);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  color: var(--m3-on-surface);
+  box-shadow: none;
+}
+
+.recipe-choice-card:hover {
+  background: var(--m3-surface-container-low);
+  border-color: var(--m3-primary);
+  transform: translateY(-2px);
+  box-shadow: var(--elevation-1);
+}
+
+.recipe-choice-card:active {
+  transform: translateY(0);
+}
+
+.choice-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.choice-text-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.choice-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--m3-on-surface);
+  margin-bottom: 2px;
+}
+
+.choice-desc {
+  font-size: 12px;
+  color: var(--m3-on-surface-variant);
+  line-height: 1.35;
+}
+
+.choice-arrow {
+  color: var(--m3-outline);
+  font-size: 20px;
+  transition: transform 0.2s ease, color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.recipe-choice-card:hover .choice-arrow {
+  transform: translateX(4px);
+  color: var(--m3-primary);
+}
+
+

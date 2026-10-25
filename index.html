@@ -25,14 +25,9 @@
         <span class="material-symbols-outlined">restaurant_menu</span>
       </div>
       <h1 class="brand-name">Food Assistant</h1>
-      <span class="app-version-badge" id="app-version-badge" title="Versión de Food Assistant">v0.40</span>
+      <span class="app-version-badge" id="app-version-badge" title="Versión de Food Assistant">v0.41</span>
     </div>
     <div class="header-actions">
-      <button class="btn btn-secondary btn-sm" id="btn-quick-import" title="Importar receta">
-        <span class="material-symbols-outlined icon-sm">add_link</span>
-        <span class="btn-import-label">Importar</span>
-      </button>
-
       <!-- Theme quick toggle -->
       <button class="btn btn-ghost btn-icon" id="btn-header-theme" title="Aspecto del tema">
         <span class="material-symbols-outlined" id="header-theme-icon">brightness_auto</span>
@@ -84,7 +79,7 @@
       </div>
       <button class="btn btn-primary btn-sm" id="btn-open-create-recipe">
         <span class="material-symbols-outlined icon-sm">add</span>
-        <span>Nueva Receta</span>
+        <span>Añadir</span>
       </button>
     </div>
 
@@ -359,7 +354,7 @@
         <span class="material-symbols-outlined" style="color: var(--m3-primary);">system_update</span> Versión y Actualizaciones
       </h3>
       <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px;">
-        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.40</strong>
+        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.41</strong>
       </p>
       <div style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
         Si acabas de desplegar o notas que algún cambio no aparece, pulsa el botón para limpiar la caché del Service Worker y cargar el código más reciente.
@@ -529,6 +524,61 @@
   </div>
 </div>
 
+<!-- MODAL: ADD RECIPE CHOICE (UNIFIED ENTRY POINT) -->
+<div class="modal-overlay" id="modal-recipe-add-choice">
+  <div class="modal-content" style="padding: 22px; max-width: 460px; width: 92%; border-radius: var(--radius-xl);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+      <h3 style="font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin: 0;">
+        <span class="material-symbols-outlined" style="color: var(--m3-primary);">add_circle</span> Añadir Receta
+      </h3>
+      <button class="btn btn-ghost btn-icon" id="btn-close-recipe-add-choice" title="Cerrar">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <p style="font-size: 13px; color: var(--m3-on-surface-variant); margin-bottom: 16px; line-height: 1.4;">
+      Elige cómo prefieres añadir la receta a tu recetario:
+    </p>
+
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <!-- Option 1: Manual -->
+      <button type="button" class="recipe-choice-card" id="btn-choice-manual">
+        <div class="choice-icon-wrap" style="background: var(--color-brand-container); color: var(--color-brand-on-container);">
+          <span class="material-symbols-outlined">edit_square</span>
+        </div>
+        <div class="choice-text-wrap">
+          <div class="choice-title">Añadir a mano</div>
+          <div class="choice-desc">Rellena los ingredientes, pasos y detalles paso a paso</div>
+        </div>
+        <span class="material-symbols-outlined choice-arrow">chevron_right</span>
+      </button>
+
+      <!-- Option 2: Link -->
+      <button type="button" class="recipe-choice-card" id="btn-choice-url">
+        <div class="choice-icon-wrap" style="background: var(--m3-secondary-container); color: var(--m3-on-secondary-container);">
+          <span class="material-symbols-outlined">language</span>
+        </div>
+        <div class="choice-text-wrap">
+          <div class="choice-title">Importar por enlace web</div>
+          <div class="choice-desc">Pega una URL de recetas para extraerla automáticamente</div>
+        </div>
+        <span class="material-symbols-outlined choice-arrow">chevron_right</span>
+      </button>
+
+      <!-- Option 3: Text / Notes -->
+      <button type="button" class="recipe-choice-card" id="btn-choice-text">
+        <div class="choice-icon-wrap" style="background: var(--m3-surface-container-high); color: var(--m3-primary);">
+          <span class="material-symbols-outlined">description</span>
+        </div>
+        <div class="choice-text-wrap">
+          <div class="choice-title">Importar por texto o notas</div>
+          <div class="choice-desc">Pega texto copiado con ingredientes y preparación</div>
+        </div>
+        <span class="material-symbols-outlined choice-arrow">chevron_right</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: RECIPE EDITOR (CREATE & EDIT) -->
 <div class="modal-overlay" id="modal-recipe-edit">
   <div class="modal-content" style="padding: 0; max-width: 620px; width: 92%; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; border-radius: var(--radius-xl);">
@@ -538,6 +588,9 @@
         <span class="material-symbols-outlined" style="color: var(--m3-primary);">edit_note</span> Editar Receta
       </h3>
       <div style="display: flex; align-items: center; gap: 8px;">
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-edit-switch-to-import" style="font-size: 12px; color: var(--m3-primary); display: flex; align-items: center; gap: 4px; padding: 4px 8px;" title="Importar por enlace web o texto">
+          <span class="material-symbols-outlined icon-sm">auto_awesome</span> Importar
+        </button>
         <button class="btn btn-primary btn-sm" id="btn-save-recipe-edit-header" style="display: flex; align-items: center; gap: 4px; font-weight: 600;">
           <span class="material-symbols-outlined icon-sm">save</span> Guardar
         </button>
@@ -711,13 +764,18 @@
     </div>
 
     <!-- Modal Footer Actions -->
-    <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; border-top: 1px solid var(--m3-outline-variant); padding-top: 12px;">
-      <button type="button" class="btn btn-primary btn-sm" id="btn-execute-import" style="min-width: 140px;">
-        <span class="material-symbols-outlined icon-sm">download</span> Analizar e Importar
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 16px; border-top: 1px solid var(--m3-outline-variant); padding-top: 12px;">
+      <button type="button" class="btn btn-ghost btn-sm" id="btn-import-switch-to-manual" style="font-size: 12px; color: var(--m3-primary); padding: 4px 8px;">
+        <span class="material-symbols-outlined icon-sm">edit_square</span> Escribir a mano
       </button>
-      <button type="button" class="btn btn-primary btn-sm" id="btn-confirm-save-import" style="display: none; background-color: var(--color-brand); color: #ffffff; min-width: 140px;">
-        <span class="material-symbols-outlined icon-sm">check_circle</span> Guardar en Recetas
-      </button>
+      <div style="display: flex; gap: 8px;">
+        <button type="button" class="btn btn-primary btn-sm" id="btn-execute-import" style="min-width: 140px;">
+          <span class="material-symbols-outlined icon-sm">download</span> Analizar e Importar
+        </button>
+        <button type="button" class="btn btn-primary btn-sm" id="btn-confirm-save-import" style="display: none; background-color: var(--color-brand); color: #ffffff; min-width: 140px;">
+          <span class="material-symbols-outlined icon-sm">check_circle</span> Guardar en Recetas
+        </button>
+      </div>
     </div>
   </div>
 </div>

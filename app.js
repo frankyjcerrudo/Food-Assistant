@@ -1899,7 +1899,7 @@ function renderAiQuota(quota) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.40';
+  window.APP_VERSION = 'v0.41';
   window.DEFAULT_AI_QUOTA = DEFAULT_AI_QUOTA;
   window.getMeterColor = getMeterColor;
   window.calculateDashOffset = calculateDashOffset;
@@ -1921,7 +1921,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.40';
+    this.appVersion = 'v0.41';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -1964,6 +1964,7 @@ class FoodAssistantApp {
     this.modalRecipeDetail = document.getElementById('modal-recipe-detail');
     this.modalRecipePicker = document.getElementById('modal-recipe-picker');
     this.modalRecipeImport = document.getElementById('modal-recipe-import');
+    this.modalRecipeAddChoice = document.getElementById('modal-recipe-add-choice');
     this.modalRecipeEdit = document.getElementById('modal-recipe-edit');
     this.modalAuth = document.getElementById('modal-auth');
     this.modalShoppingPreview = document.getElementById('modal-shopping-preview');
@@ -2829,8 +2830,11 @@ class FoodAssistantApp {
     document.getElementById('btn-auth-logout')?.addEventListener('click', () => this.logoutCloudUser());
 
     // Importer (US-15: Schema.org & Text Parser)
-    document.getElementById('btn-quick-import')?.addEventListener('click', () => this.openImportModal());
     document.getElementById('btn-close-import-modal')?.addEventListener('click', () => this.closeImportModal());
+    document.getElementById('btn-import-switch-to-manual')?.addEventListener('click', () => {
+      this.closeImportModal();
+      this.openCreateRecipeModal();
+    });
     document.getElementById('tab-import-url')?.addEventListener('click', () => this.switchImportTab('url'));
     document.getElementById('tab-import-text')?.addEventListener('click', () => this.switchImportTab('text'));
     document.getElementById('btn-execute-import')?.addEventListener('click', () => this.handleRecipeImport());
@@ -2845,8 +2849,27 @@ class FoodAssistantApp {
     document.getElementById('btn-paste-clipboard')?.addEventListener('click', () => this.handleClipboardPaste());
     document.getElementById('btn-force-cache-update')?.addEventListener('click', () => this.forceUpdateApp());
 
+    // Unified Recipe Creation Choice (Manual vs Link vs Text)
+    document.getElementById('btn-open-create-recipe')?.addEventListener('click', () => this.openAddRecipeChoiceModal());
+    document.getElementById('btn-close-recipe-add-choice')?.addEventListener('click', () => this.closeAddRecipeChoiceModal());
+    document.getElementById('btn-choice-manual')?.addEventListener('click', () => {
+      this.closeAddRecipeChoiceModal();
+      this.openCreateRecipeModal();
+    });
+    document.getElementById('btn-choice-url')?.addEventListener('click', () => {
+      this.closeAddRecipeChoiceModal();
+      this.openImportModal('url');
+    });
+    document.getElementById('btn-choice-text')?.addEventListener('click', () => {
+      this.closeAddRecipeChoiceModal();
+      this.openImportModal('text');
+    });
+
     // Recipe CRUD
-    document.getElementById('btn-open-create-recipe')?.addEventListener('click', () => this.openCreateRecipeModal());
+    document.getElementById('btn-edit-switch-to-import')?.addEventListener('click', () => {
+      this.closeEditModal();
+      this.openAddRecipeChoiceModal();
+    });
     document.getElementById('btn-detail-edit-recipe')?.addEventListener('click', () => {
       if (this.activeRecipe) {
         this.closeRecipeModal();
@@ -3252,6 +3275,9 @@ class FoodAssistantApp {
       case 'modal-recipe-import':
         this.closeImportModal();
         break;
+      case 'modal-recipe-add-choice':
+        this.closeAddRecipeChoiceModal();
+        break;
       case 'modal-recipe-edit':
         this.closeEditModal();
         break;
@@ -3419,9 +3445,24 @@ class FoodAssistantApp {
     }
   }
 
+  // UNIFIED RECIPE ADD CHOICE
+  openAddRecipeChoiceModal() {
+    if (this.modalRecipeAddChoice) {
+      this.modalRecipeAddChoice.classList.add('active');
+    }
+  }
+
+  closeAddRecipeChoiceModal() {
+    if (this.modalRecipeAddChoice) {
+      this.modalRecipeAddChoice.classList.remove('active');
+    }
+  }
+
   // RECIPE EDITOR (CREATE & EDIT)
   openCreateRecipeModal() {
     document.getElementById('recipe-edit-modal-title').textContent = "Nueva Receta";
+    const switchBtn = document.getElementById('btn-edit-switch-to-import');
+    if (switchBtn) switchBtn.style.display = 'inline-flex';
     document.getElementById('edit-recipe-id').value = "";
     document.getElementById('edit-recipe-title').value = "";
     document.getElementById('edit-recipe-desc').value = "";
@@ -3450,6 +3491,8 @@ class FoodAssistantApp {
     if (!r) return;
 
     document.getElementById('recipe-edit-modal-title').textContent = this.isReviewingImport ? "Editar y Revisar Receta Importada" : "Editar Receta";
+    const switchBtn = document.getElementById('btn-edit-switch-to-import');
+    if (switchBtn) switchBtn.style.display = 'none';
     document.getElementById('edit-recipe-id').value = r.id || ('rec-' + Date.now());
     document.getElementById('edit-recipe-title').value = r.title || "";
     document.getElementById('edit-recipe-desc').value = r.description || "";
@@ -4903,10 +4946,14 @@ class FoodAssistantApp {
 // ==========================================================================
   // UNIVERSAL RECIPE IMPORTER (US-15: SCHEMA.ORG JSON-LD & TEXT PARSER)
   // ==========================================================================
-  openImportModal() {
-    this.modalRecipeImport.classList.add('active');
-    document.getElementById('import-url-input').value = '';
-    document.getElementById('import-text-input').value = '';
+  openImportModal(defaultTab = 'url') {
+    if (this.modalRecipeImport) {
+      this.modalRecipeImport.classList.add('active');
+    }
+    const urlInput = document.getElementById('import-url-input');
+    if (urlInput) urlInput.value = '';
+    const textInput = document.getElementById('import-text-input');
+    if (textInput) textInput.value = '';
     const status = document.getElementById('import-status-indicator');
     if (status) status.style.display = 'none';
     const previewBox = document.getElementById('import-preview-box');
@@ -4918,7 +4965,7 @@ class FoodAssistantApp {
     const btnConfirm = document.getElementById('btn-confirm-save-import');
     if (btnConfirm) btnConfirm.style.display = 'none';
     this.pendingImportRecipe = null;
-    this.switchImportTab('url');
+    this.switchImportTab(defaultTab || 'url');
   }
 
   fillAndTestSampleRecipe() {
