@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Food Assistant - Informe Detallado de Calidad y Tests</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.33">
+  <link rel="stylesheet" href="styles.css?v=0.34">
   <style>
     :root {
       --qa-pass: #059669;
@@ -301,8 +301,8 @@
   <div id="qa-sandbox" style="display: none;"></div>
 
   <!-- Entorno y dependencias de la app -->
-  <script src="config.js?v=0.33"></script>
-  <script src="app.js?v=0.33"></script>
+  <script src="config.js?v=0.34"></script>
+  <script src="app.js?v=0.34"></script>
 
   <script>
     const suites = [];
@@ -393,7 +393,7 @@
     }
 
     // =========================================================
-    // DEFINICIÓN DE PRUEBAS CON DETALLE EXPLICATIVO (73 TESTS)
+    // DEFINICIÓN DE PRUEBAS CON DETALLE EXPLICATIVO (77 TESTS)
     // =========================================================
 
     // SUITE 1: StateStore y Normalización de Datos (4 tests)
@@ -2006,7 +2006,7 @@ Bocadillo De Atun Paso A Paso
       });
 
       it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-        expect(window.APP_VERSION).toBe('v0.33');
+        expect(window.APP_VERSION).toBe('v0.34');
 
         const badge = document.createElement('span');
         badge.id = 'app-version-badge';
@@ -2021,8 +2021,8 @@ Bocadillo De Atun Paso A Paso
         };
         fakeApp.initVersion();
 
-        expect(badge.textContent).toBe('v0.33');
-        expect(settingsVer.textContent).toBe('v0.33');
+        expect(badge.textContent).toBe('v0.34');
+        expect(settingsVer.textContent).toBe('v0.34');
 
         document.body.removeChild(badge);
         document.body.removeChild(settingsVer);
@@ -2030,7 +2030,7 @@ Bocadillo De Atun Paso A Paso
 
     });
 
-    // SUITE 8: Sincronización Supabase y Resiliencia Multi-dispositivo (US-35, US-45, BUG-21 a 24)
+    // SUITE 8: Sincronización Supabase y Resiliencia Multi-dispositivo (US-35, US-45, BUG-21 a 24) (14 tests)
     describe('8. Sincronización Supabase y Resiliencia Multi-dispositivo (US-35, US-45, BUG-21 a 24)', () => {
       it(
         'US-45: Generación de IDs únicos con generateId y prefijo opcional',
@@ -2540,19 +2540,12 @@ Bocadillo De Atun Paso A Paso
       );
 
       it(
-        'Consistencia de Recetas: Contador visual y ordenación determinista A-Z',
+        'Consistencia de Recetas: getSortedRecipes ordena por fecha de creación (más nuevas arriba, más viejas al final)',
         {
-          purpose: 'Verificar que las recetas se ordenan idénticamente en móvil y escritorio y el contador visual refleja el total exacto.',
-          assertions: 'Valida que getSortedRecipes ordena alfabéticamente (A-Z) y renderRecipesGrid actualiza recipes-count-badge.'
+          purpose: 'Situar las recetas recién creadas o importadas en primer lugar para fácil acceso en móvil y escritorio.',
+          assertions: 'Comprueba que una receta reciente (2026-10-25) se ordena antes que intermedias y antiguas.'
         },
         () => {
-          const sandbox = document.getElementById('qa-sandbox');
-          sandbox.innerHTML = `
-            <span id="recipes-count-badge">0</span>
-            <p id="recipes-count-subtitle"></p>
-            <div id="recipes-cards-grid"></div>
-          `;
-
           const appInst = new window.FoodAssistantApp();
           const recipesWithDates = [
             { id: 'r-old', title: 'Receta Vieja', createdAt: '2026-01-01T10:00:00Z', tags: [] },
@@ -2564,16 +2557,44 @@ Bocadillo De Atun Paso A Paso
           expect(sortedDates[0].id).toBe('r-new');
           expect(sortedDates[1].id).toBe('r-mid');
           expect(sortedDates[2].id).toBe('r-old');
+        }
+      );
 
-          // Fallback alfabético determinista en semillas o misma fecha
+      it(
+        'Consistencia de Recetas: getSortedRecipes desempata alfabéticamente (A-Z) en recetas con misma fecha o semillas',
+        {
+          purpose: 'Garantizar orden determinista y predecible cuando varias recetas carecen de fecha diferenciada.',
+          assertions: 'Verifica que sin fecha o con misma fecha, se ordenan de la A a la Z por título.'
+        },
+        () => {
+          const appInst = new window.FoodAssistantApp();
           const seeds = [
             { id: 'r-z', title: 'Zumo de naranja', tags: [] },
-            { id: 'r-a', title: 'Arroz con verduras', tags: [] }
+            { id: 'r-a', title: 'Arroz con verduras', tags: [] },
+            { id: 'r-m', title: 'Macarrones con queso', tags: [] }
           ];
           const sortedSeeds = appInst.getSortedRecipes(seeds);
           expect(sortedSeeds[0].title).toBe('Arroz con verduras');
-          expect(sortedSeeds[1].title).toBe('Zumo de naranja');
+          expect(sortedSeeds[1].title).toBe('Macarrones con queso');
+          expect(sortedSeeds[2].title).toBe('Zumo de naranja');
+        }
+      );
 
+      it(
+        'Consistencia de Recetas: renderRecipesGrid actualiza el badge y subtítulo del contador de recetas',
+        {
+          purpose: 'Mostrar visiblemente al usuario el número de recetas guardadas para verificar de un vistazo la sincronización.',
+          assertions: 'Actualiza recipes-count-badge y recipes-count-subtitle con el total y con filtros parciales.'
+        },
+        () => {
+          const sandbox = document.getElementById('qa-sandbox');
+          sandbox.innerHTML = `
+            <span id="recipes-count-badge">0</span>
+            <p id="recipes-count-subtitle"></p>
+            <div id="recipes-cards-grid"></div>
+          `;
+
+          const appInst = new window.FoodAssistantApp();
           window.state.recipes = [
             { id: 'r1', title: 'Receta 1', tags: [], imageUrl: '' },
             { id: 'r2', title: 'Receta 2', tags: [], imageUrl: '' }
@@ -2581,7 +2602,13 @@ Bocadillo De Atun Paso A Paso
 
           appInst.renderRecipesGrid(window.state.recipes);
           const badge = document.getElementById('recipes-count-badge');
+          const subtitle = document.getElementById('recipes-count-subtitle');
           expect(badge.textContent).toBe('2 recetas');
+          expect(subtitle.textContent).toContain('2 recetas guardadas');
+
+          // Filtrado parcial
+          appInst.renderRecipesGrid([window.state.recipes[0]]);
+          expect(badge.textContent).toBe('1 de 2 recetas');
 
           sandbox.innerHTML = '';
         }

@@ -1519,7 +1519,7 @@ const RecipeParser = {
 };
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.33';
+  window.APP_VERSION = 'v0.34';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -1532,7 +1532,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.33';
+    this.appVersion = 'v0.34';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
