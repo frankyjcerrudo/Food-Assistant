@@ -323,7 +323,7 @@ class StateStore {
 
     let savedRecipes = this.load('fa_recipes', null);
     if (!savedRecipes) {
-      savedRecipes = [...SEED_RECIPES];
+      savedRecipes = typeof structuredClone === 'function' ? structuredClone(SEED_RECIPES) : JSON.parse(JSON.stringify(SEED_RECIPES));
       try { localStorage.setItem('fa_recipes_seeded', 'v8'); } catch (e) {}
     } else {
       const seeded = localStorage.getItem('fa_recipes_seeded');
@@ -1598,7 +1598,7 @@ function renderAiQuota(quota) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.36';
+  window.APP_VERSION = 'v0.37';
   window.DEFAULT_AI_QUOTA = DEFAULT_AI_QUOTA;
   window.getMeterColor = getMeterColor;
   window.calculateDashOffset = calculateDashOffset;
@@ -1615,7 +1615,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.36';
+    this.appVersion = 'v0.37';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -4809,12 +4809,16 @@ class FoodAssistantApp {
       localStorage.removeItem('fa_recipes');
       localStorage.removeItem('fa_mealplan');
       localStorage.removeItem('fa_shopping');
-      state.recipes = SEED_RECIPES;
+      localStorage.removeItem('fa_deleted_records');
+      state.deletedRecords = { recipes: [], mealPlans: [], shoppingItems: [] };
+      state.recipes = typeof structuredClone === 'function' ? structuredClone(SEED_RECIPES) : JSON.parse(JSON.stringify(SEED_RECIPES));
       state.mealPlan = state.generateInitialMealPlan();
       state.shoppingList = [];
       state.save('fa_recipes', state.recipes);
       state.save('fa_mealplan', state.mealPlan);
       state.save('fa_shopping', state.shoppingList);
+      state.save('fa_deleted_records', state.deletedRecords);
+      try { localStorage.setItem('fa_recipes_seeded', 'v8'); } catch (e) {}
       this.syncDataWithCloud(true);
       this.render();
       alert("Datos restablecidos.");

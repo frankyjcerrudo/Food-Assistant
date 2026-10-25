@@ -65,4 +65,40 @@ describe('StateStore & Data Model Normalization', () => {
     expect(breakfast.length).toBeGreaterThanOrEqual(2);
     expect(snack.length).toBeGreaterThanOrEqual(1);
   });
+
+  it('BUG-10: las recetas de ejemplo no reaparecen tras ser borradas y resetDemoData clona por valor', () => {
+    const store = new StateStore();
+    const initialSeedId = store.recipes[0].id;
+    const originalTitle = store.recipes[0].title;
+
+    // Borrado de receta semilla
+    store.recipes = store.recipes.filter(r => r.id !== initialSeedId);
+    store.save('fa_recipes', store.recipes);
+    store.trackDeletion('recipes', initialSeedId);
+
+    // Reinstanciar StateStore (simula recarga de página)
+    const reloadedStore = new StateStore();
+    expect(reloadedStore.recipes.some(r => r.id === initialSeedId)).toBe(false);
+
+    // resetDemoData clona sin compartir referencia mutante con SEED_RECIPES
+    const app = new window.FoodAssistantApp();
+    const origConfirm = window.confirm;
+    const origAlert = window.alert;
+    window.confirm = () => true;
+    window.alert = () => {};
+
+    app.resetDemoData();
+    window.confirm = origConfirm;
+    window.alert = origAlert;
+
+    expect(window.state.recipes.some(r => r.id === initialSeedId)).toBe(true);
+
+    // Modificar una receta en state no altera la constante SEED_RECIPES
+    const clonedRecipe = window.state.recipes.find(r => r.id === initialSeedId);
+    clonedRecipe.title = 'Título Modificado';
+
+    const originalSeed = SEED_RECIPES.find(r => r.id === initialSeedId);
+    expect(originalSeed.title).toBe(originalTitle);
+    expect(originalSeed.title).not.toBe('Título Modificado');
+  });
 });
