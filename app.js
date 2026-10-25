@@ -1598,7 +1598,7 @@ function renderAiQuota(quota) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.35';
+  window.APP_VERSION = 'v0.36';
   window.DEFAULT_AI_QUOTA = DEFAULT_AI_QUOTA;
   window.getMeterColor = getMeterColor;
   window.calculateDashOffset = calculateDashOffset;
@@ -1615,7 +1615,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.35';
+    this.appVersion = 'v0.36';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;

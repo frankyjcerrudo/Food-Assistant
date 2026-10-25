@@ -165,8 +165,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
   });
 
   it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-    expect(window.APP_VERSION).toBe('v0.35');
-    expect(appInstance.appVersion).toBe('v0.35');
+    expect(window.APP_VERSION).toBe('v0.36');
+    expect(appInstance.appVersion).toBe('v0.36');
 
     const badge = document.createElement('span');
     badge.id = 'app-version-badge';
@@ -176,8 +176,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     document.body.appendChild(settingsVer);
 
     appInstance.initVersion();
-    expect(badge.textContent).toBe('v0.35');
-    expect(settingsVer.textContent).toBe('v0.35');
+    expect(badge.textContent).toBe('v0.36');
+    expect(settingsVer.textContent).toBe('v0.36');
 
     document.body.removeChild(badge);
     document.body.removeChild(settingsVer);
@@ -222,9 +222,11 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
 
     expect(document.getElementById('ai-plan-name').textContent).toBe('Google AI Pro');
     expect(document.getElementById('pct-gemini-weekly').textContent).toBe('18%');
-    expect(document.getElementById('pct-gemini-weekly').style.color).toBe('#d97706');
+    const weeklyColor = document.getElementById('pct-gemini-weekly').style.color;
+    expect(['#d97706', 'rgb(217, 119, 6)'].includes(weeklyColor)).toBe(true);
     expect(document.getElementById('pct-gemini-5h').textContent).toBe('72%');
-    expect(document.getElementById('pct-gemini-5h').style.color).toBe('#16a34a');
+    const fiveHourColor = document.getElementById('pct-gemini-5h').style.color;
+    expect(['#16a34a', 'rgb(22, 163, 74)'].includes(fiveHourColor)).toBe(true);
     expect(document.getElementById('desc-gemini-weekly').textContent).toBe('18% restante');
 
     expect(window.getMeterColor(18)).toBe('#d97706');

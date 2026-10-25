@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Food Assistant - Informe Detallado de Calidad y Tests</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.35">
+  <link rel="stylesheet" href="styles.css?v=0.36">
   <style>
     :root {
       --qa-pass: #059669;
@@ -616,8 +616,8 @@
   <div id="qa-sandbox" style="display: none;"></div>
 
   <!-- Entorno y dependencias de la app -->
-  <script src="config.js?v=0.35"></script>
-  <script src="app.js?v=0.35"></script>
+  <script src="config.js?v=0.36"></script>
+  <script src="app.js?v=0.36"></script>
 
   <script>
     const suites = [];
@@ -2321,7 +2321,7 @@ Bocadillo De Atun Paso A Paso
       });
 
       it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-        expect(window.APP_VERSION).toBe('v0.35');
+        expect(window.APP_VERSION).toBe('v0.36');
 
         const badge = document.createElement('span');
         badge.id = 'app-version-badge';
@@ -2336,8 +2336,8 @@ Bocadillo De Atun Paso A Paso
         };
         fakeApp.initVersion();
 
-        expect(badge.textContent).toBe('v0.35');
-        expect(settingsVer.textContent).toBe('v0.35');
+        expect(badge.textContent).toBe('v0.36');
+        expect(settingsVer.textContent).toBe('v0.36');
 
         document.body.removeChild(badge);
         document.body.removeChild(settingsVer);
@@ -2382,9 +2382,11 @@ Bocadillo De Atun Paso A Paso
 
         expect(document.getElementById('ai-plan-name').textContent).toBe('Google AI Pro');
         expect(document.getElementById('pct-gemini-weekly').textContent).toBe('18%');
-        expect(document.getElementById('pct-gemini-weekly').style.color).toBe('#d97706');
+        const weeklyColor = document.getElementById('pct-gemini-weekly').style.color;
+        expect(['#d97706', 'rgb(217, 119, 6)'].includes(weeklyColor)).toBe(true);
         expect(document.getElementById('pct-gemini-5h').textContent).toBe('72%');
-        expect(document.getElementById('pct-gemini-5h').style.color).toBe('#16a34a');
+        const fiveHourColor = document.getElementById('pct-gemini-5h').style.color;
+        expect(['#16a34a', 'rgb(22, 163, 74)'].includes(fiveHourColor)).toBe(true);
         expect(document.getElementById('desc-gemini-weekly').textContent).toBe('18% restante');
 
         expect(window.getMeterColor(18)).toBe('#d97706');
