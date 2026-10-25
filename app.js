@@ -1968,6 +1968,8 @@ const RecipeParser = {
     this.detectRobotFeatures(recipe);
     return recipe;
   }
+};
+
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.APP_VERSION = 'v0.44';
