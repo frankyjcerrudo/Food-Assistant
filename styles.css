@@ -1507,4 +1507,231 @@ body {
   color: var(--m3-primary);
 }
 
+/* ==========================================================================
+   RECIPE EDITOR - INGREDIENTS & STEPS MODERN REDESIGN
+   ========================================================================== */
+.edit-ing-card {
+  background: var(--m3-surface);
+  border: 1px solid var(--m3-outline-variant);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.edit-ing-card:focus-within {
+  border-color: var(--m3-primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.edit-ing-top-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.ing-name-wrap {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.ing-icon-badge {
+  position: absolute;
+  left: 10px;
+  color: var(--m3-primary);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.ing-name-wrap .ing-name {
+  padding-left: 36px;
+  font-weight: 500;
+  width: 100%;
+}
+
+.edit-ing-bottom-row {
+  display: grid;
+  grid-template-columns: 100px 105px 1fr;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+@media (max-width: 480px) {
+  .edit-ing-bottom-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ing-aisle-group {
+    grid-column: 1 / -1;
+  }
+}
+
+.ing-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field-micro-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--m3-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  user-select: none;
+}
+
+.btn-remove-item {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  color: var(--m3-error);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.btn-remove-item:hover {
+  background: rgba(179, 38, 30, 0.08);
+}
+
+/* Steps Editor Redesign */
+.edit-step-card {
+  background: var(--m3-surface);
+  border: 1px solid var(--m3-outline-variant);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.edit-step-card:focus-within {
+  border-color: var(--m3-primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.edit-step-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.step-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.step-num-pill {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--m3-primary-container);
+  color: var(--m3-on-primary-container);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.step-title-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--m3-on-surface);
+}
+
+.edit-step-card .step-text {
+  width: 100%;
+  resize: vertical;
+  min-height: 54px;
+  line-height: 1.4;
+  font-size: 13.5px;
+}
+
+.edit-step-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.step-timer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--m3-secondary-container);
+  color: var(--m3-on-secondary-container);
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.step-timer-auto-tag {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: rgba(0, 0, 0, 0.1);
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+}
+
+.btn-step-timer-prompt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px dashed var(--m3-outline-variant);
+  border-radius: var(--radius-full);
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--m3-on-surface-variant);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-step-timer-prompt:hover {
+  background: var(--m3-surface-container-high);
+  color: var(--m3-primary);
+  border-color: var(--m3-primary);
+}
+
+.step-timer-inline-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.step-timer-mini-input {
+  width: 52px;
+  padding: 2px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--m3-primary);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  outline: none;
+}
+
+
 

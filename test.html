@@ -2364,7 +2364,7 @@ Bocadillo De Atun Paso A Paso
       });
 
       it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-        expect(window.APP_VERSION).toBe('v0.41');
+        expect(window.APP_VERSION).toBe('v0.42');
 
         const badge = document.createElement('span');
         badge.id = 'app-version-badge';
@@ -2379,8 +2379,8 @@ Bocadillo De Atun Paso A Paso
         };
         fakeApp.initVersion();
 
-        expect(badge.textContent).toBe('v0.41');
-        expect(settingsVer.textContent).toBe('v0.41');
+        expect(badge.textContent).toBe('v0.42');
+        expect(settingsVer.textContent).toBe('v0.42');
 
         document.body.removeChild(badge);
         document.body.removeChild(settingsVer);
@@ -3129,6 +3129,95 @@ Bocadillo De Atun Paso A Paso
           nameInput.value = 'Filete de ternera';
           nameInput.dispatchEvent(new Event('input'));
           expect(aisleSelect.value).toBe('meat');
+
+          sandbox.innerHTML = '';
+        }
+      );
+    });
+
+    describe('10. Rediseño del Editor de Recetas: Ingredientes y Temporizadores Automáticos', () => {
+      it(
+        'Detección automática de temporizador en pasos (extractTimerFromStepText)',
+        {
+          purpose: 'Verificar extracción inteligente de tiempos en castellano (minutos, horas, rangos como 6/7 min).',
+          assertions: 'Comprueba minutos exactos para horno 40 min, huevo 6/7 min, pasta 9-10 min, hora y media (90m), y 0 para pasos sin tiempo.'
+        },
+        () => {
+          expect(typeof window.extractTimerFromStepText).toBe('function');
+          expect(window.extractTimerFromStepText('Meter todos los ingredientes en el horno troceados 40 minutos')).toBe(40);
+          expect(window.extractTimerFromStepText('Cuece un huevo 6/7 minutos para poner de topping')).toBe(7);
+          expect(window.extractTimerFromStepText('Cuece la pasta durante 9-10 minutos hasta que esté al dente')).toBe(10);
+          expect(window.extractTimerFromStepText('saltea los tomates cherry 3 minutos con un chorrito de aceite')).toBe(3);
+          expect(window.extractTimerFromStepText('Hornear a 180°C durante 1 hora y media')).toBe(90);
+          expect(window.extractTimerFromStepText('Pela las castañas y luego tritura todo con caldo')).toBe(0);
+        }
+      );
+
+      it(
+        'Tarjetas de ingredientes con micro-etiquetas y sin textos cortados',
+        {
+          purpose: 'Verificar que addIngredientRow genera una tarjeta espaciosa con etiquetas Cantidad, Unidad, Pasillo y ancho amplio para el nombre.',
+          assertions: 'Comprueba presencia de .edit-ing-card, etiquetas descriptivas y valores correctos.'
+        },
+        () => {
+          const sandbox = document.getElementById('qa-sandbox');
+          sandbox.innerHTML = `<div id="edit-ingredients-container"></div>`;
+
+          const appInst = new window.FoodAssistantApp();
+          appInst.addIngredientRow({ name: 'Castañas', amount: 500, unit: 'g', aisle: 'produce' });
+
+          const row = document.querySelector('.edit-ing-row');
+          expect(row).not.toBeNull();
+          expect(row.classList.contains('edit-ing-card')).toBe(true);
+
+          const labels = Array.from(row.querySelectorAll('.field-micro-label')).map(l => l.textContent.trim());
+          expect(labels).toContain('Cantidad');
+          expect(labels).toContain('Unidad');
+          expect(labels).toContain('Pasillo / Sección');
+
+          expect(row.querySelector('.ing-name').value).toBe('Castañas');
+          expect(row.querySelector('.ing-amount').value).toBe('500');
+          expect(row.querySelector('.ing-unit').value).toBe('g');
+
+          sandbox.innerHTML = '';
+        }
+      );
+
+      it(
+        'Pasos de preparación con temporizador automático, pill discreta y renumberSteps',
+        {
+          purpose: 'Comprobar que los pasos generan temporizador automático en píldora cuando hay tiempo y botón opcional cuando no, reordenando pasos al eliminar.',
+          assertions: 'Paso 1 muestra pill de 40 min; Paso 2 muestra botón + Tiempo; al escribir 15 min en Paso 2 aparece pill; renumberSteps actualiza números.'
+        },
+        () => {
+          const sandbox = document.getElementById('qa-sandbox');
+          sandbox.innerHTML = `<div id="edit-steps-container"></div>`;
+
+          const appInst = new window.FoodAssistantApp();
+          appInst.addStepRow({ text: 'Hornear 40 minutos a 180 grados' });
+          appInst.addStepRow({ text: 'Pela las castañas con cuidado' });
+
+          const steps = document.querySelectorAll('.edit-step-row');
+          expect(steps.length).toBe(2);
+
+          const timerPill1 = steps[0].querySelector('.step-timer-badge');
+          expect(timerPill1).not.toBeNull();
+          expect(timerPill1.textContent).toContain('40 min');
+
+          const timerPrompt2 = steps[1].querySelector('.btn-step-timer-prompt');
+          expect(timerPrompt2).not.toBeNull();
+
+          const textarea2 = steps[1].querySelector('.step-text');
+          textarea2.value = 'Hervir 15 minutos en agua con sal';
+          textarea2.dispatchEvent(new Event('input'));
+
+          const timerPill2 = steps[1].querySelector('.step-timer-badge');
+          expect(timerPill2).not.toBeNull();
+          expect(timerPill2.textContent).toContain('15 min');
+
+          steps[0].querySelector('.btn-remove-item').click();
+          expect(document.querySelectorAll('.edit-step-row').length).toBe(1);
+          expect(document.querySelector('.step-num-pill').textContent).toBe('1');
 
           sandbox.innerHTML = '';
         }

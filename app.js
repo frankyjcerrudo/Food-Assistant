@@ -527,6 +527,56 @@ function getIngredientSuggestions(query, max = 6, extraItems = []) {
 }
 
 // ==========================================================================
+// STEP TIMER AUTO-DETECTION (US-61 & UX)
+// ==========================================================================
+function extractTimerFromStepText(text) {
+  if (!text || typeof text !== 'string') return 0;
+  
+  // Try RecipeParser.extractTimerMinutes if available
+  if (typeof RecipeParser !== 'undefined' && typeof RecipeParser.extractTimerMinutes === 'function') {
+    const pVal = RecipeParser.extractTimerMinutes(text);
+    if (pVal && pVal > 0) return pVal;
+  }
+
+  const clean = text.toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  // 1. Horas y minutos: ej. "1 hora y media", "1 hora y 20 minutos", "1 h 30 min", "2 horas"
+  const hrAndMinMatch = clean.match(/(\d+)\s*(?:horas?|h)\s*(?:y\s*)?(?:(\d+)\s*(?:minutos?|mins?|min)?|media\s*hora)?/i);
+  if (hrAndMinMatch) {
+    const hours = parseInt(hrAndMinMatch[1], 10) || 0;
+    let mins = 0;
+    if (hrAndMinMatch[2]) {
+      mins = parseInt(hrAndMinMatch[2], 10) || 0;
+    } else if (clean.includes('y media')) {
+      mins = 30;
+    } else if (clean.includes('y cuarto')) {
+      mins = 15;
+    }
+    return (hours * 60) + mins;
+  }
+
+  // 2. Expresiones verbales comunes: "media hora", "cuarto de hora"
+  if (/\bmedia\s+hora\b/i.test(clean)) return 30;
+  if (/\b(?:un\s+)?cuarto\s+de\s+hora\b/i.test(clean)) return 15;
+
+  // 3. Rango de minutos: "6/7 minutos", "6-7 minutos", "9-10 min", "15 a 20 minutos"
+  const rangeMatch = clean.match(/(\d+)\s*(?:[\/\-]|(?:a\s+))\s*(\d+)\s*(?:minutos?|mins?|min|m)\b/i);
+  if (rangeMatch) {
+    return parseInt(rangeMatch[2], 10) || parseInt(rangeMatch[1], 10) || 0;
+  }
+
+  // 4. Minutos simples: "40 minutos", "15 min", "5 mins", "20 m"
+  const minMatch = clean.match(/(\d+)\s*(?:minutos?|mins?|min)\b/i);
+  if (minMatch) {
+    return parseInt(minMatch[1], 10) || 0;
+  }
+
+  return 0;
+}
+
+// ==========================================================================
 // DATE & CALENDAR UTILS (ISO 8601 & LOCAL DATES) - US-05, US-22, BUG-07
 // ==========================================================================
 const DAYS_OF_WEEK_ES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -1899,7 +1949,7 @@ function renderAiQuota(quota) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.41';
+  window.APP_VERSION = 'v0.42';
   window.DEFAULT_AI_QUOTA = DEFAULT_AI_QUOTA;
   window.getMeterColor = getMeterColor;
   window.calculateDashOffset = calculateDashOffset;
@@ -1916,12 +1966,13 @@ if (typeof window !== 'undefined') {
   window.getIngredientIcon = getIngredientIcon;
   window.COMMON_INGREDIENTS = COMMON_INGREDIENTS;
   window.getIngredientSuggestions = getIngredientSuggestions;
+  window.extractTimerFromStepText = extractTimerFromStepText;
 }
 
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.41';
+    this.appVersion = 'v0.42';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -3634,40 +3685,81 @@ class FoodAssistantApp {
     });
   }
 
+  renumberSteps() {
+    const container = document.getElementById('edit-steps-container');
+    if (!container) return;
+    const stepRows = container.querySelectorAll('.edit-step-row');
+    stepRows.forEach((row, idx) => {
+      const numPill = row.querySelector('.step-num-pill');
+      if (numPill) numPill.textContent = idx + 1;
+      const title = row.querySelector('.step-title-text');
+      if (title) title.textContent = `Paso ${idx + 1}`;
+    });
+  }
+
   addIngredientRow(data = {}) {
     const container = document.getElementById('edit-ingredients-container');
     const row = document.createElement('div');
-    row.className = 'edit-ing-row';
-    row.style = 'display: grid; grid-template-columns: 2fr 1fr 1fr 2fr 32px; gap: 6px; align-items: center; position: relative;';
+    row.className = 'edit-ing-row edit-ing-card';
+
+    const currentAisle = data.aisle || 'produce';
+    const initialIcon = getIngredientIcon(data.name || '', currentAisle);
 
     row.innerHTML = `
-      <div style="position: relative;">
-        <input type="text" class="form-input ing-name" placeholder="Ingrediente (ej. Pollo)" value="${data.name || ''}" autocomplete="off">
-        <div class="ing-autocomplete-dropdown autocomplete-dropdown" style="display: none;"></div>
+      <div class="edit-ing-top-row">
+        <div class="ing-name-wrap">
+          <span class="material-symbols-outlined icon-sm ing-icon-badge">${initialIcon}</span>
+          <input type="text" class="form-input ing-name" placeholder="Nombre del ingrediente (ej. Castañas, Puerro...)" value="${data.name || ''}" autocomplete="off">
+          <div class="ing-autocomplete-dropdown autocomplete-dropdown" style="display: none;"></div>
+        </div>
+        <button type="button" class="btn-remove-item" title="Eliminar ingrediente">
+          <span class="material-symbols-outlined icon-sm">delete</span>
+        </button>
       </div>
-      <input type="number" class="form-input ing-amount" placeholder="Cant." value="${data.amount !== null && data.amount !== undefined ? data.amount : ''}">
-      <input type="text" class="form-input ing-unit" placeholder="g / ud" value="${data.unit || ''}">
-      <select class="form-select ing-aisle">
-        <option value="produce" ${data.aisle === 'produce' ? 'selected' : ''}>Verduras</option>
-        <option value="meat" ${data.aisle === 'meat' ? 'selected' : ''}>Carnes</option>
-        <option value="dairy" ${data.aisle === 'dairy' ? 'selected' : ''}>Lácteos</option>
-        <option value="bakery" ${data.aisle === 'bakery' ? 'selected' : ''}>Panadería</option>
-        <option value="pantry" ${data.aisle === 'pantry' ? 'selected' : ''}>Despensa</option>
-        <option value="spices" ${data.aisle === 'spices' ? 'selected' : ''}>Especias</option>
-        <option value="frozen" ${data.aisle === 'frozen' ? 'selected' : ''}>Congelados</option>
-        <option value="beverages" ${data.aisle === 'beverages' ? 'selected' : ''}>Bebidas</option>
-        <option value="other" ${data.aisle === 'other' ? 'selected' : ''}>Otros</option>
-      </select>
-      <button class="btn btn-ghost btn-sm" onclick="this.parentElement.remove()" style="padding: 0; color: var(--m3-error);" title="Eliminar">
-        <span class="material-symbols-outlined icon-sm">close</span>
-      </button>
+
+      <div class="edit-ing-bottom-row">
+        <div class="ing-field-group ing-amount-group">
+          <label class="field-micro-label">Cantidad</label>
+          <input type="number" class="form-input ing-amount" placeholder="Ej. 1" value="${data.amount !== null && data.amount !== undefined ? data.amount : ''}" step="any">
+        </div>
+        <div class="ing-field-group ing-unit-group">
+          <label class="field-micro-label">Unidad</label>
+          <input type="text" class="form-input ing-unit" placeholder="ud, g, ml..." value="${data.unit || ''}">
+        </div>
+        <div class="ing-field-group ing-aisle-group">
+          <label class="field-micro-label">Pasillo / Sección</label>
+          <select class="form-select ing-aisle">
+            <option value="produce" ${currentAisle === 'produce' ? 'selected' : ''}>Verduras y Frutas</option>
+            <option value="meat" ${currentAisle === 'meat' ? 'selected' : ''}>Carnes y Pescados</option>
+            <option value="dairy" ${currentAisle === 'dairy' ? 'selected' : ''}>Lácteos y Huevos</option>
+            <option value="bakery" ${currentAisle === 'bakery' ? 'selected' : ''}>Panadería y Masas</option>
+            <option value="pantry" ${currentAisle === 'pantry' ? 'selected' : ''}>Despensa</option>
+            <option value="spices" ${currentAisle === 'spices' ? 'selected' : ''}>Especias</option>
+            <option value="frozen" ${currentAisle === 'frozen' ? 'selected' : ''}>Congelados</option>
+            <option value="beverages" ${currentAisle === 'beverages' ? 'selected' : ''}>Bebidas</option>
+            <option value="other" ${currentAisle === 'other' ? 'selected' : ''}>Otros</option>
+          </select>
+        </div>
+      </div>
     `;
     container.appendChild(row);
 
     const nameInput = row.querySelector('.ing-name');
     const aisleSelect = row.querySelector('.ing-aisle');
     const unitInput = row.querySelector('.ing-unit');
+    const iconBadge = row.querySelector('.ing-icon-badge');
     const dropdown = row.querySelector('.ing-autocomplete-dropdown');
+    const btnRemove = row.querySelector('.btn-remove-item');
+
+    const updateIcon = (name, aisle) => {
+      if (iconBadge) {
+        iconBadge.textContent = getIngredientIcon(name, aisle || (aisleSelect ? aisleSelect.value : 'other'));
+      }
+    };
+
+    btnRemove?.addEventListener('click', () => {
+      row.remove();
+    });
 
     if (nameInput && dropdown) {
       this.attachIngredientAutocomplete(nameInput, dropdown, (selected) => {
@@ -3678,15 +3770,22 @@ class FoodAssistantApp {
         if (selected.defaultUnit && unitInput && !unitInput.value) {
           unitInput.value = selected.defaultUnit;
         }
+        updateIcon(selected.name, selected.aisle);
       });
 
-      // Predictive auto-categorization when typing in ingredient row (US-20)
       nameInput.addEventListener('input', () => {
         const cat = categorizeIngredientAisle(nameInput.value);
         if (cat && cat !== 'other' && aisleSelect) {
           aisleSelect.value = cat;
         }
+        updateIcon(nameInput.value, aisleSelect ? aisleSelect.value : cat);
       });
+
+      if (aisleSelect) {
+        aisleSelect.addEventListener('change', () => {
+          updateIcon(nameInput.value, aisleSelect.value);
+        });
+      }
     }
   }
 
@@ -3694,22 +3793,146 @@ class FoodAssistantApp {
     const container = document.getElementById('edit-steps-container');
     const currentStepNum = container.children.length + 1;
     const row = document.createElement('div');
-    row.className = 'edit-step-row';
-    row.style = 'display: flex; gap: 8px; align-items: flex-start;';
+    row.className = 'edit-step-row edit-step-card';
+
+    const text = data.text || '';
+    let timerMinutes = parseInt(data.timerMinutes, 10) || 0;
+    let isAutoDetected = false;
+
+    if (!timerMinutes && text) {
+      const detected = extractTimerFromStepText(text);
+      if (detected > 0) {
+        timerMinutes = detected;
+        isAutoDetected = true;
+      }
+    }
 
     row.innerHTML = `
-      <div style="width: 24px; height: 32px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; color: var(--m3-on-surface-variant); flex-shrink: 0;">
-        ${currentStepNum}
+      <div class="edit-step-header">
+        <div class="step-header-left">
+          <span class="step-num-pill">${currentStepNum}</span>
+          <span class="step-title-text">Paso ${currentStepNum}</span>
+        </div>
+        <button type="button" class="btn-remove-item" title="Eliminar paso">
+          <span class="material-symbols-outlined icon-sm">delete</span>
+        </button>
       </div>
-      <textarea class="form-textarea step-text" rows="2" placeholder="Instrucción del paso..." style="flex: 1;">${data.text || ''}</textarea>
-      <div style="width: 80px; flex-shrink: 0;">
-        <input type="number" class="form-input step-timer" placeholder="Min" title="Temporizador en minutos" value="${data.timerMinutes || 0}">
+
+      <textarea class="form-textarea step-text" rows="2" placeholder="Instrucción del paso...">${text}</textarea>
+
+      <div class="edit-step-footer">
+        <div class="step-timer-slot"></div>
+        <input type="hidden" class="step-timer" value="${timerMinutes}">
       </div>
-      <button class="btn btn-ghost btn-sm" onclick="this.parentElement.remove()" style="padding: 6px 8px; color: var(--m3-error);" title="Eliminar">
-        <span class="material-symbols-outlined icon-sm">close</span>
-      </button>
     `;
     container.appendChild(row);
+
+    const stepText = row.querySelector('.step-text');
+    const timerInput = row.querySelector('.step-timer');
+    const timerSlot = row.querySelector('.step-timer-slot');
+    const btnRemove = row.querySelector('.btn-remove-item');
+
+    let manualOverride = (data.timerMinutes !== undefined && data.timerMinutes !== null && data.timerMinutes > 0);
+
+    const renderTimerSlot = () => {
+      const mins = parseInt(timerInput.value, 10) || 0;
+      if (mins > 0) {
+        timerSlot.innerHTML = `
+          <div class="step-timer-badge">
+            <span class="material-symbols-outlined icon-sm" style="font-size: 15px;">timer</span>
+            <span class="timer-display-text">${mins} min</span>
+            ${isAutoDetected ? '<span class="step-timer-auto-tag">Auto</span>' : ''}
+            <button type="button" class="btn-timer-edit" style="background:none;border:none;cursor:pointer;padding:0 2px;color:inherit;display:inline-flex;align-items:center;" title="Cambiar minutos">
+              <span class="material-symbols-outlined" style="font-size: 14px;">edit</span>
+            </button>
+            <button type="button" class="btn-timer-remove" style="background:none;border:none;cursor:pointer;padding:0 2px;color:inherit;display:inline-flex;align-items:center;" title="Quitar temporizador">
+              <span class="material-symbols-outlined" style="font-size: 15px;">close</span>
+            </button>
+          </div>
+        `;
+
+        timerSlot.querySelector('.btn-timer-edit')?.addEventListener('click', () => {
+          showInlineTimerEdit(mins);
+        });
+
+        timerSlot.querySelector('.btn-timer-remove')?.addEventListener('click', () => {
+          timerInput.value = "0";
+          manualOverride = true;
+          isAutoDetected = false;
+          renderTimerSlot();
+        });
+      } else {
+        timerSlot.innerHTML = `
+          <button type="button" class="btn-step-timer-prompt" title="Añadir temporizador opcional">
+            <span class="material-symbols-outlined icon-sm" style="font-size: 14px;">timer</span>
+            <span>+ Tiempo opcional</span>
+          </button>
+        `;
+
+        timerSlot.querySelector('.btn-step-timer-prompt')?.addEventListener('click', () => {
+          showInlineTimerEdit(mins || 5);
+        });
+      }
+    };
+
+    const showInlineTimerEdit = (initialVal) => {
+      timerSlot.innerHTML = `
+        <div class="step-timer-inline-edit">
+          <span class="material-symbols-outlined icon-sm" style="font-size: 15px; color: var(--m3-primary);">timer</span>
+          <input type="number" class="step-timer-mini-input" value="${initialVal || ''}" min="1" max="999" placeholder="Min" autofocus>
+          <span style="font-size: 12px; color: var(--m3-on-surface-variant);">min</span>
+          <button type="button" class="btn-save-inline-timer btn btn-primary btn-sm" style="padding: 2px 8px; font-size: 11px; height: 24px;">OK</button>
+        </div>
+      `;
+
+      const miniInput = timerSlot.querySelector('.step-timer-mini-input');
+      const btnSave = timerSlot.querySelector('.btn-save-inline-timer');
+
+      const applyTimer = () => {
+        const val = parseInt(miniInput.value, 10);
+        if (!isNaN(val) && val > 0) {
+          timerInput.value = String(val);
+          manualOverride = true;
+          isAutoDetected = false;
+        } else {
+          timerInput.value = "0";
+        }
+        renderTimerSlot();
+      };
+
+      btnSave?.addEventListener('click', applyTimer);
+      miniInput?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          applyTimer();
+        } else if (e.key === 'Escape') {
+          renderTimerSlot();
+        }
+      });
+      miniInput?.focus();
+    };
+
+    stepText.addEventListener('input', () => {
+      if (!manualOverride) {
+        const detected = extractTimerFromStepText(stepText.value);
+        if (detected > 0) {
+          timerInput.value = String(detected);
+          isAutoDetected = true;
+          renderTimerSlot();
+        } else if (parseInt(timerInput.value, 10) > 0 && isAutoDetected) {
+          timerInput.value = "0";
+          isAutoDetected = false;
+          renderTimerSlot();
+        }
+      }
+    });
+
+    btnRemove.addEventListener('click', () => {
+      row.remove();
+      this.renumberSteps();
+    });
+
+    renderTimerSlot();
   }
 
   saveRecipeEdit() {
@@ -5367,6 +5590,7 @@ if (typeof window !== 'undefined') {
   window.categorizeIngredientAisle = categorizeIngredientAisle;
   window.getIngredientIcon = getIngredientIcon;
   window.getIngredientSuggestions = getIngredientSuggestions;
+  window.extractTimerFromStepText = extractTimerFromStepText;
   window.StateStore = StateStore;
   window.state = state;
   window.FoodAssistantApp = FoodAssistantApp;
@@ -5383,6 +5607,7 @@ if (typeof module !== 'undefined' && module.exports) {
     categorizeIngredientAisle,
     getIngredientIcon,
     getIngredientSuggestions,
+    extractTimerFromStepText,
     StateStore,
     FoodAssistantApp,
     generateId

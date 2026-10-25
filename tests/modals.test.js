@@ -165,8 +165,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
   });
 
   it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-    expect(window.APP_VERSION).toBe('v0.41');
-    expect(appInstance.appVersion).toBe('v0.41');
+    expect(window.APP_VERSION).toBe('v0.42');
+    expect(appInstance.appVersion).toBe('v0.42');
 
     const badge = document.createElement('span');
     badge.id = 'app-version-badge';
@@ -176,8 +176,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     document.body.appendChild(settingsVer);
 
     appInstance.initVersion();
-    expect(badge.textContent).toBe('v0.41');
-    expect(settingsVer.textContent).toBe('v0.41');
+    expect(badge.textContent).toBe('v0.42');
+    expect(settingsVer.textContent).toBe('v0.42');
 
     document.body.removeChild(badge);
     document.body.removeChild(settingsVer);
@@ -208,6 +208,90 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     appInstance.closeImportModal();
 
     document.body.removeChild(choiceModal);
+  });
+
+  it('Rediseño del Editor: Detección automática de temporizador en pasos (extractTimerFromStepText)', () => {
+    expect(typeof window.extractTimerFromStepText).toBe('function');
+
+    expect(window.extractTimerFromStepText('Meter todos los ingredientes en el horno troceados 40 minutos')).toBe(40);
+    expect(window.extractTimerFromStepText('Cuece un huevo 6/7 minutos para poner de topping')).toBe(7);
+    expect(window.extractTimerFromStepText('Cuece la pasta durante 9-10 minutos hasta que esté al dente')).toBe(10);
+    expect(window.extractTimerFromStepText('saltea los tomates cherry 3 minutos con un chorrito de aceite')).toBe(3);
+    expect(window.extractTimerFromStepText('Hornear a 180°C durante 1 hora y media')).toBe(90);
+    expect(window.extractTimerFromStepText('Dejar reposar media hora antes de cortar')).toBe(30);
+    expect(window.extractTimerFromStepText('Cocinar 45 min a fuego lento')).toBe(45);
+    expect(window.extractTimerFromStepText('Pela las castañas y luego tritura todo con caldo')).toBe(0);
+  });
+
+  it('Rediseño del Editor: addIngredientRow genera tarjeta espaciosa con etiquetas claras', () => {
+    const container = document.createElement('div');
+    container.id = 'edit-ingredients-container';
+    document.body.appendChild(container);
+
+    appInstance.addIngredientRow({ name: 'Castañas', amount: 500, unit: 'g', aisle: 'produce' });
+
+    const row = container.querySelector('.edit-ing-row');
+    expect(row).not.toBeNull();
+    expect(row.classList.contains('edit-ing-card')).toBe(true);
+
+    const labels = Array.from(row.querySelectorAll('.field-micro-label')).map(l => l.textContent.trim());
+    expect(labels).toContain('Cantidad');
+    expect(labels).toContain('Unidad');
+    expect(labels).toContain('Pasillo / Sección');
+
+    const nameInput = row.querySelector('.ing-name');
+    expect(nameInput.value).toBe('Castañas');
+
+    const amountInput = row.querySelector('.ing-amount');
+    expect(amountInput.value).toBe('500');
+
+    const unitInput = row.querySelector('.ing-unit');
+    expect(unitInput.value).toBe('g');
+
+    document.body.removeChild(container);
+  });
+
+  it('Rediseño del Editor: addStepRow genera paso con temporizador automático y renumberSteps', () => {
+    const container = document.createElement('div');
+    container.id = 'edit-steps-container';
+    document.body.appendChild(container);
+
+    // Step 1 con tiempo en texto
+    appInstance.addStepRow({ text: 'Hornear 40 minutos a 180 grados' });
+    // Step 2 sin tiempo
+    appInstance.addStepRow({ text: 'Pela las castañas con cuidado' });
+
+    const steps = container.querySelectorAll('.edit-step-row');
+    expect(steps.length).toBe(2);
+
+    // Step 1 has timer pill
+    const timerPill1 = steps[0].querySelector('.step-timer-badge');
+    expect(timerPill1).not.toBeNull();
+    expect(timerPill1.textContent).toContain('40 min');
+    expect(steps[0].querySelector('.step-timer').value).toBe('40');
+
+    // Step 2 does NOT have timer pill, shows prompt
+    const timerPrompt2 = steps[1].querySelector('.btn-step-timer-prompt');
+    expect(timerPrompt2).not.toBeNull();
+    expect(steps[1].querySelector('.step-timer').value).toBe('0');
+
+    // Live typing detection in Step 2
+    const textarea2 = steps[1].querySelector('.step-text');
+    textarea2.value = 'Hervir 15 minutos en agua con sal';
+    textarea2.dispatchEvent(new Event('input'));
+
+    const timerPill2 = steps[1].querySelector('.step-timer-badge');
+    expect(timerPill2).not.toBeNull();
+    expect(timerPill2.textContent).toContain('15 min');
+    expect(steps[1].querySelector('.step-timer').value).toBe('15');
+
+    // Renumbering after remove
+    steps[0].querySelector('.btn-remove-item').click();
+    expect(container.querySelectorAll('.edit-step-row').length).toBe(1);
+    expect(container.querySelector('.step-num-pill').textContent).toBe('1');
+    expect(container.querySelector('.step-title-text').textContent).toBe('Paso 1');
+
+    document.body.removeChild(container);
   });
 
   it('AI Quota Dashboard: renderAiQuota calcula offsets, colores y persiste cuota de modelos', () => {
