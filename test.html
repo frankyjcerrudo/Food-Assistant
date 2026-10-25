@@ -2364,7 +2364,7 @@ Bocadillo De Atun Paso A Paso
       });
 
       it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-        expect(window.APP_VERSION).toBe('v0.36');
+        expect(window.APP_VERSION).toBe('v0.39');
 
         const badge = document.createElement('span');
         badge.id = 'app-version-badge';
@@ -2379,8 +2379,8 @@ Bocadillo De Atun Paso A Paso
         };
         fakeApp.initVersion();
 
-        expect(badge.textContent).toBe('v0.36');
-        expect(settingsVer.textContent).toBe('v0.36');
+        expect(badge.textContent).toBe('v0.39');
+        expect(settingsVer.textContent).toBe('v0.39');
 
         document.body.removeChild(badge);
         document.body.removeChild(settingsVer);
@@ -3021,6 +3021,114 @@ Bocadillo De Atun Paso A Paso
           // Filtrado parcial
           appInst.renderRecipesGrid([window.state.recipes[0]]);
           expect(badge.textContent).toBe('1 de 2 recetas');
+
+          sandbox.innerHTML = '';
+        }
+      );
+    });
+
+    describe('9. Autocompletado Inteligente de Ingredientes e Iconos (US-20 y BUG-14)', () => {
+      it(
+        'BUG-14: Clasificación precisa con límites de palabra (\\b) sin falsos positivos',
+        {
+          purpose: 'Verificar que "chocolate", "filete", "salsa" y "panceta" se clasifiquen en sus pasillos correctos sin colisionar con subcadenas como "te" o "sal".',
+          assertions: 'Comprueba que chocolate va a pantry, filete a meat, salsa a pantry y sal fina a spices.'
+        },
+        () => {
+          expect(window.categorizeIngredientAisle('Chocolate')).toBe('pantry');
+          expect(window.categorizeIngredientAisle('Chocolate con leche')).toBe('pantry');
+          expect(window.categorizeIngredientAisle('Filete de ternera')).toBe('meat');
+          expect(window.categorizeIngredientAisle('Salsa barbacoa')).toBe('pantry');
+          expect(window.categorizeIngredientAisle('Panceta ibérica')).toBe('meat');
+          expect(window.categorizeIngredientAisle('Bajo en sal')).not.toBe('produce');
+          expect(window.categorizeIngredientAisle('Sal fina')).toBe('spices');
+          expect(window.categorizeIngredientAisle('Té verde')).toBe('beverages');
+        }
+      );
+
+      it(
+        'BUG-14: Normalización de acentos y unificación total con RecipeParser',
+        {
+          purpose: 'Garantizar que acentos y diacríticos se normalicen y el clasificador sea idéntico en toda la app.',
+          assertions: 'Comprueba normalización de plátano/salmón/jamón y paridad total con RecipeParser.categorizeAisle.'
+        },
+        () => {
+          expect(window.categorizeIngredientAisle('Plátano de Canarias')).toBe('produce');
+          expect(window.categorizeIngredientAisle('Salmón fresco')).toBe('meat');
+          expect(window.categorizeIngredientAisle('Jamón serrano')).toBe('meat');
+
+          const items = ['Pechuga de pollo', 'Leche desnatada', 'Tomates cherry', 'Arroz basmati', 'Chocolate negro'];
+          items.forEach(item => {
+            expect(window.RecipeParser.categorizeAisle(item)).toBe(window.categorizeIngredientAisle(item));
+          });
+        }
+      );
+
+      it(
+        'US-20: Sugerencias predictivas de ingredientes (getIngredientSuggestions)',
+        {
+          purpose: 'Ofrecer autocompletado en tiempo real priorizando coincidencia de prefijo sobre inclusión.',
+          assertions: 'getIngredientSuggestions devuelve lista filtrada con atributos name, aisle, defaultUnit e icon.'
+        },
+        () => {
+          const suggestions = window.getIngredientSuggestions('pol', 5);
+          expect(suggestions.length).toBeGreaterThan(0);
+          expect(suggestions.some(s => s.name.toLowerCase().includes('pollo'))).toBe(true);
+
+          const platanoSugg = window.getIngredientSuggestions('plat', 5);
+          expect(platanoSugg.some(s => s.name.includes('Plátanos'))).toBe(true);
+        }
+      );
+
+      it(
+        'US-20: Iconos visuales distintivos por ingrediente o grupo (getIngredientIcon)',
+        {
+          purpose: 'Asignar icono específico Material Symbols según la categoría o ingrediente.',
+          assertions: 'Comprueba nutrition para frutas, kebab_dining para aves, set_meal para pescados, egg para huevos, cookie para chocolate, eco para verduras.'
+        },
+        () => {
+          expect(window.getIngredientIcon('Manzanas')).toBe('nutrition');
+          expect(window.getIngredientIcon('Pechuga de pollo')).toBe('kebab_dining');
+          expect(window.getIngredientIcon('Salmón fresco')).toBe('set_meal');
+          expect(window.getIngredientIcon('Huevos')).toBe('egg');
+          expect(window.getIngredientIcon('Chocolate')).toBe('cookie');
+          expect(window.getIngredientIcon('Tomates cherry')).toBe('eco');
+        }
+      );
+
+      it(
+        'US-20: Autocompletado interactivo en quick grocery y auto-clasificación en recetas',
+        {
+          purpose: 'Verificar despliegue de sugerencias en la lista de compra y selección de pasillo automática al escribir en la receta.',
+          assertions: 'Dispara input en input-quick-grocery y comprueba despliegue del dropdown; comprueba auto-selección en fila de ingrediente.'
+        },
+        () => {
+          const sandbox = document.getElementById('qa-sandbox');
+          sandbox.innerHTML = `
+            <input type="text" id="input-quick-grocery">
+            <div id="quick-grocery-autocomplete" class="autocomplete-dropdown" style="display: none;"></div>
+            <button id="btn-add-grocery">Añadir</button>
+            <div id="shopping-aisles-container"></div>
+            <span id="shopping-summary-text"></span>
+            <div id="edit-ingredients-container"></div>
+          `;
+
+          const appInst = new window.FoodAssistantApp();
+          const input = document.getElementById('input-quick-grocery');
+          const dropdown = document.getElementById('quick-grocery-autocomplete');
+
+          input.value = 'tom';
+          input.dispatchEvent(new Event('input'));
+          expect(dropdown.style.display).toBe('flex');
+
+          appInst.addIngredientRow();
+          const row = document.querySelector('.edit-ing-row');
+          const nameInput = row.querySelector('.ing-name');
+          const aisleSelect = row.querySelector('.ing-aisle');
+
+          nameInput.value = 'Filete de ternera';
+          nameInput.dispatchEvent(new Event('input'));
+          expect(aisleSelect.value).toBe('meat');
 
           sandbox.innerHTML = '';
         }

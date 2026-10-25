@@ -210,6 +210,323 @@ const AISLE_METADATA = {
 };
 
 // ==========================================================================
+// UNIFIED INGREDIENT CLASSIFIER, ICONS & AUTOCOMPLETE CATALOG (US-20, BUG-14)
+// ==========================================================================
+function normalizeIngredientText(str) {
+  if (!str) return '';
+  return str.toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function categorizeIngredientAisle(ingredientName) {
+  const text = normalizeIngredientText(ingredientName);
+  if (!text) return 'other';
+
+  // 1. Dulces y Chocolates específicos (pantry)
+  if (/\b(chocolate|chocolates|cacao|bombones)\b/.test(text)) {
+    return 'pantry';
+  }
+
+  // 2. Carnes, Aves, Pescados, Mariscos y Embutidos (meat)
+  if (/\b(pollo|pollos|pechuga|pechugas|muslo|muslos|alita|alitas|pavo|pavos|ternera|terneras|vaca|buey|cerdo|cerdos|cochinillo|cordero|conejo|pato|carne|carnes|picada|filete|filetes|solomillo|solomillos|lomo|lomos|costilla|costillas|chuleta|chuletas|entrecot|hamburguesa|hamburguesas|salchicha|salchichas|chorizo|chorizos|morcilla|morcillas|jamon|jamones|panceta|bacon|beicon|lacon|cecina|embutido|embutidos|pescado|pescados|salmon|salmones|merluza|merluzas|atun|atunes|bonito|bacalao|dorada|lubina|trucha|truchas|sardina|sardinas|boqueron|boquerones|anchoa|anchoas|pez\s+espada|emperador|gamba|gambas|langostino|langostinos|calamar|calamares|sepia|chipiron|chipirones|pulpo|pulpos|mejillon|mejillones|almeja|almejas|navaja|navajas|ostra|ostras|cangrejo|bogavante)\b/.test(text)) {
+    return 'meat';
+  }
+
+  // 3. Lácteos y Huevos (dairy)
+  if (/\b(leche|queso|quesos|yogur|yogurt|yogures|mantequilla|nata|crema\s+de\s+leche|huevo|huevos|clara|claras|yema|yemas|parmesano|mozzarella|ricotta|feta|mascarpone|gorgonzola|cheddar|gouda|brie|camembert|roquefort|cuajada|kefir)\b/.test(text)) {
+    return 'dairy';
+  }
+
+  // 3. Frutas, Verduras, Hortalizas y Hierbas Frescas (produce)
+  if (/\b(tomate|tomates|cherry|cebolla|cebollas|cebolleta|cebolletas|ajo|ajos|patata|patatas|papa|papas|aguacate|aguacates|espinaca|espinacas|lechuga|lechugas|zanahoria|zanahorias|limon|limones|lima|limas|manzana|manzanas|platano|platanos|banana|bananas|champinon|champinones|seta|setas|pimiento|pimientos|calabacin|calabacines|pepino|pepinos|fresa|fresas|fresones|arandano|arandanos|frambuesa|frambuesas|mora|moras|pera|peras|naranja|naranjas|mandarina|mandarinas|pomelo|uva|uvas|melon|sandia|melocoton|albaricoque|ciruela|ciruelas|mango|pina|kiwi|kiwis|brocoli|coliflor|col|repollo|lombarda|berenjena|berenjenas|judia|judias|esparrago|esparragos|triguero|trigueros|apio|puerro|puerros|calabaza|calabazas|perejil|albahaca|cilantro|hierbabuena|menta|rucula|canonigos|alcachofa|alcachofas|remolacha|rabano|rabanos|nabo|brotes|endivia|endivias)\b/.test(text)) {
+    if (/\b(tomate\s+frito|salsa\s+de\s+tomate|conserva)\b/.test(text)) {
+      return 'pantry';
+    }
+    return 'produce';
+  }
+
+  // 4. Panadería, Bollería, Masas y Harinas (bakery)
+  if (/\b(pan|panes|baguette|barra|tostada|tostadas|molde|croissant|croissants|brioche|bollo|bollos|picos|colines|harina|harinas|levadura|masa|masas|hojaldre|placas|placa|galleta|galletas|bizcocho|bizcochos|magdalena|magdalenas|tartaleta)\b/.test(text)) {
+    return 'bakery';
+  }
+
+  // 5. Congelados (frozen)
+  if (/\b(helado|helados|congelado|congelados|congelada|congeladas|guisantes\s+congelados|pizza|pizzas|nuggets|hielo)\b/.test(text)) {
+    return 'frozen';
+  }
+
+  // 6. Especias, Condimentos y Hierbas Secas (spices)
+  if (/\b(sal|pimienta|oregano|comino|pimenton|curry|canela|romero|tomillo|nuez\s+moscada|azafran|laurel|eneldo|vainilla|clavo|jengibre|curcuma|cardamomo|cayena|guindilla|pizca)\b/.test(text)) {
+    return 'spices';
+  }
+
+  // 7. Bebidas (beverages)
+  if (/\b(agua|cafe|cafes|te|infusion|infusiones|refresco|refrescos|cerveza|cervezas|vino|vinos|zumo|zumos|sidra|licor|bebida|bebidas|champan|cava|tonica)\b/.test(text)) {
+    return 'beverages';
+  }
+
+  // 8. Despensa, Pastas, Arroces, Legumbres, Aceites, Salsas y Dulces (pantry)
+  if (/\b(pasta|pastas|espaguetis|espagueti|macarrones|fideos|tallarines|raviolis|tortellini|lasana|gnocchi|arroz|arroces|quinoa|avena|legumbre|legumbres|garbanzo|garbanzos|lenteja|lentejas|alubia|alubias|frijol|frijoles|aceite|aceites|oliva|girasol|vinagre|vinagres|balsamico|modena|azucar|miel|sirope|chocolate|chocolates|cacao|bombones|tomate\s+frito|tomate\s+triturado|conserva|conservas|lata|latas|caldo|caldos|salsa|salsas|soja|mayonesa|ketchup|mostaza|tabasco|pesto|mermelada|mermeladas|frutos\s+secos|nueces|almendras|avellanas|cacahuetes|pistachos|pinones)\b/.test(text)) {
+    return 'pantry';
+  }
+
+  return 'other';
+}
+
+function getIngredientIcon(name, aisle) {
+  const norm = normalizeIngredientText(name);
+  if (/\b(manzana|manzanas|pera|peras|platano|platanos|banana|fresa|fresas|fresones|fruta|frutas|arandano|arandanos|frambuesa|frambuesas|naranja|naranjas|mandarina|mandarinas|limon|limones|lima|melon|sandia|kiwi|kiwis|uva|uvas|mango|albaricoque|ciruela|ciruelas)\b/.test(norm)) {
+    return 'nutrition';
+  }
+  if (/\b(pollo|pollos|pechuga|muslo|muslos|alitas|pavo|conejo)\b/.test(norm)) {
+    return 'kebab_dining';
+  }
+  if (/\b(ternera|vaca|buey|cerdo|hamburguesa|hamburguesas|filete|filetes|solomillo|lomo|costilla|costillas|chuleta|chuletas|carne|carnes|bacon|panceta|jamon)\b/.test(norm)) {
+    return 'dinner_dining';
+  }
+  if (/\b(pescado|pescados|salmon|merluza|atun|bonito|bacalao|dorada|lubina|trucha|sardina|sardinas|boqueron|boquerones|gamba|gambas|langostino|langostinos|calamar|calamares|pulpo|mejillon|mejillones|almeja|almejas)\b/.test(norm)) {
+    return 'set_meal';
+  }
+  if (/\b(huevo|huevos|clara|claras|yema|yemas)\b/.test(norm)) {
+    return 'egg';
+  }
+  if (/\b(leche|yogur|nata|mantequilla|crema)\b/.test(norm)) {
+    return 'water_drop';
+  }
+  if (/\b(queso|quesos|parmesano|mozzarella|cheddar|feta|ricotta|gouda)\b/.test(norm)) {
+    return 'bakery_dining';
+  }
+  if (/\b(pan|panes|baguette|tostada|tostadas|croissant|bollo|bizcocho|galleta|galletas|harina|masa|hojaldre)\b/.test(norm)) {
+    return 'bakery_dining';
+  }
+  if (/\b(pasta|espaguetis|macarrones|fideos|tallarines|arroz|quinoa|avena)\b/.test(norm)) {
+    return 'dinner_dining';
+  }
+  if (/\b(cafe|te|infusion|refresco|zumo|zumos)\b/.test(norm)) {
+    return 'local_cafe';
+  }
+  if (/\b(vino|cerveza|cervezas|sidra|licor|cava)\b/.test(norm)) {
+    return 'liquor';
+  }
+  if (/\b(chocolate|chocolates|cacao|bombones)\b/.test(norm)) {
+    return 'cookie';
+  }
+  if (/\b(helado|helados|hielo|congelado|congelados|pizza|pizzas)\b/.test(norm)) {
+    return 'ac_unit';
+  }
+  if (/\b(aceite|oliva|vinagre|salsa|salsas|mayonesa|ketchup|mostaza|soja|pesto|caldo)\b/.test(norm)) {
+    return 'soup_kitchen';
+  }
+  if (/\b(sal|pimienta|oregano|comino|curry|pimenton|canela|especias|romero|tomillo|azafran)\b/.test(norm)) {
+    return 'grain';
+  }
+  if (/\b(tomate|tomates|cebolla|cebollas|ajo|ajos|patata|patatas|papa|papas|aguacate|aguacates|espinaca|espinacas|lechuga|zanahoria|zanahorias|pimiento|pimientos|calabacin|pepino|champinon|champinones|seta|setas|brocoli|calabaza)\b/.test(norm)) {
+    return 'eco';
+  }
+  const detectedAisle = aisle || categorizeIngredientAisle(name);
+  return AISLE_METADATA[detectedAisle]?.icon || AISLE_METADATA.other.icon;
+}
+
+const COMMON_INGREDIENTS = [
+  // Frutas y verduras (produce)
+  { name: 'Aguacate', aisle: 'produce', defaultUnit: 'ud', icon: 'eco' },
+  { name: 'Ajo', aisle: 'produce', defaultUnit: 'dientes', icon: 'eco' },
+  { name: 'Albahaca fresca', aisle: 'produce', defaultUnit: 'g', icon: 'eco' },
+  { name: 'Alcachofas', aisle: 'produce', defaultUnit: 'ud', icon: 'eco' },
+  { name: 'Apio', aisle: 'produce', defaultUnit: 'ramas', icon: 'eco' },
+  { name: 'Arándanos frescos', aisle: 'produce', defaultUnit: 'g', icon: 'nutrition' },
+  { name: 'Berenjena', aisle: 'produce', defaultUnit: 'ud', icon: 'eco' },
+  { name: 'Brócoli', aisle: 'produce', defaultUnit: 'g', icon: 'eco' },
+  { name: 'Calabacín', aisle: 'produce', defaultUnit: 'ud', icon: 'eco' },
+  { name: 'Calabaza', aisle: 'produce', defaultUnit: 'g', icon: 'eco' },
+  { name: 'Canónigos', aisle: 'produce', defaultUnit: 'g', icon: 'eco' },
+  { name: 'Cebolla', aisle: 'produce', defaultUnit: 'ud', icon: 'eco' },
+  { name: 'Cebolla morada', aisle: 'produce', defaultUnit: 'ud', icon: 'eco' },
+  { name: 'Champiñones', aisle: 'produce', defaultUnit: 'g', icon: 'eco' },
+  { name: 'Cilantro fresco', aisle: 'produce', defaultUnit: 'ramas', icon: 'eco' },
+  { name: 'Coliflor', aisle: 'produce', defaultUnit: 'g', icon: 'eco' },
+  { name: 'Espárragos trigueros', aisle: 'produce', defaultUnit: 'manojo', icon: 'eco' },
+  { name: 'Espinacas frescas', aisle: 'produce', defaultUnit: 'g', icon: 'eco' },
+  { name: 'Fresas', aisle: 'produce', defaultUnit: 'g', icon: 'nutrition' },
+  { name: 'Hierbabuena fresca', aisle: 'produce', defaultUnit: 'hojas', icon: 'eco' },
+  { name: 'Judías verdes', aisle: 'produce', defaultUnit: 'g', icon: 'eco' },
+  { name: 'Kiwi', aisle: 'produce', defaultUnit: 'ud', icon: 'nutrition' },
+  { name: 'Lechuga', aisle: 'produce', defaultUnit: 'ud', icon: 'eco' },
+  { name: 'Lima', aisle: 'produce', defaultUnit: 'ud', icon: 'eco' },
+  { name: 'Limón', aisle: 'produce', defaultUnit: 'ud', icon: 'eco' },
+  { name: 'Mandarinas', aisle: 'produce', defaultUnit: 'kg', icon: 'nutrition' },
+  { name: 'Manzanas', aisle: 'produce', defaultUnit: 'kg', icon: 'nutrition' },
+  { name: 'Melocotón', aisle: 'produce', defaultUnit: 'ud', icon: 'nutrition' },
+  { name: 'Melón', aisle: 'produce', defaultUnit: 'ud', icon: 'nutrition' },
+  { name: 'Naranjas', aisle: 'produce', defaultUnit: 'kg', icon: 'nutrition' },
+  { name: 'Patatas', aisle: 'produce', defaultUnit: 'kg', icon: 'eco' },
+  { name: 'Pepino', aisle: 'produce', defaultUnit: 'ud', icon: 'eco' },
+  { name: 'Pera', aisle: 'produce', defaultUnit: 'kg', icon: 'nutrition' },
+  { name: 'Perejil fresco', aisle: 'produce', defaultUnit: 'ramas', icon: 'eco' },
+  { name: 'Pimiento rojo', aisle: 'produce', defaultUnit: 'ud', icon: 'eco' },
+  { name: 'Pimiento verde', aisle: 'produce', defaultUnit: 'ud', icon: 'eco' },
+  { name: 'Plátanos', aisle: 'produce', defaultUnit: 'kg', icon: 'nutrition' },
+  { name: 'Puerro', aisle: 'produce', defaultUnit: 'ud', icon: 'eco' },
+  { name: 'Rúcula', aisle: 'produce', defaultUnit: 'g', icon: 'eco' },
+  { name: 'Sandía', aisle: 'produce', defaultUnit: 'ud', icon: 'nutrition' },
+  { name: 'Setas variadas', aisle: 'produce', defaultUnit: 'g', icon: 'eco' },
+  { name: 'Tomates cherry', aisle: 'produce', defaultUnit: 'g', icon: 'eco' },
+  { name: 'Tomates maduros', aisle: 'produce', defaultUnit: 'kg', icon: 'eco' },
+  { name: 'Zanahorias', aisle: 'produce', defaultUnit: 'g', icon: 'eco' },
+
+  // Carnes y pescados (meat)
+  { name: 'Almejas', aisle: 'meat', defaultUnit: 'g', icon: 'set_meal' },
+  { name: 'Atún fresco', aisle: 'meat', defaultUnit: 'g', icon: 'set_meal' },
+  { name: 'Bacalao', aisle: 'meat', defaultUnit: 'g', icon: 'set_meal' },
+  { name: 'Bacon / Panceta', aisle: 'meat', defaultUnit: 'g', icon: 'dinner_dining' },
+  { name: 'Calamares', aisle: 'meat', defaultUnit: 'g', icon: 'set_meal' },
+  { name: 'Carne picada mixta', aisle: 'meat', defaultUnit: 'g', icon: 'dinner_dining' },
+  { name: 'Chorizo', aisle: 'meat', defaultUnit: 'ud', icon: 'dinner_dining' },
+  { name: 'Costillas de cerdo', aisle: 'meat', defaultUnit: 'g', icon: 'dinner_dining' },
+  { name: 'Dorada', aisle: 'meat', defaultUnit: 'ud', icon: 'set_meal' },
+  { name: 'Filetes de ternera', aisle: 'meat', defaultUnit: 'g', icon: 'dinner_dining' },
+  { name: 'Gambas / Langostinos', aisle: 'meat', defaultUnit: 'g', icon: 'set_meal' },
+  { name: 'Hamburguesas', aisle: 'meat', defaultUnit: 'ud', icon: 'dinner_dining' },
+  { name: 'Jamón serrano', aisle: 'meat', defaultUnit: 'g', icon: 'dinner_dining' },
+  { name: 'Lomo de cerdo', aisle: 'meat', defaultUnit: 'g', icon: 'dinner_dining' },
+  { name: 'Lubina', aisle: 'meat', defaultUnit: 'ud', icon: 'set_meal' },
+  { name: 'Mejillones', aisle: 'meat', defaultUnit: 'kg', icon: 'set_meal' },
+  { name: 'Merluza', aisle: 'meat', defaultUnit: 'g', icon: 'set_meal' },
+  { name: 'Muslos de pollo', aisle: 'meat', defaultUnit: 'ud', icon: 'kebab_dining' },
+  { name: 'Pavo en lonchas', aisle: 'meat', defaultUnit: 'g', icon: 'dinner_dining' },
+  { name: 'Pechuga de pavo', aisle: 'meat', defaultUnit: 'g', icon: 'kebab_dining' },
+  { name: 'Pechuga de pollo', aisle: 'meat', defaultUnit: 'g', icon: 'kebab_dining' },
+  { name: 'Pulpo', aisle: 'meat', defaultUnit: 'g', icon: 'set_meal' },
+  { name: 'Salchichas', aisle: 'meat', defaultUnit: 'paquete', icon: 'dinner_dining' },
+  { name: 'Salmón fresco', aisle: 'meat', defaultUnit: 'g', icon: 'set_meal' },
+  { name: 'Sardinas', aisle: 'meat', defaultUnit: 'g', icon: 'set_meal' },
+
+  // Lácteos y huevos (dairy)
+  { name: 'Huevos', aisle: 'dairy', defaultUnit: 'ud', icon: 'egg' },
+  { name: 'Leche entera', aisle: 'dairy', defaultUnit: 'l', icon: 'water_drop' },
+  { name: 'Leche desnatada', aisle: 'dairy', defaultUnit: 'l', icon: 'water_drop' },
+  { name: 'Leche semidesnatada', aisle: 'dairy', defaultUnit: 'l', icon: 'water_drop' },
+  { name: 'Mantequilla', aisle: 'dairy', defaultUnit: 'g', icon: 'water_drop' },
+  { name: 'Nata para cocinar', aisle: 'dairy', defaultUnit: 'ml', icon: 'water_drop' },
+  { name: 'Queso Cheddar', aisle: 'dairy', defaultUnit: 'g', icon: 'bakery_dining' },
+  { name: 'Queso Feta', aisle: 'dairy', defaultUnit: 'g', icon: 'bakery_dining' },
+  { name: 'Queso Mozzarella', aisle: 'dairy', defaultUnit: 'g', icon: 'bakery_dining' },
+  { name: 'Queso Parmesano', aisle: 'dairy', defaultUnit: 'g', icon: 'bakery_dining' },
+  { name: 'Queso crema', aisle: 'dairy', defaultUnit: 'g', icon: 'bakery_dining' },
+  { name: 'Queso rallado', aisle: 'dairy', defaultUnit: 'g', icon: 'bakery_dining' },
+  { name: 'Yogur griego', aisle: 'dairy', defaultUnit: 'ud', icon: 'water_drop' },
+  { name: 'Yogur natural', aisle: 'dairy', defaultUnit: 'ud', icon: 'water_drop' },
+
+  // Despensa y básicos (pantry)
+  { name: 'Aceite de oliva virgen extra', aisle: 'pantry', defaultUnit: 'ml', icon: 'soup_kitchen' },
+  { name: 'Aceite de girasol', aisle: 'pantry', defaultUnit: 'ml', icon: 'soup_kitchen' },
+  { name: 'Arroz basmati', aisle: 'pantry', defaultUnit: 'g', icon: 'dinner_dining' },
+  { name: 'Arroz redondo', aisle: 'pantry', defaultUnit: 'g', icon: 'dinner_dining' },
+  { name: 'Atún en lata', aisle: 'pantry', defaultUnit: 'latas', icon: 'set_meal' },
+  { name: 'Avena en copos', aisle: 'pantry', defaultUnit: 'g', icon: 'grain' },
+  { name: 'Azúcar blanco', aisle: 'pantry', defaultUnit: 'g', icon: 'grain' },
+  { name: 'Azúcar moreno', aisle: 'pantry', defaultUnit: 'g', icon: 'grain' },
+  { name: 'Cacao en polvo', aisle: 'pantry', defaultUnit: 'g', icon: 'cookie' },
+  { name: 'Caldo de pollo', aisle: 'pantry', defaultUnit: 'l', icon: 'soup_kitchen' },
+  { name: 'Caldo de verduras', aisle: 'pantry', defaultUnit: 'l', icon: 'soup_kitchen' },
+  { name: 'Chocolate negro', aisle: 'pantry', defaultUnit: 'tableta', icon: 'cookie' },
+  { name: 'Espaguetis', aisle: 'pantry', defaultUnit: 'g', icon: 'dinner_dining' },
+  { name: 'Garbanzos cocidos', aisle: 'pantry', defaultUnit: 'bote', icon: 'grain' },
+  { name: 'Lentejas cocidas', aisle: 'pantry', defaultUnit: 'bote', icon: 'grain' },
+  { name: 'Macarrones / Penne', aisle: 'pantry', defaultUnit: 'g', icon: 'dinner_dining' },
+  { name: 'Mayonesa', aisle: 'pantry', defaultUnit: 'bote', icon: 'soup_kitchen' },
+  { name: 'Miel', aisle: 'pantry', defaultUnit: 'g', icon: 'soup_kitchen' },
+  { name: 'Mostaza Dijon', aisle: 'pantry', defaultUnit: 'bote', icon: 'soup_kitchen' },
+  { name: 'Nueces', aisle: 'pantry', defaultUnit: 'g', icon: 'grain' },
+  { name: 'Piñones', aisle: 'pantry', defaultUnit: 'g', icon: 'grain' },
+  { name: 'Quinoa', aisle: 'pantry', defaultUnit: 'g', icon: 'grain' },
+  { name: 'Salsa de soja', aisle: 'pantry', defaultUnit: 'ml', icon: 'soup_kitchen' },
+  { name: 'Salsa de tomate / Tomate frito', aisle: 'pantry', defaultUnit: 'g', icon: 'soup_kitchen' },
+  { name: 'Tomate triturado', aisle: 'pantry', defaultUnit: 'lata', icon: 'soup_kitchen' },
+  { name: 'Vinagre de manzana', aisle: 'pantry', defaultUnit: 'ml', icon: 'soup_kitchen' },
+  { name: 'Vinagre de Módena', aisle: 'pantry', defaultUnit: 'ml', icon: 'soup_kitchen' },
+
+  // Panadería y masas (bakery)
+  { name: 'Bizcocho', aisle: 'bakery', defaultUnit: 'ud', icon: 'bakery_dining' },
+  { name: 'Galletas María', aisle: 'bakery', defaultUnit: 'paquete', icon: 'bakery_dining' },
+  { name: 'Harina de trigo', aisle: 'bakery', defaultUnit: 'g', icon: 'bakery_dining' },
+  { name: 'Levadura química (Royal)', aisle: 'bakery', defaultUnit: 'sobre', icon: 'bakery_dining' },
+  { name: 'Masa de hojaldre', aisle: 'bakery', defaultUnit: 'placa', icon: 'bakery_dining' },
+  { name: 'Masa de pizza', aisle: 'bakery', defaultUnit: 'ud', icon: 'bakery_dining' },
+  { name: 'Pan de barra', aisle: 'bakery', defaultUnit: 'ud', icon: 'bakery_dining' },
+  { name: 'Pan de molde', aisle: 'bakery', defaultUnit: 'paquete', icon: 'bakery_dining' },
+  { name: 'Placas de lasaña', aisle: 'bakery', defaultUnit: 'placas', icon: 'bakery_dining' },
+  { name: 'Tortillas de trigo (Fajitas)', aisle: 'bakery', defaultUnit: 'paquete', icon: 'bakery_dining' },
+
+  // Especias y condimentos (spices)
+  { name: 'Canela en polvo', aisle: 'spices', defaultUnit: 'cda', icon: 'grain' },
+  { name: 'Comino en polvo', aisle: 'spices', defaultUnit: 'cda', icon: 'grain' },
+  { name: 'Curry en polvo', aisle: 'spices', defaultUnit: 'g', icon: 'grain' },
+  { name: 'Laurel en hoja', aisle: 'spices', defaultUnit: 'hojas', icon: 'grain' },
+  { name: 'Nuez moscada', aisle: 'spices', defaultUnit: 'pizca', icon: 'grain' },
+  { name: 'Orégano seco', aisle: 'spices', defaultUnit: 'cda', icon: 'grain' },
+  { name: 'Pimentón dulce de la Vera', aisle: 'spices', defaultUnit: 'cda', icon: 'grain' },
+  { name: 'Pimienta negra molida', aisle: 'spices', defaultUnit: 'g', icon: 'grain' },
+  { name: 'Romero seco', aisle: 'spices', defaultUnit: 'ramas', icon: 'grain' },
+  { name: 'Sal fina', aisle: 'spices', defaultUnit: 'g', icon: 'grain' },
+  { name: 'Sal gorda / marina', aisle: 'spices', defaultUnit: 'g', icon: 'grain' },
+  { name: 'Tomillo seco', aisle: 'spices', defaultUnit: 'cda', icon: 'grain' },
+
+  // Congelados (frozen)
+  { name: 'Guisantes congelados', aisle: 'frozen', defaultUnit: 'g', icon: 'ac_unit' },
+  { name: 'Helado', aisle: 'frozen', defaultUnit: 'tarrina', icon: 'ac_unit' },
+  { name: 'Hielo', aisle: 'frozen', defaultUnit: 'bolsa', icon: 'ac_unit' },
+  { name: 'Pizza congelada', aisle: 'frozen', defaultUnit: 'ud', icon: 'ac_unit' },
+
+  // Bebidas (beverages)
+  { name: 'Agua mineral', aisle: 'beverages', defaultUnit: 'botella', icon: 'local_cafe' },
+  { name: 'Café molido o en grano', aisle: 'beverages', defaultUnit: 'paquete', icon: 'local_cafe' },
+  { name: 'Cerveza', aisle: 'beverages', defaultUnit: 'latas', icon: 'liquor' },
+  { name: 'Refresco', aisle: 'beverages', defaultUnit: 'latas', icon: 'local_cafe' },
+  { name: 'Té verde / Infusiones', aisle: 'beverages', defaultUnit: 'caja', icon: 'local_cafe' },
+  { name: 'Vino blanco', aisle: 'beverages', defaultUnit: 'botella', icon: 'liquor' },
+  { name: 'Vino tinto', aisle: 'beverages', defaultUnit: 'botella', icon: 'liquor' },
+  { name: 'Zumo de naranja', aisle: 'beverages', defaultUnit: 'l', icon: 'local_cafe' }
+];
+
+function getIngredientSuggestions(query, max = 6, extraItems = []) {
+  if (!query || typeof query !== 'string') return [];
+  const qNorm = normalizeIngredientText(query);
+  if (!qNorm) return [];
+
+  const all = [...COMMON_INGREDIENTS];
+  if (Array.isArray(extraItems)) {
+    extraItems.forEach(item => {
+      if (item && item.name && !all.some(c => normalizeIngredientText(c.name) === normalizeIngredientText(item.name))) {
+        all.push({
+          name: item.name,
+          aisle: item.aisle || categorizeIngredientAisle(item.name),
+          defaultUnit: item.unit || 'ud',
+          icon: getIngredientIcon(item.name, item.aisle)
+        });
+      }
+    });
+  }
+
+  const prefixMatches = [];
+  const containsMatches = [];
+
+  for (const item of all) {
+    const itemNorm = normalizeIngredientText(item.name);
+    if (itemNorm.startsWith(qNorm)) {
+      prefixMatches.push(item);
+    } else if (itemNorm.includes(qNorm)) {
+      containsMatches.push(item);
+    }
+  }
+
+  return [...prefixMatches, ...containsMatches].slice(0, max);
+}
+
+// ==========================================================================
 // DATE & CALENDAR UTILS (ISO 8601 & LOCAL DATES) - US-05, US-22, BUG-07
 // ==========================================================================
 const DAYS_OF_WEEK_ES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -522,23 +839,7 @@ const RecipeParser = {
   },
 
   categorizeAisle(ingredientName) {
-    const text = (ingredientName || '').toLowerCase();
-    if (/pollo|ternera|carne|cerdo|pavo|jam\u00F3n|salm\u00F3n|pescado|at\u00FAn|merluza|gambas|langostinos|bacon|lomo|chorizo|hamburguesa|filete|salchicha|costilla|pato|cordero|bacalao|calamar|pulpo|mejill\u00F3n|almeja/i.test(text)) {
-      return 'meat';
-    }
-    if (/leche|queso|mantequilla|yogur|nata|huevo|huevos|parmesano|mozzarella|crema|ricotta|feta|mascarpone|gorgonzola|cheddar/i.test(text)) {
-      return 'dairy';
-    }
-    if (/tomate|cebolla|ajo|patata|aguacate|espinaca|lechuga|zanahoria|lim\u00F3n|manzana|pl\u00E1tano|champi\u00F1\u00F3n|seta|pimiento|calabac\u00EDn|pepino|fresa|ar\u00E1ndano|pera|naranja|br\u00F3coli|coliflor|berenjena|jud\u00EDa|esp\u00E1rrago|apio|puerro|calabaza|perejil|albahaca|cilantro|hierbabuena|menta/i.test(text)) {
-      return 'produce';
-    }
-    if (/harina|pan|levadura|masa|hojaldre|tortilla|galleta|bizcocho|placas|pasta|espaguetis|macarrones|fideos|arroz|quinoa|avena/i.test(text)) {
-      return 'bakery';
-    }
-    if (/sal|pimienta|or\u00E9gano|comino|piment\u00F3n|curry|canela|romero|tomillo|nuez moscada|azafr\u00E1n|laurel|eneldo|vainilla|clavo|jengibre|aceite|vinagre|soja|mostaza|mayonesa|k\u00E9tchup|tabasco/i.test(text)) {
-      return 'spices';
-    }
-    return 'pantry';
+    return categorizeIngredientAisle(ingredientName);
   },
 
   parseNumber(str) {
@@ -1598,7 +1899,7 @@ function renderAiQuota(quota) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.38';
+  window.APP_VERSION = 'v0.39';
   window.DEFAULT_AI_QUOTA = DEFAULT_AI_QUOTA;
   window.getMeterColor = getMeterColor;
   window.calculateDashOffset = calculateDashOffset;
@@ -1610,12 +1911,17 @@ if (typeof window !== 'undefined') {
   window.getWeekDates = getWeekDates;
   window.formatWeekRange = formatWeekRange;
   window.DAYS_OF_WEEK_ES = DAYS_OF_WEEK_ES;
+  window.normalizeIngredientText = normalizeIngredientText;
+  window.categorizeIngredientAisle = categorizeIngredientAisle;
+  window.getIngredientIcon = getIngredientIcon;
+  window.COMMON_INGREDIENTS = COMMON_INGREDIENTS;
+  window.getIngredientSuggestions = getIngredientSuggestions;
 }
 
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.38';
+    this.appVersion = 'v0.39';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -2568,7 +2874,22 @@ class FoodAssistantApp {
       });
     });
 
-    // Shopping List
+    // Shopping List (US-20: Autocompletado inteligente de artículos)
+    const quickGroceryInput = document.getElementById('input-quick-grocery');
+    const quickGroceryDropdown = document.getElementById('quick-grocery-autocomplete');
+    if (quickGroceryInput && quickGroceryDropdown) {
+      this.attachIngredientAutocomplete(quickGroceryInput, quickGroceryDropdown, (selected) => {
+        const val = quickGroceryInput.value.trim();
+        const prefixMatch = val.match(/^([\d\.,\/\s]+(?:g|kg|ml|cl|dl|l|cda|cdta|taza|vaso|pizca|loncha|ud|uds)?\s*(?:de\s+)?)/i);
+        if (prefixMatch && prefixMatch[0].length < val.length) {
+          quickGroceryInput.value = `${prefixMatch[0].trim()} ${selected.name}`;
+        } else {
+          quickGroceryInput.value = selected.name;
+        }
+        quickGroceryInput.focus();
+      });
+    }
+
     document.getElementById('btn-add-grocery')?.addEventListener('click', () => this.handleManualAddGrocery());
     document.getElementById('input-quick-grocery')?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.handleManualAddGrocery();
@@ -3156,14 +3477,131 @@ class FoodAssistantApp {
     }
   }
 
+  attachIngredientAutocomplete(inputElem, dropdownElem, onSelect) {
+    if (!inputElem || !dropdownElem) return;
+
+    let activeIndex = -1;
+    let currentSuggestions = [];
+
+    const renderSuggestions = (items) => {
+      currentSuggestions = items;
+      activeIndex = -1;
+      if (!items || items.length === 0) {
+        dropdownElem.innerHTML = '';
+        dropdownElem.style.display = 'none';
+        return;
+      }
+
+      dropdownElem.innerHTML = items.map((item, idx) => {
+        const meta = AISLE_METADATA[item.aisle] || AISLE_METADATA.other;
+        return `
+          <div class="autocomplete-item" data-index="${idx}">
+            <div class="autocomplete-item-icon">
+              <span class="material-symbols-outlined icon-sm">${item.icon || meta.icon}</span>
+            </div>
+            <div class="autocomplete-item-text">
+              <span class="autocomplete-item-name">${item.name}</span>
+            </div>
+            <span class="autocomplete-item-badge">${meta.label}</span>
+          </div>
+        `;
+      }).join('');
+
+      dropdownElem.style.display = 'flex';
+
+      dropdownElem.querySelectorAll('.autocomplete-item').forEach(el => {
+        el.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          const idx = parseInt(el.getAttribute('data-index'), 10);
+          if (currentSuggestions[idx]) {
+            onSelect(currentSuggestions[idx]);
+            dropdownElem.style.display = 'none';
+          }
+        });
+      });
+    };
+
+    const updateActiveItem = () => {
+      const items = dropdownElem.querySelectorAll('.autocomplete-item');
+      items.forEach((item, idx) => {
+        if (idx === activeIndex) {
+          item.classList.add('active');
+          if (typeof item.scrollIntoView === 'function') {
+            item.scrollIntoView({ block: 'nearest' });
+          }
+        } else {
+          item.classList.remove('active');
+        }
+      });
+    };
+
+    inputElem.addEventListener('input', () => {
+      const q = inputElem.value.trim();
+      let searchTerm = q;
+      const prefixMatch = q.match(/^[\d\.,\/\s]+(?:g|kg|ml|cl|dl|l|cda|cdta|taza|vaso|pizca|loncha|ud|uds)?\s*(?:de\s+)?(.*)$/i);
+      if (prefixMatch && prefixMatch[1] && prefixMatch[1].trim()) {
+        searchTerm = prefixMatch[1].trim();
+      }
+
+      if (searchTerm.length < 1) {
+        dropdownElem.style.display = 'none';
+        return;
+      }
+
+      const extra = [];
+      if (typeof state !== 'undefined' && state.recipes) {
+        state.recipes.forEach(r => {
+          (r.ingredients || []).forEach(ing => {
+            if (ing && ing.name) extra.push(ing);
+          });
+        });
+      }
+
+      const suggestions = getIngredientSuggestions(searchTerm, 6, extra);
+      renderSuggestions(suggestions);
+    });
+
+    inputElem.addEventListener('keydown', (e) => {
+      if (dropdownElem.style.display === 'none' || currentSuggestions.length === 0) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        activeIndex = (activeIndex + 1) % currentSuggestions.length;
+        updateActiveItem();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        activeIndex = (activeIndex - 1 + currentSuggestions.length) % currentSuggestions.length;
+        updateActiveItem();
+      } else if (e.key === 'Enter') {
+        if (activeIndex >= 0 && currentSuggestions[activeIndex]) {
+          e.preventDefault();
+          e.stopPropagation();
+          onSelect(currentSuggestions[activeIndex]);
+          dropdownElem.style.display = 'none';
+        }
+      } else if (e.key === 'Escape') {
+        dropdownElem.style.display = 'none';
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!inputElem.contains(e.target) && !dropdownElem.contains(e.target)) {
+        dropdownElem.style.display = 'none';
+      }
+    });
+  }
+
   addIngredientRow(data = {}) {
     const container = document.getElementById('edit-ingredients-container');
     const row = document.createElement('div');
     row.className = 'edit-ing-row';
-    row.style = 'display: grid; grid-template-columns: 2fr 1fr 1fr 2fr 32px; gap: 6px; align-items: center;';
+    row.style = 'display: grid; grid-template-columns: 2fr 1fr 1fr 2fr 32px; gap: 6px; align-items: center; position: relative;';
 
     row.innerHTML = `
-      <input type="text" class="form-input ing-name" placeholder="Ingrediente (ej. Pollo)" value="${data.name || ''}">
+      <div style="position: relative;">
+        <input type="text" class="form-input ing-name" placeholder="Ingrediente (ej. Pollo)" value="${data.name || ''}" autocomplete="off">
+        <div class="ing-autocomplete-dropdown autocomplete-dropdown" style="display: none;"></div>
+      </div>
       <input type="number" class="form-input ing-amount" placeholder="Cant." value="${data.amount !== null && data.amount !== undefined ? data.amount : ''}">
       <input type="text" class="form-input ing-unit" placeholder="g / ud" value="${data.unit || ''}">
       <select class="form-select ing-aisle">
@@ -3182,6 +3620,31 @@ class FoodAssistantApp {
       </button>
     `;
     container.appendChild(row);
+
+    const nameInput = row.querySelector('.ing-name');
+    const aisleSelect = row.querySelector('.ing-aisle');
+    const unitInput = row.querySelector('.ing-unit');
+    const dropdown = row.querySelector('.ing-autocomplete-dropdown');
+
+    if (nameInput && dropdown) {
+      this.attachIngredientAutocomplete(nameInput, dropdown, (selected) => {
+        nameInput.value = selected.name;
+        if (selected.aisle && aisleSelect) {
+          aisleSelect.value = selected.aisle;
+        }
+        if (selected.defaultUnit && unitInput && !unitInput.value) {
+          unitInput.value = selected.defaultUnit;
+        }
+      });
+
+      // Predictive auto-categorization when typing in ingredient row (US-20)
+      nameInput.addEventListener('input', () => {
+        const cat = categorizeIngredientAisle(nameInput.value);
+        if (cat && cat !== 'other' && aisleSelect) {
+          aisleSelect.value = cat;
+        }
+      });
+    }
   }
 
   addStepRow(data = {}) {
@@ -3759,6 +4222,9 @@ class FoodAssistantApp {
               <div class="grocery-item-row ${item.isChecked ? 'checked' : ''}">
                 <div class="grocery-left" onclick="app.toggleGroceryCheck(${item.originalIndex})">
                   <input type="checkbox" class="grocery-checkbox" ${item.isChecked ? 'checked' : ''} onclick="event.stopPropagation(); app.toggleGroceryCheck(${item.originalIndex})">
+                  <div class="grocery-item-icon-badge" title="${item.name}">
+                    <span class="material-symbols-outlined icon-sm">${getIngredientIcon(item.name, item.aisle)}</span>
+                  </div>
                   <div style="flex: 1; min-width: 0; overflow: hidden;">
                     <div class="grocery-name">${item.name}</div>
                     ${item.recipeOrigin ? `<div style="font-size: 11px; color: var(--m3-on-surface-variant); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Para: ${item.recipeOrigin}</div>` : ''}
@@ -3847,25 +4313,36 @@ class FoodAssistantApp {
 
   handleManualAddGrocery() {
     const input = document.getElementById('input-quick-grocery');
+    if (!input) return;
     const text = input.value.trim();
     if (!text) return;
 
+    // Hide autocomplete dropdown if present
+    const autoList = document.getElementById('quick-grocery-autocomplete');
+    if (autoList) autoList.style.display = 'none';
+
+    // Parse structured input if user typed quantities (e.g. "500g pollo", "2 aguacates")
+    const parsed = RecipeParser.parseIngredientLine(text);
+    let name = text;
+    let amount = null;
+    let unit = "";
     let aisle = 'other';
-    const lower = text.toLowerCase();
-    if (/manzana|platano|plátano|limon|limón|cebolla|patata|tomate|lechuga|zanahoria|ajo|aguacate|espinaca/.test(lower)) aisle = 'produce';
-    else if (/pollo|ternera|cerdo|salmon|salmón|pescado|atun|atún|jamon|jamón|carne/.test(lower)) aisle = 'meat';
-    else if (/leche|queso|yogur|mantequilla|huevo/.test(lower)) aisle = 'dairy';
-    else if (/pan|baguette|tostada|molde|croissant/.test(lower)) aisle = 'bakery';
-    else if (/arroz|pasta|aceite|harina|azucar|azúcar|sal|tomate frito|garbanzo|lenteja/.test(lower)) aisle = 'pantry';
-    else if (/pimienta|oregano|orégano|pimenton|pimentón|curry|comino/.test(lower)) aisle = 'spices';
-    else if (/helado|guisantes|pizza|congelado/.test(lower)) aisle = 'frozen';
-    else if (/agua|cafe|café|te|té|refresco|cerveza|vino|zumo/.test(lower)) aisle = 'beverages';
+
+    if (parsed && parsed.name) {
+      name = parsed.name;
+      amount = parsed.amount !== null && parsed.amount !== undefined ? parsed.amount : null;
+      unit = parsed.unit || "";
+      aisle = parsed.aisle || categorizeIngredientAisle(parsed.name);
+    } else {
+      aisle = categorizeIngredientAisle(text);
+      name = text.charAt(0).toUpperCase() + text.slice(1);
+    }
 
     state.shoppingList.push({
       id: generateId('shop-'),
-      name: text,
-      amount: null,
-      unit: "",
+      name: name,
+      amount: amount,
+      unit: unit,
       aisle: aisle,
       isChecked: false,
       recipeOrigin: "Añadido manualmente",
@@ -4838,6 +5315,11 @@ if (typeof window !== 'undefined') {
   window.SEED_RECIPES = SEED_RECIPES;
   window.STANDARD_SLOTS = STANDARD_SLOTS;
   window.AISLE_METADATA = AISLE_METADATA;
+  window.COMMON_INGREDIENTS = COMMON_INGREDIENTS;
+  window.normalizeIngredientText = normalizeIngredientText;
+  window.categorizeIngredientAisle = categorizeIngredientAisle;
+  window.getIngredientIcon = getIngredientIcon;
+  window.getIngredientSuggestions = getIngredientSuggestions;
   window.StateStore = StateStore;
   window.state = state;
   window.FoodAssistantApp = FoodAssistantApp;
@@ -4845,5 +5327,17 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { SEED_RECIPES, STANDARD_SLOTS, AISLE_METADATA, StateStore, FoodAssistantApp, generateId };
+  module.exports = {
+    SEED_RECIPES,
+    STANDARD_SLOTS,
+    AISLE_METADATA,
+    COMMON_INGREDIENTS,
+    normalizeIngredientText,
+    categorizeIngredientAisle,
+    getIngredientIcon,
+    getIngredientSuggestions,
+    StateStore,
+    FoodAssistantApp,
+    generateId
+  };
 }
