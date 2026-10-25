@@ -343,6 +343,9 @@
         toBeGreaterThanOrEqual(val) {
           if (actual < val) throw new Error(`Esperado >= ${val}, recibido ${actual}`);
         },
+        toBeGreaterThan(val) {
+          if (actual <= val) throw new Error(`Esperado > ${val}, recibido ${actual}`);
+        },
         toHaveProperty(prop) {
           if (!(prop in actual)) throw new Error(`Se esperaba que el objeto tuviera la propiedad '${prop}'`);
         },
@@ -390,7 +393,7 @@
     }
 
     // =========================================================
-    // DEFINICIÓN DE PRUEBAS CON DETALLE EXPLICATIVO (63 TESTS)
+    // DEFINICIÓN DE PRUEBAS CON DETALLE EXPLICATIVO (71 TESTS)
     // =========================================================
 
     // SUITE 1: StateStore y Normalización de Datos (4 tests)
@@ -2025,20 +2028,369 @@ Bocadillo De Atun Paso A Paso
         document.body.removeChild(settingsVer);
       });
 
-      it('US-45: Generación de IDs únicos con generateId y migración de compra', () => {
-        const id1 = window.generateId('shop-');
-        const id2 = window.generateId('rec-');
-        expect(id1.startsWith('shop-')).toBe(true);
-        expect(id2.startsWith('rec-')).toBe(true);
-        expect(id1).not.toBe(id2);
-      });
+    });
 
-      it('BUG-21/24: Motor de Sincronización Supabase y Debounce en FoodAssistantApp', () => {
-        expect(typeof window.FoodAssistantApp.prototype.scheduleSyncWithCloud).toBe('function');
-        expect(typeof window.FoodAssistantApp.prototype.flushSync).toBe('function');
-        expect(typeof window.FoodAssistantApp.prototype.pullFromCloud).toBe('function');
-        expect(typeof window.FoodAssistantApp.prototype.pushToCloud).toBe('function');
-      });
+    // SUITE 8: Sincronización Supabase y Resiliencia Multi-dispositivo (US-35, US-45, BUG-21 a 24)
+    describe('8. Sincronización Supabase y Resiliencia Multi-dispositivo (US-35, US-45, BUG-21 a 24)', () => {
+      it(
+        'US-45: Generación de IDs únicos con generateId y prefijo opcional',
+        {
+          purpose: 'Garantizar unicidad de identificadores para sincronización distribuida sin colisiones.',
+          assertions: 'Verifica formato con prefijo (rec-, shop-), longitud mínima y que dos llamadas devuelven valores distintos.'
+        },
+        () => {
+          const recId = window.generateId('rec-');
+          const shopId = window.generateId('shop-');
+          const bareId = window.generateId();
+
+          expect(recId.startsWith('rec-')).toBe(true);
+          expect(shopId.startsWith('shop-')).toBe(true);
+          expect(bareId.length).toBeGreaterThan(10);
+          expect(window.generateId('test-')).not.toBe(window.generateId('test-'));
+        }
+      );
+
+      it(
+        'US-45: StateStore migra automáticamente artículos de compra antiguos sin ID',
+        {
+          purpose: 'Asignar UUID único a elementos heredados de versiones previas antes de sincronizar.',
+          assertions: 'Almacena items sin ID en fa_shopping, inicializa StateStore y valida asignación de id único que empieza por shop-.'
+        },
+        () => {
+          const legacyShopping = [
+            { name: 'Tomates', amount: 2, unit: 'kg', aisle: 'produce', isChecked: false },
+            { name: 'Aceite de Oliva', amount: 1, unit: 'l', aisle: 'pantry', isChecked: true }
+          ];
+          localStorage.setItem('fa_shopping', JSON.stringify(legacyShopping));
+
+          const newStore = new window.StateStore();
+          expect(newStore.shoppingList).toHaveLength(2);
+          expect(newStore.shoppingList[0].id).toBeDefined();
+          expect(newStore.shoppingList[0].id.startsWith('shop-')).toBe(true);
+          expect(newStore.shoppingList[1].id).toBeDefined();
+          expect(newStore.shoppingList[1].id.startsWith('shop-')).toBe(true);
+          expect(newStore.shoppingList[0].id).not.toBe(newStore.shoppingList[1].id);
+        }
+      );
+
+      it(
+        'BUG-21: Gestión de errores de Supabase y visualización (no falso positivo "Sincronizado")',
+        {
+          purpose: 'Evitar indicar éxito en la interfaz o actualizar lastSyncedAt cuando la llamada a Supabase falla.',
+          assertions: 'Simula fallo RLS/red en upsert, ejecuta pushToCloud y confirma success: false, indicador de error y lastSyncedAt intacto.'
+        },
+        async () => {
+          const sandbox = document.getElementById('qa-sandbox');
+          sandbox.innerHTML = '<div id="sync-status-indicator"></div><div id="settings-user-status"></div>';
+
+          window.state.cloudUser = { id: 'usr-test-123', email: 'franky@example.com', name: 'Franky' };
+          window.state.lastSyncedAt = null;
+
+          const mockSupabase = {
+            from: () => ({
+              delete: () => ({ in: () => ({ eq: () => Promise.resolve({ error: null }) }) }),
+              upsert: () => Promise.resolve({ data: null, error: { message: 'RLS policy violation or network failure' } })
+            })
+          };
+
+          const appInst = new window.FoodAssistantApp();
+          appInst.supabaseClient = mockSupabase;
+
+          const result = await appInst.pushToCloud(true);
+
+          expect(result.success).toBe(false);
+          expect(result.error).toBeDefined();
+          expect(result.error.message).toBe('RLS policy violation or network failure');
+          expect(window.state.lastSyncedAt).toBeNull();
+
+          const indicator = document.getElementById('sync-status-indicator');
+          expect(indicator.textContent).toContain('Error de sincronización');
+
+          sandbox.innerHTML = '';
+        }
+      );
+
+      it(
+        'BUG-22 & BUG-24: Batch Upsert con clave compuesta user_id,id y campos completos',
+        {
+          purpose: 'Enviar lotes con un único HTTP request por tabla con onConflict: user_id,id y atributos extendidos.',
+          assertions: 'Comprueba payload de recetas con source_url, source_domain, plan con slots y compra con IDs únicos.'
+        },
+        async () => {
+          const sandbox = document.getElementById('qa-sandbox');
+          sandbox.innerHTML = '<div id="sync-status-indicator"></div><div id="settings-user-status"></div>';
+
+          window.state.cloudUser = { id: 'usr-test-123', email: 'franky@example.com', name: 'Franky' };
+          const upsertCalls = {};
+          const mockSupabase = {
+            from: (table) => ({
+              delete: () => ({ in: () => ({ eq: () => Promise.resolve({ error: null }) }) }),
+              upsert: (payload, options) => {
+                upsertCalls[table] = { payload, options };
+                return Promise.resolve({ data: payload, error: null });
+              }
+            })
+          };
+
+          const appInst = new window.FoodAssistantApp();
+          appInst.supabaseClient = mockSupabase;
+
+          window.state.recipes = [
+            {
+              id: 'rec-test-1',
+              title: 'Pasta al Pesto',
+              sourceUrl: 'https://ejemplo.com/pesto',
+              sourceDomain: 'ejemplo.com',
+              servings: 2,
+              tags: ['Pasta'],
+              ingredients: [],
+              instructions: []
+            }
+          ];
+          window.state.shoppingList = [
+            { id: 'shop-1', name: 'Albahaca', amount: 50, unit: 'g', aisle: 'produce', isChecked: false }
+          ];
+
+          const res = await appInst.pushToCloud(true);
+          expect(res.success).toBe(true);
+
+          expect(upsertCalls.recipes).toBeDefined();
+          expect(upsertCalls.recipes.options.onConflict).toBe('user_id,id');
+          expect(upsertCalls.recipes.payload[0].user_id).toBe('usr-test-123');
+          expect(upsertCalls.recipes.payload[0].source_url).toBe('https://ejemplo.com/pesto');
+          expect(upsertCalls.recipes.payload[0].source_domain).toBe('ejemplo.com');
+
+          expect(upsertCalls.meal_plans).toBeDefined();
+          expect(upsertCalls.meal_plans.options.onConflict).toBe('user_id,id');
+
+          expect(upsertCalls.shopping_items).toBeDefined();
+          expect(upsertCalls.shopping_items.options.onConflict).toBe('user_id,id');
+          expect(upsertCalls.shopping_items.payload[0].id).toBe('shop-1');
+          expect(upsertCalls.shopping_items.payload[0].user_id).toBe('usr-test-123');
+
+          sandbox.innerHTML = '';
+        }
+      );
+
+      it(
+        'BUG-23: Propagación de registros borrados a Supabase y limpieza de cola local',
+        {
+          purpose: 'Asegurar que los registros eliminados localmente se borran en Supabase mediante delete().in() y se vacía deletedRecords.',
+          assertions: 'Marca borrado en deletedRecords, llama a pushToCloud y valida parámetros de delete y posterior limpieza.'
+        },
+        async () => {
+          const sandbox = document.getElementById('qa-sandbox');
+          sandbox.innerHTML = '<div id="sync-status-indicator"></div><div id="settings-user-status"></div>';
+
+          window.state.cloudUser = { id: 'usr-test-123', email: 'franky@example.com', name: 'Franky' };
+          const deletedTables = [];
+          const mockSupabase = {
+            from: (table) => ({
+              delete: () => ({
+                in: (col, ids) => ({
+                  eq: (userCol, userId) => {
+                    deletedTables.push({ table, col, ids, userId });
+                    return Promise.resolve({ error: null });
+                  }
+                })
+              }),
+              upsert: () => Promise.resolve({ error: null })
+            })
+          };
+
+          const appInst = new window.FoodAssistantApp();
+          appInst.supabaseClient = mockSupabase;
+
+          window.state.trackDeletion('recipes', 'rec-deleted-123');
+          window.state.trackDeletion('shoppingItems', 'shop-deleted-456');
+
+          expect(window.state.deletedRecords.recipes).toContain('rec-deleted-123');
+          expect(window.state.deletedRecords.shoppingItems).toContain('shop-deleted-456');
+
+          await appInst.pushToCloud(true);
+
+          const recipeDelete = deletedTables.find(d => d.table === 'recipes');
+          expect(recipeDelete).toBeDefined();
+          expect(recipeDelete.ids).toContain('rec-deleted-123');
+          expect(recipeDelete.userId).toBe('usr-test-123');
+
+          const shopDelete = deletedTables.find(d => d.table === 'shopping_items');
+          expect(shopDelete).toBeDefined();
+          expect(shopDelete.ids).toContain('shop-deleted-456');
+
+          expect(window.state.deletedRecords.recipes).not.toContain('rec-deleted-123');
+          expect(window.state.deletedRecords.shoppingItems).not.toContain('shop-deleted-456');
+
+          sandbox.innerHTML = '';
+        }
+      );
+
+      it(
+        'US-35: Descarga y fusión bidireccional de datos remotos (pullFromCloud)',
+        {
+          purpose: 'Integrar recetas, plan semanal y compra remotos preservando atributos enriquecidos.',
+          assertions: 'Ejecuta pullFromCloud con mock de Supabase y comprueba integración en state.recipes, mealPlan y shoppingList.'
+        },
+        async () => {
+          const sandbox = document.getElementById('qa-sandbox');
+          sandbox.innerHTML = '<div id="sync-status-indicator"></div><div id="settings-user-status"></div>';
+
+          window.state.cloudUser = { id: 'usr-test-123', email: 'franky@example.com', name: 'Franky' };
+          const mockSupabase = {
+            from: (table) => ({
+              select: () => ({
+                eq: (col, val) => {
+                  if (table === 'recipes') {
+                    return Promise.resolve({
+                      data: [
+                        {
+                          id: 'rec-remote-1',
+                          title: 'Salmón al Horno con Verduras',
+                          source_url: 'https://cocina.es/salmon',
+                          source_domain: 'cocina.es',
+                          prep_time_minutes: 10,
+                          cook_time_minutes: 25,
+                          servings: 4,
+                          tags: ['Pescado', 'Cena'],
+                          ingredients: [{ id: 'ing-1', name: 'Salmón', amount: 400, unit: 'g', aisle: 'meat' }],
+                          instructions: [{ step: 1, text: 'Hornear a 180°C' }],
+                          is_favorite: true,
+                          updated_at: '2026-10-25T10:00:00Z'
+                        }
+                      ],
+                      error: null
+                    });
+                  }
+                  if (table === 'meal_plans') {
+                    return Promise.resolve({
+                      data: [
+                        {
+                          id: '2026-10-26',
+                          plan_date: '2026-10-26',
+                          day_name: 'Lunes',
+                          breakfast_recipe_id: null,
+                          lunch_recipe_id: 'rec-remote-1',
+                          snack_recipe_id: null,
+                          dinner_recipe_id: null,
+                          custom_slots: [{ id: 'cslot-1', name: 'Post-Entreno', icon: 'fitness_center', recipeId: null }],
+                          updated_at: '2026-10-25T10:00:00Z'
+                        }
+                      ],
+                      error: null
+                    });
+                  }
+                  if (table === 'shopping_items') {
+                    return Promise.resolve({
+                      data: [
+                        {
+                          id: 'shop-remote-1',
+                          name: 'Aguacates',
+                          amount: 3,
+                          unit: 'ud',
+                          aisle: 'produce',
+                          is_checked: false,
+                          recipe_origin: 'Plan semanal',
+                          updated_at: '2026-10-25T10:00:00Z'
+                        }
+                      ],
+                      error: null
+                    });
+                  }
+                  return Promise.resolve({ data: [], error: null });
+                }
+              })
+            })
+          };
+
+          const appInst = new window.FoodAssistantApp();
+          appInst.supabaseClient = mockSupabase;
+
+          const pullRes = await appInst.pullFromCloud();
+          expect(pullRes.success).toBe(true);
+
+          const salmon = window.state.recipes.find(r => r.id === 'rec-remote-1');
+          expect(salmon).toBeDefined();
+          expect(salmon.title).toBe('Salmón al Horno con Verduras');
+          expect(salmon.sourceUrl).toBe('https://cocina.es/salmon');
+          expect(salmon.sourceDomain).toBe('cocina.es');
+
+          const mondayPlan = window.state.mealPlan['2026-10-26'];
+          expect(mondayPlan).toBeDefined();
+          expect(mondayPlan.lunch).toBe('rec-remote-1');
+          expect(mondayPlan.customSlots).toHaveLength(1);
+          expect(mondayPlan.customSlots[0].name).toBe('Post-Entreno');
+
+          const aguacates = window.state.shoppingList.find(i => i.id === 'shop-remote-1');
+          expect(aguacates).toBeDefined();
+          expect(aguacates.name).toBe('Aguacates');
+          expect(aguacates.amount).toBe(3);
+
+          sandbox.innerHTML = '';
+        }
+      );
+
+      it(
+        'US-35: Protección contra resurrección de elementos eliminados localmente',
+        {
+          purpose: 'Evitar que un elemento borrado offline reaparezca al descargar datos remotos si está en deletedRecords.',
+          assertions: 'Registra un ID en deletedRecords.recipes, ejecuta pullFromCloud y comprueba que la receta remota se descarta.'
+        },
+        async () => {
+          const sandbox = document.getElementById('qa-sandbox');
+          sandbox.innerHTML = '<div id="sync-status-indicator"></div><div id="settings-user-status"></div>';
+
+          window.state.cloudUser = { id: 'usr-test-123', email: 'franky@example.com', name: 'Franky' };
+          const mockSupabase = {
+            from: () => ({
+              select: () => ({
+                eq: () => Promise.resolve({
+                  data: [
+                    { id: 'rec-borrada-localmente', title: 'Receta Fantasma', updated_at: '2026-10-25T00:00:00Z' }
+                  ],
+                  error: null
+                })
+              })
+            })
+          };
+
+          const appInst = new window.FoodAssistantApp();
+          appInst.supabaseClient = mockSupabase;
+          window.state.trackDeletion('recipes', 'rec-borrada-localmente');
+
+          await appInst.pullFromCloud();
+
+          const ghost = window.state.recipes.find(r => r.id === 'rec-borrada-localmente');
+          expect(ghost).toBeUndefined();
+
+          sandbox.innerHTML = '';
+        }
+      );
+
+      it(
+        'BUG-24: Sincronización diferida con debounce (scheduleSyncWithCloud) y flushSync',
+        {
+          purpose: 'Agrupar múltiples mutaciones en una sola llamada diferida y vaciar la cola inmediatamente en eventos críticos.',
+          assertions: 'Comprueba que scheduleSyncWithCloud programa un timer sin enviar de inmediato y flushSync fuerza la subida.'
+        },
+        () => {
+          let pushCalled = 0;
+          const appInst = new window.FoodAssistantApp();
+          appInst.pushToCloud = () => {
+            pushCalled++;
+            return Promise.resolve({ success: true });
+          };
+          appInst.supabaseClient = {};
+          window.state.cloudUser = { id: 'usr-test-123' };
+
+          appInst.scheduleSyncWithCloud(500);
+          expect(appInst.syncDebounceTimer).not.toBeNull();
+          expect(pushCalled).toBe(0);
+
+          appInst.flushSync();
+          expect(appInst.syncDebounceTimer).toBeNull();
+          expect(pushCalled).toBe(1);
+        }
+      );
     });
 
     // =========================================================
@@ -2076,7 +2428,7 @@ Bocadillo De Atun Paso A Paso
       });
     }
 
-    function runAllTests() {
+    async function runAllTests() {
       const container = document.getElementById('test-results-container');
       container.innerHTML = '';
 
@@ -2108,6 +2460,9 @@ Bocadillo De Atun Paso A Paso
               window.state.mealPlan = window.state.generateInitialMealPlan();
               window.state.recipes = [...(window.SEED_RECIPES || [])];
               window.state.shoppingList = [];
+              window.state.cloudUser = null;
+              window.state.lastSyncedAt = null;
+              window.state.deletedRecords = { recipes: [], mealPlans: [], shoppingItems: [] };
             }
 
             total++;
@@ -2116,7 +2471,10 @@ Bocadillo De Atun Paso A Paso
             let errMsg = '';
 
             try {
-              t.testFn();
+              const res = t.testFn();
+              if (res && typeof res.then === 'function') {
+                await res;
+              }
               passed++;
               pass = true;
             } catch (err) {
