@@ -165,6 +165,90 @@ describe('US-35 & Bugs Bloqueantes: Sincronización Supabase, IDs Únicos y Esqu
       expect(upsertCalls.shopping_items.payload[0].id).toBe('shop-1');
       expect(upsertCalls.shopping_items.payload[0].user_id).toBe('test-user-uuid-1234');
     });
+
+    it('debe recuperarse y reintentar automáticamente si Supabase devuelve error de columna faltante en schema cache (resiliencia de esquema)', async () => {
+      let attempts = 0;
+      let finalPayload = null;
+      const mockSupabase = {
+        from: vi.fn().mockImplementation((table) => ({
+          delete: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ error: null })
+            })
+          }),
+          upsert: vi.fn().mockImplementation((payload) => {
+            if (table === 'recipes') {
+              attempts++;
+              if (attempts === 1) {
+                return Promise.resolve({
+                  data: null,
+                  error: { message: "Could not find the 'source_domain' column of 'recipes' in the schema cache" }
+                });
+              }
+              if (attempts === 2) {
+                return Promise.resolve({
+                  data: null,
+                  error: { message: "Could not find the 'source_url' column of 'recipes' in the schema cache" }
+                });
+              }
+              finalPayload = payload;
+            }
+            return Promise.resolve({ data: payload, error: null });
+          })
+        }))
+      };
+
+      appInstance.supabaseClient = mockSupabase;
+      state.recipes = [
+        {
+          id: 'rec-test-resilience',
+          title: 'Tortilla Casera',
+          sourceUrl: 'https://ejemplo.com/tortilla',
+          sourceDomain: 'ejemplo.com'
+        }
+      ];
+
+      const res = await appInstance.pushToCloud(true);
+      expect(res.success).toBe(true);
+      expect(attempts).toBeGreaterThanOrEqual(3);
+      expect(finalPayload[0].source_domain).toBeUndefined();
+      expect(finalPayload[0].source_url).toBeUndefined();
+      expect(finalPayload[0].title).toBe('Tortilla Casera');
+    });
+
+    it('debe retroceder a onConflict: "id" si la tabla remota no tiene clave compuesta (user_id,id)', async () => {
+      let attempts = 0;
+      let usedConflict = null;
+      const mockSupabase = {
+        from: vi.fn().mockImplementation((table) => ({
+          delete: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ error: null })
+            })
+          }),
+          upsert: vi.fn().mockImplementation((payload, options) => {
+            if (table === 'recipes') {
+              attempts++;
+              if (attempts === 1) {
+                return Promise.resolve({
+                  data: null,
+                  error: { code: '42P10', message: 'there is no unique or exclusion constraint matching the ON CONFLICT specification' }
+                });
+              }
+              usedConflict = options.onConflict;
+            }
+            return Promise.resolve({ data: payload, error: null });
+          })
+        }))
+      };
+
+      appInstance.supabaseClient = mockSupabase;
+      state.recipes = [{ id: 'rec-1', title: 'Test' }];
+
+      const res = await appInstance.pushToCloud(true);
+      expect(res.success).toBe(true);
+      expect(usedConflict).toBe('id');
+    });
   });
 
   // 4. BUG-23: Propagación de borrados remotos

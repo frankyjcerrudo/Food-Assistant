@@ -1507,7 +1507,7 @@ const RecipeParser = {
 };
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.29';
+  window.APP_VERSION = 'v0.30';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -1520,7 +1520,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.29';
+    this.appVersion = 'v0.30';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -2098,6 +2098,66 @@ class FoodAssistantApp {
     }
   }
 
+  // Resilient batch upsert: gracefully handles schema variations & missing composite constraints
+  async upsertWithSchemaFallback(table, payload) {
+    if (!payload || payload.length === 0) return { success: true };
+    if (!this.unsupportedColumns) {
+      this.unsupportedColumns = { recipes: new Set(), meal_plans: new Set(), shopping_items: new Set() };
+    }
+    if (!this.preferredConflictTargets) {
+      this.preferredConflictTargets = { recipes: 'user_id,id', meal_plans: 'user_id,id', shopping_items: 'user_id,id' };
+    }
+
+    let conflict = this.preferredConflictTargets[table] || 'user_id,id';
+    let currentPayload = payload.map(item => ({ ...item }));
+
+    // Pre-filter known unsupported columns for this table
+    if (this.unsupportedColumns[table]) {
+      this.unsupportedColumns[table].forEach(col => {
+        currentPayload.forEach(row => delete row[col]);
+      });
+    }
+
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const { data, error } = await this.supabaseClient.from(table).upsert(currentPayload, {
+        onConflict: conflict
+      });
+
+      if (!error) {
+        return { success: true, data };
+      }
+
+      // Fallback 1: Unique constraint does not match ON CONFLICT specification (e.g. table only has PRIMARY KEY (id))
+      if (error.code === '42P10' || (error.message && error.message.includes('ON CONFLICT specification'))) {
+        if (conflict !== 'id') {
+          console.warn(`[Sync] Tabla '${table}' no tiene restricción única compuesta (user_id,id). Reintentando con onConflict: 'id'...`);
+          conflict = 'id';
+          this.preferredConflictTargets[table] = 'id';
+          continue;
+        }
+      }
+
+      // Fallback 2: Column does not exist in the remote schema cache
+      const colMatch = error.message?.match(/Could not find the '([^']+)' column of '([^']+)' in the schema cache/i);
+      if (colMatch) {
+        const missingCol = colMatch[1];
+        console.warn(`[Sync] Columna '${missingCol}' no existe en '${table}' de Supabase. Descartando del payload y reintentando...`);
+        if (this.unsupportedColumns[table]) {
+          this.unsupportedColumns[table].add(missingCol);
+        }
+        currentPayload.forEach(row => {
+          delete row[missingCol];
+        });
+        continue;
+      }
+
+      // Unrecoverable error (e.g. auth / RLS / network)
+      return { success: false, error };
+    }
+
+    return { success: false, error: new Error(`Reintentos de compatibilidad de esquema agotados para ${table}`) };
+  }
+
   // US-35 / BUG-24: Subida en lote (batch upsert) y propagación de borrados (BUG-23)
   async pushToCloud(silent = false) {
     if (!this.supabaseClient || !state.cloudUser?.id) {
@@ -2168,10 +2228,8 @@ class FoodAssistantApp {
           updated_at: recipe.updatedAt || new Date().toISOString()
         }));
 
-        const { error: rErr } = await this.supabaseClient.from('recipes').upsert(recipesPayload, {
-          onConflict: 'user_id,id'
-        });
-        if (rErr) throw rErr;
+        const rRes = await this.upsertWithSchemaFallback('recipes', recipesPayload);
+        if (!rRes.success) throw rRes.error;
       }
 
       // 3. Batch Upsert Meal Plans (BUG-23, BUG-24)
@@ -2193,10 +2251,8 @@ class FoodAssistantApp {
           };
         });
 
-        const { error: mErr } = await this.supabaseClient.from('meal_plans').upsert(mealPlansPayload, {
-          onConflict: 'user_id,id'
-        });
-        if (mErr) throw mErr;
+        const mRes = await this.upsertWithSchemaFallback('meal_plans', mealPlansPayload);
+        if (!mRes.success) throw mRes.error;
       }
 
       // 4. Batch Upsert Shopping Items (US-45, BUG-23, BUG-24)
@@ -2216,10 +2272,8 @@ class FoodAssistantApp {
           };
         });
 
-        const { error: sErr } = await this.supabaseClient.from('shopping_items').upsert(shoppingPayload, {
-          onConflict: 'user_id,id'
-        });
-        if (sErr) throw sErr;
+        const sRes = await this.upsertWithSchemaFallback('shopping_items', shoppingPayload);
+        if (!sRes.success) throw sRes.error;
       }
 
       // 5. Éxito confirmado: actualizar marca temporal

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Food Assistant - Informe Detallado de Calidad y Tests</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.29">
+  <link rel="stylesheet" href="styles.css?v=0.30">
   <style>
     :root {
       --qa-pass: #059669;
@@ -301,8 +301,8 @@
   <div id="qa-sandbox" style="display: none;"></div>
 
   <!-- Entorno y dependencias de la app -->
-  <script src="config.js?v=0.29"></script>
-  <script src="app.js?v=0.29"></script>
+  <script src="config.js?v=0.30"></script>
+  <script src="app.js?v=0.30"></script>
 
   <script>
     const suites = [];
@@ -393,7 +393,7 @@
     }
 
     // =========================================================
-    // DEFINICIÓN DE PRUEBAS CON DETALLE EXPLICATIVO (71 TESTS)
+    // DEFINICIÓN DE PRUEBAS CON DETALLE EXPLICATIVO (73 TESTS)
     // =========================================================
 
     // SUITE 1: StateStore y Normalización de Datos (4 tests)
@@ -2006,7 +2006,7 @@ Bocadillo De Atun Paso A Paso
       });
 
       it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-        expect(window.APP_VERSION).toBe('v0.29');
+        expect(window.APP_VERSION).toBe('v0.30');
 
         const badge = document.createElement('span');
         badge.id = 'app-version-badge';
@@ -2021,8 +2021,8 @@ Bocadillo De Atun Paso A Paso
         };
         fakeApp.initVersion();
 
-        expect(badge.textContent).toBe('v0.29');
-        expect(settingsVer.textContent).toBe('v0.29');
+        expect(badge.textContent).toBe('v0.30');
+        expect(settingsVer.textContent).toBe('v0.30');
 
         document.body.removeChild(badge);
         document.body.removeChild(settingsVer);
@@ -2167,6 +2167,111 @@ Bocadillo De Atun Paso A Paso
           expect(upsertCalls.shopping_items.options.onConflict).toBe('user_id,id');
           expect(upsertCalls.shopping_items.payload[0].id).toBe('shop-1');
           expect(upsertCalls.shopping_items.payload[0].user_id).toBe('usr-test-123');
+
+          sandbox.innerHTML = '';
+        }
+      );
+
+      it(
+        'BUG-21/22: Recuperación automática ante columnas ausentes en el schema cache de Supabase (Resiliencia de Esquema)',
+        {
+          purpose: 'Garantizar que la app no falla si la tabla remota en Supabase no tiene aún columnas añadidas como source_domain o source_url.',
+          assertions: 'Detecta error de columna inexistente, elimina el campo del payload y completa la sincronización con éxito.'
+        },
+        async () => {
+          const sandbox = document.getElementById('qa-sandbox');
+          sandbox.innerHTML = '<div id="sync-status-indicator"></div><div id="settings-user-status"></div>';
+
+          window.state.cloudUser = { id: 'usr-test-123', email: 'franky@example.com', name: 'Franky' };
+          let attempts = 0;
+          let finalPayload = null;
+          const mockSupabase = {
+            from: (table) => ({
+              delete: () => ({ in: () => ({ eq: () => Promise.resolve({ error: null }) }) }),
+              upsert: (payload) => {
+                if (table === 'recipes') {
+                  attempts++;
+                  if (attempts === 1) {
+                    return Promise.resolve({
+                      data: null,
+                      error: { message: "Could not find the 'source_domain' column of 'recipes' in the schema cache" }
+                    });
+                  }
+                  if (attempts === 2) {
+                    return Promise.resolve({
+                      data: null,
+                      error: { message: "Could not find the 'source_url' column of 'recipes' in the schema cache" }
+                    });
+                  }
+                  finalPayload = payload;
+                }
+                return Promise.resolve({ data: payload, error: null });
+              }
+            })
+          };
+
+          const appInst = new window.FoodAssistantApp();
+          appInst.supabaseClient = mockSupabase;
+
+          window.state.recipes = [
+            {
+              id: 'rec-test-resilience',
+              title: 'Tortilla Casera',
+              sourceUrl: 'https://ejemplo.com/tortilla',
+              sourceDomain: 'ejemplo.com'
+            }
+          ];
+
+          const res = await appInst.pushToCloud(true);
+          expect(res.success).toBe(true);
+          expect(attempts).toBeGreaterThanOrEqual(3);
+          expect(finalPayload[0].source_domain).toBeUndefined();
+          expect(finalPayload[0].source_url).toBeUndefined();
+          expect(finalPayload[0].title).toBe('Tortilla Casera');
+
+          sandbox.innerHTML = '';
+        }
+      );
+
+      it(
+        'BUG-22: Retroceso dinámico a onConflict: "id" si la base remota no tiene clave compuesta (user_id,id)',
+        {
+          purpose: 'Compatibilidad con esquemas Supabase existentes con PRIMARY KEY (id) simple sin requerir migración inmediata.',
+          assertions: 'Detecta error 42P10 (ON CONFLICT specification), conmuta a onConflict: "id" y reintenta con éxito.'
+        },
+        async () => {
+          const sandbox = document.getElementById('qa-sandbox');
+          sandbox.innerHTML = '<div id="sync-status-indicator"></div><div id="settings-user-status"></div>';
+
+          window.state.cloudUser = { id: 'usr-test-123', email: 'franky@example.com', name: 'Franky' };
+          let attempts = 0;
+          let usedConflict = null;
+          const mockSupabase = {
+            from: (table) => ({
+              delete: () => ({ in: () => ({ eq: () => Promise.resolve({ error: null }) }) }),
+              upsert: (payload, options) => {
+                if (table === 'recipes') {
+                  attempts++;
+                  if (attempts === 1) {
+                    return Promise.resolve({
+                      data: null,
+                      error: { code: '42P10', message: 'there is no unique or exclusion constraint matching the ON CONFLICT specification' }
+                    });
+                  }
+                  usedConflict = options.onConflict;
+                }
+                return Promise.resolve({ data: payload, error: null });
+              }
+            })
+          };
+
+          const appInst = new window.FoodAssistantApp();
+          appInst.supabaseClient = mockSupabase;
+          window.state.recipes = [{ id: 'rec-1', title: 'Test' }];
+
+          const res = await appInst.pushToCloud(true);
+          expect(res.success).toBe(true);
+          expect(usedConflict).toBe('id');
 
           sandbox.innerHTML = '';
         }
