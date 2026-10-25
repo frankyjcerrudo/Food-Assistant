@@ -1507,7 +1507,7 @@ const RecipeParser = {
 };
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.30';
+  window.APP_VERSION = 'v0.31';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -1520,7 +1520,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.30';
+    this.appVersion = 'v0.31';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -1722,17 +1722,25 @@ class FoodAssistantApp {
 
   updateSyncIndicator(message, status = 'default') {
     const indicator = document.getElementById('sync-status-indicator');
+    const syncNowBtn = document.getElementById('btn-sync-now');
     if (indicator) {
       indicator.textContent = message;
       if (status === 'error') {
         indicator.style.color = 'var(--m3-error, #dc2626)';
+        indicator.style.backgroundColor = 'var(--m3-error-container, #ffdad6)';
       } else if (status === 'success') {
         indicator.style.color = 'var(--color-brand, #16a34a)';
+        indicator.style.backgroundColor = 'var(--color-brand-container, #c4eed0)';
       } else if (status === 'syncing') {
         indicator.style.color = 'var(--m3-primary, #0284c7)';
+        indicator.style.backgroundColor = 'var(--m3-primary-container, #d3e3fd)';
       } else {
         indicator.style.color = 'var(--m3-on-surface-variant)';
+        indicator.style.backgroundColor = 'var(--m3-surface-container-high)';
       }
+    }
+    if (syncNowBtn) {
+      syncNowBtn.classList.toggle('btn-syncing', status === 'syncing');
     }
   }
 
@@ -1747,6 +1755,7 @@ class FoodAssistantApp {
     const settingsStatus = document.getElementById('settings-user-status');
     const settingsAuthBtn = document.getElementById('btn-settings-auth-action');
     const syncNowBtn = document.getElementById('btn-sync-now');
+    const syncIndicator = document.getElementById('sync-status-indicator');
 
     const authModalTitle = document.getElementById('auth-modal-title');
     const authForms = document.getElementById('auth-forms-container');
@@ -1764,13 +1773,15 @@ class FoodAssistantApp {
       if (pillText) pillText.textContent = firstName;
 
       if (settingsIcon) settingsIcon.textContent = 'cloud_done';
-      if (settingsName) settingsName.textContent = user.name ? `${user.name} (${user.email})` : user.email;
+      if (settingsName) settingsName.textContent = user.name || user.email.split('@')[0];
       if (settingsStatus) {
-        const syncText = state.lastSyncedAt ? `Última sincronización: ${new Date(state.lastSyncedAt).toLocaleTimeString()}` : "Conectado a la nube";
-        settingsStatus.textContent = syncText;
+        settingsStatus.textContent = user.email;
       }
       if (settingsAuthBtn) settingsAuthBtn.textContent = 'Ver Cuenta';
       if (syncNowBtn) syncNowBtn.style.display = 'inline-flex';
+      if (state.lastSyncedAt && syncIndicator && !syncIndicator.textContent) {
+        this.updateSyncIndicator(`Sincronizado a las ${new Date(state.lastSyncedAt).toLocaleTimeString()}`, 'success');
+      }
 
       if (authModalTitle) authModalTitle.textContent = 'Mi Cuenta en la Nube';
       if (authTabs) authTabs.style.display = 'none';

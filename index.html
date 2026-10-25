@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#ffffff">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.30">
+  <link rel="stylesheet" href="styles.css?v=0.31">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%231a73e8'/><path d='M30 30h40v40H30z' fill='%23ffffff'/></svg>">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -25,7 +25,7 @@
         <span class="material-symbols-outlined">restaurant_menu</span>
       </div>
       <h1 class="brand-name">Food Assistant</h1>
-      <span class="app-version-badge" id="app-version-badge" title="Versión de Food Assistant">v0.30</span>
+      <span class="app-version-badge" id="app-version-badge" title="Versión de Food Assistant">v0.31</span>
     </div>
     <div class="header-actions">
       <button class="btn btn-secondary btn-sm" id="btn-quick-import" title="Importar receta">
@@ -253,16 +253,18 @@
         Inicia sesión para tener tus recetas, planes semanales y listas de la compra sincronizados automáticamente en cualquier dispositivo.
       </p>
       
-      <div id="cloud-account-box" style="background: var(--m3-surface-container); border-radius: var(--radius-md); padding: 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-        <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
-          <span class="material-symbols-outlined" style="font-size: 32px; color: var(--m3-primary);" id="settings-user-icon">account_circle</span>
-          <div style="min-width: 0;">
-            <div style="font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="settings-user-name">Modo Local (Invitado)</div>
-            <div style="font-size: 12px; color: var(--m3-on-surface-variant);" id="settings-user-status">Datos guardados en este dispositivo</div>
-            <div style="font-size: 11px; margin-top: 3px; font-weight: 500;" id="sync-status-indicator"></div>
+      <div id="cloud-account-box" class="cloud-account-box">
+        <div class="cloud-account-main">
+          <div class="cloud-account-avatar">
+            <span class="material-symbols-outlined" id="settings-user-icon">account_circle</span>
+          </div>
+          <div class="cloud-account-info">
+            <div class="cloud-account-name" id="settings-user-name">Modo Local (Invitado)</div>
+            <div class="cloud-account-status" id="settings-user-status">Datos guardados en este dispositivo</div>
+            <div class="cloud-sync-pill" id="sync-status-indicator"></div>
           </div>
         </div>
-        <div style="display: flex; gap: 8px; align-items: center; flex-shrink: 0;">
+        <div class="cloud-account-actions">
           <button class="btn btn-secondary btn-sm" id="btn-sync-now" style="display: none;" title="Sincronizar ahora con la nube">
             <span class="material-symbols-outlined icon-sm">sync</span> Sincronizar
           </button>
@@ -351,7 +353,7 @@
         <span class="material-symbols-outlined" style="color: var(--m3-primary);">system_update</span> Versión y Actualizaciones
       </h3>
       <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px;">
-        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.30</strong>
+        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.31</strong>
       </p>
       <div style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
         Si acabas de desplegar o notas que algún cambio no aparece, pulsa el botón para limpiar la caché del Service Worker y cargar el código más reciente.
@@ -880,7 +882,7 @@
   </div>
 </div>
 
-<script src="config.js?v=0.30"></script>
-<script src="app.js?v=0.30"></script>
+<script src="config.js?v=0.31"></script>
+<script src="app.js?v=0.31"></script>
 </body>
 </html>
