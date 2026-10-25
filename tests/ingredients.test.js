@@ -46,6 +46,21 @@ describe('BUG-14: Clasificación Única de Pasillo con Límites de Palabra y Nor
     expect(categorizeIngredientAisle('Sal marina')).toBe('spices');
     expect(categorizeIngredientAisle('Té verde')).toBe('beverages');
     expect(categorizeIngredientAisle('Té negro')).toBe('beverages');
+
+    // Unificación de aceites y vinagres en "Especias y Aceites"
+    expect(categorizeIngredientAisle('Aceite de oliva')).toBe('spices');
+    expect(categorizeIngredientAisle('Aceite de oliva virgen extra')).toBe('spices');
+    expect(categorizeIngredientAisle('Aceite de girasol')).toBe('spices');
+    expect(categorizeIngredientAisle('Vinagre de manzana')).toBe('spices');
+
+    // Guisantes frescos a frutas y verduras
+    expect(categorizeIngredientAisle('Guisantes')).toBe('produce');
+    expect(categorizeIngredientAisle('Guisantes frescos')).toBe('produce');
+
+    // Bebidas alcohólicas y licores
+    expect(categorizeIngredientAisle('Whiskey')).toBe('beverages');
+    expect(categorizeIngredientAisle('Whisky')).toBe('beverages');
+    expect(categorizeIngredientAisle('Ron añejo')).toBe('beverages');
   });
 
   it('normaliza acentos y diacríticos transparentemente (NFD)', () => {
@@ -229,6 +244,37 @@ describe('US-20: Autocompletado Inteligente de Ingredientes e Iconos Distintivos
       nameInput.dispatchEvent(new Event('input'));
 
       expect(aisleSelect.value).toBe('dairy');
+
+      nameInput.value = 'Aceite de oliva virgen extra';
+      nameInput.dispatchEvent(new Event('input'));
+
+      expect(aisleSelect.value).toBe('spices');
+
+      nameInput.value = 'Whiskey';
+      nameInput.dispatchEvent(new Event('input'));
+
+      expect(aisleSelect.value).toBe('beverages');
+
+      nameInput.value = 'Guisantes';
+      nameInput.dispatchEvent(new Event('input'));
+
+      expect(aisleSelect.value).toBe('produce');
+    });
+
+    it('resolveAisleOnline almacena y recupera clasificaciones online desde caché persistente', () => {
+      expect(typeof window.resolveAisleOnline).toBe('function');
+      expect(typeof window.setCachedAisle).toBe('function');
+      expect(typeof window.getCachedAisle).toBe('function');
+
+      window.setCachedAisle('pitahaya exotica', 'produce');
+      expect(window.getCachedAisle('pitahaya exotica')).toBe('produce');
+      expect(window.categorizeIngredientAisle('pitahaya exotica')).toBe('produce');
+
+      let resolvedResult = null;
+      window.resolveAisleOnline('pitahaya exotica', (res) => {
+        resolvedResult = res;
+      });
+      expect(resolvedResult).toBe('produce');
     });
   });
 });

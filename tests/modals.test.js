@@ -165,8 +165,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
   });
 
   it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-    expect(window.APP_VERSION).toBe('v0.42');
-    expect(appInstance.appVersion).toBe('v0.42');
+    expect(window.APP_VERSION).toBe('v0.43');
+    expect(appInstance.appVersion).toBe('v0.43');
 
     const badge = document.createElement('span');
     badge.id = 'app-version-badge';
@@ -176,8 +176,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     document.body.appendChild(settingsVer);
 
     appInstance.initVersion();
-    expect(badge.textContent).toBe('v0.42');
-    expect(settingsVer.textContent).toBe('v0.42');
+    expect(badge.textContent).toBe('v0.43');
+    expect(settingsVer.textContent).toBe('v0.43');
 
     document.body.removeChild(badge);
     document.body.removeChild(settingsVer);
@@ -247,6 +247,17 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
 
     const unitInput = row.querySelector('.ing-unit');
     expect(unitInput.value).toBe('g');
+
+    const aisleSelect = row.querySelector('.ing-aisle');
+    expect(aisleSelect.value).toBe('produce');
+
+    nameInput.value = 'Whiskey';
+    nameInput.dispatchEvent(new Event('input'));
+    expect(aisleSelect.value).toBe('beverages');
+
+    nameInput.value = 'Aceite de oliva virgen extra';
+    nameInput.dispatchEvent(new Event('input'));
+    expect(aisleSelect.value).toBe('spices');
 
     document.body.removeChild(container);
   });
