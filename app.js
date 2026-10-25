@@ -314,16 +314,28 @@ function generateId(prefix = '') {
 // Application State Store (Local First + Cloud Sync)
 class StateStore {
   constructor() {
-    let savedRecipes = this.load('fa_recipes', SEED_RECIPES);
-    // Merge any new seed recipes so users get breakfasts and snacks immediately
-    if (Array.isArray(savedRecipes)) {
-      SEED_RECIPES.forEach(seed => {
-        if (!savedRecipes.some(r => r.id === seed.id)) {
-          savedRecipes.push(seed);
-        }
-      });
+    // Registro de borrados para propagación a Supabase (BUG-23)
+    this.deletedRecords = this.load('fa_deleted_records', {
+      recipes: [],
+      mealPlans: [],
+      shoppingItems: []
+    });
+
+    let savedRecipes = this.load('fa_recipes', null);
+    if (!savedRecipes) {
+      savedRecipes = [...SEED_RECIPES];
+      try { localStorage.setItem('fa_recipes_seeded', 'v8'); } catch (e) {}
     } else {
-      savedRecipes = SEED_RECIPES;
+      const seeded = localStorage.getItem('fa_recipes_seeded');
+      if (seeded !== 'v8') {
+        // Migración única a v8 para usuarios antiguos, respetando borrados del usuario
+        SEED_RECIPES.forEach(seed => {
+          if (!savedRecipes.some(r => r.id === seed.id) && !this.deletedRecords.recipes?.includes(seed.id)) {
+            savedRecipes.push(seed);
+          }
+        });
+        try { localStorage.setItem('fa_recipes_seeded', 'v8'); } catch (e) {}
+      }
     }
     this.recipes = savedRecipes;
 
@@ -363,13 +375,6 @@ class StateStore {
       });
       if (migrated) this.save('fa_shopping', this.shoppingList);
     }
-
-    // Registro de borrados para propagación a Supabase (BUG-23)
-    this.deletedRecords = this.load('fa_deleted_records', {
-      recipes: [],
-      mealPlans: [],
-      shoppingItems: []
-    });
 
     this.settings = this.load('fa_settings', {
       geminiApiKey: '',
@@ -1507,7 +1512,7 @@ const RecipeParser = {
 };
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.31';
+  window.APP_VERSION = 'v0.32';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -1520,7 +1525,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.31';
+    this.appVersion = 'v0.32';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -2002,6 +2007,35 @@ class FoodAssistantApp {
 
       // 1. Fusión de Recetas
       if (Array.isArray(recRes.data)) {
+        const remoteRecipeIds = new Set(recRes.data.map(r => r.id));
+
+        // Propagación de borrados remotos entre dispositivos (BUG-23 / Multi-device):
+        // Si el cliente ya sincronizó con la nube con anterioridad (state.lastSyncedAt no es null),
+        // toda receta local que no esté presente en la nube y cuya última modificación sea anterior
+        // o igual a la última sincronización fue borrada en otro dispositivo y debe eliminarse.
+        if (state.lastSyncedAt) {
+          const lastSyncTime = new Date(state.lastSyncedAt).getTime();
+          const initialLen = state.recipes.length;
+          state.recipes = state.recipes.filter(r => {
+            if (remoteRecipeIds.has(r.id)) return true;
+            if (r.updatedAt && new Date(r.updatedAt).getTime() > lastSyncTime) {
+              return true; // Creada o editada offline tras la última sincronización
+            }
+            return false;
+          });
+          if (state.recipes.length !== initialLen) {
+            stateChanged = true;
+          }
+        } else if (recRes.data.length > 0 && Array.isArray(state.recipes)) {
+          // Si es el primer inicio de sesión en un dispositivo nuevo y el almacenamiento local
+          // solo contenía las recetas demo iniciales (SEED_RECIPES), reemplazarlas por las de la nube
+          const isOnlySeed = state.recipes.every(r => SEED_RECIPES.some(s => s.id === r.id));
+          if (isOnlySeed) {
+            state.recipes = [];
+            stateChanged = true;
+          }
+        }
+
         recRes.data.forEach(remoteRow => {
           if (state.deletedRecords.recipes?.includes(remoteRow.id)) return;
 
@@ -2040,6 +2074,26 @@ class FoodAssistantApp {
 
       // 2. Fusión de Meal Plans
       if (Array.isArray(planRes.data)) {
+        const remotePlanKeys = new Set(planRes.data.map(r => r.plan_date || r.id));
+        if (state.lastSyncedAt) {
+          const lastSyncTime = new Date(state.lastSyncedAt).getTime();
+          Object.keys(state.mealPlan).forEach(dateKey => {
+            if (!remotePlanKeys.has(dateKey)) {
+              const day = state.mealPlan[dateKey];
+              if (day && day.updatedAt && new Date(day.updatedAt).getTime() <= lastSyncTime) {
+                if (day.breakfast || day.lunch || day.snack || day.dinner || (day.customSlots && day.customSlots.length > 0)) {
+                  day.breakfast = null;
+                  day.lunch = null;
+                  day.snack = null;
+                  day.dinner = null;
+                  day.customSlots = [];
+                  stateChanged = true;
+                }
+              }
+            }
+          });
+        }
+
         planRes.data.forEach(remoteRow => {
           const dateKey = remoteRow.plan_date || remoteRow.id;
           if (!dateKey || state.deletedRecords.mealPlans?.includes(dateKey)) return;
@@ -2065,6 +2119,22 @@ class FoodAssistantApp {
 
       // 3. Fusión de Shopping Items
       if (Array.isArray(shopRes.data)) {
+        const remoteShopIds = new Set(shopRes.data.map(i => i.id));
+        if (state.lastSyncedAt) {
+          const lastSyncTime = new Date(state.lastSyncedAt).getTime();
+          const initialShopLen = state.shoppingList.length;
+          state.shoppingList = state.shoppingList.filter(item => {
+            if (remoteShopIds.has(item.id)) return true;
+            if (item.updatedAt && new Date(item.updatedAt).getTime() > lastSyncTime) {
+              return true;
+            }
+            return false;
+          });
+          if (state.shoppingList.length !== initialShopLen) {
+            stateChanged = true;
+          }
+        }
+
         shopRes.data.forEach(remoteRow => {
           if (state.deletedRecords.shoppingItems?.includes(remoteRow.id)) return;
 
@@ -2604,9 +2674,33 @@ class FoodAssistantApp {
     container.innerHTML = standardHtml + customHtml + addExtraHtml;
   }
 
+  getSortedRecipes(recipesList = state.recipes) {
+    if (!Array.isArray(recipesList)) return [];
+    return [...recipesList].sort((a, b) => {
+      const titleA = (a.title || '').trim();
+      const titleB = (b.title || '').trim();
+      return titleA.localeCompare(titleB, 'es', { sensitivity: 'base' });
+    });
+  }
+
   renderRecipesGrid(recipesList) {
     const grid = document.getElementById('recipes-cards-grid');
     if (!grid) return;
+
+    const totalCount = Array.isArray(state.recipes) ? state.recipes.length : 0;
+    const currentCount = Array.isArray(recipesList) ? recipesList.length : 0;
+    const badge = document.getElementById('recipes-count-badge');
+    if (badge) {
+      if (currentCount === totalCount) {
+        badge.textContent = `${totalCount} ${totalCount === 1 ? 'receta' : 'recetas'}`;
+      } else {
+        badge.textContent = `${currentCount} de ${totalCount} recetas`;
+      }
+    }
+    const subtitle = document.getElementById('recipes-count-subtitle');
+    if (subtitle) {
+      subtitle.textContent = `Tu recetario personal (${totalCount} ${totalCount === 1 ? 'receta guardada' : 'recetas guardadas'}).`;
+    }
 
     if (!recipesList.length) {
       grid.innerHTML = `
@@ -2618,7 +2712,9 @@ class FoodAssistantApp {
       return;
     }
 
-    grid.innerHTML = recipesList.map(rec => `
+    const sortedList = this.getSortedRecipes(recipesList);
+
+    grid.innerHTML = sortedList.map(rec => `
       <article class="recipe-card" onclick="app.openRecipeDetail('${rec.id}')">
         <div class="recipe-image-wrap">
           <img class="recipe-img" src="${rec.imageUrl}" alt="${rec.title}" loading="lazy">
@@ -2896,7 +2992,8 @@ class FoodAssistantApp {
       state.trackDeletion('recipes', deletedId);
       this.closeRecipeModal();
       this.render();
-      this.scheduleSyncWithCloud();
+      // Propagar borrado inmediatamente a Supabase (BUG-23)
+      this.pushToCloud(true);
     }
   }
 
@@ -3463,7 +3560,8 @@ class FoodAssistantApp {
 
     document.getElementById('picker-modal-title').textContent = `Elegir plato para ${slotTitle.toUpperCase()}`;
     
-    list.innerHTML = state.recipes.map(r => `
+    const sortedPickerRecipes = this.getSortedRecipes(state.recipes);
+    list.innerHTML = sortedPickerRecipes.map(r => `
       <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--m3-surface-container-low); border: 1px solid var(--m3-outline-variant); border-radius: var(--radius-md); cursor: pointer;"
            onclick="app.selectRecipeForSlot('${r.id}')">
         <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; padding-right: 8px;">

@@ -411,6 +411,36 @@ describe('US-35 & Bugs Bloqueantes: Sincronización Supabase, IDs Únicos y Esqu
       const ghost = state.recipes.find(r => r.id === 'rec-borrada-localmente');
       expect(ghost).toBeUndefined();
     });
+
+    it('pullFromCloud debe eliminar localmente recetas que fueron borradas en la nube desde otro dispositivo', async () => {
+      // Simula que el dispositivo local ya había sincronizado previamente
+      state.lastSyncedAt = '2026-10-25T12:00:00Z';
+      state.recipes = [
+        { id: 'rec-activa', title: 'Receta Activa', updatedAt: '2026-10-25T11:00:00Z' },
+        { id: 'rec-borrada-en-otro-dispositivo', title: 'Receta Borrada Remotamente', updatedAt: '2026-10-25T11:30:00Z' }
+      ];
+
+      // En Supabase solo queda 'rec-activa' (la otra fue borrada por otro dispositivo)
+      const mockSupabase = {
+        from: vi.fn().mockImplementation((table) => ({
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({
+              data: table === 'recipes' ? [
+                { id: 'rec-activa', title: 'Receta Activa', updated_at: '2026-10-25T11:00:00Z' }
+              ] : [],
+              error: null
+            })
+          })
+        }))
+      };
+
+      appInstance.supabaseClient = mockSupabase;
+      const res = await appInstance.pullFromCloud();
+
+      expect(res.success).toBe(true);
+      expect(state.recipes.some(r => r.id === 'rec-activa')).toBe(true);
+      expect(state.recipes.some(r => r.id === 'rec-borrada-en-otro-dispositivo')).toBe(false);
+    });
   });
 
   // 6. BUG-24: Debounce y sincronización diferida
@@ -431,6 +461,47 @@ describe('US-35 & Bugs Bloqueantes: Sincronización Supabase, IDs Únicos y Esqu
       appInstance.flushSync();
       expect(appInstance.syncDebounceTimer).toBeNull();
       expect(pushCalled).toBe(1);
+    });
+  });
+
+  // 7. Contador y ordenación consistente de recetas (multi-dispositivo)
+  describe('Consistencia de recetas: Contador visual y ordenación determinista A-Z', () => {
+    it('getSortedRecipes y renderRecipesGrid deben ordenar las recetas alfabéticamente (A-Z)', () => {
+      const unorderedRecipes = [
+        { id: 'rec-z', title: 'Zumo de naranja', tags: [] },
+        { id: 'rec-a', title: 'Arroz con verduras', tags: [] },
+        { id: 'rec-m', title: 'Macarrones con queso', tags: [] }
+      ];
+
+      const sorted = appInstance.getSortedRecipes(unorderedRecipes);
+      expect(sorted[0].title).toBe('Arroz con verduras');
+      expect(sorted[1].title).toBe('Macarrones con queso');
+      expect(sorted[2].title).toBe('Zumo de naranja');
+    });
+
+    it('renderRecipesGrid debe actualizar el badge y subtítulo del contador de recetas', () => {
+      document.body.innerHTML += `
+        <span id="recipes-count-badge">0</span>
+        <p id="recipes-count-subtitle"></p>
+        <div id="recipes-cards-grid"></div>
+      `;
+
+      state.recipes = [
+        { id: 'r1', title: 'Receta 1', tags: [], imageUrl: '' },
+        { id: 'r2', title: 'Receta 2', tags: [], imageUrl: '' }
+      ];
+
+      appInstance.renderRecipesGrid(state.recipes);
+
+      const badge = document.getElementById('recipes-count-badge');
+      const subtitle = document.getElementById('recipes-count-subtitle');
+
+      expect(badge.textContent).toBe('2 recetas');
+      expect(subtitle.textContent).toContain('2 recetas guardadas');
+
+      // Filtrado parcial
+      appInstance.renderRecipesGrid([state.recipes[0]]);
+      expect(badge.textContent).toBe('1 de 2 recetas');
     });
   });
 });
