@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Food Assistant - Informe Detallado de Calidad y Tests</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.34">
+  <link rel="stylesheet" href="styles.css?v=0.35">
   <style>
     :root {
       --qa-pass: #059669;
@@ -248,6 +248,178 @@
       font-size: 11px;
       white-space: pre-wrap;
     }
+
+    /* AI Models & Usage Quota Dashboard */
+    .ai-quota-card {
+      background: var(--m3-surface-container-low);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--radius-md);
+      padding: 18px 22px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+      transition: background 150ms ease, border-color 150ms ease;
+    }
+    .ai-quota-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 12px;
+      border-bottom: 1px solid var(--m3-outline-variant);
+      padding-bottom: 14px;
+    }
+    .ai-quota-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .ai-quota-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--m3-on-surface);
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .ai-quota-subtitle {
+      font-size: 12px;
+      color: var(--m3-on-surface-variant);
+      margin: 2px 0 0 0;
+    }
+    .ai-quota-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .ai-plan-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      background: var(--m3-primary-container);
+      color: var(--m3-on-primary-container);
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .ai-btn-sm {
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--m3-outline-variant);
+      background: var(--m3-surface-container);
+      color: var(--m3-on-surface);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 120ms ease;
+    }
+    .ai-btn-sm:hover {
+      background: var(--m3-surface-container-high);
+      border-color: var(--m3-outline);
+    }
+    .ai-models-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 14px;
+    }
+    .ai-model-group {
+      background: var(--m3-surface);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .ai-group-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--m3-on-surface);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2px;
+    }
+    .ai-quota-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 10px 14px;
+      background: var(--m3-surface-container-low);
+      border-radius: var(--radius-xs);
+      border: 1px solid var(--m3-outline-variant);
+    }
+    .ai-quota-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .ai-quota-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--m3-on-surface);
+      margin-bottom: 2px;
+    }
+    .ai-quota-desc {
+      font-size: 11px;
+      color: var(--m3-on-surface-variant);
+      line-height: 1.35;
+    }
+    .ai-quota-visual {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .ai-quota-pct {
+      font-size: 15px;
+      font-weight: 800;
+      min-width: 40px;
+      text-align: right;
+    }
+    .ai-ring-svg {
+      width: 38px;
+      height: 38px;
+      transform: rotate(-90deg);
+      flex-shrink: 0;
+    }
+    .ai-ring-bg {
+      fill: none;
+      stroke: var(--m3-outline-variant);
+      stroke-width: 3.5;
+    }
+    .ai-ring-meter {
+      fill: none;
+      stroke-width: 3.5;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 400ms ease, stroke 300ms ease;
+    }
+    /* Modal de Edición de Cuota */
+    .ai-edit-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(2px);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .ai-edit-modal {
+      background: var(--m3-surface);
+      border: 1px solid var(--m3-outline-variant);
+      border-radius: var(--radius-md);
+      padding: 22px 26px;
+      width: 100%;
+      max-width: 500px;
+      box-shadow: 0 10px 36px rgba(0, 0, 0, 0.25);
+    }
   </style>
 </head>
 <body>
@@ -269,6 +441,149 @@
       </button>
     </div>
   </header>
+
+  <!-- AI Models & Usage Quota Dashboard (Antigravity IDE) -->
+  <section class="ai-quota-card" id="ai-quota-section">
+    <div class="ai-quota-header">
+      <div class="ai-quota-title-wrap">
+        <span class="material-symbols-outlined" style="color: var(--m3-primary); font-size: 26px;">smart_toy</span>
+        <div>
+          <h2 class="ai-quota-title">
+            Models &amp; Usage
+            <span class="ai-plan-badge" id="ai-plan-badge">
+              <span class="material-symbols-outlined" style="font-size: 14px;">verified_user</span>
+              <span id="ai-plan-name">Google AI Pro</span>
+            </span>
+          </h2>
+          <p class="ai-quota-subtitle">Gesti&oacute;n y monitorizaci&oacute;n de cuota de modelos y l&iacute;mites en Antigravity IDE</p>
+        </div>
+      </div>
+      <div class="ai-quota-actions">
+        <button class="ai-btn-sm" id="btn-refresh-quota" onclick="loadAiQuota()" title="Recargar cuota desde ai-quota.json">
+          <span class="material-symbols-outlined" style="font-size: 16px;">sync</span> Actualizar
+        </button>
+        <button class="ai-btn-sm" id="btn-edit-quota" onclick="openAiQuotaModal()" title="Editar porcentajes y tiempos manualmente">
+          <span class="material-symbols-outlined" style="font-size: 16px;">tune</span> Modificar
+        </button>
+      </div>
+    </div>
+
+    <div class="ai-models-grid">
+      <!-- Gemini Models -->
+      <div class="ai-model-group">
+        <div class="ai-group-title">
+          <span style="display: flex; align-items: center; gap: 6px;">
+            <span class="material-symbols-outlined" style="color: #1a73e8; font-size: 18px;">auto_awesome</span>
+            Gemini Models
+          </span>
+          <span class="material-symbols-outlined" style="font-size: 16px; color: var(--m3-on-surface-variant);" title="Modelos Gemini 2.5 Flash / Pro">info</span>
+        </div>
+
+        <div class="ai-quota-row" id="row-gemini-weekly">
+          <div class="ai-quota-info">
+            <div class="ai-quota-name">Weekly Limit Remaining</div>
+            <div class="ai-quota-desc" id="desc-gemini-weekly">Has consumido parte de tu l&iacute;mite semanal, se restablece por completo en 1 d&iacute;a, 22 horas.</div>
+          </div>
+          <div class="ai-quota-visual">
+            <span class="ai-quota-pct" id="pct-gemini-weekly" style="color: #d97706;">18%</span>
+            <svg class="ai-ring-svg" viewBox="0 0 36 36">
+              <path class="ai-ring-bg" d="M18 2.0845 a 15 15 0 0 1 0 30 a 15 15 0 0 1 0 -30"/>
+              <path class="ai-ring-meter" id="ring-gemini-weekly" stroke="#d97706" stroke-dasharray="94.25, 94.25" stroke-dashoffset="77.28" d="M18 2.0845 a 15 15 0 0 1 0 30 a 15 15 0 0 1 0 -30"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="ai-quota-row" id="row-gemini-5h">
+          <div class="ai-quota-info">
+            <div class="ai-quota-name">Five Hour Limit Remaining</div>
+            <div class="ai-quota-desc" id="desc-gemini-5h">Has consumido parte de tu l&iacute;mite de 5 horas, se restablece por completo en 36 minutos.</div>
+          </div>
+          <div class="ai-quota-visual">
+            <span class="ai-quota-pct" id="pct-gemini-5h" style="color: #16a34a;">72%</span>
+            <svg class="ai-ring-svg" viewBox="0 0 36 36">
+              <path class="ai-ring-bg" d="M18 2.0845 a 15 15 0 0 1 0 30 a 15 15 0 0 1 0 -30"/>
+              <path class="ai-ring-meter" id="ring-gemini-5h" stroke="#16a34a" stroke-dasharray="94.25, 94.25" stroke-dashoffset="26.39" d="M18 2.0845 a 15 15 0 0 1 0 30 a 15 15 0 0 1 0 -30"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Claude & GPT Models -->
+      <div class="ai-model-group">
+        <div class="ai-group-title">
+          <span style="display: flex; align-items: center; gap: 6px;">
+            <span class="material-symbols-outlined" style="color: #d97706; font-size: 18px;">psychology</span>
+            Claude and GPT models
+          </span>
+          <span class="material-symbols-outlined" style="font-size: 16px; color: var(--m3-on-surface-variant);" title="Modelos Claude 3.5 Sonnet y GPT-4o">info</span>
+        </div>
+
+        <div class="ai-quota-row" id="row-claude-weekly">
+          <div class="ai-quota-info">
+            <div class="ai-quota-name">Weekly Limit Remaining</div>
+            <div class="ai-quota-desc" id="desc-claude-weekly">Has consumido parte de tu l&iacute;mite semanal, se restablece por completo en 4 d&iacute;as, 23 horas.</div>
+          </div>
+          <div class="ai-quota-visual">
+            <span class="ai-quota-pct" id="pct-claude-weekly" style="color: #16a34a;">49%</span>
+            <svg class="ai-ring-svg" viewBox="0 0 36 36">
+              <path class="ai-ring-bg" d="M18 2.0845 a 15 15 0 0 1 0 30 a 15 15 0 0 1 0 -30"/>
+              <path class="ai-ring-meter" id="ring-claude-weekly" stroke="#16a34a" stroke-dasharray="94.25, 94.25" stroke-dashoffset="48.07" d="M18 2.0845 a 15 15 0 0 1 0 30 a 15 15 0 0 1 0 -30"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="ai-quota-row" id="row-claude-5h">
+          <div class="ai-quota-info">
+            <div class="ai-quota-name">Five Hour Limit Remaining</div>
+            <div class="ai-quota-desc" id="desc-claude-5h">L&iacute;mite de 5 horas completamente disponible al 100%.</div>
+          </div>
+          <div class="ai-quota-visual">
+            <span class="ai-quota-pct" id="pct-claude-5h" style="color: #16a34a;">100%</span>
+            <svg class="ai-ring-svg" viewBox="0 0 36 36">
+              <path class="ai-ring-bg" d="M18 2.0845 a 15 15 0 0 1 0 30 a 15 15 0 0 1 0 -30"/>
+              <path class="ai-ring-meter" id="ring-claude-5h" stroke="#16a34a" stroke-dasharray="94.25, 94.25" stroke-dashoffset="0" d="M18 2.0845 a 15 15 0 0 1 0 30 a 15 15 0 0 1 0 -30"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modal rápido para modificar los valores de cuota -->
+  <div class="ai-edit-modal-backdrop" id="ai-edit-modal">
+    <div class="ai-edit-modal">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--m3-on-surface);">Actualizar Cuota de Modelos IA</h3>
+        <button class="ai-btn-sm" onclick="closeAiQuotaModal()" style="padding: 4px 8px; border: none; background: transparent;">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+        <div>
+          <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--m3-on-surface-variant);">Gemini Semanal (%)</label>
+          <input type="number" id="input-gemini-weekly" min="0" max="100" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: var(--radius-xs); border: 1px solid var(--m3-outline-variant); background: var(--m3-surface); color: var(--m3-on-surface);" />
+        </div>
+        <div>
+          <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--m3-on-surface-variant);">Gemini 5 Horas (%)</label>
+          <input type="number" id="input-gemini-5h" min="0" max="100" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: var(--radius-xs); border: 1px solid var(--m3-outline-variant); background: var(--m3-surface); color: var(--m3-on-surface);" />
+        </div>
+        <div>
+          <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--m3-on-surface-variant);">Claude/GPT Semanal (%)</label>
+          <input type="number" id="input-claude-weekly" min="0" max="100" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: var(--radius-xs); border: 1px solid var(--m3-outline-variant); background: var(--m3-surface); color: var(--m3-on-surface);" />
+        </div>
+        <div>
+          <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--m3-on-surface-variant);">Claude/GPT 5 Horas (%)</label>
+          <input type="number" id="input-claude-5h" min="0" max="100" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: var(--radius-xs); border: 1px solid var(--m3-outline-variant); background: var(--m3-surface); color: var(--m3-on-surface);" />
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button class="ai-btn-sm" onclick="closeAiQuotaModal()">Cancelar</button>
+        <button class="btn-action primary" onclick="saveAiQuotaFromModal()" style="padding: 8px 16px;">Guardar Cambios</button>
+      </div>
+    </div>
+  </div>
 
   <div class="metrics-bar">
     <div class="metric-card">
@@ -301,8 +616,8 @@
   <div id="qa-sandbox" style="display: none;"></div>
 
   <!-- Entorno y dependencias de la app -->
-  <script src="config.js?v=0.34"></script>
-  <script src="app.js?v=0.34"></script>
+  <script src="config.js?v=0.35"></script>
+  <script src="app.js?v=0.35"></script>
 
   <script>
     const suites = [];
@@ -393,7 +708,7 @@
     }
 
     // =========================================================
-    // DEFINICIÓN DE PRUEBAS CON DETALLE EXPLICATIVO (77 TESTS)
+    // DEFINICIÓN DE PRUEBAS CON DETALLE EXPLICATIVO (78 TESTS)
     // =========================================================
 
     // SUITE 1: StateStore y Normalización de Datos (4 tests)
@@ -1879,7 +2194,7 @@ Bocadillo De Atun Paso A Paso
 
     });
 
-    // SUITE 7: Accesibilidad, Modales y Control de Versión (7 tests)
+    // SUITE 7: Accesibilidad, Modales y Control de Versión (8 tests)
     describe('7. Accesibilidad, Modales y Control de Versión', () => {
       it('closeModalByElement cierra el modal adecuado según el ID del overlay', () => {
         const fakeApp = {
@@ -2006,7 +2321,7 @@ Bocadillo De Atun Paso A Paso
       });
 
       it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-        expect(window.APP_VERSION).toBe('v0.34');
+        expect(window.APP_VERSION).toBe('v0.35');
 
         const badge = document.createElement('span');
         badge.id = 'app-version-badge';
@@ -2021,11 +2336,63 @@ Bocadillo De Atun Paso A Paso
         };
         fakeApp.initVersion();
 
-        expect(badge.textContent).toBe('v0.34');
-        expect(settingsVer.textContent).toBe('v0.34');
+        expect(badge.textContent).toBe('v0.35');
+        expect(settingsVer.textContent).toBe('v0.35');
 
         document.body.removeChild(badge);
         document.body.removeChild(settingsVer);
+      });
+
+      it('AI Quota Dashboard: renderAiQuota calcula offsets, colores y persiste cuota de modelos', () => {
+        const testQuota = {
+          plan: 'Google AI Pro',
+          gemini: {
+            weekly: { remaining: 18, detail: '18% restante' },
+            fiveHour: { remaining: 72, detail: '72% restante' }
+          },
+          claudeGpt: {
+            weekly: { remaining: 49, detail: '49% restante' },
+            fiveHour: { remaining: 100, detail: '100% restante' }
+          }
+        };
+
+        const container = document.createElement('div');
+        container.innerHTML = `
+          <span id="ai-plan-name"></span>
+          <span id="pct-gemini-weekly"></span>
+          <svg><path id="ring-gemini-weekly"></path></svg>
+          <div id="desc-gemini-weekly"></div>
+
+          <span id="pct-gemini-5h"></span>
+          <svg><path id="ring-gemini-5h"></path></svg>
+          <div id="desc-gemini-5h"></div>
+
+          <span id="pct-claude-weekly"></span>
+          <svg><path id="ring-claude-weekly"></path></svg>
+          <div id="desc-claude-weekly"></div>
+
+          <span id="pct-claude-5h"></span>
+          <svg><path id="ring-claude-5h"></path></svg>
+          <div id="desc-claude-5h"></div>
+        `;
+        document.body.appendChild(container);
+
+        expect(typeof window.renderAiQuota).toBe('function');
+        window.renderAiQuota(testQuota);
+
+        expect(document.getElementById('ai-plan-name').textContent).toBe('Google AI Pro');
+        expect(document.getElementById('pct-gemini-weekly').textContent).toBe('18%');
+        expect(document.getElementById('pct-gemini-weekly').style.color).toBe('#d97706');
+        expect(document.getElementById('pct-gemini-5h').textContent).toBe('72%');
+        expect(document.getElementById('pct-gemini-5h').style.color).toBe('#16a34a');
+        expect(document.getElementById('desc-gemini-weekly').textContent).toBe('18% restante');
+
+        expect(window.getMeterColor(18)).toBe('#d97706');
+        expect(window.getMeterColor(72)).toBe('#16a34a');
+        expect(window.getMeterColor(10)).toBe('#dc2626');
+        expect(window.calculateDashOffset(100)).toBe('0.00');
+
+        document.body.removeChild(container);
       });
 
     });
@@ -2773,10 +3140,91 @@ Bocadillo De Atun Paso A Paso
       }
     }
 
+    async function loadAiQuota() {
+      let quota = null;
+      try {
+        const cached = localStorage.getItem('fa_ai_quota');
+        if (cached) {
+          quota = JSON.parse(cached);
+        }
+      } catch (e) {}
+
+      if (!quota) {
+        try {
+          const res = await fetch('./ai-quota.json');
+          if (res.ok) {
+            quota = await res.json();
+          }
+        } catch (e) {}
+      }
+
+      if (!quota) {
+        quota = window.DEFAULT_AI_QUOTA;
+      }
+
+      window.currentAiQuota = quota;
+      if (typeof window.renderAiQuota === 'function') {
+        window.renderAiQuota(quota);
+      }
+      return quota;
+    }
+
+    function openAiQuotaModal() {
+      const quota = window.currentAiQuota || window.DEFAULT_AI_QUOTA;
+      const gWeeklyInput = document.getElementById('input-gemini-weekly');
+      const g5hInput = document.getElementById('input-gemini-5h');
+      const cWeeklyInput = document.getElementById('input-claude-weekly');
+      const c5hInput = document.getElementById('input-claude-5h');
+      if (gWeeklyInput) gWeeklyInput.value = quota.gemini?.weekly?.remaining ?? 18;
+      if (g5hInput) g5hInput.value = quota.gemini?.fiveHour?.remaining ?? 72;
+      if (cWeeklyInput) cWeeklyInput.value = quota.claudeGpt?.weekly?.remaining ?? 49;
+      if (c5hInput) c5hInput.value = quota.claudeGpt?.fiveHour?.remaining ?? 100;
+      const modal = document.getElementById('ai-edit-modal');
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function closeAiQuotaModal() {
+      const modal = document.getElementById('ai-edit-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function saveAiQuotaFromModal() {
+      const gWeekly = parseInt(document.getElementById('input-gemini-weekly')?.value, 10) || 0;
+      const g5h = parseInt(document.getElementById('input-gemini-5h')?.value, 10) || 0;
+      const cWeekly = parseInt(document.getElementById('input-claude-weekly')?.value, 10) || 0;
+      const c5h = parseInt(document.getElementById('input-claude-5h')?.value, 10) || 0;
+
+      const quota = window.currentAiQuota ? JSON.parse(JSON.stringify(window.currentAiQuota)) : JSON.parse(JSON.stringify(window.DEFAULT_AI_QUOTA));
+      quota.gemini.weekly.remaining = gWeekly;
+      quota.gemini.weekly.detail = `Has consumido parte de tu límite semanal, se restablece en ${quota.gemini.weekly.refreshIn || '1 día, 22 horas'}.`;
+      quota.gemini.fiveHour.remaining = g5h;
+      quota.gemini.fiveHour.detail = `Has consumido parte de tu límite de 5 horas, se restablece en ${quota.gemini.fiveHour.refreshIn || '36 minutos'}.`;
+      quota.claudeGpt.weekly.remaining = cWeekly;
+      quota.claudeGpt.weekly.detail = `Has consumido parte de tu límite semanal, se restablece en ${quota.claudeGpt.weekly.refreshIn || '4 días, 23 horas'}.`;
+      quota.claudeGpt.fiveHour.remaining = c5h;
+      quota.claudeGpt.fiveHour.detail = (c5h === 100) ? 'Límite de 5 horas completamente disponible al 100%.' : `Has consumido parte de tu límite de 5 horas.`;
+      quota.lastUpdated = new Date().toISOString();
+
+      window.currentAiQuota = quota;
+      try {
+        localStorage.setItem('fa_ai_quota', JSON.stringify(quota));
+      } catch (e) {}
+
+      if (typeof window.renderAiQuota === 'function') {
+        window.renderAiQuota(quota);
+      }
+      closeAiQuotaModal();
+    }
+
+    async function initDashboard() {
+      await loadAiQuota();
+      await runAllTests();
+    }
+
     if (document.readyState === 'loading') {
-      window.addEventListener('DOMContentLoaded', runAllTests);
+      window.addEventListener('DOMContentLoaded', initDashboard);
     } else {
-      runAllTests();
+      initDashboard();
     }
   </script>
 </body>

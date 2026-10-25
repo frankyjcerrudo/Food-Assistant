@@ -165,8 +165,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
   });
 
   it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-    expect(window.APP_VERSION).toBe('v0.34');
-    expect(appInstance.appVersion).toBe('v0.34');
+    expect(window.APP_VERSION).toBe('v0.35');
+    expect(appInstance.appVersion).toBe('v0.35');
 
     const badge = document.createElement('span');
     badge.id = 'app-version-badge';
@@ -176,11 +176,63 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     document.body.appendChild(settingsVer);
 
     appInstance.initVersion();
-    expect(badge.textContent).toBe('v0.34');
-    expect(settingsVer.textContent).toBe('v0.34');
+    expect(badge.textContent).toBe('v0.35');
+    expect(settingsVer.textContent).toBe('v0.35');
 
     document.body.removeChild(badge);
     document.body.removeChild(settingsVer);
+  });
+
+  it('AI Quota Dashboard: renderAiQuota calcula offsets, colores y persiste cuota de modelos', () => {
+    const testQuota = {
+      plan: 'Google AI Pro',
+      gemini: {
+        weekly: { remaining: 18, detail: '18% restante' },
+        fiveHour: { remaining: 72, detail: '72% restante' }
+      },
+      claudeGpt: {
+        weekly: { remaining: 49, detail: '49% restante' },
+        fiveHour: { remaining: 100, detail: '100% restante' }
+      }
+    };
+
+    const container = document.createElement('div');
+    container.innerHTML = `
+      <span id="ai-plan-name"></span>
+      <span id="pct-gemini-weekly"></span>
+      <svg><path id="ring-gemini-weekly"></path></svg>
+      <div id="desc-gemini-weekly"></div>
+
+      <span id="pct-gemini-5h"></span>
+      <svg><path id="ring-gemini-5h"></path></svg>
+      <div id="desc-gemini-5h"></div>
+
+      <span id="pct-claude-weekly"></span>
+      <svg><path id="ring-claude-weekly"></path></svg>
+      <div id="desc-claude-weekly"></div>
+
+      <span id="pct-claude-5h"></span>
+      <svg><path id="ring-claude-5h"></path></svg>
+      <div id="desc-claude-5h"></div>
+    `;
+    document.body.appendChild(container);
+
+    expect(typeof window.renderAiQuota).toBe('function');
+    window.renderAiQuota(testQuota);
+
+    expect(document.getElementById('ai-plan-name').textContent).toBe('Google AI Pro');
+    expect(document.getElementById('pct-gemini-weekly').textContent).toBe('18%');
+    expect(document.getElementById('pct-gemini-weekly').style.color).toBe('#d97706');
+    expect(document.getElementById('pct-gemini-5h').textContent).toBe('72%');
+    expect(document.getElementById('pct-gemini-5h').style.color).toBe('#16a34a');
+    expect(document.getElementById('desc-gemini-weekly').textContent).toBe('18% restante');
+
+    expect(window.getMeterColor(18)).toBe('#d97706');
+    expect(window.getMeterColor(72)).toBe('#16a34a');
+    expect(window.getMeterColor(10)).toBe('#dc2626');
+    expect(window.calculateDashOffset(100)).toBe('0.00');
+
+    document.body.removeChild(container);
   });
 });
 

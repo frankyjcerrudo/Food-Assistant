@@ -1517,9 +1517,92 @@ const RecipeParser = {
     return recipe;
   }
 };
+const DEFAULT_AI_QUOTA = {
+  plan: 'Google AI Pro',
+  planDescription: 'You can upgrade to a Google AI Ultra plan to receive higher rate limits.',
+  lastUpdated: '2026-10-25T13:50:00Z',
+  creditOveragesEnabled: false,
+  gemini: {
+    weekly: {
+      remaining: 18,
+      refreshIn: '1 día, 22 horas',
+      detail: 'Has consumido parte de tu límite semanal. Se restablece por completo en 1 día, 22 horas.'
+    },
+    fiveHour: {
+      remaining: 72,
+      refreshIn: '36 minutos',
+      detail: 'Has consumido parte de tu límite de 5 horas. Se restablece por completo en 36 minutos.'
+    }
+  },
+  claudeGpt: {
+    weekly: {
+      remaining: 49,
+      refreshIn: '4 días, 23 horas',
+      detail: 'Has consumido parte de tu límite semanal. Se restablece por completo en 4 días, 23 horas.'
+    },
+    fiveHour: {
+      remaining: 100,
+      refreshIn: 'Completado',
+      detail: 'Límite de 5 horas disponible al 100%.'
+    }
+  }
+};
+
+function getMeterColor(pct) {
+  if (pct >= 50) return '#16a34a'; // verde
+  if (pct >= 15) return '#d97706'; // naranja/ámbar
+  return '#dc2626'; // rojo
+}
+
+function calculateDashOffset(pct) {
+  const circumference = 94.25;
+  const clamped = Math.max(0, Math.min(100, Number(pct) || 0));
+  return (circumference * (1 - clamped / 100)).toFixed(2);
+}
+
+function renderAiQuota(quota) {
+  if (!quota || typeof document === 'undefined') return;
+  const planName = document.getElementById('ai-plan-name');
+  if (planName) planName.textContent = quota.plan || 'Google AI Pro';
+
+  const items = [
+    { key: 'gemini-weekly', data: quota.gemini?.weekly },
+    { key: 'gemini-5h', data: quota.gemini?.fiveHour },
+    { key: 'claude-weekly', data: quota.claudeGpt?.weekly },
+    { key: 'claude-5h', data: quota.claudeGpt?.fiveHour }
+  ];
+
+  items.forEach(({ key, data }) => {
+    if (!data) return;
+    const pctEl = document.getElementById(`pct-${key}`);
+    const ringEl = document.getElementById(`ring-${key}`);
+    const descEl = document.getElementById(`desc-${key}`);
+
+    const pct = Math.max(0, Math.min(100, Number(data.remaining) || 0));
+    const color = getMeterColor(pct);
+    const offset = calculateDashOffset(pct);
+
+    if (pctEl) {
+      pctEl.textContent = `${pct}%`;
+      pctEl.style.color = color;
+    }
+    if (ringEl) {
+      ringEl.setAttribute('stroke', color);
+      ringEl.setAttribute('stroke-dashoffset', offset);
+    }
+    if (descEl && data.detail) {
+      descEl.textContent = data.detail;
+    }
+  });
+}
+
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.34';
+  window.APP_VERSION = 'v0.35';
+  window.DEFAULT_AI_QUOTA = DEFAULT_AI_QUOTA;
+  window.getMeterColor = getMeterColor;
+  window.calculateDashOffset = calculateDashOffset;
+  window.renderAiQuota = renderAiQuota;
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -1532,7 +1615,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.34';
+    this.appVersion = 'v0.35';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;

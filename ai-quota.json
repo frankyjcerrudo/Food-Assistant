@@ -1,0 +1,30 @@
+{
+  "plan": "Google AI Pro",
+  "planDescription": "You can upgrade to a Google AI Ultra plan to receive higher rate limits.",
+  "lastUpdated": "2026-10-25T13:50:00Z",
+  "creditOveragesEnabled": false,
+  "gemini": {
+    "weekly": {
+      "remaining": 18,
+      "refreshIn": "1 día, 22 horas",
+      "detail": "Has consumido parte de tu límite semanal. Se restablece por completo en 1 día, 22 horas."
+    },
+    "fiveHour": {
+      "remaining": 72,
+      "refreshIn": "36 minutos",
+      "detail": "Has consumido parte de tu límite de 5 horas. Se restablece por completo en 36 minutos."
+    }
+  },
+  "claudeGpt": {
+    "weekly": {
+      "remaining": 49,
+      "refreshIn": "4 días, 23 horas",
+      "detail": "Has consumido parte de tu límite semanal. Se restablece por completo en 4 días, 23 horas."
+    },
+    "fiveHour": {
+      "remaining": 100,
+      "refreshIn": "Completado",
+      "detail": "Límite de 5 horas disponible al 100%."
+    }
+  }
+}
