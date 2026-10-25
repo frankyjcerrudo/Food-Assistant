@@ -283,6 +283,33 @@ function formatWeekRange(weekDays) {
   return `${startDay} ${startMonth} – ${endDay} ${endMonth} ${endYear}`;
 }
 
+/**
+ * US-45: Generador de identificadores únicos universales con crypto.randomUUID()
+ * y soporte resiliente para entornos sin soporte nativo o tests.
+ */
+function generateId(prefix = '') {
+  let uuid = '';
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    try {
+      uuid = crypto.randomUUID();
+    } catch (e) {
+      uuid = '';
+    }
+  }
+  if (!uuid) {
+    if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+      const arr = new Uint8Array(16);
+      crypto.getRandomValues(arr);
+      arr[6] = (arr[6] & 0x0f) | 0x40;
+      arr[8] = (arr[8] & 0x3f) | 0x80;
+      const hex = Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
+      uuid = `${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}`;
+    } else {
+      uuid = `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 11)}`;
+    }
+  }
+  return prefix ? `${prefix}${uuid}` : uuid;
+}
 
 // Application State Store (Local First + Cloud Sync)
 class StateStore {
@@ -325,6 +352,25 @@ class StateStore {
     }
 
     this.shoppingList = this.load('fa_shopping', []);
+    // US-45 & BUG-23: Migración transparente para asegurar que todo artículo tenga id
+    if (Array.isArray(this.shoppingList)) {
+      let migrated = false;
+      this.shoppingList.forEach(item => {
+        if (!item.id) {
+          item.id = generateId('shop-');
+          migrated = true;
+        }
+      });
+      if (migrated) this.save('fa_shopping', this.shoppingList);
+    }
+
+    // Registro de borrados para propagación a Supabase (BUG-23)
+    this.deletedRecords = this.load('fa_deleted_records', {
+      recipes: [],
+      mealPlans: [],
+      shoppingItems: []
+    });
+
     this.settings = this.load('fa_settings', {
       geminiApiKey: '',
       defaultServings: 2,
@@ -337,6 +383,21 @@ class StateStore {
       anonKey: window.APP_CONFIG?.supabaseAnonKey || localStorage.getItem('fa_sb_key') || ''
     };
     this.lastSyncedAt = localStorage.getItem('fa_last_sync') || null;
+  }
+
+  trackDeletion(entityType, id) {
+    if (!id) return;
+    if (!this.deletedRecords[entityType]) this.deletedRecords[entityType] = [];
+    if (!this.deletedRecords[entityType].includes(id)) {
+      this.deletedRecords[entityType].push(id);
+      this.save('fa_deleted_records', this.deletedRecords);
+    }
+  }
+
+  clearDeletedRecords(entityType, ids) {
+    if (!this.deletedRecords[entityType] || !ids || ids.length === 0) return;
+    this.deletedRecords[entityType] = this.deletedRecords[entityType].filter(id => !ids.includes(id));
+    this.save('fa_deleted_records', this.deletedRecords);
   }
 
   load(key, fallback) {
@@ -796,7 +857,7 @@ const RecipeParser = {
     if (!name || (name.length <= 1 && /^[a-z\.\,]$/i.test(name))) return null;
 
     return {
-      id: 'ing-' + Math.random().toString(36).substr(2, 9),
+      id: generateId('ing-'),
       name: name.charAt(0).toUpperCase() + name.slice(1),
       amount: amount,
       unit: unit,
@@ -1100,7 +1161,7 @@ const RecipeParser = {
     const resolvedDomain = this.getDomain(resolvedSourceUrl) || (schema.publisher?.name || '');
 
     const recipe = {
-      id: 'rec-' + Date.now(),
+      id: generateId('rec-'),
       title: schema.name ? String(schema.name).trim() : 'Receta Web',
       description: schema.description ? String(schema.description).trim() : '',
       imageUrl: imageUrl,
@@ -1427,7 +1488,7 @@ const RecipeParser = {
 
     const resolvedDomain = sourceUrl ? this.getDomain(sourceUrl) : '';
     const recipe = {
-      id: 'rec-' + Date.now(),
+      id: generateId('rec-'),
       title: title || 'Receta de Notas',
       description: 'Receta importada desde texto estructurado.',
       imageUrl: candidateImage || 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop&q=80',
@@ -1446,7 +1507,8 @@ const RecipeParser = {
 };
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.28';
+  window.APP_VERSION = 'v0.29';
+  window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
   window.getMondayOfWeek = getMondayOfWeek;
@@ -1458,7 +1520,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.28';
+    this.appVersion = 'v0.29';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -1587,9 +1649,10 @@ class FoodAssistantApp {
   }
 
   // ==========================================================================
-  // ITEM 2: CLOUD AUTH & SUPABASE DATABASE SYNC
+  // US-35 / BUG-21-24: CLOUD AUTH & SUPABASE BIDIRECTIONAL SYNC ENGINE
   // ==========================================================================
   initSupabaseClient() {
+    this.syncDebounceTimer = null;
     const rawUrl = state.supabaseConfig.url || '';
     const cleanUrl = rawUrl.trim().replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
     const cleanKey = (state.supabaseConfig.anonKey || '').trim();
@@ -1599,8 +1662,8 @@ class FoodAssistantApp {
         this.supabaseClient = window.supabase.createClient(cleanUrl, cleanKey);
 
         // Check active session (including after Google OAuth redirect)
-        this.supabaseClient.auth.getSession().then(({ data: { session } }) => {
-          if (session?.user) {
+        this.supabaseClient.auth.getSession().then(({ data: { session }, error }) => {
+          if (session?.user && !error) {
             state.cloudUser = {
               email: session.user.email,
               name: session.user.user_metadata?.full_name || session.user.email.split('@')[0],
@@ -1609,8 +1672,10 @@ class FoodAssistantApp {
             };
             state.save('fa_cloud_user', state.cloudUser);
             this.updateUserAccountUI();
+            // US-35: Descarga y sincronización automática al abrir la app con sesión activa
+            this.syncDataWithCloud(true);
           }
-        });
+        }).catch(err => console.warn("Supabase session check error:", err));
 
         // Listen for real-time auth changes
         this.supabaseClient.auth.onAuthStateChange((event, session) => {
@@ -1634,6 +1699,41 @@ class FoodAssistantApp {
         console.warn("Could not create Supabase client:", err);
       }
     }
+
+    // US-35: Resiliencia Local-First y recuperación de conexión offline
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => {
+        this.updateSyncIndicator('Conexión reanudada. Sincronizando...', 'syncing');
+        this.syncDataWithCloud(true);
+      });
+      window.addEventListener('offline', () => {
+        this.updateSyncIndicator('Sin conexión (modo local)', 'warning');
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+          this.flushSync();
+        }
+      });
+      window.addEventListener('pagehide', () => {
+        this.flushSync();
+      });
+    }
+  }
+
+  updateSyncIndicator(message, status = 'default') {
+    const indicator = document.getElementById('sync-status-indicator');
+    if (indicator) {
+      indicator.textContent = message;
+      if (status === 'error') {
+        indicator.style.color = 'var(--m3-error, #dc2626)';
+      } else if (status === 'success') {
+        indicator.style.color = 'var(--color-brand, #16a34a)';
+      } else if (status === 'syncing') {
+        indicator.style.color = 'var(--m3-primary, #0284c7)';
+      } else {
+        indicator.style.color = 'var(--m3-on-surface-variant)';
+      }
+    }
   }
 
   updateUserAccountUI() {
@@ -1646,6 +1746,7 @@ class FoodAssistantApp {
     const settingsName = document.getElementById('settings-user-name');
     const settingsStatus = document.getElementById('settings-user-status');
     const settingsAuthBtn = document.getElementById('btn-settings-auth-action');
+    const syncNowBtn = document.getElementById('btn-sync-now');
 
     const authModalTitle = document.getElementById('auth-modal-title');
     const authForms = document.getElementById('auth-forms-container');
@@ -1669,6 +1770,7 @@ class FoodAssistantApp {
         settingsStatus.textContent = syncText;
       }
       if (settingsAuthBtn) settingsAuthBtn.textContent = 'Ver Cuenta';
+      if (syncNowBtn) syncNowBtn.style.display = 'inline-flex';
 
       if (authModalTitle) authModalTitle.textContent = 'Mi Cuenta en la Nube';
       if (authTabs) authTabs.style.display = 'none';
@@ -1688,6 +1790,8 @@ class FoodAssistantApp {
       if (settingsName) settingsName.textContent = 'Modo Local (Invitado)';
       if (settingsStatus) settingsStatus.textContent = 'Datos almacenados solo en este dispositivo';
       if (settingsAuthBtn) settingsAuthBtn.textContent = 'Iniciar Sesión';
+      if (syncNowBtn) syncNowBtn.style.display = 'none';
+      this.updateSyncIndicator('');
 
       if (authModalTitle) authModalTitle.textContent = 'Cuenta en la Nube';
       if (authTabs) authTabs.style.display = 'flex';
@@ -1755,6 +1859,16 @@ class FoodAssistantApp {
             options: { data: { full_name: name || email.split('@')[0] } }
           });
           if (error) throw error;
+
+          // BUG-20: Si Supabase exige confirmar email, data.session es null
+          if (data?.user && !data?.session) {
+            if (errBox) {
+              errBox.style.color = 'var(--m3-primary)';
+              errBox.textContent = "Revisa tu correo para confirmar la cuenta antes de iniciar sesión.";
+              errBox.style.display = 'block';
+            }
+            return;
+          }
           state.cloudUser = { email: data.user.email, name: name || email.split('@')[0], id: data.user.id };
         } else {
           const { data, error } = await this.supabaseClient.auth.signInWithPassword({
@@ -1766,6 +1880,7 @@ class FoodAssistantApp {
         }
       } catch (err) {
         if (errBox) {
+          errBox.style.color = 'var(--m3-error)';
           errBox.textContent = err.message || "Error al autenticar en Supabase.";
           errBox.style.display = 'block';
         }
@@ -1776,7 +1891,7 @@ class FoodAssistantApp {
       state.cloudUser = {
         email,
         name: name || email.split('@')[0],
-        id: 'usr_' + Math.random().toString(36).substr(2, 9),
+        id: generateId('usr_'),
         token: 'tk_' + Date.now()
       };
     }
@@ -1803,14 +1918,14 @@ class FoodAssistantApp {
       }
     } else {
       // Local/Simulated Google OAuth sign-in flow
-      const demoEmail = prompt("Acceso con cuenta de Google. Introduce tu correo de Google:", "frankyjcerrudo@gmail.com");
+      const demoEmail = prompt("Acceso con cuenta de Google. Introduce tu correo de Google:", "usuario@gmail.com");
       if (!demoEmail) return;
 
       const userName = demoEmail.split('@')[0];
       state.cloudUser = {
         email: demoEmail,
         name: userName.charAt(0).toUpperCase() + userName.slice(1),
-        id: 'usr_g_' + Math.random().toString(36).substr(2, 9),
+        id: generateId('usr_g_'),
         provider: 'google'
       };
       state.save('fa_cloud_user', state.cloudUser);
@@ -1832,45 +1947,313 @@ class FoodAssistantApp {
     alert("Has cerrado sesión. Tus datos continúan disponibles localmente.");
   }
 
-  async syncDataWithCloud(silent = false) {
-    const indicator = document.getElementById('sync-status-indicator');
-    if (indicator) indicator.textContent = "Sincronizando con la nube...";
+  // BUG-24: Sincronización diferida con debounce para mutaciones frecuentes
+  scheduleSyncWithCloud(delay = 800) {
+    if (!this.supabaseClient || !state.cloudUser?.id) return;
+    this.updateSyncIndicator('Guardando cambios...', 'syncing');
+    if (this.syncDebounceTimer) {
+      clearTimeout(this.syncDebounceTimer);
+    }
+    this.syncDebounceTimer = setTimeout(() => {
+      this.syncDebounceTimer = null;
+      this.pushToCloud(true);
+    }, delay);
+  }
 
-    if (this.supabaseClient && state.cloudUser?.id) {
-      try {
-        // Upsert recipes into Supabase 'recipes' table
-        for (const recipe of state.recipes) {
-          await this.supabaseClient.from('recipes').upsert({
-            id: recipe.id,
-            user_id: state.cloudUser.id,
-            title: recipe.title,
-            description: recipe.description,
-            image_url: recipe.imageUrl,
-            prep_time_minutes: recipe.prepTimeMinutes,
-            cook_time_minutes: recipe.cookTimeMinutes,
-            servings: recipe.servings,
-            tags: recipe.tags,
-            ingredients: recipe.ingredients,
-            instructions: recipe.instructions,
-            updated_at: new Date().toISOString()
-          });
-        }
-      } catch (e) {
-        console.warn("Supabase table sync notice:", e.message);
+  flushSync() {
+    if (this.syncDebounceTimer) {
+      clearTimeout(this.syncDebounceTimer);
+      this.syncDebounceTimer = null;
+      this.pushToCloud(true);
+    }
+  }
+
+  // US-35: Descarga y fusión bidireccional desde Supabase
+  async pullFromCloud() {
+    if (!this.supabaseClient || !state.cloudUser?.id) return { success: false, reason: 'no_session' };
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      this.updateSyncIndicator('Sin conexión (modo local)', 'warning');
+      return { success: false, reason: 'offline' };
+    }
+
+    try {
+      const [recRes, planRes, shopRes] = await Promise.all([
+        this.supabaseClient.from('recipes').select('*').eq('user_id', state.cloudUser.id),
+        this.supabaseClient.from('meal_plans').select('*').eq('user_id', state.cloudUser.id),
+        this.supabaseClient.from('shopping_items').select('*').eq('user_id', state.cloudUser.id)
+      ]);
+
+      if (recRes.error) throw recRes.error;
+      if (planRes.error) throw planRes.error;
+      if (shopRes.error) throw shopRes.error;
+
+      let stateChanged = false;
+
+      // 1. Fusión de Recetas
+      if (Array.isArray(recRes.data)) {
+        recRes.data.forEach(remoteRow => {
+          if (state.deletedRecords.recipes?.includes(remoteRow.id)) return;
+
+          const localIdx = state.recipes.findIndex(r => r.id === remoteRow.id);
+          const remoteRecipe = {
+            id: remoteRow.id,
+            title: remoteRow.title,
+            description: remoteRow.description || '',
+            imageUrl: remoteRow.image_url || '',
+            sourceUrl: remoteRow.source_url || '',
+            sourceDomain: remoteRow.source_domain || '',
+            prepTimeMinutes: remoteRow.prep_time_minutes || 0,
+            cookTimeMinutes: remoteRow.cook_time_minutes || 0,
+            servings: remoteRow.servings || 2,
+            tags: Array.isArray(remoteRow.tags) ? remoteRow.tags : [],
+            ingredients: Array.isArray(remoteRow.ingredients) ? remoteRow.ingredients : [],
+            instructions: Array.isArray(remoteRow.instructions) ? remoteRow.instructions : [],
+            isFavorite: !!remoteRow.is_favorite,
+            updatedAt: remoteRow.updated_at
+          };
+
+          if (localIdx >= 0) {
+            const local = state.recipes[localIdx];
+            const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
+            const localDate = new Date(local.updatedAt || 0).getTime();
+            if (remoteDate >= localDate) {
+              state.recipes[localIdx] = { ...local, ...remoteRecipe };
+              stateChanged = true;
+            }
+          } else {
+            state.recipes.push(remoteRecipe);
+            stateChanged = true;
+          }
+        });
       }
+
+      // 2. Fusión de Meal Plans
+      if (Array.isArray(planRes.data)) {
+        planRes.data.forEach(remoteRow => {
+          const dateKey = remoteRow.plan_date || remoteRow.id;
+          if (!dateKey || state.deletedRecords.mealPlans?.includes(dateKey)) return;
+
+          const localPlan = state.mealPlan[dateKey];
+          const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
+          const localDate = new Date(localPlan?.updatedAt || 0).getTime();
+
+          if (!localPlan || remoteDate >= localDate) {
+            state.mealPlan[dateKey] = {
+              dayName: remoteRow.day_name || localPlan?.dayName || 'Día',
+              breakfast: remoteRow.breakfast_recipe_id || null,
+              lunch: remoteRow.lunch_recipe_id || null,
+              snack: remoteRow.snack_recipe_id || null,
+              dinner: remoteRow.dinner_recipe_id || null,
+              customSlots: Array.isArray(remoteRow.custom_slots) ? remoteRow.custom_slots : [],
+              updatedAt: remoteRow.updated_at
+            };
+            stateChanged = true;
+          }
+        });
+      }
+
+      // 3. Fusión de Shopping Items
+      if (Array.isArray(shopRes.data)) {
+        shopRes.data.forEach(remoteRow => {
+          if (state.deletedRecords.shoppingItems?.includes(remoteRow.id)) return;
+
+          const localIdx = state.shoppingList.findIndex(i => i.id === remoteRow.id);
+          const remoteItem = {
+            id: remoteRow.id,
+            name: remoteRow.name,
+            amount: remoteRow.amount !== null && !isNaN(remoteRow.amount) ? Number(remoteRow.amount) : null,
+            unit: remoteRow.unit || '',
+            aisle: remoteRow.aisle || 'other',
+            isChecked: !!remoteRow.is_checked,
+            recipeOrigin: remoteRow.recipe_origin || '',
+            updatedAt: remoteRow.updated_at
+          };
+
+          if (localIdx >= 0) {
+            const local = state.shoppingList[localIdx];
+            const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
+            const localDate = new Date(local.updatedAt || 0).getTime();
+            if (remoteDate >= localDate) {
+              state.shoppingList[localIdx] = { ...local, ...remoteItem };
+              stateChanged = true;
+            }
+          } else {
+            state.shoppingList.push(remoteItem);
+            stateChanged = true;
+          }
+        });
+      }
+
+      if (stateChanged) {
+        state.save('fa_recipes', state.recipes);
+        state.save('fa_mealplan', state.mealPlan);
+        state.save('fa_shopping', state.shoppingList);
+        this.render();
+      }
+
+      return { success: true };
+    } catch (err) {
+      console.warn("Error al descargar datos de Supabase:", err);
+      return { success: false, error: err };
+    }
+  }
+
+  // US-35 / BUG-24: Subida en lote (batch upsert) y propagación de borrados (BUG-23)
+  async pushToCloud(silent = false) {
+    if (!this.supabaseClient || !state.cloudUser?.id) {
+      return { success: false, reason: 'no_session' };
+    }
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      this.updateSyncIndicator('Sin conexión (modo local)', 'warning');
+      return { success: false, reason: 'offline' };
     }
 
-    state.lastSyncedAt = new Date().toISOString();
-    localStorage.setItem('fa_last_sync', state.lastSyncedAt);
-    this.updateUserAccountUI();
+    this.updateSyncIndicator('Sincronizando con la nube...', 'syncing');
 
-    if (indicator) {
-      indicator.textContent = `Sincronizado a las ${new Date(state.lastSyncedAt).toLocaleTimeString()}`;
+    try {
+      // 1. Propagar borrados pendientes (BUG-23)
+      if (state.deletedRecords.recipes?.length > 0) {
+        const { error } = await this.supabaseClient.from('recipes')
+          .delete()
+          .in('id', state.deletedRecords.recipes)
+          .eq('user_id', state.cloudUser.id);
+        if (!error) {
+          state.clearDeletedRecords('recipes', [...state.deletedRecords.recipes]);
+        } else {
+          console.warn('Error al propagar borrado de recetas:', error);
+        }
+      }
+
+      if (state.deletedRecords.mealPlans?.length > 0) {
+        const { error } = await this.supabaseClient.from('meal_plans')
+          .delete()
+          .in('id', state.deletedRecords.mealPlans)
+          .eq('user_id', state.cloudUser.id);
+        if (!error) {
+          state.clearDeletedRecords('mealPlans', [...state.deletedRecords.mealPlans]);
+        } else {
+          console.warn('Error al propagar borrado de planes:', error);
+        }
+      }
+
+      if (state.deletedRecords.shoppingItems?.length > 0) {
+        const { error } = await this.supabaseClient.from('shopping_items')
+          .delete()
+          .in('id', state.deletedRecords.shoppingItems)
+          .eq('user_id', state.cloudUser.id);
+        if (!error) {
+          state.clearDeletedRecords('shoppingItems', [...state.deletedRecords.shoppingItems]);
+        } else {
+          console.warn('Error al propagar borrado de compra:', error);
+        }
+      }
+
+      // 2. Batch Upsert Recipes (BUG-22, BUG-24)
+      if (Array.isArray(state.recipes) && state.recipes.length > 0) {
+        const recipesPayload = state.recipes.map(recipe => ({
+          id: recipe.id,
+          user_id: state.cloudUser.id,
+          title: recipe.title,
+          description: recipe.description || '',
+          image_url: recipe.imageUrl || null,
+          source_url: recipe.sourceUrl || '',
+          source_domain: recipe.sourceDomain || '',
+          prep_time_minutes: recipe.prepTimeMinutes || 0,
+          cook_time_minutes: recipe.cookTimeMinutes || 0,
+          servings: recipe.servings || 2,
+          tags: Array.isArray(recipe.tags) ? recipe.tags : [],
+          ingredients: recipe.ingredients || [],
+          instructions: recipe.instructions || [],
+          is_favorite: !!recipe.isFavorite,
+          updated_at: recipe.updatedAt || new Date().toISOString()
+        }));
+
+        const { error: rErr } = await this.supabaseClient.from('recipes').upsert(recipesPayload, {
+          onConflict: 'user_id,id'
+        });
+        if (rErr) throw rErr;
+      }
+
+      // 3. Batch Upsert Meal Plans (BUG-23, BUG-24)
+      const planKeys = Object.keys(state.mealPlan || {});
+      if (planKeys.length > 0) {
+        const mealPlansPayload = planKeys.map(dateKey => {
+          const day = state.mealPlan[dateKey] || {};
+          return {
+            id: dateKey,
+            user_id: state.cloudUser.id,
+            plan_date: dateKey,
+            day_name: day.dayName || 'Día',
+            breakfast_recipe_id: day.breakfast || null,
+            lunch_recipe_id: day.lunch || null,
+            snack_recipe_id: day.snack || null,
+            dinner_recipe_id: day.dinner || null,
+            custom_slots: Array.isArray(day.customSlots) ? day.customSlots : [],
+            updated_at: day.updatedAt || new Date().toISOString()
+          };
+        });
+
+        const { error: mErr } = await this.supabaseClient.from('meal_plans').upsert(mealPlansPayload, {
+          onConflict: 'user_id,id'
+        });
+        if (mErr) throw mErr;
+      }
+
+      // 4. Batch Upsert Shopping Items (US-45, BUG-23, BUG-24)
+      if (Array.isArray(state.shoppingList) && state.shoppingList.length > 0) {
+        const shoppingPayload = state.shoppingList.map(item => {
+          if (!item.id) item.id = generateId('shop-');
+          return {
+            id: item.id,
+            user_id: state.cloudUser.id,
+            name: item.name,
+            amount: item.amount !== null && !isNaN(item.amount) ? Number(item.amount) : null,
+            unit: item.unit || '',
+            aisle: item.aisle || 'other',
+            is_checked: !!item.isChecked,
+            recipe_origin: item.recipeOrigin || null,
+            updated_at: item.updatedAt || new Date().toISOString()
+          };
+        });
+
+        const { error: sErr } = await this.supabaseClient.from('shopping_items').upsert(shoppingPayload, {
+          onConflict: 'user_id,id'
+        });
+        if (sErr) throw sErr;
+      }
+
+      // 5. Éxito confirmado: actualizar marca temporal
+      state.lastSyncedAt = new Date().toISOString();
+      localStorage.setItem('fa_last_sync', state.lastSyncedAt);
+      this.updateUserAccountUI();
+      this.updateSyncIndicator(`Sincronizado a las ${new Date(state.lastSyncedAt).toLocaleTimeString()}`, 'success');
+
+      if (!silent) {
+        alert("¡Datos sincronizados correctamente con la nube!");
+      }
+      return { success: true };
+    } catch (err) {
+      // BUG-21: No marcar como sincronizado si Supabase devolvió error
+      console.warn("Error durante la sincronización con Supabase:", err);
+      this.updateSyncIndicator(`Error de sincronización: ${err.message || 'Error de conexión'}`, 'error');
+      if (!silent) {
+        alert("Error al sincronizar con la nube: " + (err.message || 'Fallo de conexión'));
+      }
+      return { success: false, error: err };
+    }
+  }
+
+  // Sincronización completa (descarga + subida)
+  async syncDataWithCloud(silent = false) {
+    if (!this.supabaseClient || !state.cloudUser?.id) {
+      this.updateUserAccountUI();
+      return { success: false, reason: 'no_session' };
     }
 
-    if (!silent) {
-      alert("¡Datos sincronizados correctamente con la nube!");
-    }
+    this.updateSyncIndicator("Sincronizando con la nube...", 'syncing');
+    const pullRes = await this.pullFromCloud();
+    const pushRes = await this.pushToCloud(silent);
+    return { pull: pullRes, push: pushRes };
   }
 
   // ==========================================================================
@@ -1903,6 +2286,7 @@ class FoodAssistantApp {
     // Cloud Auth events
     document.getElementById('btn-header-account')?.addEventListener('click', () => this.openAuthModal());
     document.getElementById('btn-settings-auth-action')?.addEventListener('click', () => this.openAuthModal());
+    document.getElementById('btn-sync-now')?.addEventListener('click', () => this.syncDataWithCloud(false));
     document.getElementById('btn-close-auth-modal')?.addEventListener('click', () => this.closeAuthModal());
     document.getElementById('btn-auth-google')?.addEventListener('click', () => this.handleGoogleAuth());
     document.querySelectorAll('#auth-tab-buttons .auth-tab').forEach(tab => {
@@ -2441,10 +2825,13 @@ class FoodAssistantApp {
   deleteCurrentRecipe() {
     if (!this.activeRecipe) return;
     if (confirm(`¿Eliminar la receta "${this.activeRecipe.title}"?`)) {
-      state.recipes = state.recipes.filter(r => r.id !== this.activeRecipe.id);
+      const deletedId = this.activeRecipe.id;
+      state.recipes = state.recipes.filter(r => r.id !== deletedId);
       state.save('fa_recipes', state.recipes);
+      state.trackDeletion('recipes', deletedId);
       this.closeRecipeModal();
       this.render();
+      this.scheduleSyncWithCloud();
     }
   }
 
@@ -2563,7 +2950,7 @@ class FoodAssistantApp {
       return;
     }
 
-    const id = document.getElementById('edit-recipe-id').value || ('rec-' + Date.now());
+    const id = document.getElementById('edit-recipe-id').value || generateId('rec-');
     const description = document.getElementById('edit-recipe-desc').value.trim();
     const prepTimeMinutes = parseInt(document.getElementById('edit-recipe-prep').value, 10) || 0;
     const cookTimeMinutes = parseInt(document.getElementById('edit-recipe-cook').value, 10) || 0;
@@ -2582,7 +2969,7 @@ class FoodAssistantApp {
 
       if (name) {
         ingredients.push({
-          id: 'i-' + Math.random().toString(36).substr(2, 6),
+          id: generateId('ing-'),
           name: name,
           amount: amountVal !== "" ? parseFloat(amountVal) : null,
           unit: unit,
@@ -2619,12 +3006,20 @@ class FoodAssistantApp {
       instructions
     };
 
-    const wasReviewing = this.isReviewingImport;
     const existingIdx = state.recipes.findIndex(r => r.id === id);
+    const existing = existingIdx >= 0 ? state.recipes[existingIdx] : null;
+    const finalRecipe = {
+      ...(existing || {}),
+      ...updatedRecipe,
+      sourceUrl: existing?.sourceUrl || updatedRecipe.sourceUrl || '',
+      sourceDomain: existing?.sourceDomain || updatedRecipe.sourceDomain || '',
+      updatedAt: new Date().toISOString()
+    };
+
     if (existingIdx >= 0) {
-      state.recipes[existingIdx] = updatedRecipe;
+      state.recipes[existingIdx] = finalRecipe;
     } else {
-      state.recipes.unshift(updatedRecipe);
+      state.recipes.unshift(finalRecipe);
     }
 
     state.save('fa_recipes', state.recipes);
@@ -2633,7 +3028,7 @@ class FoodAssistantApp {
     this.closeEditModal();
     this.render();
     this.openRecipeDetail(id);
-    this.syncDataWithCloud(true);
+    this.scheduleSyncWithCloud();
   }
 
   // COOK MODE
@@ -2901,8 +3296,9 @@ class FoodAssistantApp {
   clearSlot(dateStr, slotType) {
     if (state.mealPlan[dateStr]) {
       state.mealPlan[dateStr][slotType] = null;
+      state.mealPlan[dateStr].updatedAt = new Date().toISOString();
       state.save('fa_mealplan', state.mealPlan);
-      this.syncDataWithCloud(true);
+      this.scheduleSyncWithCloud();
       this.render();
     }
   }
@@ -2912,8 +3308,9 @@ class FoodAssistantApp {
       const cs = state.mealPlan[dateStr].customSlots.find(c => c.id === customSlotId);
       if (cs) {
         cs.recipeId = null;
+        state.mealPlan[dateStr].updatedAt = new Date().toISOString();
         state.save('fa_mealplan', state.mealPlan);
-        this.syncDataWithCloud(true);
+        this.scheduleSyncWithCloud();
         this.render();
       }
     }
@@ -2922,8 +3319,9 @@ class FoodAssistantApp {
   deleteCustomSlot(dateStr, customSlotId) {
     if (state.mealPlan[dateStr] && Array.isArray(state.mealPlan[dateStr].customSlots)) {
       state.mealPlan[dateStr].customSlots = state.mealPlan[dateStr].customSlots.filter(c => c.id !== customSlotId);
+      state.mealPlan[dateStr].updatedAt = new Date().toISOString();
       state.save('fa_mealplan', state.mealPlan);
-      this.syncDataWithCloud(true);
+      this.scheduleSyncWithCloud();
       this.render();
     }
   }
@@ -2971,15 +3369,16 @@ class FoodAssistantApp {
 
     const dayData = state.getDayPlan(dateStr);
     const newSlot = {
-      id: 'cslot-' + Date.now(),
+      id: generateId('cslot-'),
       name: name,
       icon: icon,
       recipeId: null
     };
 
     dayData.customSlots.push(newSlot);
+    dayData.updatedAt = new Date().toISOString();
     state.save('fa_mealplan', state.mealPlan);
-    this.syncDataWithCloud(true);
+    this.scheduleSyncWithCloud();
     this.closeAddCustomSlotModal();
     this.render();
   }
@@ -3035,10 +3434,11 @@ class FoodAssistantApp {
       } else {
         dayData[slotKey] = recipeId;
       }
+      dayData.updatedAt = new Date().toISOString();
 
       state.save('fa_mealplan', state.mealPlan);
       this.closePickerModal();
-      this.syncDataWithCloud(true);
+      this.scheduleSyncWithCloud();
       this.render();
     }
   }
@@ -3116,16 +3516,21 @@ class FoodAssistantApp {
   toggleGroceryCheck(index) {
     if (state.shoppingList[index]) {
       state.shoppingList[index].isChecked = !state.shoppingList[index].isChecked;
+      state.shoppingList[index].updatedAt = new Date().toISOString();
       state.save('fa_shopping', state.shoppingList);
-      this.syncDataWithCloud(true);
+      this.scheduleSyncWithCloud();
       this.render();
     }
   }
 
   deleteGroceryItem(index) {
+    const item = state.shoppingList[index];
+    if (item && item.id) {
+      state.trackDeletion('shoppingItems', item.id);
+    }
     state.shoppingList.splice(index, 1);
     state.save('fa_shopping', state.shoppingList);
-    this.syncDataWithCloud(true);
+    this.scheduleSyncWithCloud();
     this.render();
   }
 
@@ -3142,25 +3547,34 @@ class FoodAssistantApp {
       const total = state.shoppingList.length;
       if (count === total) {
         if (confirm(`\u00BFEliminar los ${count} art\u00EDculos comprados y vaciar la lista?`)) {
+          state.shoppingList.forEach(item => {
+            if (item.id) state.trackDeletion('shoppingItems', item.id);
+          });
           state.shoppingList = [];
           state.save('fa_shopping', state.shoppingList);
-          this.syncDataWithCloud(true);
+          this.scheduleSyncWithCloud();
           this.render();
         }
       } else {
         if (confirm(`\u00BFEliminar los ${count} art\u00EDculos marcados como comprados?`)) {
+          completed.forEach(item => {
+            if (item.id) state.trackDeletion('shoppingItems', item.id);
+          });
           state.shoppingList = state.shoppingList.filter(i => !i.isChecked);
           state.save('fa_shopping', state.shoppingList);
-          this.syncDataWithCloud(true);
+          this.scheduleSyncWithCloud();
           this.render();
         }
       }
     } else {
       // Ningún artículo está marcado con el checkbox
       if (confirm("No hay artículos marcados como comprados.\n\n¿Deseas vaciar toda la lista de la compra?")) {
+        state.shoppingList.forEach(item => {
+          if (item.id) state.trackDeletion('shoppingItems', item.id);
+        });
         state.shoppingList = [];
         state.save('fa_shopping', state.shoppingList);
-        this.syncDataWithCloud(true);
+        this.scheduleSyncWithCloud();
         this.render();
       }
     }
@@ -3183,16 +3597,18 @@ class FoodAssistantApp {
     else if (/agua|cafe|café|te|té|refresco|cerveza|vino|zumo/.test(lower)) aisle = 'beverages';
 
     state.shoppingList.push({
+      id: generateId('shop-'),
       name: text,
       amount: null,
       unit: "",
       aisle: aisle,
       isChecked: false,
-      recipeOrigin: "Añadido manualmente"
+      recipeOrigin: "Añadido manualmente",
+      updatedAt: new Date().toISOString()
     });
 
     state.save('fa_shopping', state.shoppingList);
-    this.syncDataWithCloud(true);
+    this.scheduleSyncWithCloud();
     input.value = '';
     this.renderShoppingList();
   }
@@ -3531,6 +3947,9 @@ class FoodAssistantApp {
 
     const clearFirst = document.getElementById('shopping-preview-clear-first')?.checked;
     if (clearFirst) {
+      state.shoppingList.forEach(item => {
+        if (item.id) state.trackDeletion('shoppingItems', item.id);
+      });
       state.shoppingList = [];
     }
 
@@ -3541,24 +3960,27 @@ class FoodAssistantApp {
 
       if (existing && existing.amount !== null && item.amount !== null) {
         existing.amount = Math.round((existing.amount + item.amount) * 10) / 10;
+        existing.updatedAt = new Date().toISOString();
         if (item.recipeOrigin && !existing.recipeOrigin.includes(item.recipeOrigin)) {
           existing.recipeOrigin += `, ${item.recipeOrigin}`;
         }
       } else {
         state.shoppingList.push({
+          id: item.id || generateId('shop-'),
           name: item.name,
           amount: item.amount,
           unit: item.unit || '',
           aisle: item.aisle || 'other',
           isChecked: false,
-          recipeOrigin: item.recipeOrigin || ''
+          recipeOrigin: item.recipeOrigin || '',
+          updatedAt: new Date().toISOString()
         });
       }
       addedCount++;
     });
 
     state.save('fa_shopping', state.shoppingList);
-    this.syncDataWithCloud(true);
+    this.scheduleSyncWithCloud();
     this.closeShoppingPreviewModal();
     this.render();
     this.switchView('view-shopping');
@@ -3721,7 +4143,7 @@ class FoodAssistantApp {
       i++;
     });
     state.save('fa_mealplan', state.mealPlan);
-    this.syncDataWithCloud(true);
+    this.scheduleSyncWithCloud();
     this.render();
     alert("¡Menú completo (desayunos, almuerzos, meriendas y cenas) organizado con éxito en tu calendario!");
     this.switchView('view-planner');
@@ -4017,8 +4439,9 @@ class FoodAssistantApp {
     if (!newRecipe) return;
 
     if (!newRecipe.id) {
-      newRecipe.id = 'rec-' + Date.now();
+      newRecipe.id = generateId('rec-');
     }
+    newRecipe.updatedAt = new Date().toISOString();
 
     const existingIdx = state.recipes.findIndex(r => r.id === newRecipe.id);
     if (existingIdx >= 0) {
@@ -4028,7 +4451,7 @@ class FoodAssistantApp {
     }
 
     state.save('fa_recipes', state.recipes);
-    this.syncDataWithCloud(true);
+    this.scheduleSyncWithCloud();
     this.isReviewingImport = false;
     this.pendingImportRecipe = null;
     this.closeImportModal();
@@ -4146,8 +4569,9 @@ if (typeof window !== 'undefined') {
   window.StateStore = StateStore;
   window.state = state;
   window.FoodAssistantApp = FoodAssistantApp;
+  window.generateId = generateId;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { SEED_RECIPES, STANDARD_SLOTS, AISLE_METADATA, StateStore, FoodAssistantApp };
+  module.exports = { SEED_RECIPES, STANDARD_SLOTS, AISLE_METADATA, StateStore, FoodAssistantApp, generateId };
 }
