@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Food Assistant - Informe Detallado de Calidad y Tests</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.48">
+  <link rel="stylesheet" href="styles.css?v=0.49">
   <style>
     :root {
       --qa-pass: #059669;
@@ -301,8 +301,8 @@
   <div id="qa-sandbox" style="display: none;"></div>
 
   <!-- Entorno y dependencias de la app -->
-  <script src="config.js?v=0.48"></script>
-  <script src="app.js?v=0.48"></script>
+  <script src="config.js?v=0.49"></script>
+  <script src="app.js?v=0.49"></script>
 
   <script>
     const suites = [];
@@ -393,7 +393,7 @@
     }
 
     // =========================================================
-    // DEFINICIÓN DE PRUEBAS CON DETALLE EXPLICATIVO (79 TESTS)
+    // DEFINICIÓN DE PRUEBAS CON DETALLE EXPLICATIVO (115 TESTS)
     // =========================================================
 
     // SUITE 1: StateStore y Normalización de Datos (5 tests)
@@ -2049,7 +2049,7 @@ Bocadillo De Atun Paso A Paso
       });
 
       it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-        expect(window.APP_VERSION).toBe('v0.48');
+        expect(window.APP_VERSION).toBe('v0.49');
 
         const badge = document.createElement('span');
         badge.id = 'app-version-badge';
@@ -2064,8 +2064,8 @@ Bocadillo De Atun Paso A Paso
         };
         fakeApp.initVersion();
 
-        expect(badge.textContent).toBe('v0.48');
-        expect(settingsVer.textContent).toBe('v0.48');
+        expect(badge.textContent).toBe('v0.49');
+        expect(settingsVer.textContent).toBe('v0.49');
 
         document.body.removeChild(badge);
         document.body.removeChild(settingsVer);
@@ -2914,8 +2914,509 @@ Bocadillo De Atun Paso A Paso
       );
     });
 
+    // SUITE 11: US-02 Filtros Dietéticos, Chips, Advertencias y Auto-etiquetado (28 tests)
+    let __indexHtmlCache = null;
+
+    async function setupDietaryEnv() {
+      localStorage.clear();
+      const s = window.state;
+      s.dietaryPreferences = [];
+      s.customTags = [];
+      s.recipes = JSON.parse(JSON.stringify(window.SEED_RECIPES));
+      s.mealPlan = s.generateInitialMealPlan();
+      s.shoppingList = [];
+      s.save('fa_dietary_preferences', s.dietaryPreferences);
+      s.save('fa_custom_tags', s.customTags);
+      s.save('fa_recipes', s.recipes);
+      s.save('fa_mealplan', s.mealPlan);
+
+      // Cargar la estructura DOM real de index.html en un contenedor oculto (modales, chips, planificador, ajustes)
+      if (!__indexHtmlCache) {
+        const res = await fetch('index.html');
+        if (!res.ok) throw new Error('No se pudo cargar index.html para montar el DOM de pruebas');
+        __indexHtmlCache = await res.text();
+      }
+      const parsed = new DOMParser().parseFromString(__indexHtmlCache, 'text/html');
+      parsed.querySelectorAll('script').forEach(n => n.remove());
+      teardownDietaryEnv();
+      const host = document.createElement('div');
+      host.id = 'qa-index-dom';
+      host.style.display = 'none';
+      Array.from(parsed.body.children).forEach(c => host.appendChild(document.importNode(c, true)));
+      document.body.appendChild(host);
+
+      return new window.FoodAssistantApp();
+    }
+
+    function teardownDietaryEnv() {
+      const host = document.getElementById('qa-index-dom');
+      if (host) host.remove();
+    }
+
+    function dietIt(description, purpose, assertions, fn) {
+      it(description, { purpose, assertions }, async () => {
+        const app = await setupDietaryEnv();
+        try {
+          await fn(app);
+        } finally {
+          teardownDietaryEnv();
+        }
+      });
+    }
+
+    describe('11. US-02: Filtros Dietéticos, Chips, Advertencias y Auto-etiquetado', () => {
+      const W = window;
+
+      // ---- 11.1 Modelo de datos y categorías predefinidas ----
+      dietIt(
+        'Define las etiquetas dietéticas requeridas (Keto, Vegano, Sin Gluten, etc.)',
+        'Garantizar que el catálogo base de etiquetas dietéticas contiene las opciones exigidas por US-02.',
+        'PREDEFINED_DIETARY_TAGS contiene Keto, Vegano, Vegetariano, Sin Gluten, Sin Lactosa y Bajo en Carbos.',
+        () => {
+          ['Keto', 'Vegano', 'Vegetariano', 'Sin Gluten', 'Sin Lactosa', 'Bajo en Carbos'].forEach(t => {
+            expect(W.PREDEFINED_DIETARY_TAGS).toContain(t);
+          });
+        }
+      );
+
+      dietIt(
+        'v0.49: Alta en Proteínas y un emoji distinto por etiqueta dietética',
+        'Asegurar que cada etiqueta dietética tiene su propio emoji y que las demás etiquetas no lo tienen.',
+        'Alta en Proteínas existe; Vegano=🌱, Vegetariano=🥗, Alta en Proteínas=💪; emojis únicos; Rápida devuelve cadena vacía.',
+        () => {
+          expect(W.PREDEFINED_DIETARY_TAGS).toContain('Alta en Proteínas');
+          expect(W.getDietaryTagEmoji('Vegano')).toBe('🌱');
+          expect(W.getDietaryTagEmoji('Vegetariano')).toBe('🥗');
+          expect(W.getDietaryTagEmoji('Alta en Proteínas')).toBe('💪');
+          const emojis = W.PREDEFINED_DIETARY_TAGS.map(W.getDietaryTagEmoji);
+          expect(new Set(emojis).size).toBe(W.PREDEFINED_DIETARY_TAGS.length);
+          expect(W.getDietaryTagEmoji('Rápida')).toBe('');
+        }
+      );
+
+      dietIt(
+        'v0.49: analyzeAndInferRecipeTags detecta Alta en Proteínas, Almuerzo y Cena',
+        'Verificar la nueva heurística de proteínas y de momentos de comida Almuerzo / Cena.',
+        'Pechuga a la plancha => Alta en Proteínas + Cena; Guiso de lentejas => Almuerzo; solo tomates => sin Alta en Proteínas.',
+        () => {
+          const chicken = W.analyzeAndInferRecipeTags({
+            title: 'Pechuga a la plancha',
+            ingredients: [{ name: 'Pechuga de pollo' }, { name: 'Sal' }]
+          });
+          expect(chicken).toContain('Alta en Proteínas');
+          expect(chicken).toContain('Cena');
+
+          const stew = W.analyzeAndInferRecipeTags({ title: 'Guiso de lentejas', ingredients: [{ name: 'Lentejas' }] });
+          expect(stew).toContain('Almuerzo');
+
+          const tomato = W.analyzeAndInferRecipeTags({ title: 'Tomates', ingredients: [{ name: 'Tomates' }] });
+          expect(tomato).not.toContain('Alta en Proteínas');
+        }
+      );
+
+      dietIt(
+        'Define etiquetas prácticas requeridas (Rápida, Horno, Tupper)',
+        'Comprobar que las etiquetas prácticas básicas están predefinidas.',
+        'PREDEFINED_PRACTICAL_TAGS contiene Rápida, Horno y Tupper.',
+        () => {
+          expect(W.PREDEFINED_PRACTICAL_TAGS).toContain('Rápida');
+          expect(W.PREDEFINED_PRACTICAL_TAGS).toContain('Horno');
+          expect(W.PREDEFINED_PRACTICAL_TAGS).toContain('Tupper');
+        }
+      );
+
+      dietIt(
+        'StateStore inicializa y persiste preferencias dietéticas y etiquetas personalizadas',
+        'Verificar persistencia en localStorage de preferencias y etiquetas propias, sin duplicados por mayúsculas.',
+        'saveDietaryPreferences persiste tras recargar un nuevo StateStore; addCustomTag no duplica ignorando mayúsculas.',
+        () => {
+          const state = W.state;
+          expect(state.dietaryPreferences).toEqual([]);
+          expect(state.customTags).toEqual([]);
+
+          state.saveDietaryPreferences(['Vegano', 'Sin Gluten']);
+          expect(state.dietaryPreferences).toEqual(['Vegano', 'Sin Gluten']);
+
+          const reloaded = new W.StateStore();
+          expect(reloaded.dietaryPreferences).toEqual(['Vegano', 'Sin Gluten']);
+
+          state.addCustomTag('Airfryer Pro');
+          expect(state.customTags).toContain('Airfryer Pro');
+          state.addCustomTag('airfryer pro');
+          expect(state.customTags.filter(t => t.toLowerCase() === 'airfryer pro')).toHaveLength(1);
+        }
+      );
+
+      dietIt(
+        'getAllTags() devuelve la unión de predefinidas, personalizadas y de recetas',
+        'Asegurar que el catálogo de chips muestra todas las etiquetas disponibles.',
+        'Contiene Keto, Vegano, Rápida, la personalizada Fiesta y Pasta (de una receta semilla).',
+        () => {
+          W.state.addCustomTag('Fiesta');
+          const all = W.state.getAllTags();
+          ['Keto', 'Vegano', 'Rápida', 'Fiesta', 'Pasta'].forEach(t => expect(all).toContain(t));
+        }
+      );
+
+      // ---- 11.2 Motor de cumplimiento dietético ----
+      dietIt(
+        'Cumplimiento: es complaciente si no hay preferencias configuradas',
+        'Sin preferencias activas, ninguna receta debe generar avisos.',
+        'checkDietaryCompliance(receta, []) => compliant true y 0 violaciones.',
+        () => {
+          const r = W.checkDietaryCompliance({ title: 'Pollo al Limón', tags: ['Pollo', 'Cena'], ingredients: [] }, []);
+          expect(r.compliant).toBe(true);
+          expect(r.violations).toHaveLength(0);
+        }
+      );
+
+      dietIt(
+        'Cumplimiento: detecta cumplimiento cuando la receta tiene la etiqueta dietética',
+        'Una receta etiquetada Vegano sin ingredientes cárnicos cumple la preferencia Vegano.',
+        'compliant true y 0 violaciones.',
+        () => {
+          const r = W.checkDietaryCompliance({
+            title: 'Tostas de Hummus', tags: ['Vegano', 'Saludable'],
+            ingredients: [{ name: 'Hummus', aisle: 'pantry' }]
+          }, ['Vegano']);
+          expect(r.compliant).toBe(true);
+          expect(r.violations).toHaveLength(0);
+        }
+      );
+
+      dietIt(
+        'Cumplimiento: detecta infracción cuando falta la etiqueta dietética requerida',
+        'Una receta de pollo no cumple Keto ni Vegano si no tiene esas etiquetas.',
+        'compliant false y violaciones incluyen Keto y Vegano.',
+        () => {
+          const r = W.checkDietaryCompliance({
+            title: 'Pollo al Limón', tags: ['Pollo', 'Cena'],
+            ingredients: [{ name: 'Pollo', aisle: 'meat' }]
+          }, ['Keto', 'Vegano']);
+          expect(r.compliant).toBe(false);
+          expect(r.violations).toContain('Keto');
+          expect(r.violations).toContain('Vegano');
+        }
+      );
+
+      dietIt(
+        'Cumplimiento: carne/pescado o lácteos invalidan Vegano aunque esté etiquetada',
+        'Evitar falsos positivos cuando una receta está mal etiquetada como Vegana.',
+        'Receta marcada Vegano con pechuga de pollo => no cumple Vegano.',
+        () => {
+          const r = W.checkDietaryCompliance({
+            title: 'Pechuga con verduras', tags: ['Vegano'],
+            ingredients: [{ name: 'Pechuga de pollo', aisle: 'meat' }]
+          }, ['Vegano']);
+          expect(r.compliant).toBe(false);
+          expect(r.violations).toContain('Vegano');
+        }
+      );
+
+      // ---- 11.3 Selector de chips en el editor ----
+      dietIt(
+        'openCreateRecipeModal inicializa con etiquetas sugeridas por defecto y chips interactivos',
+        'Comprobar que el editor nuevo arranca con Cena y Saludable seleccionadas y las pinta en el selector.',
+        'editorSelectedTags contiene Cena y Saludable y el contenedor de chips muestra ambos textos.',
+        (app) => {
+          app.openCreateRecipeModal();
+          expect(app.editorSelectedTags.has('Cena')).toBe(true);
+          expect(app.editorSelectedTags.has('Saludable')).toBe(true);
+          const box = document.getElementById('editor-selected-tags-container');
+          expect(box.textContent).toContain('Cena');
+          expect(box.textContent).toContain('Saludable');
+        }
+      );
+
+      dietIt(
+        'toggleEditorTag añade y quita etiquetas sincronizando el input oculto',
+        'Verificar el comportamiento toggle de los chips y la sincronización con el campo oculto del formulario.',
+        'Añadir Sin Gluten lo incluye en #edit-recipe-tags; volver a pulsarlo lo elimina.',
+        (app) => {
+          app.openCreateRecipeModal();
+          app.toggleEditorTag('Sin Gluten');
+          expect(app.editorSelectedTags.has('Sin Gluten')).toBe(true);
+          const hidden = document.getElementById('edit-recipe-tags');
+          expect(hidden.value).toContain('Sin Gluten');
+          app.toggleEditorTag('Sin Gluten');
+          expect(app.editorSelectedTags.has('Sin Gluten')).toBe(false);
+          expect(hidden.value).not.toContain('Sin Gluten');
+        }
+      );
+
+      dietIt(
+        'removeEditorTag elimina la etiqueta seleccionada',
+        'Comprobar que el botón de quitar chip elimina la etiqueta del conjunto seleccionado.',
+        'Cena pasa de seleccionada a no seleccionada tras removeEditorTag.',
+        (app) => {
+          app.openCreateRecipeModal();
+          expect(app.editorSelectedTags.has('Cena')).toBe(true);
+          app.removeEditorTag('Cena');
+          expect(app.editorSelectedTags.has('Cena')).toBe(false);
+        }
+      );
+
+      dietIt(
+        'Permite crear y añadir etiquetas personalizadas sobre la marcha',
+        'Verificar que el usuario puede crear etiquetas propias desde el editor y que se guardan globalmente.',
+        'Batch Cooking queda seleccionada, se guarda en customTags y el input se vacía.',
+        (app) => {
+          app.openCreateRecipeModal();
+          const input = document.getElementById('input-new-custom-tag');
+          input.value = 'Batch Cooking';
+          app.handleAddCustomTagFromEditor();
+          expect(app.editorSelectedTags.has('Batch Cooking')).toBe(true);
+          expect(W.state.customTags).toContain('Batch Cooking');
+          expect(input.value).toBe('');
+        }
+      );
+
+      dietIt(
+        'saveRecipeEdit persiste las etiquetas de editorSelectedTags en la receta',
+        'Asegurar que las etiquetas elegidas con chips se guardan en la receta creada.',
+        'La receta Bowl Keto Especial se guarda con tags exactos [Keto, Rápida].',
+        (app) => {
+          app.openCreateRecipeModal();
+          document.getElementById('edit-recipe-title').value = 'Bowl Keto Especial';
+          app.editorSelectedTags.clear();
+          app.editorSelectedTags.add('Keto');
+          app.editorSelectedTags.add('Rápida');
+          app.saveRecipeEdit();
+          const created = W.state.recipes.find(r => r.title === 'Bowl Keto Especial');
+          expect(created).toBeDefined();
+          expect(created.tags).toEqual(['Keto', 'Rápida']);
+        }
+      );
+
+      // ---- 11.4 Filtro múltiple combinado ----
+      dietIt(
+        'Filtra por múltiples chips de forma combinada (AND)',
+        'Verificar que seleccionar varios chips devuelve recetas que cumplen todas las etiquetas.',
+        'Con Cena + Rápida el contador del catálogo es >= 2.',
+        (app) => {
+          app.selectedRecipeTags.clear();
+          app.selectedRecipeTags.add('Cena');
+          app.selectedRecipeTags.add('Rápida');
+          app.applyRecipeFilters();
+          const badge = document.getElementById('recipes-count-badge');
+          expect(parseInt(badge.textContent, 10)).toBeGreaterThanOrEqual(2);
+        }
+      );
+
+      dietIt(
+        'Combina filtros de chips con texto libre en el buscador',
+        'Comprobar que el buscador y los chips se aplican a la vez.',
+        'Cena + búsqueda "Pesto" muestra "1 de N" en el contador.',
+        (app) => {
+          app.selectedRecipeTags.clear();
+          app.selectedRecipeTags.add('Cena');
+          document.getElementById('recipes-search-input').value = 'Pesto';
+          app.applyRecipeFilters();
+          expect(document.getElementById('recipes-count-badge').textContent).toContain('1 de');
+        }
+      );
+
+      dietIt(
+        'El chip "Todas" resetea la selección múltiple',
+        'Garantizar que "Todas" limpia los filtros activos y vuelve a mostrar el catálogo completo.',
+        'Tras filterRecipesByTag("all") no quedan chips seleccionados y el contador iguala el total de recetas.',
+        (app) => {
+          const search = document.getElementById('recipes-search-input');
+          if (search) search.value = '';
+          app.selectedRecipeTags.add('Keto');
+          app.filterRecipesByTag('all');
+          expect(app.selectedRecipeTags.size).toBe(0);
+          expect(document.getElementById('recipes-count-badge').textContent).toBe(String(W.state.recipes.length));
+        }
+      );
+
+      // ---- 11.5 Advertencias en planificador y Hoy ----
+      dietIt(
+        'Muestra aviso en el slot si la receta asignada incumple la dieta activa',
+        'Avisar visualmente en el planificador cuando un plato no encaja con la dieta del usuario.',
+        'Con Vegano activo y pollo en el almuerzo aparece dietary-warning-badge y "No cumple: Vegano".',
+        (app) => {
+          W.state.saveDietaryPreferences(['Vegano']);
+          const dateKey = Object.keys(W.state.mealPlan)[0];
+          W.state.mealPlan[dateKey].lunch = 'rec-lemon-chicken';
+          app.renderPlanner();
+          const html = document.getElementById('planner-days-container').innerHTML;
+          expect(html).toContain('dietary-warning-badge');
+          expect(html).toContain('No cumple: Vegano');
+        }
+      );
+
+      dietIt(
+        'No muestra aviso si la receta asignada cumple las preferencias',
+        'Evitar avisos falsos cuando el plato sí cumple la dieta.',
+        'Con Vegetariano activo y pasta al pesto no aparece "No cumple: Vegetariano".',
+        (app) => {
+          W.state.saveDietaryPreferences(['Vegetariano']);
+          const dateKey = Object.keys(W.state.mealPlan)[0];
+          W.state.mealPlan = {
+            [dateKey]: { dayName: 'Lunes', breakfast: null, lunch: 'rec-pesto-pasta', snack: null, dinner: null, customSlots: [] }
+          };
+          app.renderPlanner();
+          expect(document.getElementById('planner-days-container').innerHTML).not.toContain('No cumple: Vegetariano');
+        }
+      );
+
+      dietIt(
+        'Muestra aviso en la vista Hoy si una comida asignada incumple la dieta',
+        'Replicar el aviso dietético en la pantalla Hoy.',
+        'Con Keto activo y pasta al pesto hoy aparece dietary-warning-badge y "No cumple: Keto".',
+        (app) => {
+          W.state.saveDietaryPreferences(['Keto']);
+          const todayStr = W.toLocalDateKey();
+          if (!W.state.mealPlan[todayStr]) {
+            W.state.mealPlan[todayStr] = { breakfast: null, lunch: null, snack: null, dinner: null, customSlots: [] };
+          }
+          W.state.mealPlan[todayStr].lunch = 'rec-pesto-pasta';
+          app.renderTodayView();
+          const html = document.getElementById('today-slots-container').innerHTML;
+          expect(html).toContain('dietary-warning-badge');
+          expect(html).toContain('No cumple: Keto');
+        }
+      );
+
+      dietIt(
+        'openPickerModal muestra el filtro "Solo aptas para mis dietas" con preferencias activas',
+        'Permitir filtrar el selector de recetas del planificador por dieta.',
+        'La barra picker-dietary-filter-bar es visible y la lista incluye dietary-warning-badge.',
+        (app) => {
+          W.state.saveDietaryPreferences(['Vegano']);
+          app.openPickerModal('2026-10-26', 'lunch', false);
+          expect(document.getElementById('picker-dietary-filter-bar').style.display).not.toBe('none');
+          expect(document.getElementById('picker-recipes-list').innerHTML).toContain('dietary-warning-badge');
+        }
+      );
+
+      // ---- 11.6 Auto-análisis y etiquetado automático ----
+      dietIt(
+        'Auto-etiquetado: detecta etiquetas prácticas por tiempo y técnicas',
+        'Inferir Rápida (≤25 min) y Horno desde los pasos de la receta.',
+        'Berenjenas rellenas al horno (22 min) => Rápida + Horno.',
+        () => {
+          const tags = W.analyzeAndInferRecipeTags({
+            title: 'Berenjenas Rellenas al Horno', prepTimeMinutes: 10, cookTimeMinutes: 12,
+            instructions: [{ step: 1, text: 'Hornear a 200°C durante 10 minutos hasta gratinar.' }],
+            ingredients: [{ name: 'Berenjena', aisle: 'produce' }]
+          });
+          expect(tags).toContain('Rápida');
+          expect(tags).toContain('Horno');
+        }
+      );
+
+      dietIt(
+        'Auto-etiquetado: Vegano, Vegetariano, Sin Gluten y Sin Lactosa en recetas 100% vegetales',
+        'Inferir etiquetas dietéticas por exclusión de ingredientes animales, lácteos y gluten.',
+        'Bowl de quinoa con aguacate y espinacas => Vegano, Vegetariano, Sin Gluten, Sin Lactosa y Rápida.',
+        () => {
+          const tags = W.analyzeAndInferRecipeTags({
+            title: 'Bowl de Quinoa con Aguacate y Espinacas', prepTimeMinutes: 10, cookTimeMinutes: 10,
+            ingredients: [
+              { name: 'Quinoa cocida', aisle: 'pantry' }, { name: 'Aguacate', aisle: 'produce' },
+              { name: 'Espinacas frescas', aisle: 'produce' }, { name: 'Aceite de oliva virgen extra', aisle: 'spices' }
+            ],
+            instructions: [{ step: 1, text: 'Mezclar todo en un bol y servir fresco.' }]
+          });
+          ['Vegano', 'Vegetariano', 'Sin Gluten', 'Sin Lactosa', 'Rápida'].forEach(t => expect(tags).toContain(t));
+        }
+      );
+
+      dietIt(
+        'Auto-etiquetado: Vegetariano pero no Vegano si contiene lácteos o queso',
+        'Distinguir recetas vegetarianas de las veganas y retirar Sin Lactosa cuando hay queso.',
+        'Tortilla con queso manchego => Vegetariano, sin Vegano ni Sin Lactosa.',
+        () => {
+          const tags = W.analyzeAndInferRecipeTags({
+            title: 'Tortilla de Patatas con Queso Manchego',
+            ingredients: [
+              { name: 'Patatas', aisle: 'produce' }, { name: 'Huevos', aisle: 'dairy' }, { name: 'Queso manchego', aisle: 'dairy' }
+            ],
+            instructions: [{ step: 1, text: 'Cuajar la tortilla en sartén.' }]
+          });
+          expect(tags).toContain('Vegetariano');
+          expect(tags).not.toContain('Vegano');
+          expect(tags).not.toContain('Sin Lactosa');
+        }
+      );
+
+      dietIt(
+        'Auto-etiquetado: detecta Airfryer y Desayuno según título y descripción',
+        'Inferir método Airfryer y momento Desayuno a partir del texto de la receta.',
+        'Tostada de avena en airfryer (13 min) => Airfryer + Desayuno + Rápida.',
+        () => {
+          const tags = W.analyzeAndInferRecipeTags({
+            title: 'Tostada de Avena Crujiente en Airfryer', prepTimeMinutes: 5, cookTimeMinutes: 8,
+            ingredients: [{ name: 'Pan de centeno', aisle: 'bakery' }],
+            instructions: [{ step: 1, text: 'Introducir en la cesta de la freidora de aire.' }]
+          });
+          expect(tags).toContain('Airfryer');
+          expect(tags).toContain('Desayuno');
+          expect(tags).toContain('Rápida');
+        }
+      );
+
+      dietIt(
+        'autoAnalyzeAndTagAllRecipes actualiza las recetas guardadas y muestra mensaje en Ajustes',
+        'Verificar el botón masivo de Ajustes: etiqueta recetas, sella updatedAt y es idempotente.',
+        'Batido verde => 1 receta actualizada con Rápida/Vegano/Vegetariano/Merienda y updatedAt; la segunda ejecución actualiza 0.',
+        async (app) => {
+          W.state.recipes = [{
+            id: 'test-rec-analyze-1', title: 'Batido Verde Detox', description: 'Merienda saludable',
+            prepTimeMinutes: 5, cookTimeMinutes: 0, tags: [],
+            ingredients: [
+              { name: 'Espinacas', aisle: 'produce' }, { name: 'Plátano', aisle: 'produce' },
+              { name: 'Bebida de avena sin gluten', aisle: 'dairy' }
+            ],
+            instructions: [{ step: 1, text: 'Triturar en batidora y servir.' }]
+          }];
+
+          const result = await app.autoAnalyzeAndTagAllRecipes();
+          expect(result.updatedCount).toBe(1);
+          expect(result.totalTagsAdded).toBeGreaterThanOrEqual(3);
+
+          const rec = W.state.recipes.find(r => r.id === 'test-rec-analyze-1');
+          ['Rápida', 'Vegano', 'Vegetariano', 'Merienda'].forEach(t => expect(rec.tags).toContain(t));
+          expect(rec.updatedAt).toBeDefined();
+
+          const msgEl = document.getElementById('auto-tag-result-msg');
+          expect(msgEl.style.display).not.toBe('none');
+          expect(msgEl.textContent).toContain('¡Análisis completado!');
+
+          const second = await app.autoAnalyzeAndTagAllRecipes();
+          expect(second.updatedCount).toBe(0);
+          expect(msgEl.textContent).toContain('Todas tus recetas ya cuentan con las etiquetas correspondientes');
+        }
+      );
+
+      dietIt(
+        'autoAnalyzeAndTagAllRecipes limpia la etiqueta obsoleta General y etiqueta una receta de solo tomates',
+        'Evitar la etiqueta "General" y asegurar que recetas muy simples reciben sus etiquetas.',
+        'Tomates aliñados con tag General => sin General, con Vegano, Vegetariano, Sin Gluten, Sin Lactosa, Rápida y updatedAt.',
+        async (app) => {
+          W.state.recipes = [{
+            id: 'test-rec-tomatoes', title: 'Tomates Aliñados', description: 'Tomates frescos de huerto',
+            prepTimeMinutes: 5, cookTimeMinutes: 0, tags: ['General'],
+            ingredients: [{ name: 'Tomates', aisle: 'produce' }],
+            instructions: [{ step: 1, text: 'Cortar los tomates en rodajas.' }]
+          }];
+
+          const result = await app.autoAnalyzeAndTagAllRecipes();
+          expect(result.updatedCount).toBe(1);
+
+          const rec = W.state.recipes.find(r => r.id === 'test-rec-tomatoes');
+          expect(rec.tags).not.toContain('General');
+          ['Vegano', 'Vegetariano', 'Sin Gluten', 'Sin Lactosa', 'Rápida'].forEach(t => expect(rec.tags).toContain(t));
+          expect(rec.updatedAt).toBeDefined();
+        }
+      );
+    });
+
     // =========================================================
     // CONTROLES DE INTERFAZ, FILTRADO Y MODO OSCURO/CLARO
+
     // =========================================================
     function toggleTheme() {
       const html = document.documentElement;
