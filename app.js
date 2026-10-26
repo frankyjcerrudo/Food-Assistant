@@ -244,6 +244,118 @@ function checkDietaryCompliance(recipe, preferences) {
   };
 }
 
+// US-02: Motor de Inferencia y Auto-etiquetado Inteligente de Recetas
+function analyzeAndInferRecipeTags(recipe) {
+  if (!recipe) return [];
+  const inferred = new Set();
+  const title = (recipe.title || '').toLowerCase();
+  const desc = (recipe.description || '').toLowerCase();
+  const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
+  const instructions = Array.isArray(recipe.instructions) ? recipe.instructions : [];
+
+  const ingNames = ingredients.map(i => (typeof i === 'string' ? i : (i.name || '')).toLowerCase());
+  const allIngText = ingNames.join(' ');
+  const stepsText = instructions.map(s => (typeof s === 'string' ? s : (s.text || '')).toLowerCase()).join(' ');
+  const fullText = `${title} ${desc} ${allIngText} ${stepsText}`;
+
+  const prep = parseInt(recipe.prepTimeMinutes, 10) || 0;
+  const cook = parseInt(recipe.cookTimeMinutes, 10) || 0;
+  const totalTime = prep + cook;
+
+  // 1. Prácticas / Técnicas
+  if (totalTime > 0 && totalTime <= 25) {
+    inferred.add('Rápida');
+  }
+  if (/\b(horno|hornear|hornead[oa]s?|gratinar|gratinad[oa]s?|asar al horno|precalentar)\b/i.test(`${stepsText} ${title}`)) {
+    inferred.add('Horno');
+  }
+  if (/\b(airfryer|freidora de aire|freidora sin aceite)\b/i.test(fullText)) {
+    inferred.add('Airfryer');
+  }
+  if (/\b(microondas)\b/i.test(fullText)) {
+    inferred.add('Microondas');
+  }
+  if (/\b(tupper|taper|batch cooking|para llevar|conservar en nevera)\b/i.test(fullText)) {
+    inferred.add('Tupper');
+  }
+  if (/\b(congelar|congelable|apto para congelador)\b/i.test(fullText)) {
+    inferred.add('Para Congelar');
+  }
+
+  // 2. Dietéticas basadas en ingredientes
+  if (ingredients.length > 0) {
+    const hasMeat = ingredients.some(ing => {
+      const name = (typeof ing === 'string' ? ing : (ing.name || '')).toLowerCase();
+      const aisle = (typeof ing === 'object' && ing.aisle) || '';
+      return aisle === 'meat' || /\b(pollo|pechuga|carne|ternera|cerdo|lomo|bacon|beicon|jam[oó]n|pavo|salchicha|hamburguesa|chorizo|panceta|cordero|conejo|solomillo|alitas)\b/i.test(name);
+    });
+
+    const hasFish = ingredients.some(ing => {
+      const name = (typeof ing === 'string' ? ing : (ing.name || '')).toLowerCase();
+      const aisle = (typeof ing === 'object' && ing.aisle) || '';
+      return aisle === 'fish' || /\b(pescado|salm[oó]n|at[uú]n|merluza|bacalao|gambas?|langostinos?|camarones?|mejillones?|calamar|pulpo|anchoas?|sardinas?|dorada|lubina|almejas?)\b/i.test(name);
+    });
+
+    const hasDairy = ingredients.some(ing => {
+      const name = (typeof ing === 'string' ? ing : (ing.name || '')).toLowerCase();
+      const aisle = (typeof ing === 'object' && ing.aisle) || '';
+      if (/\b(sin lactosa|vegetal|de avena|de soja|de almendra|de coco|de arroz)\b/i.test(name)) return false;
+      return aisle === 'dairy' || /\b(leche|queso|yogur|mantequilla|nata|parmesano|mozzarella|crema de leche|feta|cottage|ricotta|mascarpone|cuajada)\b/i.test(name);
+    });
+
+    const hasEgg = ingredients.some(ing => {
+      const name = (typeof ing === 'string' ? ing : (ing.name || '')).toLowerCase();
+      return /\b(huevo|huevos|clara|claras|yema|yemas)\b/i.test(name);
+    });
+
+    const hasGluten = ingredients.some(ing => {
+      const name = (typeof ing === 'string' ? ing : (ing.name || '')).toLowerCase();
+      if (/\b(sin gluten|gluten[ -]?free)\b/i.test(name)) return false;
+      return /\b(harina(?! de almendra| de arroz| de ma[ií]z| sin gluten)|trigo|pan\b(?! sin gluten)|pasta\b(?! sin gluten)|espaguetis?|macarrones?|tallarines?|fideos?|cebada|centeno|avena\b(?! sin gluten)|cerveza|cusc[uú]s|galletas?)\b/i.test(name);
+    });
+
+    const hasHighCarbs = ingredients.some(ing => {
+      const name = (typeof ing === 'string' ? ing : (ing.name || '')).toLowerCase();
+      return /\b(arroz|pasta|espaguetis?|pan\b|patatas?|papas?|az[uú]car|miel|harina|legumbres|garbanzos?|lentejas?|alubias?|ma[ií]z)\b/i.test(name);
+    });
+
+    // Vegano: Sin carne, pescado, lácteos, huevos ni miel
+    if (!hasMeat && !hasFish && !hasDairy && !hasEgg && !/\b(miel)\b/i.test(allIngText)) {
+      inferred.add('Vegano');
+      inferred.add('Vegetariano');
+    } else if (!hasMeat && !hasFish) {
+      inferred.add('Vegetariano');
+    }
+
+    // Sin Gluten
+    if (!hasGluten) {
+      inferred.add('Sin Gluten');
+    }
+
+    // Sin Lactosa
+    if (!hasDairy) {
+      inferred.add('Sin Lactosa');
+    }
+
+    // Keto / Bajo en Carbos
+    if (!hasHighCarbs && (hasMeat || hasFish || hasEgg || /\b(aguacate|aceite de oliva|frutos secos|nueces|semillas|espinacas?|calabac[ií]n|br[oó]coli|coliflor)\b/i.test(allIngText))) {
+      inferred.add('Bajo en Carbos');
+      inferred.add('Keto');
+    }
+  }
+
+  // 3. Momento de Comida
+  if (/\b(desayuno|tostada|porridge|avena|smoothie|tortitas|pancakes|granola|muesli|caf[eé])\b/i.test(`${title} ${desc}`)) {
+    inferred.add('Desayuno');
+  }
+  if (/\b(merienda|snack|batido|tentempi[eé]|barrita)\b/i.test(`${title} ${desc}`)) {
+    inferred.add('Merienda');
+    inferred.add('Snack');
+  }
+
+  return Array.from(inferred);
+}
+
 const AISLE_METADATA = {
   produce: { label: "Frutas y Verduras", icon: "eco" },
   meat: { label: "Carnes y Pescados", icon: "set_meal" },
@@ -2051,7 +2163,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.45';
+  window.APP_VERSION = 'v0.46';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2073,12 +2185,13 @@ if (typeof window !== 'undefined') {
   window.PREDEFINED_PRACTICAL_TAGS = PREDEFINED_PRACTICAL_TAGS;
   window.ALL_PREDEFINED_TAGS = ALL_PREDEFINED_TAGS;
   window.checkDietaryCompliance = checkDietaryCompliance;
+  window.analyzeAndInferRecipeTags = analyzeAndInferRecipeTags;
 }
 
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.45';
+    this.appVersion = 'v0.46';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -3099,6 +3212,7 @@ class FoodAssistantApp {
     document.getElementById('btn-export-backup')?.addEventListener('click', () => this.exportBackup());
     document.getElementById('input-import-backup')?.addEventListener('change', (e) => this.importBackup(e));
     document.getElementById('btn-reset-demo')?.addEventListener('click', () => this.resetDemoData());
+    document.getElementById('btn-auto-tag-recipes')?.addEventListener('click', () => this.autoAnalyzeAndTagAllRecipes());
 
     // Modal closes & Light Dismiss (clicking outside the modal window / backdrop closes it)
     document.getElementById('btn-close-recipe-modal')?.addEventListener('click', () => this.closeRecipeModal());
@@ -5911,6 +6025,52 @@ class FoodAssistantApp {
     this.renderTodayView();
   }
 
+  // US-02: Auto-análisis inteligente y etiquetado masivo de recetas guardadas
+  autoAnalyzeAndTagAllRecipes() {
+    const recipes = state.recipes || [];
+    let updatedCount = 0;
+    let totalTagsAdded = 0;
+
+    recipes.forEach(recipe => {
+      const existingTags = Array.isArray(recipe.tags) ? recipe.tags : [];
+      const existingLower = new Set(existingTags.map(t => String(t).toLowerCase().trim()));
+      const inferredTags = analyzeAndInferRecipeTags(recipe);
+
+      const newTagsToAdd = [];
+      inferredTags.forEach(tag => {
+        if (!existingLower.has(tag.toLowerCase().trim())) {
+          newTagsToAdd.push(tag);
+          state.addCustomTag && state.addCustomTag(tag);
+        }
+      });
+
+      if (newTagsToAdd.length > 0) {
+        recipe.tags = [...existingTags, ...newTagsToAdd];
+        updatedCount++;
+        totalTagsAdded += newTagsToAdd.length;
+      }
+    });
+
+    if (updatedCount > 0) {
+      state.save('fa_recipes', state.recipes);
+      this.syncDataWithCloud(false);
+      this.initRecipeTagFilters();
+      this.render();
+    }
+
+    const resultMsg = document.getElementById('auto-tag-result-msg');
+    if (resultMsg) {
+      resultMsg.style.display = 'block';
+      if (updatedCount > 0) {
+        resultMsg.innerHTML = `<span style="color: var(--color-brand); font-weight: 500;">✓ ¡Análisis completado! Se actualizaron ${updatedCount} ${updatedCount === 1 ? 'receta' : 'recetas'} con ${totalTagsAdded} nuevas ${totalTagsAdded === 1 ? 'etiqueta' : 'etiquetas'}.</span>`;
+      } else {
+        resultMsg.innerHTML = `<span style="color: var(--m3-on-surface-variant); font-weight: 500;">✓ Todas tus recetas ya cuentan con las etiquetas correspondientes.</span>`;
+      }
+    }
+
+    return { updatedCount, totalTagsAdded };
+  }
+
   saveGeminiKey() {
     const key = document.getElementById('input-gemini-key').value.trim();
     state.settings.geminiApiKey = key;
@@ -6010,6 +6170,7 @@ if (typeof window !== 'undefined') {
   window.state = state;
   window.FoodAssistantApp = FoodAssistantApp;
   window.generateId = generateId;
+  window.analyzeAndInferRecipeTags = analyzeAndInferRecipeTags;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -6028,6 +6189,7 @@ if (typeof module !== 'undefined' && module.exports) {
     extractTimerFromStepText,
     StateStore,
     FoodAssistantApp,
-    generateId
+    generateId,
+    analyzeAndInferRecipeTags
   };
 }

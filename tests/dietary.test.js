@@ -19,6 +19,7 @@ const {
   PREDEFINED_PRACTICAL_TAGS,
   ALL_PREDEFINED_TAGS,
   checkDietaryCompliance,
+  analyzeAndInferRecipeTags,
   toLocalDateKey,
   state,
   SEED_RECIPES
@@ -295,6 +296,115 @@ describe('US-02: Filtros Dietéticos, Selector de Chips & Advertencias Nutricion
 
       const pickerList = document.getElementById('picker-recipes-list');
       expect(pickerList.innerHTML).toContain('dietary-warning-badge');
+    });
+  });
+
+  describe('6. Motor de Auto-Análisis y Asignación Automática de Chips en Ajustes', () => {
+    it('analyzeAndInferRecipeTags detecta etiquetas prácticas por tiempo y técnicas', () => {
+      const quickOvenRecipe = {
+        title: 'Berenjenas Rellenas al Horno',
+        prepTimeMinutes: 10,
+        cookTimeMinutes: 12,
+        instructions: [{ step: 1, text: 'Hornear a 200°C durante 10 minutos hasta gratinar.' }],
+        ingredients: [{ name: 'Berenjena', aisle: 'produce' }]
+      };
+
+      const tags = analyzeAndInferRecipeTags(quickOvenRecipe);
+      expect(tags).toContain('Rápida');
+      expect(tags).toContain('Horno');
+    });
+
+    it('analyzeAndInferRecipeTags detecta Vegano, Vegetariano, Sin Gluten y Sin Lactosa en recetas 100% vegetales', () => {
+      const veganRecipe = {
+        title: 'Bowl de Quinoa con Aguacate y Espinacas',
+        prepTimeMinutes: 10,
+        cookTimeMinutes: 10,
+        ingredients: [
+          { name: 'Quinoa cocida', aisle: 'pantry' },
+          { name: 'Aguacate', aisle: 'produce' },
+          { name: 'Espinacas frescas', aisle: 'produce' },
+          { name: 'Aceite de oliva virgen extra', aisle: 'spices' }
+        ],
+        instructions: [{ step: 1, text: 'Mezclar todo en un bol y servir fresco.' }]
+      };
+
+      const tags = analyzeAndInferRecipeTags(veganRecipe);
+      expect(tags).toContain('Vegano');
+      expect(tags).toContain('Vegetariano');
+      expect(tags).toContain('Sin Gluten');
+      expect(tags).toContain('Sin Lactosa');
+      expect(tags).toContain('Rápida');
+    });
+
+    it('analyzeAndInferRecipeTags detecta Vegetariano pero no Vegano si contiene lácteos o queso', () => {
+      const vegetarianRecipe = {
+        title: 'Tortilla de Patatas con Queso Manchego',
+        ingredients: [
+          { name: 'Patatas', aisle: 'produce' },
+          { name: 'Huevos', aisle: 'dairy' },
+          { name: 'Queso manchego', aisle: 'dairy' }
+        ],
+        instructions: [{ step: 1, text: 'Cuajar la tortilla en sartén.' }]
+      };
+
+      const tags = analyzeAndInferRecipeTags(vegetarianRecipe);
+      expect(tags).toContain('Vegetariano');
+      expect(tags).not.toContain('Vegano');
+      expect(tags).not.toContain('Sin Lactosa');
+    });
+
+    it('analyzeAndInferRecipeTags detecta Airfryer y Desayuno según título y descripción', () => {
+      const breakfastRecipe = {
+        title: 'Tostada de Avena Crujiente en Airfryer',
+        prepTimeMinutes: 5,
+        cookTimeMinutes: 8,
+        ingredients: [{ name: 'Pan de centeno', aisle: 'bakery' }],
+        instructions: [{ step: 1, text: 'Introducir en la cesta de la freidora de aire.' }]
+      };
+
+      const tags = analyzeAndInferRecipeTags(breakfastRecipe);
+      expect(tags).toContain('Airfryer');
+      expect(tags).toContain('Desayuno');
+      expect(tags).toContain('Rápida');
+    });
+
+    it('autoAnalyzeAndTagAllRecipes actualiza las recetas guardadas y muestra mensaje de éxito en Ajustes', () => {
+      // Simular una receta sin etiquetas previas
+      state.recipes = [
+        {
+          id: 'test-rec-analyze-1',
+          title: 'Batido Verde Detox',
+          description: 'Merienda saludable',
+          prepTimeMinutes: 5,
+          cookTimeMinutes: 0,
+          tags: [],
+          ingredients: [
+            { name: 'Espinacas', aisle: 'produce' },
+            { name: 'Plátano', aisle: 'produce' },
+            { name: 'Bebida de avena sin gluten', aisle: 'dairy' }
+          ],
+          instructions: [{ step: 1, text: 'Triturar en batidora y servir.' }]
+        }
+      ];
+
+      const result = app.autoAnalyzeAndTagAllRecipes();
+      expect(result.updatedCount).toBe(1);
+      expect(result.totalTagsAdded).toBeGreaterThanOrEqual(3);
+
+      const updatedRecipe = state.recipes.find(r => r.id === 'test-rec-analyze-1');
+      expect(updatedRecipe.tags).toContain('Rápida');
+      expect(updatedRecipe.tags).toContain('Vegano');
+      expect(updatedRecipe.tags).toContain('Vegetariano');
+      expect(updatedRecipe.tags).toContain('Merienda');
+
+      const msgEl = document.getElementById('auto-tag-result-msg');
+      expect(msgEl.style.display).not.toBe('none');
+      expect(msgEl.textContent).toContain('¡Análisis completado!');
+
+      // Segunda ejecución sin cambios nuevos
+      const secondResult = app.autoAnalyzeAndTagAllRecipes();
+      expect(secondResult.updatedCount).toBe(0);
+      expect(msgEl.textContent).toContain('Todas tus recetas ya cuentan con las etiquetas correspondientes');
     });
   });
 });
