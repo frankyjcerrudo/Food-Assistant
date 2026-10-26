@@ -12,7 +12,7 @@ const SEED_RECIPES = [
     prepTimeMinutes: 10,
     cookTimeMinutes: 12,
     servings: 2,
-    tags: ["Pasta", "Rápida", "Cena", "Saludable"],
+    tags: ["Pasta", "Rápida", "Cena", "Saludable", "Vegetariano"],
     ingredients: [
       { id: "i1", name: "Espaguetis o Tagliatelle", amount: 200, unit: "g", aisle: "pantry" },
       { id: "i2", name: "Albahaca fresca", amount: 50, unit: "g", aisle: "produce" },
@@ -38,7 +38,7 @@ const SEED_RECIPES = [
     prepTimeMinutes: 15,
     cookTimeMinutes: 30,
     servings: 2,
-    tags: ["Pollo", "Almuerzo", "Cena", "Saludable"],
+    tags: ["Pollo", "Almuerzo", "Cena", "Saludable", "Sin Gluten"],
     ingredients: [
       { id: "i8", name: "Pechugas de pollo", amount: 400, unit: "g", aisle: "meat" },
       { id: "i9", name: "Limón (zumo y ralladura)", amount: 2, unit: "ud", aisle: "produce" },
@@ -61,7 +61,7 @@ const SEED_RECIPES = [
     prepTimeMinutes: 10,
     cookTimeMinutes: 15,
     servings: 2,
-    tags: ["Pescado", "Cena", "Saludable", "Rápida"],
+    tags: ["Pescado", "Cena", "Saludable", "Rápida", "Sin Gluten", "Keto"],
     ingredients: [
       { id: "i13", name: "Lomos de salmón fresco", amount: 300, unit: "g", aisle: "meat" },
       { id: "i14", name: "Espárragos trigueros", amount: 1, unit: "manojo", aisle: "produce" },
@@ -83,7 +83,7 @@ const SEED_RECIPES = [
     prepTimeMinutes: 12,
     cookTimeMinutes: 0,
     servings: 2,
-    tags: ["Saludable", "Rápida", "Almuerzo", "Cena"],
+    tags: ["Saludable", "Rápida", "Almuerzo", "Cena", "Vegetariano", "Sin Gluten"],
     ingredients: [
       { id: "i17", name: "Garbanzos cocidos en conserva", amount: 400, unit: "g", aisle: "pantry" },
       { id: "i18", name: "Aguacate maduro", amount: 1, unit: "ud", aisle: "produce" },
@@ -106,7 +106,7 @@ const SEED_RECIPES = [
     prepTimeMinutes: 5,
     cookTimeMinutes: 6,
     servings: 2,
-    tags: ["Desayuno", "Rápida", "Saludable"],
+    tags: ["Desayuno", "Rápida", "Saludable", "Vegetariano"],
     ingredients: [
       { id: "i22", name: "Pan integral de masa madre", amount: 2, unit: "rebanadas", aisle: "bakery" },
       { id: "i23", name: "Aguacate maduro", amount: 1, unit: "ud", aisle: "produce" },
@@ -129,7 +129,7 @@ const SEED_RECIPES = [
     prepTimeMinutes: 3,
     cookTimeMinutes: 7,
     servings: 2,
-    tags: ["Desayuno", "Saludable"],
+    tags: ["Desayuno", "Saludable", "Vegetariano"],
     ingredients: [
       { id: "i27", name: "Copos de avena integral", amount: 100, unit: "g", aisle: "pantry" },
       { id: "i28", name: "Leche o bebida vegetal", amount: 400, unit: "ml", aisle: "dairy" },
@@ -152,7 +152,7 @@ const SEED_RECIPES = [
     prepTimeMinutes: 5,
     cookTimeMinutes: 0,
     servings: 2,
-    tags: ["Merienda", "Saludable", "Rápida"],
+    tags: ["Merienda", "Saludable", "Rápida", "Vegano", "Vegetariano"],
     ingredients: [
       { id: "i33", name: "Tostadas de espelta o centeno", amount: 4, unit: "ud", aisle: "bakery" },
       { id: "i34", name: "Hummus de garbanzos", amount: 120, unit: "g", aisle: "pantry" },
@@ -174,7 +174,7 @@ const SEED_RECIPES = [
     prepTimeMinutes: 5,
     cookTimeMinutes: 0,
     servings: 2,
-    tags: ["Desayuno", "Merienda", "Saludable", "Rápida"],
+    tags: ["Desayuno", "Merienda", "Saludable", "Rápida", "Vegetariano", "Sin Gluten"],
     ingredients: [
       { id: "i38", name: "Yogur griego natural sin azúcar", amount: 300, unit: "g", aisle: "dairy" },
       { id: "i39", name: "Fresas", amount: 100, unit: "g", aisle: "produce" },
@@ -196,6 +196,53 @@ const STANDARD_SLOTS = [
   { key: 'snack', label: 'Merienda', icon: 'cookie' },
   { key: 'dinner', label: 'Cena', icon: 'dark_mode' }
 ];
+
+// ==========================================================================
+// PREDEFINED TAGS & DIETARY CLASSIFIER (US-02)
+// ==========================================================================
+const PREDEFINED_DIETARY_TAGS = ['Keto', 'Vegano', 'Vegetariano', 'Sin Gluten', 'Sin Lactosa', 'Bajo en Carbos'];
+const PREDEFINED_OCCASION_TAGS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena'];
+const PREDEFINED_PRACTICAL_TAGS = ['Rápida', 'Horno', 'Tupper', 'Airfryer', 'Saludable', 'Robot de Cocina'];
+const ALL_PREDEFINED_TAGS = [
+  ...PREDEFINED_DIETARY_TAGS,
+  ...PREDEFINED_OCCASION_TAGS,
+  ...PREDEFINED_PRACTICAL_TAGS
+];
+
+function checkDietaryCompliance(recipe, preferences) {
+  if (!recipe || !Array.isArray(preferences) || preferences.length === 0) {
+    return { compliant: true, violations: [] };
+  }
+  const recipeTagsLower = (Array.isArray(recipe.tags) ? recipe.tags : []).map(t => String(t).toLowerCase().trim());
+  const violations = [];
+
+  preferences.forEach(pref => {
+    const prefLower = String(pref).toLowerCase().trim();
+    let isCompliant = recipeTagsLower.includes(prefLower);
+
+    // Negative ingredient/tag check for vegetarian / vegan
+    if (prefLower === 'vegano' || prefLower === 'vegetariano') {
+      const hasMeatAisle = Array.isArray(recipe.ingredients) && recipe.ingredients.some(i => i && (i.aisle === 'meat' || i.aisle === 'fish'));
+      const hasMeatTag = recipeTagsLower.some(t => ['pollo', 'carne', 'pescado', 'ternera', 'cerdo', 'jamon', 'jamón'].includes(t));
+      if (hasMeatAisle || hasMeatTag) {
+        isCompliant = false;
+      }
+      if (prefLower === 'vegano') {
+        const hasDairy = Array.isArray(recipe.ingredients) && recipe.ingredients.some(i => i && i.aisle === 'dairy');
+        if (hasDairy) isCompliant = false;
+      }
+    }
+
+    if (!isCompliant) {
+      violations.push(pref);
+    }
+  });
+
+  return {
+    compliant: violations.length === 0,
+    violations
+  };
+}
 
 const AISLE_METADATA = {
   produce: { label: "Frutas y Verduras", icon: "eco" },
@@ -856,6 +903,8 @@ class StateStore {
       defaultServings: 2,
       geminiModel: 'gemini-2.5-flash'
     });
+    this.dietaryPreferences = this.load('fa_dietary_preferences', []);
+    this.customTags = this.load('fa_custom_tags', []);
     this.theme = localStorage.getItem('fa_theme_mode') || 'light';
     this.cloudUser = this.load('fa_cloud_user', null);
     this.supabaseConfig = {
@@ -863,6 +912,36 @@ class StateStore {
       anonKey: window.APP_CONFIG?.supabaseAnonKey || localStorage.getItem('fa_sb_key') || ''
     };
     this.lastSyncedAt = localStorage.getItem('fa_last_sync') || null;
+  }
+
+  saveDietaryPreferences(prefs) {
+    this.dietaryPreferences = Array.isArray(prefs) ? prefs : [];
+    this.save('fa_dietary_preferences', this.dietaryPreferences);
+  }
+
+  addCustomTag(tag) {
+    if (!tag || typeof tag !== 'string') return;
+    const trimmed = tag.trim();
+    if (!trimmed) return;
+    if (!Array.isArray(this.customTags)) this.customTags = [];
+    if (!this.customTags.some(t => t.toLowerCase() === trimmed.toLowerCase())) {
+      this.customTags.push(trimmed);
+      this.save('fa_custom_tags', this.customTags);
+    }
+  }
+
+  getAllTags() {
+    const tagSet = new Set();
+    ALL_PREDEFINED_TAGS.forEach(t => tagSet.add(t));
+    (this.customTags || []).forEach(t => tagSet.add(t));
+    (this.recipes || []).forEach(r => {
+      if (Array.isArray(r.tags)) {
+        r.tags.forEach(t => {
+          if (t && typeof t === 'string' && t.trim()) tagSet.add(t.trim());
+        });
+      }
+    });
+    return Array.from(tagSet);
   }
 
   trackDeletion(entityType, id) {
@@ -1972,7 +2051,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.44';
+  window.APP_VERSION = 'v0.45';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -1989,17 +2068,25 @@ if (typeof window !== 'undefined') {
   window.resolveAisleOnline = resolveAisleOnline;
   window.getCachedAisle = getCachedAisle;
   window.setCachedAisle = setCachedAisle;
+  window.PREDEFINED_DIETARY_TAGS = PREDEFINED_DIETARY_TAGS;
+  window.PREDEFINED_OCCASION_TAGS = PREDEFINED_OCCASION_TAGS;
+  window.PREDEFINED_PRACTICAL_TAGS = PREDEFINED_PRACTICAL_TAGS;
+  window.ALL_PREDEFINED_TAGS = ALL_PREDEFINED_TAGS;
+  window.checkDietaryCompliance = checkDietaryCompliance;
 }
 
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.44';
+    this.appVersion = 'v0.45';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
     this.pickerTarget = null;
     this.plannerWeekOffset = 0; // 0: current week, -1: previous, +1: next (US-05)
+    this.selectedRecipeTags = new Set();
+    this.editorSelectedTags = new Set();
+    this.pickerOnlyDietary = false;
     
     // Cook mode state
     this.cookStepIndex = 0;
@@ -2957,17 +3044,27 @@ class FoodAssistantApp {
     document.getElementById('btn-add-ingredient-row')?.addEventListener('click', () => this.addIngredientRow());
     document.getElementById('btn-add-step-row')?.addEventListener('click', () => this.addStepRow());
 
-    // Recipe search and tag chips
+    // Recipe search and tag chips (US-02: Filtro múltiple combinado)
     const searchInput = document.getElementById('recipes-search-input');
     if (searchInput) {
-      searchInput.addEventListener('input', (e) => this.filterRecipes(e.target.value));
+      searchInput.addEventListener('input', () => this.applyRecipeFilters());
     }
-    document.querySelectorAll('#recipes-tag-filters .m3-filter-chip').forEach(chip => {
-      chip.addEventListener('click', (e) => {
-        document.querySelectorAll('#recipes-tag-filters .m3-filter-chip').forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
-        this.filterRecipesByTag(chip.dataset.tag);
-      });
+    this.initRecipeTagFilters();
+
+    // Recipe Editor Custom Tag (US-02)
+    document.getElementById('btn-add-custom-tag')?.addEventListener('click', () => this.handleAddCustomTagFromEditor());
+    document.getElementById('input-new-custom-tag')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.handleAddCustomTagFromEditor();
+      }
+    });
+
+    // Recipe Picker Dietary Filter Toggle (US-02)
+    document.getElementById('btn-toggle-picker-dietary-only')?.addEventListener('click', () => {
+      this.pickerOnlyDietary = !this.pickerOnlyDietary;
+      document.getElementById('btn-toggle-picker-dietary-only')?.classList.toggle('active', this.pickerOnlyDietary);
+      this.renderPickerRecipesList();
     });
 
     // Shopping List (US-20: Autocompletado inteligente de artículos)
@@ -3071,7 +3168,8 @@ class FoodAssistantApp {
 
   render() {
     this.renderTodayView();
-    this.renderRecipesGrid(state.recipes);
+    this.initRecipeTagFilters();
+    this.applyRecipeFilters();
     this.renderPlanner();
     this.renderShoppingList();
     this.renderSettings();
@@ -3127,6 +3225,13 @@ class FoodAssistantApp {
       const recipe = state.recipes.find(r => r.id === recId);
 
       if (recipe) {
+        const comp = checkDietaryCompliance(recipe, state.dietaryPreferences);
+        const warningBadgeHtml = !comp.compliant ? `
+          <div class="dietary-warning-badge" title="Incumple preferencias dietéticas: ${comp.violations.join(', ')}">
+            <span class="material-symbols-outlined" style="font-size: 13px;">warning</span> No cumple: ${comp.violations.join(', ')}
+          </div>
+        ` : '';
+
         return `
           <div class="meal-slot has-meal" onclick="app.openRecipeDetail('${recipe.id}')">
             <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -3141,6 +3246,7 @@ class FoodAssistantApp {
               <img src="${recipe.imageUrl}" alt="" style="width: 48px; height: 48px; border-radius: 10px; object-fit: cover; flex-shrink: 0;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\\'http://www.w3.org/2000/svg\\\' viewBox=\\\'0 0 48 48\\\'><rect width=\\\'48\\\' height=\\\'48\\\' rx=\\\'10\\\' fill=\\\'%23f1f3f4\\\'/><text x=\\\'50%25\\\' y=\\\'55%25\\\' dominant-baseline=\\\'middle\\\' text-anchor=\\\'middle\\\' font-size=\\\'20\\\'>🍲</text></svg>'">
               <div style="flex: 1; min-width: 0; overflow: hidden;">
                 <div class="slot-recipe-name" title="${recipe.title}">${recipe.title}</div>
+                ${warningBadgeHtml}
                 <div style="font-size: 11px; color: var(--m3-on-surface-variant); margin-top: 3px; display: flex; align-items: center; gap: 8px;">
                   <span style="display: inline-flex; align-items: center; gap: 3px;">
                     <span class="material-symbols-outlined icon-sm">schedule</span> ${recipe.prepTimeMinutes + recipe.cookTimeMinutes} min
@@ -3249,33 +3355,126 @@ class FoodAssistantApp {
                 <span class="material-symbols-outlined" style="font-size: 13px;">link</span> ${rec.sourceDomain}
               </span>
             ` : ''}
-            ${rec.tags.map(t => `<span class="tag-chip">${t}</span>`).join('')}
+            ${rec.tags.map(t => {
+              const isDiet = PREDEFINED_DIETARY_TAGS.includes(t);
+              return `<span class="tag-chip" ${isDiet ? 'style="border: 1px solid var(--color-brand); color: var(--color-brand); font-weight: 600;"' : ''}>${isDiet ? '🌱 ' : ''}${t}</span>`;
+            }).join('')}
           </div>
         </div>
       </article>
     `).join('');
   }
 
-  filterRecipes(searchTerm) {
-    const term = searchTerm.toLowerCase().trim();
-    if (!term) {
-      this.renderRecipesGrid(state.recipes);
-      return;
-    }
-    const filtered = state.recipes.filter(r => 
-      r.title.toLowerCase().includes(term) ||
-      r.tags.some(t => t.toLowerCase().includes(term))
-    );
+  // US-02: Filtro múltiple combinado con el buscador de recetas
+  initRecipeTagFilters() {
+    const container = document.getElementById('recipes-tag-filters');
+    if (!container) return;
+
+    const availableTags = state.getAllTags ? state.getAllTags() : ALL_PREDEFINED_TAGS;
+    const isAllActive = this.selectedRecipeTags.size === 0;
+
+    let html = `
+      <button type="button" class="m3-filter-chip ${isAllActive ? 'active' : ''}" data-tag="all">
+        ${isAllActive ? '<span class="material-symbols-outlined" style="font-size: 15px;">done</span>' : ''}
+        Todas
+      </button>
+    `;
+
+    availableTags.forEach(tag => {
+      const isSelected = this.selectedRecipeTags.has(tag);
+      const isDietary = PREDEFINED_DIETARY_TAGS.includes(tag);
+      html += `
+        <button type="button" class="m3-filter-chip ${isDietary ? 'dietary-chip' : ''} ${isSelected ? 'active' : ''}" data-tag="${tag}">
+          ${isDietary ? '<span class="material-symbols-outlined" style="font-size: 14px;">eco</span>' : ''}
+          ${isSelected && !isDietary ? '<span class="material-symbols-outlined" style="font-size: 14px;">done</span>' : ''}
+          ${tag}
+        </button>
+      `;
+    });
+
+    container.innerHTML = html;
+
+    container.querySelectorAll('.m3-filter-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const tag = chip.dataset.tag;
+        if (tag === 'all') {
+          this.selectedRecipeTags.clear();
+        } else {
+          if (this.selectedRecipeTags.has(tag)) {
+            this.selectedRecipeTags.delete(tag);
+          } else {
+            this.selectedRecipeTags.add(tag);
+          }
+        }
+        this.initRecipeTagFilters();
+        this.applyRecipeFilters();
+      });
+    });
+  }
+
+  applyRecipeFilters() {
+    const searchInput = document.getElementById('recipes-search-input');
+    const term = (searchInput?.value || '').toLowerCase().trim();
+
+    const filtered = state.recipes.filter(r => {
+      // 1. Tag multi-selection (AND logic: debe contener todas las etiquetas seleccionadas)
+      if (this.selectedRecipeTags.size > 0) {
+        const rTagsLower = (r.tags || []).map(t => String(t).toLowerCase().trim());
+        for (const selTag of this.selectedRecipeTags) {
+          if (!rTagsLower.includes(selTag.toLowerCase().trim())) {
+            return false;
+          }
+        }
+      }
+
+      // 2. Término de búsqueda (título, etiquetas o ingredientes)
+      if (term) {
+        const titleMatch = (r.title || '').toLowerCase().includes(term);
+        const tagsMatch = (r.tags || []).some(t => String(t).toLowerCase().includes(term));
+        const ingMatch = (r.ingredients || []).some(i => i && i.name && i.name.toLowerCase().includes(term));
+        if (!titleMatch && !tagsMatch && !ingMatch) return false;
+      }
+
+      return true;
+    });
+
     this.renderRecipesGrid(filtered);
+
+    // Actualizar badge y subtítulo dinámico
+    const badge = document.getElementById('recipes-count-badge');
+    const subtitle = document.getElementById('recipes-count-subtitle');
+    if (badge) {
+      if (this.selectedRecipeTags.size > 0 || term) {
+        badge.textContent = `${filtered.length} de ${state.recipes.length}`;
+      } else {
+        badge.textContent = `${state.recipes.length}`;
+      }
+    }
+    if (subtitle) {
+      if (this.selectedRecipeTags.size > 0 || term) {
+        const filtersDesc = [];
+        if (this.selectedRecipeTags.size > 0) filtersDesc.push(`etiquetas: ${Array.from(this.selectedRecipeTags).join(', ')}`);
+        if (term) filtersDesc.push(`"${term}"`);
+        subtitle.textContent = `${filtered.length} receta${filtered.length === 1 ? '' : 's'} (${filtersDesc.join(' + ')}).`;
+      } else {
+        subtitle.textContent = 'Tu recetario personal.';
+      }
+    }
+  }
+
+  filterRecipes(searchTerm) {
+    this.applyRecipeFilters();
   }
 
   filterRecipesByTag(tag) {
     if (!tag || tag === 'all') {
-      this.renderRecipesGrid(state.recipes);
-      return;
+      this.selectedRecipeTags.clear();
+    } else {
+      this.selectedRecipeTags.clear();
+      this.selectedRecipeTags.add(tag);
     }
-    const filtered = state.recipes.filter(r => r.tags.includes(tag));
-    this.renderRecipesGrid(filtered);
+    this.initRecipeTagFilters();
+    this.applyRecipeFilters();
   }
 
   // RECIPE DETAIL MODAL
@@ -3544,6 +3743,8 @@ class FoodAssistantApp {
     document.getElementById('edit-recipe-servings').value = state.settings.defaultServings || "2";
     document.getElementById('edit-recipe-image').value = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80";
     document.getElementById('edit-recipe-tags').value = "Cena, Saludable";
+    this.editorSelectedTags = new Set(["Cena", "Saludable"]);
+    this.renderRecipeEditorChips();
 
     document.getElementById('edit-ingredients-container').innerHTML = "";
     document.getElementById('edit-steps-container').innerHTML = "";
@@ -3574,6 +3775,8 @@ class FoodAssistantApp {
     document.getElementById('edit-recipe-servings').value = r.servings || 2;
     document.getElementById('edit-recipe-image').value = r.imageUrl || "";
     document.getElementById('edit-recipe-tags').value = (r.tags || []).join(', ');
+    this.editorSelectedTags = new Set(Array.isArray(r.tags) ? r.tags : []);
+    this.renderRecipeEditorChips();
 
     const ingContainer = document.getElementById('edit-ingredients-container');
     ingContainer.innerHTML = "";
@@ -3591,6 +3794,89 @@ class FoodAssistantApp {
     if (this.isReviewingImport && this.pendingImportRecipe) {
       this.openImportReview(this.pendingImportRecipe);
     }
+  }
+
+  // US-02: Selector de etiquetas interactivas por Chips en el editor
+  renderRecipeEditorChips() {
+    const selectedContainer = document.getElementById('editor-selected-tags-container');
+    const dietaryContainer = document.getElementById('editor-dietary-chips');
+    const occasionContainer = document.getElementById('editor-occasion-chips');
+    const practicalContainer = document.getElementById('editor-practical-chips');
+    const hiddenInput = document.getElementById('edit-recipe-tags');
+
+    const selectedArray = Array.from(this.editorSelectedTags);
+    if (hiddenInput) {
+      hiddenInput.value = selectedArray.join(', ');
+    }
+
+    if (selectedContainer) {
+      if (selectedArray.length === 0) {
+        selectedContainer.className = 'recipe-editor-chips-box empty';
+        selectedContainer.innerHTML = '<span>Ninguna etiqueta seleccionada. Elige una abajo o crea una nueva.</span>';
+      } else {
+        selectedContainer.className = 'recipe-editor-chips-box';
+        selectedContainer.innerHTML = selectedArray.map(tag => `
+          <span class="editor-selected-chip">
+            <span>${tag}</span>
+            <button type="button" class="chip-remove-btn" onclick="app.removeEditorTag('${tag.replace(/'/g, "\\'")}')" title="Quitar etiqueta">
+              <span class="material-symbols-outlined" style="font-size: 14px;">close</span>
+            </button>
+          </span>
+        `).join('');
+      }
+    }
+
+    const renderGroup = (container, tagList) => {
+      if (!container) return;
+      container.innerHTML = tagList.map(t => {
+        const isSelected = this.editorSelectedTags.has(t);
+        return `
+          <button type="button" class="editor-suggested-chip ${isSelected ? 'active' : ''}" onclick="app.toggleEditorTag('${t.replace(/'/g, "\\'")}')">
+            <span class="material-symbols-outlined" style="font-size: 14px;">${isSelected ? 'check' : 'add'}</span>
+            <span>${t}</span>
+          </button>
+        `;
+      }).join('');
+    };
+
+    renderGroup(dietaryContainer, PREDEFINED_DIETARY_TAGS);
+    renderGroup(occasionContainer, PREDEFINED_OCCASION_TAGS);
+
+    const practicalPlusCustom = [...PREDEFINED_PRACTICAL_TAGS];
+    (state.customTags || []).forEach(ct => {
+      if (!practicalPlusCustom.includes(ct) && !PREDEFINED_DIETARY_TAGS.includes(ct) && !PREDEFINED_OCCASION_TAGS.includes(ct)) {
+        practicalPlusCustom.push(ct);
+      }
+    });
+    renderGroup(practicalContainer, practicalPlusCustom);
+  }
+
+  toggleEditorTag(tag) {
+    if (!tag) return;
+    if (this.editorSelectedTags.has(tag)) {
+      this.editorSelectedTags.delete(tag);
+    } else {
+      this.editorSelectedTags.add(tag);
+    }
+    this.renderRecipeEditorChips();
+  }
+
+  removeEditorTag(tag) {
+    if (!tag) return;
+    this.editorSelectedTags.delete(tag);
+    this.renderRecipeEditorChips();
+  }
+
+  handleAddCustomTagFromEditor() {
+    const input = document.getElementById('input-new-custom-tag');
+    if (!input) return;
+    const val = input.value.trim();
+    if (!val) return;
+    state.addCustomTag(val);
+    this.editorSelectedTags.add(val);
+    input.value = '';
+    this.renderRecipeEditorChips();
+    this.initRecipeTagFilters();
   }
 
   attachIngredientAutocomplete(inputElem, dropdownElem, onSelect) {
@@ -3978,12 +4264,17 @@ class FoodAssistantApp {
 
     const id = document.getElementById('edit-recipe-id').value || generateId('rec-');
     const description = document.getElementById('edit-recipe-desc').value.trim();
+    const imageUrl = document.getElementById('edit-recipe-image')?.value.trim() || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80';
     const prepTimeMinutes = parseInt(document.getElementById('edit-recipe-prep').value, 10) || 0;
     const cookTimeMinutes = parseInt(document.getElementById('edit-recipe-cook').value, 10) || 0;
     const servings = parseInt(document.getElementById('edit-recipe-servings').value, 10) || 2;
-    const imageUrl = document.getElementById('edit-recipe-image').value.trim() || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80";
-    const tagsStr = document.getElementById('edit-recipe-tags').value.trim();
-    const tags = tagsStr ? tagsStr.split(',').map(t => t.trim()).filter(Boolean) : ["General"];
+    let tags = this.editorSelectedTags && this.editorSelectedTags.size > 0
+      ? Array.from(this.editorSelectedTags)
+      : (document.getElementById('edit-recipe-tags')?.value.trim()
+          ? document.getElementById('edit-recipe-tags').value.split(',').map(t => t.trim()).filter(Boolean)
+          : ["General"]);
+    if (!tags || tags.length === 0) tags = ["General"];
+    tags.forEach(t => state.addCustomTag && state.addCustomTag(t));
 
     // Collect Ingredients
     const ingredients = [];
@@ -4240,6 +4531,13 @@ class FoodAssistantApp {
     const recipe = state.recipes.find(r => r.id === recipeId);
 
     if (recipe) {
+      const comp = checkDietaryCompliance(recipe, state.dietaryPreferences);
+      const warningHtml = !comp.compliant ? `
+        <div class="dietary-warning-badge" title="Incumple preferencias dietéticas: ${comp.violations.join(', ')}">
+          <span class="material-symbols-outlined" style="font-size: 13px;">warning</span> No cumple: ${comp.violations.join(', ')}
+        </div>
+      ` : '';
+
       return `
         <div class="meal-slot has-meal" onclick="app.openRecipeDetail('${recipe.id}')">
           <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -4251,9 +4549,10 @@ class FoodAssistantApp {
             </button>
           </div>
           <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; min-width: 0;">
-            <img src="${recipe.imageUrl}" alt="" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0;">
+            <img src="${recipe.imageUrl}" alt="" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\\'http://www.w3.org/2000/svg\\\' viewBox=\\\'0 0 48 48\\\'><rect width=\\\'48\\\' height=\\\'48\\\' rx=\\\'8\\\' fill=\\\'%23f1f3f4\\\'/><text x=\\\'50%25\\\' y=\\\'55%25\\\' dominant-baseline=\\\'middle\\\' text-anchor=\\\'middle\\\' font-size=\\\'18\\\'>🍲</text></svg>'">
             <div style="flex: 1; min-width: 0; overflow: hidden;">
               <div class="slot-recipe-name" title="${recipe.title}">${recipe.title}</div>
+              ${warningHtml}
             </div>
           </div>
         </div>
@@ -4278,6 +4577,13 @@ class FoodAssistantApp {
     const slotLabel = customSlot.name || 'Momento Extra';
 
     if (recipe) {
+      const comp = checkDietaryCompliance(recipe, state.dietaryPreferences);
+      const warningHtml = !comp.compliant ? `
+        <div class="dietary-warning-badge" title="Incumple preferencias dietéticas: ${comp.violations.join(', ')}">
+          <span class="material-symbols-outlined" style="font-size: 13px;">warning</span> No cumple: ${comp.violations.join(', ')}
+        </div>
+      ` : '';
+
       return `
         <div class="meal-slot has-meal" onclick="app.openRecipeDetail('${recipe.id}')" style="border-left: 3px solid var(--m3-primary);">
           <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -4294,9 +4600,10 @@ class FoodAssistantApp {
             </div>
           </div>
           <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; min-width: 0;">
-            <img src="${recipe.imageUrl}" alt="" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0;">
+            <img src="${recipe.imageUrl}" alt="" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\\'http://www.w3.org/2000/svg\\\' viewBox=\\\'0 0 48 48\\\'><rect width=\\\'48\\\' height=\\\'48\\\' rx=\\\'8\\\' fill=\\\'%23f1f3f4\\\'/><text x=\\\'50%25\\\' y=\\\'55%25\\\' dominant-baseline=\\\'middle\\\' text-anchor=\\\'middle\\\' font-size=\\\'18\\\'>🍲</text></svg>'">
             <div style="flex: 1; min-width: 0; overflow: hidden;">
               <div class="slot-recipe-name" title="${recipe.title}">${recipe.title}</div>
+              ${warningHtml}
             </div>
           </div>
         </div>
@@ -4412,7 +4719,8 @@ class FoodAssistantApp {
 
   openPickerModal(dateStr, slotKey, isCustom = false) {
     this.pickerTarget = { dateStr, slotKey, isCustom };
-    const list = document.getElementById('picker-recipes-list');
+    const filterBar = document.getElementById('picker-dietary-filter-bar');
+    const toggleBtn = document.getElementById('btn-toggle-picker-dietary-only');
 
     let slotTitle = slotKey;
     if (isCustom) {
@@ -4424,25 +4732,63 @@ class FoodAssistantApp {
     }
 
     document.getElementById('picker-modal-title').textContent = `Elegir plato para ${slotTitle.toUpperCase()}`;
-    
-    const sortedPickerRecipes = this.getSortedRecipes(state.recipes);
-    list.innerHTML = sortedPickerRecipes.map(r => `
-      <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--m3-surface-container-low); border: 1px solid var(--m3-outline-variant); border-radius: var(--radius-md); cursor: pointer;"
-           onclick="app.selectRecipeForSlot('${r.id}')">
-        <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; padding-right: 8px;">
-          <img src="${r.imageUrl}" alt="" style="width: 40px; height: 40px; border-radius: 6px; object-fit: cover; flex-shrink: 0;">
-          <div style="min-width: 0;">
-            <strong style="font-size: 13px; color: var(--m3-on-surface); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${r.title}</strong>
-            <div style="font-size: 11px; color: var(--m3-on-surface-variant); display: flex; align-items: center; gap: 4px;">
-              <span class="material-symbols-outlined icon-sm">schedule</span> ${r.prepTimeMinutes + r.cookTimeMinutes} min
+
+    const hasPreferences = Array.isArray(state.dietaryPreferences) && state.dietaryPreferences.length > 0;
+    if (filterBar) {
+      filterBar.style.display = hasPreferences ? 'flex' : 'none';
+    }
+    if (toggleBtn) {
+      toggleBtn.classList.toggle('active', this.pickerOnlyDietary);
+    }
+
+    this.renderPickerRecipesList();
+    this.modalRecipePicker.classList.add('active');
+  }
+
+  renderPickerRecipesList() {
+    const list = document.getElementById('picker-recipes-list');
+    if (!list) return;
+
+    let recipes = this.getSortedRecipes(state.recipes);
+    const hasPreferences = Array.isArray(state.dietaryPreferences) && state.dietaryPreferences.length > 0;
+
+    if (this.pickerOnlyDietary && hasPreferences) {
+      recipes = recipes.filter(r => checkDietaryCompliance(r, state.dietaryPreferences).compliant);
+    }
+
+    if (recipes.length === 0) {
+      list.innerHTML = `
+        <div style="text-align: center; padding: 28px 16px; color: var(--m3-on-surface-variant); font-size: 13px;">
+          <span class="material-symbols-outlined" style="font-size: 32px; display: block; margin-bottom: 6px; color: var(--m3-primary);">eco</span>
+          No hay recetas que cumplan con los filtros dietéticos seleccionados.
+        </div>
+      `;
+      return;
+    }
+
+    list.innerHTML = recipes.map(r => {
+      const comp = hasPreferences ? checkDietaryCompliance(r, state.dietaryPreferences) : { compliant: true, violations: [] };
+      return `
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--m3-surface-container-low); border: 1px solid var(--m3-outline-variant); border-radius: var(--radius-md); cursor: pointer;"
+             onclick="app.selectRecipeForSlot('${r.id}')">
+          <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; padding-right: 8px;">
+            <img src="${r.imageUrl}" alt="" style="width: 42px; height: 42px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\\'http://www.w3.org/2000/svg\\\' viewBox=\\\'0 0 48 48\\\'><rect width=\\\'48\\\' height=\\\'48\\\' rx=\\\'8\\\' fill=\\\'%23f1f3f4\\\'/><text x=\\\'50%25\\\' y=\\\'55%25\\\' dominant-baseline=\\\'middle\\\' text-anchor=\\\'middle\\\' font-size=\\\'18\\\'>🍲</text></svg>'">
+            <div style="min-width: 0;">
+              <strong style="font-size: 13px; color: var(--m3-on-surface); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${r.title}</strong>
+              <div style="font-size: 11px; color: var(--m3-on-surface-variant); display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+                <span class="material-symbols-outlined icon-sm">schedule</span> ${r.prepTimeMinutes + r.cookTimeMinutes} min
+              </div>
+              ${hasPreferences ? (
+                comp.compliant
+                  ? `<span class="dietary-ok-badge" style="margin-top: 3px;"><span class="material-symbols-outlined" style="font-size: 12px;">check</span> Apta (${state.dietaryPreferences.join(', ')})</span>`
+                  : `<span class="dietary-warning-badge" style="margin-top: 3px;"><span class="material-symbols-outlined" style="font-size: 12px;">warning</span> No cumple: ${comp.violations.join(', ')}</span>`
+              ) : ''}
             </div>
           </div>
+          <button class="btn btn-primary btn-sm" style="flex-shrink: 0;">Elegir</button>
         </div>
-        <button class="btn btn-primary btn-sm" style="flex-shrink: 0;">Elegir</button>
-      </div>
-    `).join('');
-
-    this.modalRecipePicker.classList.add('active');
+      `;
+    }).join('');
   }
 
   closePickerModal() {
@@ -5531,6 +5877,38 @@ class FoodAssistantApp {
         state.save('fa_settings', state.settings);
       };
     }
+
+    this.renderDietaryPreferencesSettings();
+  }
+
+  // US-02: Preferencias dietéticas activas en Ajustes
+  renderDietaryPreferencesSettings() {
+    const container = document.getElementById('settings-dietary-chips');
+    if (!container) return;
+
+    container.innerHTML = PREDEFINED_DIETARY_TAGS.map(pref => {
+      const isSelected = (state.dietaryPreferences || []).includes(pref);
+      return `
+        <button type="button" class="m3-filter-chip dietary-chip ${isSelected ? 'active' : ''}" onclick="app.toggleDietaryPreference('${pref}')">
+          <span class="material-symbols-outlined" style="font-size: 14px;">${isSelected ? 'check_circle' : 'eco'}</span>
+          <span>${pref}</span>
+        </button>
+      `;
+    }).join('');
+  }
+
+  toggleDietaryPreference(pref) {
+    if (!pref) return;
+    let prefs = [...(state.dietaryPreferences || [])];
+    if (prefs.includes(pref)) {
+      prefs = prefs.filter(p => p !== pref);
+    } else {
+      prefs.push(pref);
+    }
+    state.saveDietaryPreferences(prefs);
+    this.renderDietaryPreferencesSettings();
+    this.renderPlanner();
+    this.renderTodayView();
   }
 
   saveGeminiKey() {

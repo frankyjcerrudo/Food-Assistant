@@ -1733,5 +1733,182 @@ body {
   outline: none;
 }
 
+/* ==========================================================================
+   US-02: Filtros Dietéticos, Selector de Chips & Advertencias Nutricionales
+   ========================================================================== */
+
+/* Multi-select filter chips active indicator */
+.m3-filter-chip.active {
+  background-color: var(--m3-primary-container);
+  color: var(--m3-on-primary-container);
+  border-color: var(--m3-primary);
+  font-weight: 700;
+  box-shadow: var(--elevation-1);
+}
+
+.m3-filter-chip.dietary-chip {
+  border-color: var(--color-brand);
+}
+.m3-filter-chip.dietary-chip.active {
+  background-color: var(--color-brand-container);
+  color: var(--color-brand-on-container);
+  border-color: var(--color-brand);
+}
+
+/* Recipe Editor Chips Selector */
+.recipe-editor-chips-box {
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background-color: var(--m3-surface-container-low);
+  border: 1px solid var(--m3-outline-variant);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  transition: border-color 0.15s ease;
+}
+
+.recipe-editor-chips-box:focus-within {
+  border-color: var(--m3-primary);
+  background-color: var(--m3-surface);
+}
+
+.recipe-editor-chips-box.empty {
+  color: var(--m3-on-surface-variant);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.editor-selected-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background-color: var(--m3-primary-container);
+  color: var(--m3-on-primary-container);
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  animation: chipFadeIn 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.editor-selected-chip .chip-remove-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  color: var(--m3-on-primary-container);
+  opacity: 0.7;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.editor-selected-chip .chip-remove-btn:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.editor-suggested-tags-wrapper {
+  background: var(--m3-surface-container-lowest);
+  border: 1px solid var(--m3-outline-variant);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin-top: 10px;
+}
+
+.tags-group-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--m3-primary);
+  margin-bottom: 6px;
+}
+
+.chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.editor-suggested-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--m3-outline-variant);
+  background-color: var(--m3-surface);
+  color: var(--m3-on-surface-variant);
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.editor-suggested-chip:hover {
+  background-color: var(--m3-surface-container-high);
+  border-color: var(--m3-outline);
+}
+
+.editor-suggested-chip.active {
+  background-color: var(--m3-secondary-container);
+  color: var(--m3-on-secondary-container);
+  border-color: transparent;
+  font-weight: 600;
+}
+
+/* Dietary Warning Badges for Planner & Today */
+.dietary-warning-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-xs);
+  background-color: #fde8e8;
+  color: #9b1c1c;
+  border: 1px solid #f8b4b4;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  margin-top: 5px;
+  box-shadow: 0 1px 2px rgba(155, 28, 28, 0.08);
+}
+
+:root[data-theme="dark"] .dietary-warning-badge {
+  background-color: rgba(248, 113, 113, 0.15);
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.dietary-ok-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  background-color: var(--color-brand-container);
+  color: var(--color-brand-on-container);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+@keyframes chipFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 
 
