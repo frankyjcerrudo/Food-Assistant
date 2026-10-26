@@ -200,7 +200,19 @@ const STANDARD_SLOTS = [
 // ==========================================================================
 // PREDEFINED TAGS & DIETARY CLASSIFIER (US-02)
 // ==========================================================================
-const PREDEFINED_DIETARY_TAGS = ['Keto', 'Vegano', 'Vegetariano', 'Sin Gluten', 'Sin Lactosa', 'Bajo en Carbos'];
+const PREDEFINED_DIETARY_TAGS = ['Keto', 'Vegano', 'Vegetariano', 'Sin Gluten', 'Sin Lactosa', 'Bajo en Carbos', 'Alta en Proteínas'];
+const DIETARY_TAG_EMOJIS = {
+  'Keto': '🥑',
+  'Vegano': '🌱',
+  'Vegetariano': '🥗',
+  'Sin Gluten': '🌾',
+  'Sin Lactosa': '🥛',
+  'Bajo en Carbos': '🥦',
+  'Alta en Proteínas': '💪'
+};
+function getDietaryTagEmoji(tag) {
+  return DIETARY_TAG_EMOJIS[tag] || '';
+}
 const PREDEFINED_OCCASION_TAGS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena'];
 const PREDEFINED_PRACTICAL_TAGS = ['Rápida', 'Horno', 'Tupper', 'Airfryer', 'Saludable', 'Robot de Cocina'];
 const ALL_PREDEFINED_TAGS = [
@@ -342,6 +354,12 @@ function analyzeAndInferRecipeTags(recipe) {
       inferred.add('Bajo en Carbos');
       inferred.add('Keto');
     }
+
+    // Alta en Proteínas (heurística por ingredientes proteicos clave)
+    const hasProteinSource = ingNames.some(name => /\b(pollo|pechuga|pavo|ternera|solomillo|at[uú]n|salm[oó]n|merluza|bacalao|gambas?|langostinos?|huevos?|claras?|tofu|tempeh|seit[aá]n|soja texturizada|reques[oó]n|cottage|prote[ií]na|lentejas?|garbanzos?|alubias?)\b/i.test(name));
+    if (hasProteinSource) {
+      inferred.add('Alta en Proteínas');
+    }
   }
 
   // 3. Momento de Comida
@@ -351,6 +369,12 @@ function analyzeAndInferRecipeTags(recipe) {
   if (/\b(merienda|snack|batido|tentempi[eé]|barrita)\b/i.test(`${title} ${desc}`)) {
     inferred.add('Merienda');
     inferred.add('Snack');
+  }
+  if (/\b(guiso|potaje|cocido|estofado|fabada|paella|arroz|lentejas|garbanzos|alubias|pasta|espaguetis|macarrones|lasa[ñn]a|risotto)\b/i.test(`${title} ${desc}`)) {
+    inferred.add('Almuerzo');
+  }
+  if (/\b(cena|crema|sopa|ensalada|tortilla|salteado|plancha|revuelto|wrap)\b/i.test(`${title} ${desc}`)) {
+    inferred.add('Cena');
   }
 
   return Array.from(inferred);
@@ -2163,7 +2187,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.47';
+  window.APP_VERSION = 'v0.48';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2181,6 +2205,8 @@ if (typeof window !== 'undefined') {
   window.getCachedAisle = getCachedAisle;
   window.setCachedAisle = setCachedAisle;
   window.PREDEFINED_DIETARY_TAGS = PREDEFINED_DIETARY_TAGS;
+  window.DIETARY_TAG_EMOJIS = DIETARY_TAG_EMOJIS;
+  window.getDietaryTagEmoji = getDietaryTagEmoji;
   window.PREDEFINED_OCCASION_TAGS = PREDEFINED_OCCASION_TAGS;
   window.PREDEFINED_PRACTICAL_TAGS = PREDEFINED_PRACTICAL_TAGS;
   window.ALL_PREDEFINED_TAGS = ALL_PREDEFINED_TAGS;
@@ -2191,7 +2217,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.47';
+    this.appVersion = 'v0.48';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -3471,7 +3497,7 @@ class FoodAssistantApp {
             ` : ''}
             ${rec.tags.map(t => {
               const isDiet = PREDEFINED_DIETARY_TAGS.includes(t);
-              return `<span class="tag-chip" ${isDiet ? 'style="border: 1px solid var(--color-brand); color: var(--color-brand); font-weight: 600;"' : ''}>${isDiet ? '🌱 ' : ''}${t}</span>`;
+              return `<span class="tag-chip" ${isDiet ? 'style="border: 1px solid var(--color-brand); color: var(--color-brand); font-weight: 600;"' : ''}>${isDiet ? getDietaryTagEmoji(t) + ' ' : ''}${t}</span>`;
             }).join('')}
           </div>
         </div>
@@ -3499,7 +3525,7 @@ class FoodAssistantApp {
       const isDietary = PREDEFINED_DIETARY_TAGS.includes(tag);
       html += `
         <button type="button" class="m3-filter-chip ${isDietary ? 'dietary-chip' : ''} ${isSelected ? 'active' : ''}" data-tag="${tag}">
-          ${isDietary ? '<span class="material-symbols-outlined" style="font-size: 14px;">eco</span>' : ''}
+          ${isDietary ? `<span class="dietary-emoji">${getDietaryTagEmoji(tag)}</span>` : ''}
           ${isSelected && !isDietary ? '<span class="material-symbols-outlined" style="font-size: 14px;">done</span>' : ''}
           ${tag}
         </button>
@@ -3946,7 +3972,7 @@ class FoodAssistantApp {
         const isSelected = this.editorSelectedTags.has(t);
         return `
           <button type="button" class="editor-suggested-chip ${isSelected ? 'active' : ''}" onclick="app.toggleEditorTag('${t.replace(/'/g, "\\'")}')">
-            <span class="material-symbols-outlined" style="font-size: 14px;">${isSelected ? 'check' : 'add'}</span>
+            ${PREDEFINED_DIETARY_TAGS.includes(t) ? `<span class="dietary-emoji">${getDietaryTagEmoji(t)}</span>` : `<span class="material-symbols-outlined" style="font-size: 14px;">${isSelected ? 'check' : 'add'}</span>`}
             <span>${t}</span>
           </button>
         `;
@@ -6005,7 +6031,7 @@ class FoodAssistantApp {
       const isSelected = (state.dietaryPreferences || []).includes(pref);
       return `
         <button type="button" class="m3-filter-chip dietary-chip ${isSelected ? 'active' : ''}" onclick="app.toggleDietaryPreference('${pref}')">
-          <span class="material-symbols-outlined" style="font-size: 14px;">${isSelected ? 'check_circle' : 'eco'}</span>
+          ${isSelected ? '<span class="material-symbols-outlined" style="font-size: 14px;">check_circle</span>' : `<span class="dietary-emoji">${getDietaryTagEmoji(pref)}</span>`}
           <span>${pref}</span>
         </button>
       `;

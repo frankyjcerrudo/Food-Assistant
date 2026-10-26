@@ -1754,6 +1754,10 @@ body {
   color: var(--color-brand-on-container);
   border-color: var(--color-brand);
 }
+.dietary-emoji {
+  font-size: 14px;
+  line-height: 1;
+}
 
 /* Recipe Editor Chips Selector */
 .recipe-editor-chips-box {

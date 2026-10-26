@@ -20,6 +20,7 @@ const {
   ALL_PREDEFINED_TAGS,
   checkDietaryCompliance,
   analyzeAndInferRecipeTags,
+  getDietaryTagEmoji,
   toLocalDateKey,
   state,
   SEED_RECIPES
@@ -56,6 +57,34 @@ describe('US-02: Filtros Dietéticos, Selector de Chips & Advertencias Nutricion
       expect(PREDEFINED_DIETARY_TAGS).toContain('Sin Gluten');
       expect(PREDEFINED_DIETARY_TAGS).toContain('Sin Lactosa');
       expect(PREDEFINED_DIETARY_TAGS).toContain('Bajo en Carbos');
+    });
+
+    it('v0.48: define Alta en Proteínas y un emoji distinto por etiqueta dietética', () => {
+      expect(PREDEFINED_DIETARY_TAGS).toContain('Alta en Proteínas');
+      expect(getDietaryTagEmoji('Vegano')).toBe('🌱');
+      expect(getDietaryTagEmoji('Vegetariano')).toBe('🥗');
+      expect(getDietaryTagEmoji('Alta en Proteínas')).toBe('💪');
+      const emojis = PREDEFINED_DIETARY_TAGS.map(getDietaryTagEmoji);
+      expect(new Set(emojis).size).toBe(PREDEFINED_DIETARY_TAGS.length);
+      expect(getDietaryTagEmoji('Rápida')).toBe('');
+    });
+
+    it('v0.48: analyzeAndInferRecipeTags detecta Alta en Proteínas, Almuerzo y Cena', () => {
+      const chicken = analyzeAndInferRecipeTags({
+        title: 'Pechuga a la plancha',
+        ingredients: [{ name: 'Pechuga de pollo' }, { name: 'Sal' }]
+      });
+      expect(chicken).toContain('Alta en Proteínas');
+      expect(chicken).toContain('Cena');
+
+      const stew = analyzeAndInferRecipeTags({
+        title: 'Guiso de lentejas',
+        ingredients: [{ name: 'Lentejas' }]
+      });
+      expect(stew).toContain('Almuerzo');
+
+      const tomato = analyzeAndInferRecipeTags({ title: 'Tomates', ingredients: [{ name: 'Tomates' }] });
+      expect(tomato).not.toContain('Alta en Proteínas');
     });
 
     it('debe definir etiquetas prácticas requeridas (Rápida, Horno, Tupper)', () => {
