@@ -368,7 +368,7 @@ describe('US-02: Filtros Dietéticos, Selector de Chips & Advertencias Nutricion
       expect(tags).toContain('Rápida');
     });
 
-    it('autoAnalyzeAndTagAllRecipes actualiza las recetas guardadas y muestra mensaje de éxito en Ajustes', () => {
+    it('autoAnalyzeAndTagAllRecipes actualiza las recetas guardadas y muestra mensaje de éxito en Ajustes', async () => {
       // Simular una receta sin etiquetas previas
       state.recipes = [
         {
@@ -387,7 +387,7 @@ describe('US-02: Filtros Dietéticos, Selector de Chips & Advertencias Nutricion
         }
       ];
 
-      const result = app.autoAnalyzeAndTagAllRecipes();
+      const result = await app.autoAnalyzeAndTagAllRecipes();
       expect(result.updatedCount).toBe(1);
       expect(result.totalTagsAdded).toBeGreaterThanOrEqual(3);
 
@@ -396,15 +396,45 @@ describe('US-02: Filtros Dietéticos, Selector de Chips & Advertencias Nutricion
       expect(updatedRecipe.tags).toContain('Vegano');
       expect(updatedRecipe.tags).toContain('Vegetariano');
       expect(updatedRecipe.tags).toContain('Merienda');
+      expect(updatedRecipe.updatedAt).toBeDefined();
 
       const msgEl = document.getElementById('auto-tag-result-msg');
       expect(msgEl.style.display).not.toBe('none');
       expect(msgEl.textContent).toContain('¡Análisis completado!');
 
       // Segunda ejecución sin cambios nuevos
-      const secondResult = app.autoAnalyzeAndTagAllRecipes();
+      const secondResult = await app.autoAnalyzeAndTagAllRecipes();
       expect(secondResult.updatedCount).toBe(0);
       expect(msgEl.textContent).toContain('Todas tus recetas ya cuentan con las etiquetas correspondientes');
+    });
+
+    it('autoAnalyzeAndTagAllRecipes limpia la etiqueta obsoleta General y asigna etiquetas a receta con solo tomates', async () => {
+      state.recipes = [
+        {
+          id: 'test-rec-tomatoes',
+          title: 'Tomates Aliñados',
+          description: 'Tomates frescos de huerto',
+          prepTimeMinutes: 5,
+          cookTimeMinutes: 0,
+          tags: ['General'],
+          ingredients: [
+            { name: 'Tomates', aisle: 'produce' }
+          ],
+          instructions: [{ step: 1, text: 'Cortar los tomates en rodajas.' }]
+        }
+      ];
+
+      const result = await app.autoAnalyzeAndTagAllRecipes();
+      expect(result.updatedCount).toBe(1);
+
+      const rec = state.recipes.find(r => r.id === 'test-rec-tomatoes');
+      expect(rec.tags).not.toContain('General');
+      expect(rec.tags).toContain('Vegano');
+      expect(rec.tags).toContain('Vegetariano');
+      expect(rec.tags).toContain('Sin Gluten');
+      expect(rec.tags).toContain('Sin Lactosa');
+      expect(rec.tags).toContain('Rápida');
+      expect(rec.updatedAt).toBeDefined();
     });
   });
 });

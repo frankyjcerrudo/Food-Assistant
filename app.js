@@ -2163,7 +2163,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.46';
+  window.APP_VERSION = 'v0.47';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2191,7 +2191,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.46';
+    this.appVersion = 'v0.47';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -2731,8 +2731,8 @@ class FoodAssistantApp {
           if (localIdx >= 0) {
             const local = state.recipes[localIdx];
             const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
-            const localDate = new Date(local.updatedAt || 0).getTime();
-            if (remoteDate >= localDate) {
+            const localDate = new Date(local.updatedAt || local.createdAt || 0).getTime();
+            if (remoteDate > localDate) {
               state.recipes[localIdx] = { ...local, ...remoteRecipe };
               stateChanged = true;
             }
@@ -4386,8 +4386,9 @@ class FoodAssistantApp {
       ? Array.from(this.editorSelectedTags)
       : (document.getElementById('edit-recipe-tags')?.value.trim()
           ? document.getElementById('edit-recipe-tags').value.split(',').map(t => t.trim()).filter(Boolean)
-          : ["General"]);
-    if (!tags || tags.length === 0) tags = ["General"];
+          : []);
+    if (!tags) tags = [];
+    tags = tags.filter(t => t && t.toLowerCase() !== 'general');
     tags.forEach(t => state.addCustomTag && state.addCustomTag(t));
 
     // Collect Ingredients
@@ -6026,19 +6027,25 @@ class FoodAssistantApp {
   }
 
   // US-02: Auto-análisis inteligente y etiquetado masivo de recetas guardadas
-  autoAnalyzeAndTagAllRecipes() {
+  async autoAnalyzeAndTagAllRecipes() {
     const recipes = state.recipes || [];
     let updatedCount = 0;
     let totalTagsAdded = 0;
+    const nowIso = new Date().toISOString();
 
     recipes.forEach(recipe => {
+      // 1. Limpiar la etiqueta obsoleta "General" si existe
+      if (Array.isArray(recipe.tags) && recipe.tags.some(t => t && String(t).trim().toLowerCase() === 'general')) {
+        recipe.tags = recipe.tags.filter(t => t && String(t).trim().toLowerCase() !== 'general');
+      }
+
       const existingTags = Array.isArray(recipe.tags) ? recipe.tags : [];
       const existingLower = new Set(existingTags.map(t => String(t).toLowerCase().trim()));
       const inferredTags = analyzeAndInferRecipeTags(recipe);
 
       const newTagsToAdd = [];
       inferredTags.forEach(tag => {
-        if (!existingLower.has(tag.toLowerCase().trim())) {
+        if (!existingLower.has(tag.toLowerCase().trim()) && tag.toLowerCase().trim() !== 'general') {
           newTagsToAdd.push(tag);
           state.addCustomTag && state.addCustomTag(tag);
         }
@@ -6046,6 +6053,7 @@ class FoodAssistantApp {
 
       if (newTagsToAdd.length > 0) {
         recipe.tags = [...existingTags, ...newTagsToAdd];
+        recipe.updatedAt = nowIso;
         updatedCount++;
         totalTagsAdded += newTagsToAdd.length;
       }
@@ -6053,9 +6061,11 @@ class FoodAssistantApp {
 
     if (updatedCount > 0) {
       state.save('fa_recipes', state.recipes);
-      this.syncDataWithCloud(false);
       this.initRecipeTagFilters();
       this.render();
+      if (this.supabaseClient && state.cloudUser?.id) {
+        await this.pushToCloud(true);
+      }
     }
 
     const resultMsg = document.getElementById('auto-tag-result-msg');
