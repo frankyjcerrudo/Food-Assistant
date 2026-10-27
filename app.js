@@ -2443,7 +2443,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.56';
+  window.APP_VERSION = 'v0.57';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2475,7 +2475,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.56';
+    this.appVersion = 'v0.57';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -2994,6 +2994,25 @@ class FoodAssistantApp {
           if (state.deletedRecords.recipes?.includes(remoteRow.id)) return;
 
           const localIdx = state.recipes.findIndex(r => r.id === remoteRow.id);
+
+          // Extraer información nutricional: columna dedicada o fallback en instructions[0]._nutrition
+          let remoteNutrition = remoteRow.nutrition || null;
+          if (!remoteNutrition && Array.isArray(remoteRow.instructions) && remoteRow.instructions[0]?._nutrition) {
+            remoteNutrition = remoteRow.instructions[0]._nutrition;
+          }
+
+          // Limpiar el fallback interno de instructions para no ensuciar los pasos en la UI
+          const cleanInstructions = Array.isArray(remoteRow.instructions)
+            ? remoteRow.instructions.map((inst, idx) => {
+                if (idx === 0 && inst && typeof inst === 'object' && '_nutrition' in inst) {
+                  const copy = { ...inst };
+                  delete copy._nutrition;
+                  return copy;
+                }
+                return inst;
+              }).filter(inst => inst && (typeof inst === 'string' ? inst.trim() !== '' : (inst.text?.trim() !== '' || inst.timerMinutes > 0)))
+            : [];
+
           const remoteRecipe = {
             id: remoteRow.id,
             title: remoteRow.title,
@@ -3006,7 +3025,8 @@ class FoodAssistantApp {
             servings: remoteRow.servings || 2,
             tags: Array.isArray(remoteRow.tags) ? remoteRow.tags : [],
             ingredients: Array.isArray(remoteRow.ingredients) ? remoteRow.ingredients : [],
-            instructions: Array.isArray(remoteRow.instructions) ? remoteRow.instructions : [],
+            instructions: cleanInstructions.length > 0 ? cleanInstructions : (Array.isArray(remoteRow.instructions) ? remoteRow.instructions : []),
+            nutrition: remoteNutrition,
             isFavorite: !!remoteRow.is_favorite,
             createdAt: remoteRow.created_at || remoteRow.updated_at || null,
             updatedAt: remoteRow.updated_at
@@ -3016,9 +3036,37 @@ class FoodAssistantApp {
             const local = state.recipes[localIdx];
             const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
             const localDate = new Date(local.updatedAt || local.createdAt || 0).getTime();
+
+            const remoteHasNutrition = !!remoteRecipe.nutrition;
+            const localHasNutrition = !!local.nutrition;
+            const tagsDiffer = JSON.stringify(local.tags || []) !== JSON.stringify(remoteRecipe.tags || []);
+
             if (remoteDate > localDate) {
-              state.recipes[localIdx] = { ...local, ...remoteRecipe };
+              state.recipes[localIdx] = {
+                ...local,
+                ...remoteRecipe,
+                nutrition: remoteRecipe.nutrition || local.nutrition || null
+              };
               stateChanged = true;
+            } else if (remoteDate === localDate || remoteDate >= localDate) {
+              let updated = false;
+              if (!localHasNutrition && remoteHasNutrition) {
+                local.nutrition = remoteRecipe.nutrition;
+                updated = true;
+              }
+              if (tagsDiffer) {
+                local.tags = remoteRecipe.tags;
+                updated = true;
+              }
+              if (updated) {
+                stateChanged = true;
+              }
+            } else {
+              // Si local es más nuevo pero carece de nutrición y remota sí la tiene, recuperarla
+              if (!localHasNutrition && remoteHasNutrition) {
+                local.nutrition = remoteRecipe.nutrition;
+                stateChanged = true;
+              }
             }
           } else {
             state.recipes.push(remoteRecipe);
@@ -3226,6 +3274,7 @@ class FoodAssistantApp {
         state.save('fa_shopping', state.shoppingList);
         this.renderDietaryPreferencesSettings();
         this.renderNutritionGoalsSettings();
+        this.initRecipeTagFilters();
         this.render();
       }
 
@@ -3348,24 +3397,46 @@ class FoodAssistantApp {
 
       // 2. Batch Upsert Recipes (BUG-22, BUG-24)
       if (Array.isArray(state.recipes) && state.recipes.length > 0) {
-        const recipesPayload = state.recipes.map(recipe => ({
-          id: recipe.id,
-          user_id: state.cloudUser.id,
-          title: recipe.title,
-          description: recipe.description || '',
-          image_url: recipe.imageUrl || null,
-          source_url: recipe.sourceUrl || '',
-          source_domain: recipe.sourceDomain || '',
-          prep_time_minutes: recipe.prepTimeMinutes || 0,
-          cook_time_minutes: recipe.cookTimeMinutes || 0,
-          servings: recipe.servings || 2,
-          tags: Array.isArray(recipe.tags) ? recipe.tags : [],
-          ingredients: recipe.ingredients || [],
-          instructions: recipe.instructions || [],
-          is_favorite: !!recipe.isFavorite,
-          created_at: recipe.createdAt || recipe.updatedAt || new Date().toISOString(),
-          updated_at: recipe.updatedAt || new Date().toISOString()
-        }));
+        const recipesPayload = state.recipes.map(recipe => {
+          // Asegurar cálculo de nutrición persistente si la receta aún no lo tenía explícito
+          const calculatedNutrition = recipe.nutrition || (typeof getRecipeNutrition === 'function' ? getRecipeNutrition(recipe) : null);
+          if (!recipe.nutrition && calculatedNutrition && (calculatedNutrition.calories > 0 || calculatedNutrition.protein > 0)) {
+            recipe.nutrition = calculatedNutrition;
+          }
+
+          let instructionsCopy = Array.isArray(recipe.instructions)
+            ? recipe.instructions.map(inst => (typeof inst === 'object' && inst !== null ? { ...inst } : { text: String(inst) }))
+            : [];
+
+          // Adjuntar _nutrition como metadato seguro en instructions[0] para persistencia ante fallbacks de esquema
+          if (recipe.nutrition) {
+            if (instructionsCopy.length > 0) {
+              instructionsCopy[0]._nutrition = recipe.nutrition;
+            } else {
+              instructionsCopy.push({ text: '', _nutrition: recipe.nutrition });
+            }
+          }
+
+          return {
+            id: recipe.id,
+            user_id: state.cloudUser.id,
+            title: recipe.title,
+            description: recipe.description || '',
+            image_url: recipe.imageUrl || null,
+            source_url: recipe.sourceUrl || '',
+            source_domain: recipe.sourceDomain || '',
+            prep_time_minutes: recipe.prepTimeMinutes || 0,
+            cook_time_minutes: recipe.cookTimeMinutes || 0,
+            servings: recipe.servings || 2,
+            tags: Array.isArray(recipe.tags) ? recipe.tags : [],
+            ingredients: recipe.ingredients || [],
+            instructions: instructionsCopy,
+            nutrition: recipe.nutrition || null,
+            is_favorite: !!recipe.isFavorite,
+            created_at: recipe.createdAt || recipe.updatedAt || new Date().toISOString(),
+            updated_at: recipe.updatedAt || new Date().toISOString()
+          };
+        });
 
         const rRes = await this.upsertWithSchemaFallback('recipes', recipesPayload);
         if (!rRes.success) throw rRes.error;

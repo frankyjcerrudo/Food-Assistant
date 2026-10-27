@@ -17,6 +17,7 @@ create table if not exists public.recipes (
   tags text[] default array[]::text[],
   ingredients jsonb not null default '[]'::jsonb,
   instructions jsonb not null default '[]'::jsonb,
+  nutrition jsonb default null,
   is_favorite boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -26,6 +27,7 @@ create table if not exists public.recipes (
 -- Si la tabla ya existía con clave primaria simple, aplicar migraciones idempotentes:
 alter table public.recipes add column if not exists source_url text default '';
 alter table public.recipes add column if not exists source_domain text default '';
+alter table public.recipes add column if not exists nutrition jsonb default null;
 
 -- 2. TABLA DE PLAN SEMANAL (Meal Plans)
 -- Soporta los 4 momentos estándar + momentos dinámicos / flexibles (BUG-23)

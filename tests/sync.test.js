@@ -667,6 +667,141 @@ describe('US-35 & Bugs Bloqueantes: Sincronización Supabase, IDs Únicos y Esqu
       expect(state.settings.nutritionGoals.protein).toBe(165);
       expect(state.settings.nutritionGoals.calories).toBe(2300);
     });
+
+    it('v0.57: pushToCloud debe enviar nutrition y fallback _nutrition en instructions', async () => {
+      let recipesUpsertPayload = null;
+      const mockSupabase = {
+        from: vi.fn().mockImplementation((table) => {
+          if (table === 'recipes') {
+            return {
+              upsert: vi.fn().mockImplementation((payload) => {
+                recipesUpsertPayload = payload;
+                return Promise.resolve({ error: null });
+              })
+            };
+          }
+          return {
+            upsert: vi.fn().mockResolvedValue({ error: null }),
+            delete: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ error: null })
+              })
+            })
+          };
+        }),
+        auth: {
+          updateUser: vi.fn().mockResolvedValue({ error: null })
+        }
+      };
+
+      state.recipes = [
+        {
+          id: 'rec-nut-sync-1',
+          title: 'Bowl Proteico de Salmón',
+          servings: 2,
+          tags: ['Alta en Proteínas', 'Keto'],
+          ingredients: [{ id: 'ing-1', name: 'Salmón', amount: 300, unit: 'g', aisle: 'meat' }],
+          instructions: [{ step: 1, text: 'Saltear el salmón' }],
+          nutrition: {
+            calories: 480,
+            protein: 42,
+            carbs: 8,
+            fat: 26
+          },
+          updatedAt: new Date().toISOString()
+        }
+      ];
+
+      appInstance.supabaseClient = mockSupabase;
+      const res = await appInstance.pushToCloud(true);
+      expect(res.success).toBe(true);
+      expect(recipesUpsertPayload).toBeDefined();
+      expect(recipesUpsertPayload.length).toBe(1);
+
+      const pushed = recipesUpsertPayload[0];
+      // Comprobar que nutrition se envía en la raíz del payload de recetas
+      expect(pushed.nutrition).toEqual({
+        calories: 480,
+        protein: 42,
+        carbs: 8,
+        fat: 26
+      });
+      // Comprobar que las etiquetas se envían
+      expect(pushed.tags).toEqual(['Alta en Proteínas', 'Keto']);
+      // Comprobar fallback de resiliencia en instructions[0]
+      expect(pushed.instructions[0]._nutrition).toEqual({
+        calories: 480,
+        protein: 42,
+        carbs: 8,
+        fat: 26
+      });
+    });
+
+    it('v0.57: pullFromCloud descarga nutrition, limpia fallback y unifica etiquetas divergentes', async () => {
+      const mockSupabase = {
+        from: vi.fn().mockImplementation((table) => {
+          if (table === 'recipes') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: 'rec-remote-nut-2',
+                      title: 'Pollo con Verduras Salteadas',
+                      prep_time_minutes: 15,
+                      cook_time_minutes: 15,
+                      servings: 2,
+                      tags: ['Alta en Proteínas', 'Cena', 'Rápida'],
+                      ingredients: [{ id: 'ing-1', name: 'Pechuga de pollo', amount: 350, unit: 'g', aisle: 'meat' }],
+                      // Simula que la columna nutrition venía directa de Supabase
+                      nutrition: { calories: 390, protein: 48, carbs: 6, fat: 12 },
+                      instructions: [
+                        { step: 1, text: 'Cortar pechuga en tiras', _nutrition: { calories: 390, protein: 48, carbs: 6, fat: 12 } }
+                      ],
+                      updated_at: '2026-10-27T12:00:00Z'
+                    }
+                  ],
+                  error: null
+                })
+              })
+            };
+          }
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null })
+            })
+          };
+        })
+      };
+
+      // Simular que en local el móvil tenía la receta sin nutrición y con tags incompletos
+      state.recipes = [
+        {
+          id: 'rec-remote-nut-2',
+          title: 'Pollo con Verduras Salteadas',
+          servings: 2,
+          tags: ['Cena'], // faltaba 'Alta en Proteínas'
+          ingredients: [{ id: 'ing-1', name: 'Pechuga de pollo', amount: 350, unit: 'g', aisle: 'meat' }],
+          instructions: [{ step: 1, text: 'Cortar pechuga en tiras' }],
+          nutrition: null, // faltaba nutrición
+          updatedAt: '2026-10-27T10:00:00Z' // más antigua que la nube
+        }
+      ];
+
+      appInstance.supabaseClient = mockSupabase;
+      const pullRes = await appInstance.pullFromCloud();
+      expect(pullRes.success).toBe(true);
+
+      const updatedRecipe = state.recipes.find(r => r.id === 'rec-remote-nut-2');
+      expect(updatedRecipe).toBeDefined();
+      // Nutrición sincronizada
+      expect(updatedRecipe.nutrition).toEqual({ calories: 390, protein: 48, carbs: 6, fat: 12 });
+      // Etiquetas sincronizadas
+      expect(updatedRecipe.tags).toEqual(['Alta en Proteínas', 'Cena', 'Rápida']);
+      // instructions limpia de metadatos internos _nutrition
+      expect(updatedRecipe.instructions[0]._nutrition).toBeUndefined();
+      expect(updatedRecipe.instructions[0].text).toBe('Cortar pechuga en tiras');
+    });
   });
 });
 
