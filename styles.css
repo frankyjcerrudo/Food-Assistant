@@ -1914,5 +1914,181 @@ body {
   }
 }
 
+/* ==========================================================================
+   US-01: Nutrition & Macronutrient Breakdown (Material 3)
+   ========================================================================== */
+
+/* Recipe Modal Nutrition Card */
+.recipe-nutrition-card {
+  background: var(--m3-surface-container);
+  border: 1px solid var(--m3-outline-variant);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+
+.recipe-nutrition-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.recipe-nutrition-title {
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--m3-on-surface);
+}
+
+.recipe-nutrition-subtitle {
+  font-size: 11px;
+  color: var(--m3-on-surface-variant);
+}
+
+.recipe-macros-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.macro-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--m3-surface-container-low);
+  border: 1px solid var(--m3-outline-variant);
+  text-align: center;
+  min-width: 0;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.macro-chip-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.macro-chip-val {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--m3-on-surface);
+}
+
+.macro-chip-unit {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.8;
+  margin-left: 1px;
+}
+
+/* Specific macro color accents */
+.macro-cal .macro-chip-label { color: #d9480f; }
+.macro-prot .macro-chip-label { color: #1971c2; }
+.macro-carbs .macro-chip-label { color: #2f9e44; }
+.macro-fat .macro-chip-label { color: #f59f00; }
+
+:root[data-theme="dark"] .macro-cal .macro-chip-label { color: #ff922b; }
+:root[data-theme="dark"] .macro-prot .macro-chip-label { color: #74c0fc; }
+:root[data-theme="dark"] .macro-carbs .macro-chip-label { color: #8ce99a; }
+:root[data-theme="dark"] .macro-fat .macro-chip-label { color: #ffd43b; }
+
+/* Today View Daily Nutrition Summary Card */
+.today-nutrition-card {
+  background: var(--m3-surface-container);
+  border: 1px solid var(--m3-outline-variant);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  box-shadow: var(--elevation-1);
+}
+
+.today-nutrition-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.today-nutrition-title {
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--m3-on-surface);
+}
+
+.today-nutrition-meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--m3-on-surface-variant);
+  background: var(--m3-surface-container-high);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.today-nutrition-empty {
+  font-size: 12px;
+  color: var(--m3-on-surface-variant);
+  padding: 4px 0 2px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.today-macros-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.macro-ratio-bar {
+  display: flex;
+  height: 6px;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background: var(--m3-surface-container-high);
+  margin-top: 6px;
+}
+
+.ratio-segment {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.ratio-prot { background-color: #1971c2; }
+.ratio-carbs { background-color: #2f9e44; }
+.ratio-fat { background-color: #f59f00; }
+
+:root[data-theme="dark"] .ratio-prot { background-color: #4dabf7; }
+:root[data-theme="dark"] .ratio-carbs { background-color: #69db7c; }
+:root[data-theme="dark"] .ratio-fat { background-color: #fcc419; }
+
+/* Editor Nutrition Inputs */
+.nutrition-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .nutrition-editor-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 
 

@@ -12,6 +12,7 @@ const SEED_RECIPES = [
     prepTimeMinutes: 10,
     cookTimeMinutes: 12,
     servings: 2,
+    nutrition: { calories: 540, protein: 18, carbs: 62, fat: 24 },
     tags: ["Pasta", "Rápida", "Cena", "Saludable", "Vegetariano"],
     ingredients: [
       { id: "i1", name: "Espaguetis o Tagliatelle", amount: 200, unit: "g", aisle: "pantry" },
@@ -38,6 +39,7 @@ const SEED_RECIPES = [
     prepTimeMinutes: 15,
     cookTimeMinutes: 30,
     servings: 2,
+    nutrition: { calories: 420, protein: 46, carbs: 28, fat: 12 },
     tags: ["Pollo", "Almuerzo", "Cena", "Saludable", "Sin Gluten"],
     ingredients: [
       { id: "i8", name: "Pechugas de pollo", amount: 400, unit: "g", aisle: "meat" },
@@ -61,6 +63,7 @@ const SEED_RECIPES = [
     prepTimeMinutes: 10,
     cookTimeMinutes: 15,
     servings: 2,
+    nutrition: { calories: 510, protein: 38, carbs: 32, fat: 22 },
     tags: ["Pescado", "Cena", "Saludable", "Rápida", "Sin Gluten", "Keto"],
     ingredients: [
       { id: "i13", name: "Lomos de salmón fresco", amount: 300, unit: "g", aisle: "meat" },
@@ -83,6 +86,7 @@ const SEED_RECIPES = [
     prepTimeMinutes: 12,
     cookTimeMinutes: 0,
     servings: 2,
+    nutrition: { calories: 380, protein: 16, carbs: 42, fat: 14 },
     tags: ["Saludable", "Rápida", "Almuerzo", "Cena", "Vegetariano", "Sin Gluten"],
     ingredients: [
       { id: "i17", name: "Garbanzos cocidos en conserva", amount: 400, unit: "g", aisle: "pantry" },
@@ -106,6 +110,7 @@ const SEED_RECIPES = [
     prepTimeMinutes: 5,
     cookTimeMinutes: 6,
     servings: 2,
+    nutrition: { calories: 340, protein: 15, carbs: 26, fat: 19 },
     tags: ["Desayuno", "Rápida", "Saludable", "Vegetariano"],
     ingredients: [
       { id: "i22", name: "Pan integral de masa madre", amount: 2, unit: "rebanadas", aisle: "bakery" },
@@ -129,6 +134,7 @@ const SEED_RECIPES = [
     prepTimeMinutes: 3,
     cookTimeMinutes: 7,
     servings: 2,
+    nutrition: { calories: 360, protein: 12, carbs: 58, fat: 8 },
     tags: ["Desayuno", "Saludable", "Vegetariano"],
     ingredients: [
       { id: "i27", name: "Copos de avena integral", amount: 100, unit: "g", aisle: "pantry" },
@@ -152,6 +158,7 @@ const SEED_RECIPES = [
     prepTimeMinutes: 5,
     cookTimeMinutes: 0,
     servings: 2,
+    nutrition: { calories: 290, protein: 11, carbs: 36, fat: 10 },
     tags: ["Merienda", "Saludable", "Rápida", "Vegano", "Vegetariano"],
     ingredients: [
       { id: "i33", name: "Tostadas de espelta o centeno", amount: 4, unit: "ud", aisle: "bakery" },
@@ -174,6 +181,7 @@ const SEED_RECIPES = [
     prepTimeMinutes: 5,
     cookTimeMinutes: 0,
     servings: 2,
+    nutrition: { calories: 310, protein: 22, carbs: 38, fat: 6 },
     tags: ["Desayuno", "Merienda", "Saludable", "Rápida", "Vegetariano", "Sin Gluten"],
     ingredients: [
       { id: "i38", name: "Yogur griego natural sin azúcar", amount: 300, unit: "g", aisle: "dairy" },
@@ -196,6 +204,155 @@ const STANDARD_SLOTS = [
   { key: 'snack', label: 'Merienda', icon: 'cookie' },
   { key: 'dinner', label: 'Cena', icon: 'dark_mode' }
 ];
+
+// ==========================================================================
+// US-01: GESTIÓN NUTRICIONAL, MACRONUTRIENTES Y ESTIMADOR (Kcal, P, C, G)
+// ==========================================================================
+function estimateRecipeNutrition(recipe) {
+  if (!recipe) {
+    return { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  }
+
+  const servings = Math.max(1, parseInt(recipe.servings, 10) || 2);
+  const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
+
+  if (ingredients.length === 0) {
+    const title = (recipe.title || '').toLowerCase();
+    if (/\b(snack|merienda|tostas?|fruta|yogur)\b/i.test(title)) {
+      return { calories: 280, protein: 12, carbs: 35, fat: 8 };
+    }
+    if (/\b(desayuno|avena|porridge|tostadas?)\b/i.test(title)) {
+      return { calories: 350, protein: 14, carbs: 48, fat: 10 };
+    }
+    return { calories: 450, protein: 28, carbs: 45, fat: 15 };
+  }
+
+  let totalCal = 0;
+  let totalProt = 0;
+  let totalCarbs = 0;
+  let totalFat = 0;
+
+  ingredients.forEach(ing => {
+    if (!ing || !ing.name) return;
+    const name = ing.name.toLowerCase();
+    const amount = Number(ing.amount) || 1;
+    const unit = (ing.unit || 'ud').toLowerCase();
+
+    // Estimación de peso en gramos
+    let grams = 100;
+    if (unit === 'g' || unit === 'gr' || unit === 'gramo' || unit === 'gramos') {
+      grams = amount;
+    } else if (unit === 'kg' || unit === 'kilo' || unit === 'kilos') {
+      grams = amount * 1000;
+    } else if (unit === 'ml' || unit === 'cl' || unit === 'l') {
+      const ml = unit === 'l' ? amount * 1000 : (unit === 'cl' ? amount * 10 : amount);
+      grams = ml;
+    } else if (unit === 'cda' || unit === 'cucharada' || unit === 'cucharadas') {
+      grams = amount * 15;
+    } else if (unit === 'cdta' || unit === 'cucharadita' || unit === 'cucharaditas') {
+      grams = amount * 5;
+    } else if (unit === 'rebanada' || unit === 'rebanadas' || unit === 'loncha' || unit === 'lonchas' || unit === 'tostada' || unit === 'tostadas') {
+      grams = amount * 35;
+    } else if (unit === 'taza' || unit === 'tazas' || unit === 'vaso' || unit === 'vasos') {
+      grams = amount * 200;
+    } else if (unit === 'diente' || unit === 'dientes' || unit === 'pizca' || unit === 'pizcas') {
+      grams = amount * 5;
+    } else {
+      if (/\b(huevo|huevos)\b/i.test(name)) grams = amount * 60;
+      else if (/\b(aguacate)\b/i.test(name)) grams = amount * 150;
+      else if (/\b(patata|patatas|papas?|manzana|manzanas|pera|peras|pl[aá]tano|pl[aá]tanos|naranja|naranjas|pepino|pepinos)\b/i.test(name)) grams = amount * 160;
+      else if (/\b(lim[oó]n|limones|tomate|tomates)\b/i.test(name)) grams = amount * 100;
+      else if (/\b(cebolla|cebollas)\b/i.test(name)) grams = amount * 120;
+      else if (/\b(pechuga|pechugas|filete|filetes|lomo|lomos)\b/i.test(name)) grams = amount * 180;
+      else grams = amount * 80;
+    }
+
+    // Densidad nutricional por 100g
+    let c100 = 100, p100 = 3, cb100 = 15, f100 = 2;
+
+    if (/\b(pollo|pechuga|pavo)\b/i.test(name)) {
+      c100 = 150; p100 = 31; cb100 = 0; f100 = 3;
+    } else if (/\b(ternera|solomillo|buey|cerdo|carne)\b/i.test(name)) {
+      c100 = 220; p100 = 26; cb100 = 0; f100 = 13;
+    } else if (/\b(salm[oó]n)\b/i.test(name)) {
+      c100 = 208; p100 = 22; cb100 = 0; f100 = 13;
+    } else if (/\b(at[uú]n|merluza|bacalao|pescado|gambas?|langostinos?)\b/i.test(name)) {
+      c100 = 110; p100 = 22; cb100 = 0; f100 = 2;
+    } else if (/\b(huevo|huevos|claras?)\b/i.test(name)) {
+      c100 = 145; p100 = 13; cb100 = 1; f100 = 10;
+    } else if (/\b(tofu|tempeh|soja)\b/i.test(name)) {
+      c100 = 120; p100 = 14; cb100 = 3; f100 = 6;
+    } else if (/\b(pasta|espaguetis?|macarrones?|tallarines?|fideos?|lasa[ñn]a)\b/i.test(name)) {
+      c100 = 350; p100 = 12; cb100 = 72; f100 = 2;
+    } else if (/\b(arroz|basmati|quinoa|cusc[uú]s)\b/i.test(name)) {
+      c100 = 360; p100 = 8; cb100 = 78; f100 = 1;
+    } else if (/\b(avena|copos de avena|harina)\b/i.test(name)) {
+      c100 = 370; p100 = 13; cb100 = 60; f100 = 7;
+    } else if (/\b(pan|tostadas?|panecillo|masa)\b/i.test(name)) {
+      c100 = 260; p100 = 9; cb100 = 50; f100 = 3;
+    } else if (/\b(garbanzos?|lentejas?|alubias?|frijoles?|hummus)\b/i.test(name)) {
+      c100 = 140; p100 = 9; cb100 = 20; f100 = 3;
+    } else if (/\b(aceite|oliva|mantequilla|ghee)\b/i.test(name)) {
+      c100 = 884; p100 = 0; cb100 = 0; f100 = 100;
+    } else if (/\b(aguacate)\b/i.test(name)) {
+      c100 = 160; p100 = 2; cb100 = 8; f100 = 15;
+    } else if (/\b(queso|parmesano|feta|mozzarella|cheddar)\b/i.test(name)) {
+      c100 = 320; p100 = 22; cb100 = 2; f100 = 25;
+    } else if (/\b(yogur|leche|bebida vegetal)\b/i.test(name)) {
+      c100 = 80; p100 = 7; cb100 = 5; f100 = 4;
+    } else if (/\b(nueces|almendras?|pi[ñn]ones|ch[ií]a|semillas|cacahuetes?|frutos secos)\b/i.test(name)) {
+      c100 = 590; p100 = 18; cb100 = 15; f100 = 52;
+    } else if (/\b(pl[aá]tano|banana|miel|az[uú]car|sirope)\b/i.test(name)) {
+      c100 = 120; p100 = 1; cb100 = 30; f100 = 0;
+    } else if (/\b(fresas?|ar[aá]ndanos?|frutos rojos|kiwi|manzana|pera|naranja|lim[oó]n)\b/i.test(name)) {
+      c100 = 50; p100 = 1; cb100 = 12; f100 = 0;
+    } else if (/\b(patatas?|papas?)\b/i.test(name)) {
+      c100 = 85; p100 = 2; cb100 = 19; f100 = 0;
+    } else if (/\b(tomates?|cherry|pepino|cebolla|ajo|esp[aá]rragos?|albahaca|romero|espinacas?|calabac[ií]n)\b/i.test(name)) {
+      c100 = 25; p100 = 1.5; cb100 = 4; f100 = 0.2;
+    }
+
+    const factor = grams / 100;
+    totalCal += c100 * factor;
+    totalProt += p100 * factor;
+    totalCarbs += cb100 * factor;
+    totalFat += f100 * factor;
+  });
+
+  const perServingCalories = Math.max(50, Math.round(totalCal / servings));
+  const perServingProtein = Math.max(1, Math.round((totalProt / servings) * 10) / 10);
+  const perServingCarbs = Math.max(1, Math.round((totalCarbs / servings) * 10) / 10);
+  const perServingFat = Math.max(1, Math.round((totalFat / servings) * 10) / 10);
+
+  return {
+    calories: perServingCalories,
+    protein: perServingProtein,
+    carbs: perServingCarbs,
+    fat: perServingFat
+  };
+}
+
+function getRecipeNutrition(recipe) {
+  if (!recipe) {
+    return { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  }
+  const raw = recipe.nutrition || recipe.nutritionSummary;
+  if (raw && typeof raw === 'object') {
+    const calories = Number(raw.calories) || 0;
+    const protein = Number(raw.protein) || 0;
+    const carbs = Number(raw.carbs) || 0;
+    const fat = Number(raw.fat) || 0;
+    if (calories > 0 || protein > 0 || carbs > 0 || fat > 0) {
+      return {
+        calories: Math.round(calories),
+        protein: Math.round(protein * 10) / 10,
+        carbs: Math.round(carbs * 10) / 10,
+        fat: Math.round(fat * 10) / 10
+      };
+    }
+  }
+  return estimateRecipeNutrition(recipe);
+}
 
 // ==========================================================================
 // PREDEFINED TAGS & DIETARY CLASSIFIER (US-02)
@@ -355,9 +512,11 @@ function analyzeAndInferRecipeTags(recipe) {
       inferred.add('Keto');
     }
 
-    // Alta en Proteínas (heurística por ingredientes proteicos clave)
+    // Alta en Proteínas (por valor nutricional >= 25g o fuentes proteicas clave)
+    const nutrition = (typeof getRecipeNutrition === 'function') ? getRecipeNutrition(recipe) : null;
+    const hasHighProteinValue = nutrition && nutrition.protein >= 25;
     const hasProteinSource = ingNames.some(name => /\b(pollo|pechuga|pavo|ternera|solomillo|at[uú]n|salm[oó]n|merluza|bacalao|gambas?|langostinos?|huevos?|claras?|tofu|tempeh|seit[aá]n|soja texturizada|reques[oó]n|cottage|prote[ií]na|lentejas?|garbanzos?|alubias?)\b/i.test(name));
-    if (hasProteinSource) {
+    if (hasHighProteinValue || hasProteinSource) {
       inferred.add('Alta en Proteínas');
     }
   }
@@ -1839,6 +1998,9 @@ const RecipeParser = {
     const resolvedSourceUrl = sourceUrl || schema.mainEntityOfPage || schema.url || '';
     const resolvedDomain = this.getDomain(resolvedSourceUrl) || (schema.publisher?.name || '');
 
+    const parsedNutrition = this.parseNutrition(schema.nutrition);
+    const parsedServings = this.parseServings(schema.recipeYield);
+
     const recipe = {
       id: generateId('rec-'),
       title: schema.name ? String(schema.name).trim() : 'Receta Web',
@@ -1846,7 +2008,12 @@ const RecipeParser = {
       imageUrl: imageUrl,
       prepTimeMinutes: this.parseIsoDuration(schema.prepTime),
       cookTimeMinutes: this.parseIsoDuration(schema.cookTime || schema.totalTime),
-      servings: this.parseServings(schema.recipeYield),
+      servings: parsedServings,
+      nutrition: parsedNutrition || estimateRecipeNutrition({
+        title: schema.name,
+        ingredients: ingredients,
+        servings: parsedServings
+      }),
       tags: tags.slice(0, 4),
       ingredients: ingredients,
       instructions: instructions,
@@ -1855,6 +2022,27 @@ const RecipeParser = {
     };
     this.detectRobotFeatures(recipe);
     return recipe;
+  },
+
+  parseNutritionNumber(val) {
+    if (val === null || val === undefined) return 0;
+    if (typeof val === 'number') return isNaN(val) ? 0 : Math.round(val);
+    const str = String(val).replace(',', '.');
+    const match = str.match(/\d+(?:\.\d+)?/);
+    return match ? Math.round(parseFloat(match[0])) : 0;
+  },
+
+  parseNutrition(schemaNutrition) {
+    if (!schemaNutrition || typeof schemaNutrition !== 'object') return null;
+    const calories = this.parseNutritionNumber(schemaNutrition.calories);
+    const protein = this.parseNutritionNumber(schemaNutrition.proteinContent || schemaNutrition.protein);
+    const carbs = this.parseNutritionNumber(schemaNutrition.carbohydrateContent || schemaNutrition.carbs);
+    const fat = this.parseNutritionNumber(schemaNutrition.fatContent || schemaNutrition.fat);
+
+    if (calories > 0 || protein > 0 || carbs > 0 || fat > 0) {
+      return { calories, protein, carbs, fat };
+    }
+    return null;
   },
 
 
@@ -2174,6 +2362,7 @@ const RecipeParser = {
       prepTimeMinutes: prepTimeMinutes,
       cookTimeMinutes: cookTimeMinutes,
       servings: servings,
+      nutrition: estimateRecipeNutrition({ title, ingredients, servings }),
       tags: [],
       ingredients: ingredients,
       instructions: instructions,
@@ -2187,7 +2376,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.49';
+  window.APP_VERSION = 'v0.50';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2212,12 +2401,14 @@ if (typeof window !== 'undefined') {
   window.ALL_PREDEFINED_TAGS = ALL_PREDEFINED_TAGS;
   window.checkDietaryCompliance = checkDietaryCompliance;
   window.analyzeAndInferRecipeTags = analyzeAndInferRecipeTags;
+  window.estimateRecipeNutrition = estimateRecipeNutrition;
+  window.getRecipeNutrition = getRecipeNutrition;
 }
 
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.49';
+    this.appVersion = 'v0.50';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -3315,6 +3506,68 @@ class FoodAssistantApp {
     this.renderSettings();
   }
 
+  calculateTodayNutrition(todayPlan) {
+    let totalCalories = 0;
+    let totalProtein = 0;
+    let totalCarbs = 0;
+    let totalFat = 0;
+    let mealCount = 0;
+
+    if (!todayPlan) {
+      return {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        totalCalories: 0,
+        totalProtein: 0,
+        totalCarbs: 0,
+        totalFat: 0,
+        mealCount: 0
+      };
+    }
+
+    const recipeIds = [];
+    STANDARD_SLOTS.forEach(s => {
+      const slotVal = todayPlan[s.key];
+      const recId = typeof slotVal === 'object' && slotVal !== null ? (slotVal.recipeId || slotVal.id) : slotVal;
+      if (recId) recipeIds.push(recId);
+    });
+    (todayPlan.customSlots || []).forEach(cs => {
+      const recId = typeof cs === 'object' && cs !== null ? (cs.recipeId || cs.id) : cs;
+      if (recId) recipeIds.push(recId);
+    });
+
+    recipeIds.forEach(id => {
+      const rec = state.recipes.find(r => r.id === id);
+      if (rec) {
+        const nut = getRecipeNutrition(rec);
+        totalCalories += nut.calories;
+        totalProtein += nut.protein;
+        totalCarbs += nut.carbs;
+        totalFat += nut.fat;
+        mealCount++;
+      }
+    });
+
+    const c = Math.round(totalCalories);
+    const p = Math.round(totalProtein * 10) / 10;
+    const cb = Math.round(totalCarbs * 10) / 10;
+    const f = Math.round(totalFat * 10) / 10;
+
+    return {
+      calories: c,
+      protein: p,
+      carbs: cb,
+      fat: f,
+      totalCalories: c,
+      totalProtein: p,
+      totalCarbs: cb,
+      totalFat: f,
+      mealCount
+    };
+  }
+
   renderTodayView() {
     const today = new Date();
     const todayStr = toLocalDateKey(today);
@@ -3354,6 +3607,62 @@ class FoodAssistantApp {
         summaryElem.textContent = `Todas las comidas planificadas (${assignedCount} de ${totalSlotsCount}). ¡Listo para cocinar!`;
       } else {
         summaryElem.textContent = `${assignedCount} de ${totalSlotsCount} comidas planificadas para hoy.`;
+      }
+    }
+
+    // Resumen diario de calorías y macronutrientes (US-01)
+    const todayNutrition = this.calculateTodayNutrition(todayPlan);
+    const nutritionContainer = document.getElementById('today-nutrition-card');
+    if (nutritionContainer) {
+      if (todayNutrition.mealCount === 0) {
+        nutritionContainer.innerHTML = `
+          <div class="today-nutrition-header">
+            <div class="today-nutrition-title">
+              <span class="material-symbols-outlined icon-sm" style="color: var(--m3-primary);">local_fire_department</span> Resumen Nutricional Diario
+            </div>
+            <span class="today-nutrition-meta">0 comidas</span>
+          </div>
+          <div class="today-nutrition-empty">
+            <span style="font-weight: 700; color: var(--m3-on-surface);">0 kcal</span> · Asigna platos a tu día para ver calorías y macronutrientes.
+          </div>
+        `;
+      } else {
+        const totalMacroGrams = (todayNutrition.totalProtein + todayNutrition.totalCarbs + todayNutrition.totalFat) || 1;
+        const protPercent = Math.round((todayNutrition.totalProtein / totalMacroGrams) * 100);
+        const carbsPercent = Math.round((todayNutrition.totalCarbs / totalMacroGrams) * 100);
+        const fatPercent = Math.max(0, 100 - protPercent - carbsPercent);
+
+        nutritionContainer.innerHTML = `
+          <div class="today-nutrition-header">
+            <div class="today-nutrition-title">
+              <span class="material-symbols-outlined icon-sm" style="color: #d9480f;">local_fire_department</span> Resumen Nutricional Diario
+            </div>
+            <span class="today-nutrition-meta">${todayNutrition.mealCount} ${todayNutrition.mealCount === 1 ? 'comida' : 'comidas'}</span>
+          </div>
+          <div class="today-macros-grid">
+            <div class="macro-chip macro-cal">
+              <span class="macro-chip-label">Calorías</span>
+              <span class="macro-chip-val" id="today-macro-calories">${todayNutrition.totalCalories}<span class="macro-chip-unit">kcal</span></span>
+            </div>
+            <div class="macro-chip macro-prot">
+              <span class="macro-chip-label">Proteínas</span>
+              <span class="macro-chip-val" id="today-macro-protein">${Math.round(todayNutrition.totalProtein)}<span class="macro-chip-unit">g</span></span>
+            </div>
+            <div class="macro-chip macro-carbs">
+              <span class="macro-chip-label">Carbos</span>
+              <span class="macro-chip-val" id="today-macro-carbs">${Math.round(todayNutrition.totalCarbs)}<span class="macro-chip-unit">g</span></span>
+            </div>
+            <div class="macro-chip macro-fat">
+              <span class="macro-chip-label">Grasas</span>
+              <span class="macro-chip-val" id="today-macro-fat">${Math.round(todayNutrition.totalFat)}<span class="macro-chip-unit">g</span></span>
+            </div>
+          </div>
+          <div class="macro-ratio-bar" title="Distribución: ${protPercent}% P / ${carbsPercent}% C / ${fatPercent}% G">
+            <div class="ratio-segment ratio-prot" style="width: ${protPercent}%;" title="Proteína: ${protPercent}%"></div>
+            <div class="ratio-segment ratio-carbs" style="width: ${carbsPercent}%;" title="Carbohidratos: ${carbsPercent}%"></div>
+            <div class="ratio-segment ratio-fat" style="width: ${fatPercent}%;" title="Grasa: ${fatPercent}%"></div>
+          </div>
+        `;
       }
     }
 
@@ -3722,6 +4031,11 @@ class FoodAssistantApp {
     if (!body || !r) return;
 
     const scale = this.activeServings / r.servings;
+    const baseNutrition = getRecipeNutrition(r);
+    const currentTotalCal = Math.round(baseNutrition.calories * this.activeServings);
+    const currentTotalProt = Math.round(baseNutrition.protein * this.activeServings * 10) / 10;
+    const currentTotalCarbs = Math.round(baseNutrition.carbs * this.activeServings * 10) / 10;
+    const currentTotalFat = Math.round(baseNutrition.fat * this.activeServings * 10) / 10;
 
     body.innerHTML = `
       <div style="position: relative; height: 220px; background: #000; overflow: hidden;">
@@ -3749,7 +4063,7 @@ class FoodAssistantApp {
               Fuente: ${r.sourceDomain || 'Web Original'}
             </a>
           ` : ''}
-          ${r.tags.map(t => `<span class="tag-chip" style="background: var(--m3-primary-container); color: var(--m3-on-primary-container); font-weight: 700;">${t}</span>`).join('')}
+          ${(r.tags || []).map(t => `<span class="tag-chip" style="background: var(--m3-primary-container); color: var(--m3-on-primary-container); font-weight: 700;">${t}</span>`).join('')}
         </div>
         
         <h2 style="font-size: 20px; font-weight: 500; line-height: 1.3; margin-bottom: 6px;">${r.title}</h2>
@@ -3773,6 +4087,36 @@ class FoodAssistantApp {
             <div style="display: flex; gap: 4px;">
               <button class="btn btn-secondary btn-sm" onclick="app.adjustServings(-1)" style="width: 28px; height: 28px; padding: 0;">-</button>
               <button class="btn btn-secondary btn-sm" onclick="app.adjustServings(1)" style="width: 28px; height: 28px; padding: 0;">+</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- NUTRITION BREAKDOWN CARD (US-01) -->
+        <div class="recipe-nutrition-card" id="recipe-nutrition-breakdown">
+          <div class="recipe-nutrition-header">
+            <div class="recipe-nutrition-title">
+              <span class="material-symbols-outlined icon-sm" style="color: #d9480f;">local_fire_department</span> Información Nutricional
+            </div>
+            <div class="recipe-nutrition-subtitle" id="recipe-nutrition-subtitle">
+              ${this.activeServings} ${this.activeServings === 1 ? 'persona' : 'personas'} (${baseNutrition.calories} kcal / ración)
+            </div>
+          </div>
+          <div class="recipe-macros-grid">
+            <div class="macro-chip macro-cal">
+              <span class="macro-chip-label">Calorías</span>
+              <span class="macro-chip-val" id="macro-detail-calories">${currentTotalCal}<span class="macro-chip-unit">kcal</span></span>
+            </div>
+            <div class="macro-chip macro-prot">
+              <span class="macro-chip-label">Proteínas</span>
+              <span class="macro-chip-val" id="macro-detail-protein">${currentTotalProt}<span class="macro-chip-unit">g</span></span>
+            </div>
+            <div class="macro-chip macro-carbs">
+              <span class="macro-chip-label">Carbos</span>
+              <span class="macro-chip-val" id="macro-detail-carbs">${currentTotalCarbs}<span class="macro-chip-unit">g</span></span>
+            </div>
+            <div class="macro-chip macro-fat">
+              <span class="macro-chip-label">Grasas</span>
+              <span class="macro-chip-val" id="macro-detail-fat">${currentTotalFat}<span class="macro-chip-unit">g</span></span>
             </div>
           </div>
         </div>
@@ -3883,6 +4227,14 @@ class FoodAssistantApp {
     document.getElementById('edit-recipe-servings').value = state.settings.defaultServings || "2";
     document.getElementById('edit-recipe-image').value = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80";
     document.getElementById('edit-recipe-tags').value = "Cena, Saludable";
+    const calEl = document.getElementById('edit-recipe-calories');
+    const proEl = document.getElementById('edit-recipe-protein');
+    const carbEl = document.getElementById('edit-recipe-carbs');
+    const fatEl = document.getElementById('edit-recipe-fat');
+    if (calEl) calEl.value = "";
+    if (proEl) proEl.value = "";
+    if (carbEl) carbEl.value = "";
+    if (fatEl) fatEl.value = "";
     this.editorSelectedTags = new Set(["Cena", "Saludable"]);
     this.renderRecipeEditorChips();
 
@@ -3915,6 +4267,15 @@ class FoodAssistantApp {
     document.getElementById('edit-recipe-servings').value = r.servings || 2;
     document.getElementById('edit-recipe-image').value = r.imageUrl || "";
     document.getElementById('edit-recipe-tags').value = (r.tags || []).join(', ');
+    const calEl = document.getElementById('edit-recipe-calories');
+    const proEl = document.getElementById('edit-recipe-protein');
+    const carbEl = document.getElementById('edit-recipe-carbs');
+    const fatEl = document.getElementById('edit-recipe-fat');
+    const nut = r.nutrition || (typeof getRecipeNutrition === 'function' ? getRecipeNutrition(r) : null);
+    if (calEl) calEl.value = (nut && nut.calories > 0) ? nut.calories : "";
+    if (proEl) proEl.value = (nut && nut.protein > 0) ? nut.protein : "";
+    if (carbEl) carbEl.value = (nut && nut.carbs > 0) ? nut.carbs : "";
+    if (fatEl) fatEl.value = (nut && nut.fat > 0) ? nut.fat : "";
     this.editorSelectedTags = new Set(Array.isArray(r.tags) ? r.tags : []);
     this.renderRecipeEditorChips();
 
@@ -4451,6 +4812,34 @@ class FoodAssistantApp {
       }
     });
 
+    const existingIdx = state.recipes.findIndex(r => r.id === id);
+    const existing = existingIdx >= 0 ? state.recipes[existingIdx] : null;
+
+    // Collect Nutrition
+    const calVal = parseFloat(document.getElementById('edit-recipe-calories')?.value);
+    const proVal = parseFloat(document.getElementById('edit-recipe-protein')?.value);
+    const carbVal = parseFloat(document.getElementById('edit-recipe-carbs')?.value);
+    const fatVal = parseFloat(document.getElementById('edit-recipe-fat')?.value);
+
+    let nutrition = null;
+    if (!isNaN(calVal) || !isNaN(proVal) || !isNaN(carbVal) || !isNaN(fatVal)) {
+      nutrition = {
+        calories: !isNaN(calVal) ? Math.max(0, Math.round(calVal)) : 0,
+        protein: !isNaN(proVal) ? Math.max(0, Math.round(proVal * 10) / 10) : 0,
+        carbs: !isNaN(carbVal) ? Math.max(0, Math.round(carbVal * 10) / 10) : 0,
+        fat: !isNaN(fatVal) ? Math.max(0, Math.round(fatVal * 10) / 10) : 0
+      };
+    } else if (existing?.nutrition) {
+      nutrition = { ...existing.nutrition };
+    } else {
+      const estimated = typeof estimateRecipeNutrition === 'function'
+        ? estimateRecipeNutrition({ servings, ingredients })
+        : null;
+      if (estimated && (estimated.calories > 0 || estimated.protein > 0)) {
+        nutrition = estimated;
+      }
+    }
+
     const updatedRecipe = {
       id,
       title,
@@ -4460,12 +4849,11 @@ class FoodAssistantApp {
       cookTimeMinutes,
       servings,
       tags,
+      nutrition: nutrition || undefined,
       ingredients,
       instructions
     };
 
-    const existingIdx = state.recipes.findIndex(r => r.id === id);
-    const existing = existingIdx >= 0 ? state.recipes[existingIdx] : null;
     const finalRecipe = {
       ...(existing || {}),
       ...updatedRecipe,
@@ -6207,6 +6595,8 @@ if (typeof window !== 'undefined') {
   window.FoodAssistantApp = FoodAssistantApp;
   window.generateId = generateId;
   window.analyzeAndInferRecipeTags = analyzeAndInferRecipeTags;
+  window.estimateRecipeNutrition = estimateRecipeNutrition;
+  window.getRecipeNutrition = getRecipeNutrition;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -6226,6 +6616,8 @@ if (typeof module !== 'undefined' && module.exports) {
     StateStore,
     FoodAssistantApp,
     generateId,
-    analyzeAndInferRecipeTags
+    analyzeAndInferRecipeTags,
+    estimateRecipeNutrition,
+    getRecipeNutrition
   };
 }
