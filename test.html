@@ -2070,6 +2070,28 @@ Bocadillo De Atun Paso A Paso
         document.body.removeChild(badge);
         document.body.removeChild(settingsVer);
       });
+
+      it('Añadir Receta Unificada: Selector de modalidades (a mano, link, texto/notas)', () => {
+        const choiceModal = document.createElement('div');
+        choiceModal.className = 'modal-overlay';
+        choiceModal.id = 'modal-recipe-add-choice';
+        document.body.appendChild(choiceModal);
+
+        const appInst = new window.FoodAssistantApp();
+        appInst.modalRecipeAddChoice = choiceModal;
+
+        appInst.openAddRecipeChoiceModal();
+        expect(choiceModal.classList.contains('active')).toBe(true);
+
+        appInst.closeAddRecipeChoiceModal();
+        expect(choiceModal.classList.contains('active')).toBe(false);
+
+        choiceModal.classList.add('active');
+        appInst.closeModalByElement(choiceModal);
+        expect(choiceModal.classList.contains('active')).toBe(false);
+
+        document.body.removeChild(choiceModal);
+      });
     });
 
     // SUITE 8: Sincronización Supabase y Resiliencia Multi-dispositivo (US-35, US-45, BUG-21 a 24) (14 tests)
@@ -2692,17 +2714,43 @@ Bocadillo De Atun Paso A Paso
       );
 
       it(
-        'BUG-14: Normalización de acentos y unificación total con RecipeParser',
+        'BUG-14: Normalización de acentos y diacríticos transparentemente (NFD)',
         {
-          purpose: 'Garantizar que acentos y diacríticos se normalicen y el clasificador sea idéntico en toda la app.',
-          assertions: 'Comprueba normalización de plátano/salmón/jamón y paridad total con RecipeParser.categorizeAisle.'
+          purpose: 'Garantizar que acentos y diacríticos se normalicen para que la clasificación funcione con y sin tilde.',
+          assertions: 'Comprueba normalización de plátano/platano, salmón/salmon y jamón/jamon.'
         },
         () => {
-          expect(window.categorizeIngredientAisle('Plátano de Canarias')).toBe('produce');
-          expect(window.categorizeIngredientAisle('Salmón fresco')).toBe('meat');
-          expect(window.categorizeIngredientAisle('Jamón serrano')).toBe('meat');
+          expect(window.normalizeIngredientText('Plátano')).toBe('platano');
+          expect(window.normalizeIngredientText('Salmón')).toBe('salmon');
+          expect(window.normalizeIngredientText('Jamón Ibérico')).toBe('jamon iberico');
 
-          const items = ['Pechuga de pollo', 'Leche desnatada', 'Tomates cherry', 'Arroz basmati', 'Chocolate negro'];
+          expect(window.categorizeIngredientAisle('Plátano de Canarias')).toBe('produce');
+          expect(window.categorizeIngredientAisle('Platano')).toBe('produce');
+          expect(window.categorizeIngredientAisle('Salmón fresco')).toBe('meat');
+          expect(window.categorizeIngredientAisle('Salmon')).toBe('meat');
+          expect(window.categorizeIngredientAisle('Jamón serrano')).toBe('meat');
+          expect(window.categorizeIngredientAisle('Jamon')).toBe('meat');
+        }
+      );
+
+      it(
+        'BUG-14: Unificación total de RecipeParser y clasificador manual',
+        {
+          purpose: 'Garantizar que RecipeParser y categorizeIngredientAisle arrojen resultados 100% idénticos.',
+          assertions: 'Comprueba paridad total en pollo, leche, tomates cherry, arroz basmati y chocolate negro.'
+        },
+        () => {
+          const items = [
+            'Pechuga de pollo',
+            'Leche desnatada',
+            'Tomates cherry',
+            'Placas de lasaña',
+            'Arroz basmati',
+            'Curry en polvo',
+            'Helado de vainilla',
+            'Café molido',
+            'Chocolate negro'
+          ];
           items.forEach(item => {
             expect(window.RecipeParser.categorizeAisle(item)).toBe(window.categorizeIngredientAisle(item));
           });
@@ -2742,38 +2790,96 @@ Bocadillo De Atun Paso A Paso
       );
 
       it(
-        'US-20: Autocompletado interactivo en quick grocery y auto-clasificación en recetas',
+        'attachIngredientAutocomplete despliega sugerencias predictivas al escribir',
         {
-          purpose: 'Verificar despliegue de sugerencias en la lista de compra y selección de pasillo automática al escribir en la receta.',
-          assertions: 'Dispara input en input-quick-grocery y comprueba despliegue del dropdown; comprueba auto-selección en fila de ingrediente.'
+          purpose: 'Verificar despliegue dinámico del dropdown predictivo al escribir en el input de compra.',
+          assertions: 'Input tom activa display flex y renderiza sugerencias coincidentes con Tomate.'
         },
         () => {
           const sandbox = document.getElementById('qa-sandbox');
           sandbox.innerHTML = `
             <input type="text" id="input-quick-grocery">
             <div id="quick-grocery-autocomplete" class="autocomplete-dropdown" style="display: none;"></div>
-            <button id="btn-add-grocery">Añadir</button>
-            <div id="shopping-aisles-container"></div>
-            <span id="shopping-summary-text"></span>
-            <div id="edit-ingredients-container"></div>
           `;
 
-          const appInst = new window.FoodAssistantApp();
+          new window.FoodAssistantApp();
           const input = document.getElementById('input-quick-grocery');
           const dropdown = document.getElementById('quick-grocery-autocomplete');
 
           input.value = 'tom';
           input.dispatchEvent(new Event('input'));
           expect(dropdown.style.display).toBe('flex');
+          const items = dropdown.querySelectorAll('.autocomplete-item');
+          expect(items.length).toBeGreaterThan(0);
+          expect(items[0].textContent).toContain('Tomate');
 
-          appInst.addIngredientRow();
-          const row = document.querySelector('.edit-ing-row');
-          const nameInput = row.querySelector('.ing-name');
-          const aisleSelect = row.querySelector('.ing-aisle');
+          sandbox.innerHTML = '';
+        }
+      );
 
-          nameInput.value = 'Filete de ternera';
-          nameInput.dispatchEvent(new Event('input'));
-          expect(aisleSelect.value).toBe('meat');
+      it(
+        'handleManualAddGrocery clasifica automáticamente el pasillo y soporta cantidades estructuradas',
+        {
+          purpose: 'Comprobar adición manual a la lista de compra con detección de pasillo y parseo de cantidad/unidad.',
+          assertions: 'Chocolate negro va a pantry; 500 g de pechuga de pollo guarda 500, g, Pechuga de pollo y pasillo meat.'
+        },
+        () => {
+          const sandbox = document.getElementById('qa-sandbox');
+          sandbox.innerHTML = `
+            <input type="text" id="input-quick-grocery">
+            <div id="quick-grocery-autocomplete" class="autocomplete-dropdown" style="display: none;"></div>
+            <span id="shopping-summary-text"></span>
+            <div id="shopping-aisles-container"></div>
+          `;
+
+          window.state.shoppingList = [];
+          const appInst = new window.FoodAssistantApp();
+          const input = document.getElementById('input-quick-grocery');
+
+          input.value = 'Chocolate negro';
+          appInst.handleManualAddGrocery();
+          expect(window.state.shoppingList).toHaveLength(1);
+          expect(window.state.shoppingList[0].name).toBe('Chocolate negro');
+          expect(window.state.shoppingList[0].aisle).toBe('pantry');
+
+          input.value = '500 g de pechuga de pollo';
+          appInst.handleManualAddGrocery();
+          expect(window.state.shoppingList).toHaveLength(2);
+          expect(window.state.shoppingList[1].name).toBe('Pechuga de pollo');
+          expect(window.state.shoppingList[1].amount).toBe(500);
+          expect(window.state.shoppingList[1].unit).toBe('g');
+          expect(window.state.shoppingList[1].aisle).toBe('meat');
+
+          sandbox.innerHTML = '';
+        }
+      );
+
+      it(
+        'renderShoppingList muestra el icono distintivo para cada ingrediente',
+        {
+          purpose: 'Verificar asignación de iconos visuales en las insignias de los artículos de la compra.',
+          assertions: 'Huevos muestra icono egg y Manzanas muestra icono nutrition.'
+        },
+        () => {
+          const sandbox = document.getElementById('qa-sandbox');
+          sandbox.innerHTML = `
+            <span id="shopping-summary-text"></span>
+            <div id="shopping-aisles-container"></div>
+          `;
+
+          window.state.shoppingList = [
+            { id: 'item-1', name: 'Huevos', amount: 6, unit: 'ud', aisle: 'dairy', isChecked: false },
+            { id: 'item-2', name: 'Manzanas', amount: 1, unit: 'kg', aisle: 'produce', isChecked: false }
+          ];
+
+          const appInst = new window.FoodAssistantApp();
+          appInst.renderShoppingList();
+
+          const container = document.getElementById('shopping-aisles-container');
+          const badges = container.querySelectorAll('.grocery-item-icon-badge');
+          expect(badges.length).toBe(2);
+          expect(badges[0].innerHTML).toContain('egg');
+          expect(badges[1].innerHTML).toContain('nutrition');
 
           sandbox.innerHTML = '';
         }
@@ -2869,10 +2975,10 @@ Bocadillo De Atun Paso A Paso
       );
 
       it(
-        'Clasificación automática en tiempo real de ingredientes (Whiskey, AOVE, Guisantes) y resolución online persistente',
+        'addIngredientRow clasifica automáticamente el pasillo en el formulario de recetas al escribir',
         {
-          purpose: 'Verificar que al escribir en el formulario de recetas el pasillo y el icono se sincronicen de inmediato, sin quedarse atascado en verduras, y soporte resolución online.',
-          assertions: 'Al teclear Aceite de oliva virgen extra selecciona spices, Whiskey selecciona beverages, Guisantes selecciona produce, y setCachedAisle resuelve correctamente.'
+          purpose: 'Verificar que al escribir en el formulario de recetas el pasillo se actualice en tiempo real.',
+          assertions: 'Al teclear Aceite de oliva virgen extra selecciona spices, Whiskey selecciona beverages y Guisantes selecciona produce.'
         },
         () => {
           const sandbox = document.getElementById('qa-sandbox');
@@ -2897,7 +3003,17 @@ Bocadillo De Atun Paso A Paso
           nameInput.dispatchEvent(new Event('input'));
           expect(aisleSelect.value).toBe('produce');
 
-          // Verificación de caché online persistente
+          sandbox.innerHTML = '';
+        }
+      );
+
+      it(
+        'resolveAisleOnline almacena y recupera clasificaciones online desde caché persistente',
+        {
+          purpose: 'Verificar almacenamiento y recuperación de clasificaciones online desde caché persistente.',
+          assertions: 'setCachedAisle y resolveAisleOnline resuelven pitahaya exotica como produce.'
+        },
+        () => {
           expect(typeof window.resolveAisleOnline).toBe('function');
           window.setCachedAisle('pitahaya exotica', 'produce');
           expect(window.getCachedAisle('pitahaya exotica')).toBe('produce');
@@ -2908,8 +3024,6 @@ Bocadillo De Atun Paso A Paso
             resolvedRes = res;
           });
           expect(resolvedRes).toBe('produce');
-
-          sandbox.innerHTML = '';
         }
       );
     });
@@ -3418,131 +3532,229 @@ Bocadillo De Atun Paso A Paso
       const W = window;
 
       dietIt(
-        'getRecipeNutrition y estimateRecipeNutrition calculan Kcal, Proteínas, Carbos y Grasas',
-        'Validar el cálculo y normalización de valores nutricionales por ración.',
-        'getRecipeNutrition devuelve valores fijos o aproximados con densidad y macronutrientes realistas.',
+        'getRecipeNutrition devuelve los valores directos si la receta ya tiene nutrition',
+        'Comprobar que cuando la receta tiene valores explícitos, se retornan sin alteración.',
+        'calories: 520, protein: 42, carbs: 55, fat: 12.',
         () => {
-          const directRecipe = {
-            title: 'Salmón Grill',
+          const recipe = {
+            title: 'Pollo con Arroz',
             servings: 1,
-            nutrition: { calories: 420, protein: 34, carbs: 4, fat: 28 }
+            nutrition: { calories: 520, protein: 42, carbs: 55, fat: 12 }
           };
-          const nut = W.getRecipeNutrition(directRecipe);
-          expect(nut.calories).toBe(420);
-          expect(nut.protein).toBe(34);
-          expect(nut.carbs).toBe(4);
-          expect(nut.fat).toBe(28);
+          const nut = W.getRecipeNutrition(recipe);
+          expect(nut.calories).toBe(520);
+          expect(nut.protein).toBe(42);
+          expect(nut.carbs).toBe(55);
+          expect(nut.fat).toBe(12);
+        }
+      );
 
-          const estimated = W.estimateRecipeNutrition({
+      dietIt(
+        'estimateRecipeNutrition calcula valores aproximados si no hay nutrition explícita',
+        'Estimar densidad nutricional basada en ingredientes para recetas sin nutrition.',
+        'calories > 200, protein > 15, fat > 5 en tortilla de atún.',
+        () => {
+          const recipe = {
+            title: 'Tortilla de Atún',
             servings: 2,
             ingredients: [
-              { name: 'Pechuga de pollo', amount: 300, unit: 'g' },
-              { name: 'Arroz basmati', amount: 150, unit: 'g' }
+              { name: 'Huevos', amount: 4, unit: 'unidades' },
+              { name: 'Atún en lata', amount: 150, unit: 'g' },
+              { name: 'Aceite de oliva', amount: 15, unit: 'ml' }
             ]
-          });
-          expect(estimated.calories).toBeGreaterThan(250);
-          expect(estimated.protein).toBeGreaterThan(20);
+          };
+          const estimated = W.estimateRecipeNutrition(recipe);
+          expect(estimated.calories).toBeGreaterThan(200);
+          expect(estimated.protein).toBeGreaterThan(15);
+          expect(estimated.fat).toBeGreaterThan(5);
         }
       );
 
       dietIt(
-        'RecipeParser.parseNutrition extrae Kcal y macronutrientes de schema.org o texto',
-        'Comprobar la conversión de strings como "450 calories" o "30 grams" a números limpios.',
+        'RecipeParser.parseNutrition extrae valores numéricos de cadenas con unidades',
+        'Comprobar la conversión de strings como "450 kcal" o "35 grams" a números limpios.',
         'parseNutrition normaliza calories, protein, carbs y fat.',
         () => {
-          const parsed = W.RecipeParser.parseNutrition({
-            calories: '520 kcal',
-            proteinContent: '38 g',
-            carbohydrateContent: '45 grams',
-            fatContent: '14 g'
-          });
-          expect(parsed.calories).toBe(520);
-          expect(parsed.protein).toBe(38);
-          expect(parsed.carbs).toBe(45);
-          expect(parsed.fat).toBe(14);
+          const rawNutrition = {
+            calories: '450 kcal',
+            proteinContent: '35 grams',
+            carbohydrateContent: '40 g',
+            fatContent: '12g'
+          };
+          const parsed = W.RecipeParser.parseNutrition(rawNutrition);
+          expect(parsed.calories).toBe(450);
+          expect(parsed.protein).toBe(35);
+          expect(parsed.carbs).toBe(40);
+          expect(parsed.fat).toBe(12);
         }
       );
 
       dietIt(
-        'Desglose en modal de detalle de receta con escalado dinámico por raciones',
+        'analyzeAndInferRecipeTags asigna "Alta en Proteínas" si protein >= 25',
+        'Garantizar la conexión entre el motor de nutrición y los chips inteligentes de US-02.',
+        'Pechuga (32g proteina) recibe Alta en Proteínas; Ensalada (2g) no la recibe.',
+        () => {
+          const highProteinRecipe = {
+            title: 'Pechuga a la plancha',
+            servings: 1,
+            nutrition: { calories: 350, protein: 32, carbs: 5, fat: 8 },
+            ingredients: [{ name: 'Pechuga de pollo', amount: 200, unit: 'g' }]
+          };
+          const tags = W.analyzeAndInferRecipeTags(highProteinRecipe);
+          expect(tags).toContain('Alta en Proteínas');
+
+          const lowProteinRecipe = {
+            title: 'Ensalada Verde Simple',
+            servings: 1,
+            nutrition: { calories: 120, protein: 2, carbs: 10, fat: 4 },
+            ingredients: [{ name: 'Lechuga', amount: 100, unit: 'g' }]
+          };
+          const tagsLow = W.analyzeAndInferRecipeTags(lowProteinRecipe);
+          expect(tagsLow).not.toContain('Alta en Proteínas');
+        }
+      );
+
+      dietIt(
+        'muestra el desglose nutricional en modal-recipe-detail y se escala al cambiar raciones',
         'Verificar que al pulsar + o - de raciones, los macros se multiplican proporcionalmente.',
         '#recipe-nutrition-breakdown muestra kcal, proteínas, carbohidratos y grasas escaladas.',
         (app) => {
-          const testRec = {
-            id: 'rec-qa-macros',
-            title: 'Bowl Proteico',
-            servings: 1,
-            nutrition: { calories: 300, protein: 25, carbs: 30, fat: 8 },
-            ingredients: [{ name: 'Pollo', amount: 150, unit: 'g' }],
-            instructions: [{ step: 1, text: 'Servir en bowl' }]
+          const sampleRecipe = {
+            id: 'rec-test-macros-qa',
+            title: 'Salmón con Quinoa',
+            servings: 2,
+            nutrition: { calories: 400, protein: 30, carbs: 35, fat: 14 },
+            ingredients: [{ name: 'Salmón', amount: 300, unit: 'g' }],
+            instructions: [{ step: 1, text: 'Cocinar al horno' }]
           };
-          W.state.recipes.push(testRec);
+          W.state.recipes.push(sampleRecipe);
 
-          app.openRecipeDetail('rec-qa-macros');
+          app.openRecipeDetail('rec-test-macros-qa');
           const breakdown = document.getElementById('recipe-nutrition-breakdown');
           expect(breakdown).not.toBeNull();
-          expect(breakdown.textContent).toContain('300');
-          expect(breakdown.textContent).toContain('25');
+          expect(breakdown.textContent).toContain('800');
+          expect(breakdown.textContent).toContain('60');
 
-          app.adjustServings(1); // raciones = 2
+          app.adjustServings(1);
+          expect(app.activeServings).toBe(3);
           const updatedBreakdown = document.getElementById('recipe-nutrition-breakdown');
-          expect(updatedBreakdown.textContent).toContain('600');
-          expect(updatedBreakdown.textContent).toContain('50');
+          expect(updatedBreakdown.textContent).toContain('1200');
+          expect(updatedBreakdown.textContent).toContain('90');
         }
       );
 
       dietIt(
-        'Resumen diario en vista Hoy (calculateTodayNutrition y tarjeta con barra de distribución)',
+        'calculateTodayNutrition agrega calorías y macronutrientes de los platos asignados hoy',
+        'Comprobar la agregación aritmética de calorías y macros de las comidas planificadas.',
+        'dailyTotals.calories === 950, protein === 65, carbs === 95, fat === 28.',
+        (app) => {
+          const recipeA = {
+            id: 'rec-a-calc',
+            title: 'Desayuno Proteico',
+            servings: 1,
+            nutrition: { calories: 350, protein: 25, carbs: 30, fat: 10 }
+          };
+          const recipeB = {
+            id: 'rec-b-calc',
+            title: 'Almuerzo Equilibrado',
+            servings: 1,
+            nutrition: { calories: 600, protein: 40, carbs: 65, fat: 18 }
+          };
+          W.state.recipes.push(recipeA, recipeB);
+
+          const fakeTodayPlan = {
+            breakfast: { recipeId: 'rec-a-calc' },
+            lunch: { recipeId: 'rec-b-calc' },
+            snack: null,
+            dinner: null
+          };
+
+          const dailyTotals = app.calculateTodayNutrition(fakeTodayPlan);
+          expect(dailyTotals.calories).toBe(950);
+          expect(dailyTotals.protein).toBe(65);
+          expect(dailyTotals.carbs).toBe(95);
+          expect(dailyTotals.fat).toBe(28);
+        }
+      );
+
+      dietIt(
+        'renderTodayView renderiza la tarjeta de nutrición de hoy con chips y ratio bar',
         'Garantizar que la tarjeta diaria en #view-today agrega las comidas planificadas para hoy.',
         '#today-nutrition-card muestra el total de kcal y macro-chips con distribución visual.',
         (app) => {
-          const recLunch = {
-            id: 'rec-lunch-qa',
-            title: 'Almuerzo Sano',
+          const recipe = {
+            id: 'rec-lunch-view-qa',
+            title: 'Plato Combinado',
             servings: 1,
-            nutrition: { calories: 550, protein: 40, carbs: 55, fat: 18 }
+            nutrition: { calories: 500, protein: 35, carbs: 50, fat: 15 }
           };
-          W.state.recipes.push(recLunch);
+          W.state.recipes.push(recipe);
 
           const todayKey = W.toLocalDateKey();
           W.state.mealPlan[todayKey] = {
-            lunch: { recipeId: 'rec-lunch-qa' }
+            lunch: { recipeId: 'rec-lunch-view-qa' }
           };
 
           app.renderTodayView();
           const card = document.getElementById('today-nutrition-card');
           expect(card).not.toBeNull();
-          expect(card.textContent).toContain('550');
-          expect(card.textContent).toContain('40g');
+          expect(card.textContent).toContain('500');
+          expect(card.textContent).toContain('35g');
+          expect(card.textContent).toContain('50g');
+          expect(card.textContent).toContain('15g');
           expect(card.querySelector('.macro-ratio-bar')).not.toBeNull();
         }
       );
 
       dietIt(
-        'Editor de recetas permite ingresar o editar calorías y macronutrientes manualmente',
+        'limpia los campos nutricionales al abrir openCreateRecipeModal',
+        'Verificar el reseteo de los 4 inputs de nutrición al abrir el creador de recetas.',
+        'edit-recipe-calories, protein, carbs y fat quedan vacíos.',
+        (app) => {
+          document.getElementById('edit-recipe-calories').value = '999';
+          document.getElementById('edit-recipe-protein').value = '99';
+          document.getElementById('edit-recipe-carbs').value = '99';
+          document.getElementById('edit-recipe-fat').value = '99';
+
+          app.openCreateRecipeModal();
+
+          expect(document.getElementById('edit-recipe-calories').value).toBe('');
+          expect(document.getElementById('edit-recipe-protein').value).toBe('');
+          expect(document.getElementById('edit-recipe-carbs').value).toBe('');
+          expect(document.getElementById('edit-recipe-fat').value).toBe('');
+        }
+      );
+
+      dietIt(
+        'rellena los campos nutricionales en openEditRecipeModal y guarda los valores en saveRecipeEdit',
         'Validar que el formulario de edición persiste los valores nutricionales introducidos por el usuario.',
         'Los inputs #edit-recipe-calories, protein, carbs y fat se guardan en state.recipes.',
         (app) => {
-          const rec = {
-            id: 'rec-edit-qa',
-            title: 'Receta Test Edición',
+          const recipeToEdit = {
+            id: 'rec-edit-nutrition-qa',
+            title: 'Crema de Calabaza Fit',
             servings: 2,
-            nutrition: { calories: 200, protein: 10, carbs: 20, fat: 5 },
-            ingredients: [{ name: 'Verduras', amount: 200, unit: 'g' }],
-            instructions: [{ step: 1, text: 'Saltear' }]
+            nutrition: { calories: 280, protein: 12, carbs: 34, fat: 8 },
+            ingredients: [{ name: 'Calabaza', amount: 500, unit: 'g' }],
+            instructions: [{ step: 1, text: 'Hervir y triturar' }]
           };
-          W.state.recipes.push(rec);
+          W.state.recipes.push(recipeToEdit);
 
-          app.openEditRecipeModal('rec-edit-qa');
-          expect(document.getElementById('edit-recipe-calories').value).toBe('200');
+          app.openEditRecipeModal('rec-edit-nutrition-qa');
+          expect(document.getElementById('edit-recipe-calories').value).toBe('280');
+          expect(document.getElementById('edit-recipe-protein').value).toBe('12');
+          expect(document.getElementById('edit-recipe-carbs').value).toBe('34');
+          expect(document.getElementById('edit-recipe-fat').value).toBe('8');
 
-          document.getElementById('edit-recipe-calories').value = '250';
-          document.getElementById('edit-recipe-protein').value = '18';
+          document.getElementById('edit-recipe-calories').value = '310';
+          document.getElementById('edit-recipe-protein').value = '15';
           app.saveRecipeEdit();
 
-          const updated = W.state.recipes.find(r => r.id === 'rec-edit-qa');
-          expect(updated.nutrition.calories).toBe(250);
-          expect(updated.nutrition.protein).toBe(18);
+          const updated = W.state.recipes.find(r => r.id === 'rec-edit-nutrition-qa');
+          expect(updated.nutrition.calories).toBe(310);
+          expect(updated.nutrition.protein).toBe(15);
+          expect(updated.nutrition.carbs).toBe(34);
+          expect(updated.nutrition.fat).toBe(8);
         }
       );
     });
