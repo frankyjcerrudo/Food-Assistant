@@ -2151,15 +2151,245 @@ body {
 }
 
 /* ==========================================================================
-   US-03: Daily Nutrition Goals & Progress Tracking (Material 3)
+   US-03: Daily Nutrition Goals & Refined Material 3 Layout
    ========================================================================== */
-.goal-status-badge {
-  font-size: 9px;
+/* M3 Switch Component */
+.m3-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.m3-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.m3-switch-track {
+  width: 44px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--m3-surface-container-highest);
+  border: 1.5px solid var(--m3-outline);
+  position: relative;
+  transition: all 0.22s cubic-bezier(0.2, 0, 0, 1);
+  box-sizing: border-box;
+}
+
+.m3-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--m3-outline);
+  transition: all 0.22s cubic-bezier(0.2, 0, 0, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.m3-switch input:checked + .m3-switch-track {
+  background: var(--m3-primary);
+  border-color: var(--m3-primary);
+}
+
+.m3-switch input:checked + .m3-switch-track .m3-switch-thumb {
+  transform: translateX(20px);
+  background: #ffffff;
+}
+
+/* Modal Goals Dialog Refinements */
+.modal-goals-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.modal-goals-title-group {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.modal-goals-icon-circle {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: rgba(26, 115, 232, 0.1);
+  color: var(--m3-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+:root[data-theme="dark"] .modal-goals-icon-circle {
+  background: rgba(138, 180, 248, 0.15);
+  color: var(--m3-primary);
+}
+
+.modal-goals-title {
+  font-size: 16px;
   font-weight: 700;
-  padding: 1px 5px;
-  border-radius: var(--radius-xs);
+  margin: 0;
+  color: var(--m3-on-surface);
+}
+
+.modal-goals-subtitle {
+  font-size: 12px;
+  color: var(--m3-on-surface-variant);
+  margin: 2px 0 0 0;
+  line-height: 1.35;
+}
+
+.goals-switch-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--m3-surface-container-low);
+  border: 1px solid var(--m3-outline-variant);
+  border-radius: var(--radius-md);
+  margin-bottom: 14px;
+}
+
+.goals-switch-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.goals-switch-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--m3-on-surface);
+}
+
+.goals-switch-desc {
+  font-size: 11px;
+  color: var(--m3-on-surface-variant);
+}
+
+/* Nutrient Input Cards Grid */
+.nutrient-input-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.nutrient-input-card {
+  background: var(--m3-surface-container-low);
+  border: 1px solid var(--m3-outline-variant);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.nutrient-input-card:focus-within {
+  border-color: var(--m3-primary);
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.12);
+}
+
+.nutrient-input-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nutrient-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--m3-on-surface-variant);
   text-transform: uppercase;
   letter-spacing: 0.3px;
+}
+
+.nutrient-icon {
+  font-size: 16px;
+  display: inline-flex;
+}
+
+.nutrient-icon.icon-cal { color: #d9480f; }
+.nutrient-icon.icon-prot { color: #1971c2; }
+.nutrient-icon.icon-carbs { color: #2b8a3e; }
+.nutrient-icon.icon-fat { color: #e67700; }
+
+:root[data-theme="dark"] .nutrient-icon.icon-cal { color: #ff922b; }
+:root[data-theme="dark"] .nutrient-icon.icon-prot { color: #74c0fc; }
+:root[data-theme="dark"] .nutrient-icon.icon-carbs { color: #8ce99a; }
+:root[data-theme="dark"] .nutrient-icon.icon-fat { color: #ffd43b; }
+
+.nutrient-input-field-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.nutrient-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--m3-on-surface);
+  font-size: 18px;
+  font-weight: 700;
+  padding: 0;
+  outline: none;
+  font-family: inherit;
+}
+
+.nutrient-unit {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--m3-on-surface-variant);
+  flex-shrink: 0;
+}
+
+/* Trigger Button on Today Nutrition Card */
+.btn-today-goals-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--m3-outline-variant);
+  background: var(--m3-surface-container);
+  color: var(--m3-on-surface);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-today-goals-trigger:hover {
+  background: var(--m3-surface-container-high);
+  border-color: var(--m3-outline);
+}
+
+/* Today Macros Grid Responsive Behavior */
+@media (max-width: 560px) {
+  .today-macros-grid.has-goals {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+}
+
+/* Goal Status Badges */
+.goal-status-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+  text-transform: none;
+  letter-spacing: 0.1px;
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -2171,16 +2401,16 @@ body {
   color: #2b8a3e;
 }
 :root[data-theme="dark"] .goal-status-badge.goal-ok {
-  background: rgba(81, 207, 102, 0.2);
+  background: rgba(81, 207, 102, 0.18);
   color: #8ce99a;
 }
 
 .goal-status-badge.goal-under {
   background: rgba(245, 159, 0, 0.12);
-  color: #e67700;
+  color: #d9480f;
 }
 :root[data-theme="dark"] .goal-status-badge.goal-under {
-  background: rgba(255, 212, 59, 0.2);
+  background: rgba(255, 212, 59, 0.18);
   color: #ffd43b;
 }
 
@@ -2189,7 +2419,7 @@ body {
   color: #e03131;
 }
 :root[data-theme="dark"] .goal-status-badge.goal-over {
-  background: rgba(255, 135, 135, 0.2);
+  background: rgba(255, 135, 135, 0.18);
   color: #ff8787;
 }
 
@@ -2198,12 +2428,12 @@ body {
   color: #1971c2;
 }
 :root[data-theme="dark"] .goal-status-badge.goal-super {
-  background: rgba(116, 192, 252, 0.2);
+  background: rgba(116, 192, 252, 0.18);
   color: #74c0fc;
 }
 
 .macro-goal-subtext {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--m3-on-surface-variant);
   margin-top: 2px;
@@ -2223,42 +2453,26 @@ body {
 .goal-progress-fill {
   height: 100%;
   border-radius: var(--radius-full);
-  transition: width 0.3s ease;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.goal-progress-fill.goal-ok {
-  background: #2b8a3e;
-}
-:root[data-theme="dark"] .goal-progress-fill.goal-ok {
-  background: #51cf66;
-}
+.goal-progress-fill.goal-ok { background: #2b8a3e; }
+:root[data-theme="dark"] .goal-progress-fill.goal-ok { background: #51cf66; }
 
-.goal-progress-fill.goal-under {
-  background: #f59f00;
-}
-:root[data-theme="dark"] .goal-progress-fill.goal-under {
-  background: #fcc419;
-}
+.goal-progress-fill.goal-under { background: #f59f00; }
+:root[data-theme="dark"] .goal-progress-fill.goal-under { background: #fcc419; }
 
-.goal-progress-fill.goal-over {
-  background: #e03131;
-}
-:root[data-theme="dark"] .goal-progress-fill.goal-over {
-  background: #ff6b6b;
-}
+.goal-progress-fill.goal-over { background: #e03131; }
+:root[data-theme="dark"] .goal-progress-fill.goal-over { background: #ff6b6b; }
 
-.goal-progress-fill.goal-super {
-  background: #1971c2;
-}
-:root[data-theme="dark"] .goal-progress-fill.goal-super {
-  background: #4dabf7;
-}
+.goal-progress-fill.goal-super { background: #1971c2; }
+:root[data-theme="dark"] .goal-progress-fill.goal-super { background: #4dabf7; }
 
 .today-goal-banner {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 9px 12px;
   border-radius: var(--radius-sm);
   margin-top: 10px;
   font-size: 12px;
@@ -2267,37 +2481,38 @@ body {
 }
 
 .today-goal-banner.banner-ok {
-  background: rgba(43, 138, 62, 0.1);
+  background: rgba(43, 138, 62, 0.08);
   color: #2b8a3e;
-  border: 1px solid rgba(43, 138, 62, 0.25);
+  border: 1px solid rgba(43, 138, 62, 0.22);
 }
 :root[data-theme="dark"] .today-goal-banner.banner-ok {
-  background: rgba(81, 207, 102, 0.15);
+  background: rgba(81, 207, 102, 0.12);
   color: #8ce99a;
-  border-color: rgba(81, 207, 102, 0.3);
+  border-color: rgba(81, 207, 102, 0.25);
 }
 
 .today-goal-banner.banner-under {
-  background: rgba(245, 159, 0, 0.1);
+  background: rgba(245, 159, 0, 0.08);
   color: #d9480f;
-  border: 1px solid rgba(245, 159, 0, 0.25);
+  border: 1px solid rgba(245, 159, 0, 0.22);
 }
 :root[data-theme="dark"] .today-goal-banner.banner-under {
-  background: rgba(255, 212, 59, 0.15);
+  background: rgba(255, 212, 59, 0.12);
   color: #ffd43b;
-  border-color: rgba(255, 212, 59, 0.3);
+  border-color: rgba(255, 212, 59, 0.25);
 }
 
 .today-goal-banner.banner-over {
-  background: rgba(224, 49, 49, 0.1);
+  background: rgba(224, 49, 49, 0.08);
   color: #c92a2a;
-  border: 1px solid rgba(224, 49, 49, 0.25);
+  border: 1px solid rgba(224, 49, 49, 0.22);
 }
 :root[data-theme="dark"] .today-goal-banner.banner-over {
-  background: rgba(255, 135, 135, 0.15);
+  background: rgba(255, 135, 135, 0.12);
   color: #ff8787;
-  border-color: rgba(255, 135, 135, 0.3);
+  border-color: rgba(255, 135, 135, 0.25);
 }
+
 
 
 

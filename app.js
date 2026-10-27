@@ -2443,7 +2443,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.55';
+  window.APP_VERSION = 'v0.56';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2475,7 +2475,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.55';
+    this.appVersion = 'v0.56';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -3826,8 +3826,8 @@ class FoodAssistantApp {
       const goalsEnabled = !!goals.enabled && (goals.calories > 0 || goals.protein > 0 || goals.carbs > 0 || goals.fat > 0);
 
       const headerGoalsBtn = `
-        <button type="button" class="btn btn-secondary btn-sm" id="btn-today-quick-goals" onclick="app.openNutritionGoalsModal()" style="padding: 2px 8px; font-size: 11px; height: 26px; border-radius: 12px; display: inline-flex; align-items: center; gap: 4px;" title="Configurar metas nutricionales diarias">
-          <span class="material-symbols-outlined" style="font-size: 14px; color: #d9480f;">flag</span>
+        <button type="button" class="btn-today-goals-trigger" id="btn-today-quick-goals" onclick="app.openNutritionGoalsModal()" title="Configurar metas nutricionales diarias">
+          <span class="material-symbols-outlined" style="font-size: 14px; color: var(--m3-primary);">tune</span>
           <span>${goalsEnabled ? 'Objetivos' : 'Fijar metas'}</span>
         </button>
       `;
@@ -3878,19 +3878,19 @@ class FoodAssistantApp {
               statusText = '+ Superado';
             } else {
               statusClass = 'goal-over';
-              statusText = `+${diff}${unit} exceso`;
+              statusText = `+${diff}${unit}`;
             }
           }
 
           const barPercent = Math.min(100, Math.max(0, percent));
 
           return `
-            <div class="macro-chip macro-${macroKey}" style="align-items: stretch; text-align: left;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-                <span class="macro-chip-label" style="margin-bottom: 0;">${label}</span>
+            <div class="macro-chip macro-${macroKey}" style="align-items: stretch; text-align: left; padding: 10px 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; gap: 4px;">
+                <span class="macro-chip-label" style="margin-bottom: 0; font-size: 11px; font-weight: 600;">${label}</span>
                 <span class="goal-status-badge ${statusClass}">${statusText}</span>
               </div>
-              <div class="macro-chip-val" id="today-macro-${macroKey}" style="text-align: left;">
+              <div class="macro-chip-val" id="today-macro-${macroKey}" style="text-align: left; font-size: 16px; font-weight: 700;">
                 ${currentNum}<span class="macro-chip-unit">${unit}</span>
               </div>
               <span class="macro-goal-subtext">de ${targetVal}${unit} (${percent}%)</span>
@@ -3945,14 +3945,14 @@ class FoodAssistantApp {
         nutritionContainer.innerHTML = `
           <div class="today-nutrition-header">
             <div class="today-nutrition-title">
-              <span class="material-symbols-outlined icon-sm" style="color: #d9480f;">local_fire_department</span> Resumen Nutricional Diario
+              <span class="material-symbols-outlined icon-sm" style="color: var(--m3-primary);">local_fire_department</span> Resumen Nutricional Diario
             </div>
             <div style="display: flex; align-items: center; gap: 6px;">
               ${headerGoalsBtn}
               <span class="today-nutrition-meta">${todayNutrition.mealCount} ${todayNutrition.mealCount === 1 ? 'comida' : 'comidas'}</span>
             </div>
           </div>
-          <div class="today-macros-grid">
+          <div class="today-macros-grid ${goalsEnabled ? 'has-goals' : ''}">
             ${formatChipWithGoal('cal', 'Calorías', todayNutrition.totalCalories, 'kcal', goals.calories)}
             ${formatChipWithGoal('prot', 'Proteínas', todayNutrition.totalProtein, 'g', goals.protein, true)}
             ${formatChipWithGoal('carbs', 'Carbos', todayNutrition.totalCarbs, 'g', goals.carbs)}

@@ -2,8 +2,8 @@
 
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
-> **Versión Actual**: v0.55  
-> **Última actualización**: Octubre 2026 (objetivos nutricionales diarios del usuario con seguimiento y alertas en Hoy v0.55)  
+> **Versión Actual**: v0.56  
+> **Última actualización**: Octubre 2026 (rediseño premium Material 3 de objetivos nutricionales en Hoy y modal de metas v0.56)  
 
 ---
 

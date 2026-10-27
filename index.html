@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#ffffff">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.55">
+  <link rel="stylesheet" href="styles.css?v=0.56">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%231a73e8'/><path d='M30 30h40v40H30z' fill='%23ffffff'/></svg>">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -332,36 +332,82 @@
     </div>
 
     <!-- 4.1: OBJETIVOS NUTRICIONALES DIARIOS (US-03) -->
+    <!-- 4.1: OBJETIVOS NUTRICIONALES DIARIOS (US-03) -->
     <div class="card" id="card-nutrition-goals">
-      <h3 style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-        <span class="material-symbols-outlined" style="color: #d9480f;">flag</span> Objetivos Nutricionales Diarios
-      </h3>
-      <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;">
-        Configura tus metas diarias de calorías y macronutrientes. En la pestaña "Hoy" verás el progreso de tus comidas y si estás en rango, por debajo o excediendo tu plan.
-      </p>
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--m3-outline-variant);">
-        <label for="toggle-nutrition-goals-enabled" style="font-size: 13px; font-weight: 500; cursor: pointer; color: var(--m3-on-surface);">Activar seguimiento de objetivos</label>
-        <input type="checkbox" id="toggle-nutrition-goals-enabled" style="width: 18px; height: 18px; cursor: pointer;">
-      </div>
-      <div id="nutrition-goals-inputs-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 12px;">
-        <div>
-          <label style="font-size: 11px; font-weight: 700; color: #d9480f; display: block; margin-bottom: 4px;">CALORÍAS (kcal)</label>
-          <input type="number" min="0" step="50" class="form-input" id="input-goal-calories" placeholder="Ej: 2000">
-        </div>
-        <div>
-          <label style="font-size: 11px; font-weight: 700; color: #1971c2; display: block; margin-bottom: 4px;">PROTEÍNAS (g)</label>
-          <input type="number" min="0" step="5" class="form-input" id="input-goal-protein" placeholder="Ej: 140">
-        </div>
-        <div>
-          <label style="font-size: 11px; font-weight: 700; color: #2f9e44; display: block; margin-bottom: 4px;">CARBOS (g)</label>
-          <input type="number" min="0" step="5" class="form-input" id="input-goal-carbs" placeholder="Ej: 200">
-        </div>
-        <div>
-          <label style="font-size: 11px; font-weight: 700; color: #f59f00; display: block; margin-bottom: 4px;">GRASAS (g)</label>
-          <input type="number" min="0" step="5" class="form-input" id="input-goal-fat" placeholder="Ej: 65">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <div class="modal-goals-icon-circle" style="width: 34px; height: 34px;">
+            <span class="material-symbols-outlined" style="font-size: 18px;">flag</span>
+          </div>
+          <div>
+            <h3 style="font-size: 14px; font-weight: 600; margin: 0; color: var(--m3-on-surface);">Objetivos Nutricionales Diarios</h3>
+            <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin: 2px 0 0 0;">
+              Compara el menú de cada día con tus metas recomendadas.
+            </p>
+          </div>
         </div>
       </div>
-      <div style="display: flex; gap: 8px; align-items: center;">
+
+      <div class="goals-switch-card">
+        <div class="goals-switch-info">
+          <span class="goals-switch-label">Activar seguimiento</span>
+          <span class="goals-switch-desc">Muestra el balance y progreso en la pestaña Hoy</span>
+        </div>
+        <label class="m3-switch" for="toggle-nutrition-goals-enabled">
+          <input type="checkbox" id="toggle-nutrition-goals-enabled">
+          <span class="m3-switch-track">
+            <span class="m3-switch-thumb"></span>
+          </span>
+        </label>
+      </div>
+
+      <div class="nutrient-input-grid" id="nutrition-goals-inputs-container">
+        <div class="nutrient-input-card nutrient-cal">
+          <div class="nutrient-input-header">
+            <span class="material-symbols-outlined nutrient-icon icon-cal">local_fire_department</span>
+            <span class="nutrient-name">Calorías</span>
+          </div>
+          <div class="nutrient-input-field-wrap">
+            <input type="number" min="0" step="50" class="nutrient-input" id="input-goal-calories" placeholder="2000">
+            <span class="nutrient-unit">kcal</span>
+          </div>
+        </div>
+
+        <div class="nutrient-input-card nutrient-prot">
+          <div class="nutrient-input-header">
+            <span class="material-symbols-outlined nutrient-icon icon-prot">fitness_center</span>
+            <span class="nutrient-name">Proteínas</span>
+          </div>
+          <div class="nutrient-input-field-wrap">
+            <input type="number" min="0" step="5" class="nutrient-input" id="input-goal-protein" placeholder="140">
+            <span class="nutrient-unit">g</span>
+          </div>
+        </div>
+
+        <div class="nutrient-input-card nutrient-carbs">
+          <div class="nutrient-input-header">
+            <span class="material-symbols-outlined nutrient-icon icon-carbs">grain</span>
+            <span class="nutrient-name">Carbohidratos</span>
+          </div>
+          <div class="nutrient-input-field-wrap">
+            <input type="number" min="0" step="5" class="nutrient-input" id="input-goal-carbs" placeholder="200">
+            <span class="nutrient-unit">g</span>
+          </div>
+        </div>
+
+        <div class="nutrient-input-card nutrient-fat">
+          <div class="nutrient-input-header">
+            <span class="material-symbols-outlined nutrient-icon icon-fat">water_drop</span>
+            <span class="nutrient-name">Grasas</span>
+          </div>
+          <div class="nutrient-input-field-wrap">
+            <input type="number" min="0" step="5" class="nutrient-input" id="input-goal-fat" placeholder="65">
+            <span class="nutrient-unit">g</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 8px; align-items: center; margin-top: 12px;">
         <button class="btn btn-primary btn-sm" id="btn-save-nutrition-goals">
           <span class="material-symbols-outlined icon-sm">save</span> Guardar objetivos
         </button>
@@ -427,7 +473,7 @@
         <span class="material-symbols-outlined" style="color: var(--m3-primary);">system_update</span> Versión y Actualizaciones
       </h3>
       <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px;">
-        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.55</strong>
+        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.56</strong>
       </p>
       <div style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
         Si acabas de desplegar o notas que algún cambio no aparece, pulsa el botón para limpiar la caché del Service Worker y cargar el código más reciente.
@@ -1053,45 +1099,84 @@
 
 <!-- MODAL: OBJETIVOS NUTRICIONALES DIARIOS (US-03) -->
 <div class="modal-overlay" id="modal-nutrition-goals">
-  <div class="modal-content" style="max-width: 440px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-      <h3 style="font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 6px; margin: 0;">
-        <span class="material-symbols-outlined" style="color: #d9480f;">flag</span> Objetivos Nutricionales
-      </h3>
+  <div class="modal-content" style="max-width: 440px; padding: 22px 20px;">
+    <div class="modal-goals-header">
+      <div class="modal-goals-title-group">
+        <div class="modal-goals-icon-circle">
+          <span class="material-symbols-outlined">flag</span>
+        </div>
+        <div>
+          <h3 class="modal-goals-title">Objetivos Nutricionales</h3>
+          <p class="modal-goals-subtitle">Define tus metas diarias para comparar tu ingesta en tiempo real.</p>
+        </div>
+      </div>
       <button type="button" class="btn btn-icon btn-sm" onclick="app.closeNutritionGoalsModal()" title="Cerrar">
         <span class="material-symbols-outlined icon-sm">close</span>
       </button>
     </div>
 
-    <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 14px; line-height: 1.4;">
-      Define tus metas diarias para comparar tu ingesta planificada en tiempo real.
-    </p>
-
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding: 10px 12px; background: var(--m3-surface-container); border-radius: var(--radius-sm);">
-      <label for="toggle-modal-goal-enabled" style="font-size: 13px; font-weight: 500; cursor: pointer; color: var(--m3-on-surface);">Activar seguimiento</label>
-      <input type="checkbox" id="toggle-modal-goal-enabled" style="width: 18px; height: 18px; cursor: pointer;">
+    <!-- Toggle Activar / Desactivar con Switch M3 -->
+    <div class="goals-switch-card">
+      <div class="goals-switch-info">
+        <span class="goals-switch-label">Activar seguimiento</span>
+        <span class="goals-switch-desc">Compara tu ingesta diaria en la pestaña Hoy</span>
+      </div>
+      <label class="m3-switch" for="toggle-modal-goal-enabled">
+        <input type="checkbox" id="toggle-modal-goal-enabled">
+        <span class="m3-switch-track">
+          <span class="m3-switch-thumb"></span>
+        </span>
+      </label>
     </div>
 
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px;">
-      <div>
-        <label style="font-size: 11px; font-weight: 700; color: #d9480f; display: block; margin-bottom: 4px;">CALORÍAS (kcal)</label>
-        <input type="number" min="0" step="50" class="form-input" id="input-modal-goal-calories" placeholder="Ej: 2000">
+    <!-- Nutrient Cards Grid -->
+    <div class="nutrient-input-grid">
+      <div class="nutrient-input-card nutrient-cal">
+        <div class="nutrient-input-header">
+          <span class="material-symbols-outlined nutrient-icon icon-cal">local_fire_department</span>
+          <span class="nutrient-name">Calorías</span>
+        </div>
+        <div class="nutrient-input-field-wrap">
+          <input type="number" min="0" step="50" class="nutrient-input" id="input-modal-goal-calories" placeholder="2000">
+          <span class="nutrient-unit">kcal</span>
+        </div>
       </div>
-      <div>
-        <label style="font-size: 11px; font-weight: 700; color: #1971c2; display: block; margin-bottom: 4px;">PROTEÍNAS (g)</label>
-        <input type="number" min="0" step="5" class="form-input" id="input-modal-goal-protein" placeholder="Ej: 140">
+
+      <div class="nutrient-input-card nutrient-prot">
+        <div class="nutrient-input-header">
+          <span class="material-symbols-outlined nutrient-icon icon-prot">fitness_center</span>
+          <span class="nutrient-name">Proteínas</span>
+        </div>
+        <div class="nutrient-input-field-wrap">
+          <input type="number" min="0" step="5" class="nutrient-input" id="input-modal-goal-protein" placeholder="140">
+          <span class="nutrient-unit">g</span>
+        </div>
       </div>
-      <div>
-        <label style="font-size: 11px; font-weight: 700; color: #2f9e44; display: block; margin-bottom: 4px;">CARBOHIDRATOS (g)</label>
-        <input type="number" min="0" step="5" class="form-input" id="input-modal-goal-carbs" placeholder="Ej: 200">
+
+      <div class="nutrient-input-card nutrient-carbs">
+        <div class="nutrient-input-header">
+          <span class="material-symbols-outlined nutrient-icon icon-carbs">grain</span>
+          <span class="nutrient-name">Carbohidratos</span>
+        </div>
+        <div class="nutrient-input-field-wrap">
+          <input type="number" min="0" step="5" class="nutrient-input" id="input-modal-goal-carbs" placeholder="200">
+          <span class="nutrient-unit">g</span>
+        </div>
       </div>
-      <div>
-        <label style="font-size: 11px; font-weight: 700; color: #f59f00; display: block; margin-bottom: 4px;">GRASAS (g)</label>
-        <input type="number" min="0" step="5" class="form-input" id="input-modal-goal-fat" placeholder="Ej: 65">
+
+      <div class="nutrient-input-card nutrient-fat">
+        <div class="nutrient-input-header">
+          <span class="material-symbols-outlined nutrient-icon icon-fat">water_drop</span>
+          <span class="nutrient-name">Grasas</span>
+        </div>
+        <div class="nutrient-input-field-wrap">
+          <input type="number" min="0" step="5" class="nutrient-input" id="input-modal-goal-fat" placeholder="65">
+          <span class="nutrient-unit">g</span>
+        </div>
       </div>
     </div>
 
-    <div style="display: flex; justify-content: flex-end; gap: 8px;">
+    <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
       <button type="button" class="btn btn-secondary btn-sm" onclick="app.closeNutritionGoalsModal()">Cancelar</button>
       <button type="button" class="btn btn-primary btn-sm" id="btn-modal-save-nutrition-goals" onclick="app.saveNutritionGoalsFromModal()">
         <span class="material-symbols-outlined icon-sm">check</span> Guardar
@@ -1136,7 +1221,7 @@
   </div>
 </div>
 
-<script src="config.js?v=0.55"></script>
-<script src="app.js?v=0.55"></script>
+<script src="config.js?v=0.56"></script>
+<script src="app.js?v=0.56"></script>
 </body>
 </html>
