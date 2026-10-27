@@ -1,6 +1,6 @@
 {
   "name": "food-assistant",
-  "version": "0.51.0",
+  "version": "0.52.0",
   "description": "Planificador de comidas y recetas minimalista estilo Google",
   "type": "module",
   "scripts": {

@@ -2004,6 +2004,66 @@ body {
 :root[data-theme="dark"] .macro-carbs .macro-chip-label { color: #8ce99a; }
 :root[data-theme="dark"] .macro-fat .macro-chip-label { color: #ffd43b; }
 
+/* Mini tabla de valores nutricionales en tarjeta de receta (US-01) */
+.recipe-card-macros {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  background: var(--m3-surface-container);
+  border: 1px solid var(--m3-outline-variant);
+  border-radius: var(--radius-sm);
+  padding: 6px 4px;
+  margin-bottom: 8px;
+  text-align: center;
+  transition: background-color 0.15s ease;
+}
+
+.recipe-card:hover .recipe-card-macros {
+  background: var(--m3-surface-container-high);
+}
+
+.card-macro-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 1px;
+}
+
+.card-macro-lbl {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 1px;
+  white-space: nowrap;
+}
+
+.card-macro-val {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--m3-on-surface);
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.card-macro-unit {
+  font-size: 9px;
+  font-weight: 500;
+  opacity: 0.8;
+  margin-left: 1px;
+}
+
+.card-macro-cal .card-macro-lbl { color: #d9480f; }
+.card-macro-prot .card-macro-lbl { color: #1971c2; }
+.card-macro-carbs .card-macro-lbl { color: #2f9e44; }
+.card-macro-fat .card-macro-lbl { color: #f59f00; }
+
+:root[data-theme="dark"] .card-macro-cal .card-macro-lbl { color: #ff922b; }
+:root[data-theme="dark"] .card-macro-prot .card-macro-lbl { color: #74c0fc; }
+:root[data-theme="dark"] .card-macro-carbs .card-macro-lbl { color: #8ce99a; }
+:root[data-theme="dark"] .card-macro-fat .card-macro-lbl { color: #ffd43b; }
+
 /* Today View Daily Nutrition Summary Card */
 .today-nutrition-card {
   background: var(--m3-surface-container);

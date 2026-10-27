@@ -249,4 +249,40 @@ describe('US-01: Contador de Calorías y Macronutrientes por plato y resumen dia
       expect(updated.nutrition.fat).toBe(8);
     });
   });
+
+  describe('Catálogo de Recetas con Tabla de Macros (US-01)', () => {
+    it('renderRecipesGrid incluye la tabla de valores nutricionales por ración en cada tarjeta', () => {
+      state.recipes = [
+        {
+          id: 'rec-card-macro-test',
+          title: 'Bowl Proteico de Atún',
+          description: 'Rápido y saludable',
+          imageUrl: 'https://example.com/bowl.jpg',
+          prepTimeMinutes: 10,
+          cookTimeMinutes: 0,
+          servings: 1,
+          nutrition: { calories: 380, protein: 35, carbs: 20, fat: 12 },
+          tags: ['Alta en Proteínas', 'Rápida']
+        }
+      ];
+
+      app.renderRecipesGrid(state.recipes);
+
+      const grid = document.getElementById('recipes-cards-grid');
+      expect(grid).not.toBeNull();
+      const card = grid.querySelector('.recipe-card');
+      expect(card).not.toBeNull();
+
+      const macrosTable = card.querySelector('.recipe-card-macros');
+      expect(macrosTable).not.toBeNull();
+      expect(macrosTable.textContent).toContain('380');
+      expect(macrosTable.textContent).toContain('35');
+      expect(macrosTable.textContent).toContain('20');
+      expect(macrosTable.textContent).toContain('12');
+      expect(macrosTable.querySelector('.card-macro-cal')).not.toBeNull();
+      expect(macrosTable.querySelector('.card-macro-prot')).not.toBeNull();
+      expect(macrosTable.querySelector('.card-macro-carbs')).not.toBeNull();
+      expect(macrosTable.querySelector('.card-macro-fat')).not.toBeNull();
+    });
+  });
 });

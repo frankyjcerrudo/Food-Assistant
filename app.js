@@ -2401,7 +2401,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.51';
+  window.APP_VERSION = 'v0.52';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2433,7 +2433,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.51';
+    this.appVersion = 'v0.52';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -3812,7 +3812,9 @@ class FoodAssistantApp {
 
     const sortedList = this.getSortedRecipes(recipesList);
 
-    grid.innerHTML = sortedList.map(rec => `
+    grid.innerHTML = sortedList.map(rec => {
+      const nut = getRecipeNutrition(rec);
+      return `
       <article class="recipe-card" onclick="app.openRecipeDetail('${rec.id}')">
         <div class="recipe-image-wrap">
           <img class="recipe-img" src="${rec.imageUrl}" alt="${rec.title}" loading="lazy">
@@ -3823,6 +3825,27 @@ class FoodAssistantApp {
         <div class="recipe-body">
           <h3 class="recipe-title">${rec.title}</h3>
           <p class="recipe-desc">${rec.description}</p>
+
+          <!-- Tabla compacta de valores nutricionales por ración (US-01) -->
+          <div class="recipe-card-macros" title="Valores nutricionales por ración individual">
+            <div class="card-macro-item card-macro-cal" title="Calorías">
+              <span class="card-macro-lbl">Calorías</span>
+              <span class="card-macro-val">${nut.calories}<span class="card-macro-unit">kcal</span></span>
+            </div>
+            <div class="card-macro-item card-macro-prot" title="Proteínas">
+              <span class="card-macro-lbl">Proteínas</span>
+              <span class="card-macro-val">${Math.round(nut.protein)}<span class="card-macro-unit">g</span></span>
+            </div>
+            <div class="card-macro-item card-macro-carbs" title="Carbohidratos">
+              <span class="card-macro-lbl">Carbos</span>
+              <span class="card-macro-val">${Math.round(nut.carbs)}<span class="card-macro-unit">g</span></span>
+            </div>
+            <div class="card-macro-item card-macro-fat" title="Grasas">
+              <span class="card-macro-lbl">Grasas</span>
+              <span class="card-macro-val">${Math.round(nut.fat)}<span class="card-macro-unit">g</span></span>
+            </div>
+          </div>
+
           <div class="recipe-tags">
             ${rec.sourceDomain ? `
               <span class="tag-chip" style="background: var(--m3-surface-container-high); color: var(--m3-primary); font-weight: 500; display: inline-flex; align-items: center; gap: 3px;" title="Fuente: ${rec.sourceDomain}">
@@ -3836,7 +3859,8 @@ class FoodAssistantApp {
           </div>
         </div>
       </article>
-    `).join('');
+    `;
+    }).join('');
   }
 
   // US-02: Filtro múltiple combinado con el buscador de recetas

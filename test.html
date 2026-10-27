@@ -301,8 +301,8 @@
   <div id="qa-sandbox" style="display: none;"></div>
 
   <!-- Entorno y dependencias de la app -->
-  <script src="config.js?v=0.51"></script>
-  <script src="app.js?v=0.51"></script>
+  <script src="config.js?v=0.52"></script>
+  <script src="app.js?v=0.52"></script>
 
   <script>
     const suites = [];
@@ -2049,7 +2049,7 @@ Bocadillo De Atun Paso A Paso
       });
 
       it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-        expect(window.APP_VERSION).toBe('v0.51');
+        expect(window.APP_VERSION).toBe('v0.52');
 
         const badge = document.createElement('span');
         badge.id = 'app-version-badge';
@@ -2064,8 +2064,8 @@ Bocadillo De Atun Paso A Paso
         };
         fakeApp.initVersion();
 
-        expect(badge.textContent).toBe('v0.51');
-        expect(settingsVer.textContent).toBe('v0.51');
+        expect(badge.textContent).toBe('v0.52');
+        expect(settingsVer.textContent).toBe('v0.52');
 
         document.body.removeChild(badge);
         document.body.removeChild(settingsVer);
@@ -3771,6 +3771,43 @@ Bocadillo De Atun Paso A Paso
           expect(updated.nutrition.protein).toBe(15);
           expect(updated.nutrition.carbs).toBe(34);
           expect(updated.nutrition.fat).toBe(8);
+        }
+      );
+
+      dietIt(
+        'renderRecipesGrid incluye la tabla de valores nutricionales por ración en cada tarjeta',
+        'Comprobar que las tarjetas del catálogo de recetas muestran la mini tabla .recipe-card-macros con calorías y macros.',
+        '.recipe-card-macros presente en la tarjeta con .card-macro-cal, prot, carbs y fat.',
+        (app) => {
+          W.state.recipes.push({
+            id: 'rec-card-macro-qa',
+            title: 'Bowl Proteico de Atún QA',
+            description: 'Rápido y saludable',
+            imageUrl: 'https://example.com/bowl.jpg',
+            prepTimeMinutes: 10,
+            cookTimeMinutes: 0,
+            servings: 1,
+            nutrition: { calories: 380, protein: 35, carbs: 20, fat: 12 },
+            tags: ['Alta en Proteínas', 'Rápida']
+          });
+
+          app.renderRecipesGrid(W.state.recipes);
+
+          const grid = document.getElementById('recipes-cards-grid');
+          expect(grid).not.toBeNull();
+          const card = grid.querySelector('.recipe-card');
+          expect(card).not.toBeNull();
+
+          const macrosTable = card.querySelector('.recipe-card-macros');
+          expect(macrosTable).not.toBeNull();
+          expect(macrosTable.textContent).toContain('380');
+          expect(macrosTable.textContent).toContain('35');
+          expect(macrosTable.textContent).toContain('20');
+          expect(macrosTable.textContent).toContain('12');
+          expect(macrosTable.querySelector('.card-macro-cal')).not.toBeNull();
+          expect(macrosTable.querySelector('.card-macro-prot')).not.toBeNull();
+          expect(macrosTable.querySelector('.card-macro-carbs')).not.toBeNull();
+          expect(macrosTable.querySelector('.card-macro-fat')).not.toBeNull();
         }
       );
     });
