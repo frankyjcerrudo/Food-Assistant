@@ -2,8 +2,8 @@
 
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
-> **Versión Actual**: v0.58  
-> **Última actualización**: Octubre 2026 (detección precisa de descompensación de macros en el banner de Hoy v0.58)  
+> **Versión Actual**: v0.59  
+> **Última actualización**: Octubre 2026 (calibración rigurosa de Alta en Proteínas con exclusión de dulces hipercalóricos e inclusión de comidas reales v0.59)  
 
 ---
 

@@ -127,6 +127,27 @@ describe('US-01: Contador de Calorías y Macronutrientes por plato y resumen dia
         ingredients: [{ name: 'Huevo', amount: 1, unit: 'ud' }, { name: 'Aguacate' }]
       };
       expect(analyzeAndInferRecipeTags(eggToast)).not.toContain('Alta en Proteínas');
+
+      // Caso Franky v0.59: Gnocchis (23g de proteína, 658 kcal) DEBEN ser Alta en Proteínas
+      const gnocchisRecipe = {
+        title: 'Gnocchis gratinados con chorizo con queso fundido',
+        servings: 1,
+        nutrition: { calories: 658, protein: 23, carbs: 49, fat: 39 },
+        ingredients: [{ name: 'Gnocchis' }, { name: 'Chorizo', aisle: 'meat' }, { name: 'Queso', aisle: 'dairy' }]
+      };
+      const gnocchiTags = analyzeAndInferRecipeTags(gnocchisRecipe);
+      expect(gnocchiTags).toContain('Alta en Proteínas');
+
+      // Caso Franky v0.59: Carrot Cake (31g de proteína pero 1236 kcal, 91g grasa, postre dulce) NO debe ser Alta en Proteínas
+      const carrotCakeRecipe = {
+        title: 'Carrot Cake',
+        description: 'Tarta clásica de zanahoria con cobertura de queso crema y nueces',
+        servings: 1,
+        nutrition: { calories: 1236, protein: 31, carbs: 74, fat: 91 },
+        ingredients: [{ name: 'Zanahorias' }, { name: 'Harina' }, { name: 'Nueces' }, { name: 'Queso crema' }]
+      };
+      const cakeTags = analyzeAndInferRecipeTags(carrotCakeRecipe);
+      expect(cakeTags).not.toContain('Alta en Proteínas');
     });
   });
 
