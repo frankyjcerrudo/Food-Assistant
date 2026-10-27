@@ -460,5 +460,50 @@ describe('US-01: Contador de Calorías y Macronutrientes por plato y resumen dia
       expect(banner).not.toBeNull();
       expect(banner.textContent).toContain('Menú equilibrado');
     });
+
+    it('v0.58: detecta descompensación de macronutrientes (grasas excedidas y carbos bajos) aunque calorías y proteínas estén en rango', () => {
+      // Caso idéntico al reportado por Franky:
+      // Calorías: 2308 (meta 2200, 105% -> en rango)
+      // Proteínas: 161g (meta 165g, 98% -> en rango)
+      // Carbos: 144g (meta 210g, 69% -> faltan 66g)
+      // Grasas: 119g (meta 65g, 184% -> +54g)
+      state.recipes = [
+        {
+          id: 'rec-imbalanced-day',
+          title: 'Día con Grasas Altas y Carbos Bajos',
+          servings: 1,
+          nutrition: { calories: 2308, protein: 161, carbs: 144, fat: 119 }
+        }
+      ];
+
+      const todayKey = toLocalDateKey();
+      state.mealPlan = {
+        [todayKey]: {
+          lunch: { recipeId: 'rec-imbalanced-day' }
+        }
+      };
+
+      state.saveNutritionGoals({
+        enabled: true,
+        calories: 2200,
+        protein: 165,
+        carbs: 210,
+        fat: 65
+      });
+
+      app.renderTodayView();
+
+      const card = document.getElementById('today-nutrition-card');
+      // No debe mostrar "Menú equilibrado"
+      const okBanner = card.querySelector('.today-goal-banner.banner-ok');
+      expect(okBanner).toBeNull();
+
+      // Debe mostrar el banner de aviso con la descompensación detectada
+      const alertBanner = card.querySelector('.today-goal-banner.banner-over');
+      expect(alertBanner).not.toBeNull();
+      expect(alertBanner.textContent).toContain('Distribución descompensada');
+      expect(alertBanner.textContent).toContain('exceso de 54g de grasas');
+      expect(alertBanner.textContent).toContain('faltan 66g de carbos');
+    });
   });
 });

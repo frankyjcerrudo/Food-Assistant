@@ -2,8 +2,8 @@
 
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
-> **Versión Actual**: v0.57  
-> **Última actualización**: Octubre 2026 (sincronización bidireccional de nutrición y etiquetas de recetas con fallback en Supabase v0.57)  
+> **Versión Actual**: v0.58  
+> **Última actualización**: Octubre 2026 (detección precisa de descompensación de macros en el banner de Hoy v0.58)  
 
 ---
 

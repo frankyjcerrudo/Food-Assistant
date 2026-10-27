@@ -2443,7 +2443,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.57';
+  window.APP_VERSION = 'v0.58';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2475,7 +2475,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.57';
+    this.appVersion = 'v0.58';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -3973,12 +3973,18 @@ class FoodAssistantApp {
         };
 
         let goalBannerHtml = '';
-        if (goalsEnabled && (goals.calories > 0 || goals.protein > 0)) {
+        if (goalsEnabled && (goals.calories > 0 || goals.protein > 0 || goals.carbs > 0 || goals.fat > 0)) {
           const calGoal = Number(goals.calories) || 0;
           const protGoal = Number(goals.protein) || 0;
+          const carbsGoal = Number(goals.carbs) || 0;
+          const fatGoal = Number(goals.fat) || 0;
+
           const calCurrent = todayNutrition.totalCalories;
           const protCurrent = Math.round(todayNutrition.totalProtein);
+          const carbsCurrent = Math.round(todayNutrition.totalCarbs);
+          const fatCurrent = Math.round(todayNutrition.totalFat);
 
+          // 1. Calorías globales (máxima prioridad energética)
           if (calGoal > 0 && calCurrent > calGoal * 1.1) {
             const excess = calCurrent - calGoal;
             goalBannerHtml = `
@@ -3995,21 +4001,79 @@ class FoodAssistantApp {
                 <span>Plan actual: Faltan <strong>${missing} kcal</strong> para alcanzar tu meta diaria.</span>
               </div>
             `;
-          } else if (protGoal > 0 && protCurrent < protGoal * 0.85) {
-            const missingP = protGoal - protCurrent;
-            goalBannerHtml = `
-              <div class="today-goal-banner banner-under">
-                <span class="material-symbols-outlined icon-sm">fitness_center</span>
-                <span>Aporte proteico: Faltan <strong>${missingP}g</strong> de proteína para alcanzar tu meta diaria.</span>
-              </div>
-            `;
           } else {
-            goalBannerHtml = `
-              <div class="today-goal-banner banner-ok">
-                <span class="material-symbols-outlined icon-sm">check_circle</span>
-                <span>¡Menú equilibrado! Tu plan de comidas de hoy cumple con los objetivos nutricionales configurados.</span>
-              </div>
-            `;
+            // 2. Comprobar descompensación en macronutrientes individuales (proteínas, carbos, grasas)
+            const overMacros = [];
+            const underMacros = [];
+
+            if (protGoal > 0) {
+              if (protCurrent < protGoal * 0.85) {
+                underMacros.push(`faltan ${protGoal - protCurrent}g de proteína`);
+              } else if (protCurrent > protGoal * 1.3) {
+                overMacros.push(`+${protCurrent - protGoal}g de proteína`);
+              }
+            }
+
+            if (carbsGoal > 0) {
+              if (carbsCurrent < carbsGoal * 0.85) {
+                underMacros.push(`faltan ${carbsGoal - carbsCurrent}g de carbos`);
+              } else if (carbsCurrent > carbsGoal * 1.1) {
+                overMacros.push(`+${carbsCurrent - carbsGoal}g de carbos`);
+              }
+            }
+
+            if (fatGoal > 0) {
+              if (fatCurrent < fatGoal * 0.85) {
+                underMacros.push(`faltan ${fatGoal - fatCurrent}g de grasas`);
+              } else if (fatCurrent > fatGoal * 1.1) {
+                overMacros.push(`+${fatCurrent - fatGoal}g de grasas`);
+              }
+            }
+
+            const totalIssues = overMacros.length + underMacros.length;
+
+            if (totalIssues > 0) {
+              const bannerClass = overMacros.length > 0 ? 'banner-over' : 'banner-under';
+              const icon = overMacros.length > 0 ? 'warning' : 'tune';
+
+              if (totalIssues === 1) {
+                if (underMacros.length === 1) {
+                  const item = underMacros[0];
+                  goalBannerHtml = `
+                    <div class="today-goal-banner ${bannerClass}">
+                      <span class="material-symbols-outlined icon-sm">${icon}</span>
+                      <span>Plan actual: ${item.charAt(0).toUpperCase() + item.slice(1)} para alcanzar tu meta.</span>
+                    </div>
+                  `;
+                } else {
+                  const item = overMacros[0];
+                  goalBannerHtml = `
+                    <div class="today-goal-banner ${bannerClass}">
+                      <span class="material-symbols-outlined icon-sm">${icon}</span>
+                      <span>Aviso de macros: Exceso de <strong>${item.replace('+', '')}</strong> respecto a tu objetivo diario.</span>
+                    </div>
+                  `;
+                }
+              } else {
+                const parts = [
+                  ...overMacros.map(o => `exceso de ${o.replace('+', '')}`),
+                  ...underMacros
+                ];
+                goalBannerHtml = `
+                  <div class="today-goal-banner ${bannerClass}">
+                    <span class="material-symbols-outlined icon-sm">${icon}</span>
+                    <span>Distribución descompensada: ${parts.join(' y ')}.</span>
+                  </div>
+                `;
+              }
+            } else {
+              goalBannerHtml = `
+                <div class="today-goal-banner banner-ok">
+                  <span class="material-symbols-outlined icon-sm">check_circle</span>
+                  <span>¡Menú equilibrado! Tu plan de comidas de hoy cumple con los objetivos nutricionales configurados.</span>
+                </div>
+              `;
+            }
           }
         }
 
