@@ -520,21 +520,24 @@ function analyzeAndInferRecipeTags(recipe) {
     }
 
     // Alta en Proteínas:
-    // 1) >= 20g de proteína por ración (umbral de síntesis proteica muscular)
-    // 2) O al menos el 25% de las calorías totales provienen de proteínas (densidad proteica para batidos/snacks)
-    // 3) O fuentes proteicas clave / suplementos (whey, aislado, proteína, claras)
-    const hasHighProteinGrams = nutrition && nutrition.protein >= 20;
-    const hasHighProteinDensity = nutrition && nutrition.calories > 0 && ((nutrition.protein * 4) / nutrition.calories) >= 0.25;
-    const hasProteinSource = ingNames.some(name => /\b(pollo|pechuga|pavo|ternera|solomillo|at[uú]n|salm[oó]n|merluza|bacalao|gambas?|langostinos?|huevos?|claras?|tofu|tempeh|seit[aá]n|soja texturizada|reques[oó]n|cottage|prote[ií]na|whey|aislado|lentejas?|garbanzos?|alubias?)\b/i.test(name)) || /\b(batido de prote[ií]nas?|proteico|proteica|whey)\b/i.test(`${title} ${desc}`);
+    // 1) Plato principal rico en proteínas: >= 25g de proteína por ración individual
+    // 2) O batido / snack / comida ligera con alta densidad proteica: >= 20g de proteína Y >= 30% de las calorías totales provienen de proteínas
+    // 3) O suplementos proteicos explícitos (whey, aislado de proteína, batido de proteínas)
+    const hasHighProteinGrams = nutrition && nutrition.protein >= 25;
+    const hasHighProteinDensity = nutrition && nutrition.protein >= 20 && nutrition.calories > 0 && ((nutrition.protein * 4) / nutrition.calories) >= 0.30;
+    const hasExplicitSupplement = /\b(batido de prote[ií]nas?|whey|aislado de prote[ií]na|suplemento proteico)\b/i.test(`${title} ${desc} ${allIngText}`);
 
-    if (hasHighProteinGrams || hasHighProteinDensity || hasProteinSource) {
+    if (hasHighProteinGrams || hasHighProteinDensity || hasExplicitSupplement) {
       inferred.add('Alta en Proteínas');
     }
   } else {
     // Si la receta no tiene ingredientes desglosados pero sí nutrición directa
     const nutrition = (typeof getRecipeNutrition === 'function') ? getRecipeNutrition(recipe) : null;
     if (nutrition) {
-      if (nutrition.protein >= 20 || (nutrition.calories > 0 && ((nutrition.protein * 4) / nutrition.calories) >= 0.25)) {
+      const isHighGrams = nutrition.protein >= 25;
+      const isHighDensity = nutrition.protein >= 20 && nutrition.calories > 0 && ((nutrition.protein * 4) / nutrition.calories) >= 0.30;
+      const hasExplicit = /\b(batido de prote[ií]nas?|whey|aislado de prote[ií]na|suplemento proteico)\b/i.test(`${title} ${desc}`);
+      if (isHighGrams || isHighDensity || hasExplicit) {
         inferred.add('Alta en Proteínas');
       }
       if (nutrition.carbs > 0 && nutrition.carbs <= 20) {
@@ -1173,11 +1176,25 @@ class StateStore {
       }
     }
     if (Array.isArray(savedRecipes)) {
+      let tagsCleaned = false;
       savedRecipes.forEach(r => {
         if (!r.createdAt && r.updatedAt) {
           r.createdAt = r.updatedAt;
         }
+        // Saneamiento v0.53: limpiar etiqueta 'Alta en Proteínas' si fue asignada erróneamente por ingredientes en lugar de por macros reales
+        if (Array.isArray(r.tags) && r.tags.includes('Alta en Proteínas')) {
+          const nut = (typeof getRecipeNutrition === 'function') ? getRecipeNutrition(r) : (r.nutrition || null);
+          const isExplicit = /\b(batido de prote[ií]nas?|whey|aislado de prote[ií]na|suplemento proteico)\b/i.test(`${r.title || ''} ${r.description || ''}`);
+          const qualifies = nut && ((nut.protein >= 25) || (nut.protein >= 20 && nut.calories > 0 && ((nut.protein * 4) / nut.calories) >= 0.30));
+          if (!qualifies && !isExplicit) {
+            r.tags = r.tags.filter(t => t !== 'Alta en Proteínas');
+            tagsCleaned = true;
+          }
+        }
       });
+      if (tagsCleaned) {
+        try { localStorage.setItem('fa_recipes', JSON.stringify(savedRecipes)); } catch (e) {}
+      }
     }
     this.recipes = savedRecipes;
 
@@ -2401,7 +2418,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.52';
+  window.APP_VERSION = 'v0.53';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2433,7 +2450,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.52';
+    this.appVersion = 'v0.53';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -6499,19 +6516,27 @@ class FoodAssistantApp {
       }
 
       const existingTags = Array.isArray(recipe.tags) ? recipe.tags : [];
-      const existingLower = new Set(existingTags.map(t => String(t).toLowerCase().trim()));
       const inferredTags = analyzeAndInferRecipeTags(recipe);
 
+      // Limpiar 'Alta en Proteínas' si ya no califica según el análisis nutricional actual
+      let tagsUpdated = false;
+      let currentTags = [...existingTags];
+      if (currentTags.includes('Alta en Proteínas') && !inferredTags.includes('Alta en Proteínas')) {
+        currentTags = currentTags.filter(t => t !== 'Alta en Proteínas');
+        tagsUpdated = true;
+      }
+
+      const currentLower = new Set(currentTags.map(t => String(t).toLowerCase().trim()));
       const newTagsToAdd = [];
       inferredTags.forEach(tag => {
-        if (!existingLower.has(tag.toLowerCase().trim()) && tag.toLowerCase().trim() !== 'general') {
+        if (!currentLower.has(tag.toLowerCase().trim()) && tag.toLowerCase().trim() !== 'general') {
           newTagsToAdd.push(tag);
           state.addCustomTag && state.addCustomTag(tag);
         }
       });
 
-      if (newTagsToAdd.length > 0) {
-        recipe.tags = [...existingTags, ...newTagsToAdd];
+      if (newTagsToAdd.length > 0 || tagsUpdated) {
+        recipe.tags = [...currentTags, ...newTagsToAdd];
         recipe.updatedAt = nowIso;
         updatedCount++;
         totalTagsAdded += newTagsToAdd.length;

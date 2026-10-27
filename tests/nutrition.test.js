@@ -110,6 +110,23 @@ describe('US-01: Contador de Calorías y Macronutrientes por plato y resumen dia
       };
       const tagsLow = analyzeAndInferRecipeTags(lowProteinRecipe);
       expect(tagsLow).not.toContain('Alta en Proteínas');
+
+      // Comidas estándar con un poco de huevo o legumbres: NO deben marcarse como Alta en Proteínas
+      const hummusToast = {
+        title: 'Tostas de Hummus',
+        servings: 1,
+        nutrition: { calories: 290, protein: 11, carbs: 36, fat: 10 },
+        ingredients: [{ name: 'Garbanzos en hummus', amount: 60, unit: 'g' }]
+      };
+      expect(analyzeAndInferRecipeTags(hummusToast)).not.toContain('Alta en Proteínas');
+
+      const eggToast = {
+        title: 'Tostadas de Aguacate y Huevo Poché',
+        servings: 1,
+        nutrition: { calories: 340, protein: 15, carbs: 26, fat: 19 },
+        ingredients: [{ name: 'Huevo', amount: 1, unit: 'ud' }, { name: 'Aguacate' }]
+      };
+      expect(analyzeAndInferRecipeTags(eggToast)).not.toContain('Alta en Proteínas');
     });
   });
 

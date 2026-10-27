@@ -86,9 +86,11 @@ describe('US-02: Filtros Dietéticos, Selector de Chips & Advertencias Nutricion
 
       const stew = analyzeAndInferRecipeTags({
         title: 'Guiso de lentejas',
+        nutrition: { calories: 380, protein: 16, carbs: 48, fat: 8 },
         ingredients: [{ name: 'Lentejas' }]
       });
       expect(stew).toContain('Almuerzo');
+      expect(stew).not.toContain('Alta en Proteínas');
 
       const tomato = analyzeAndInferRecipeTags({ title: 'Tomates', ingredients: [{ name: 'Tomates' }] });
       expect(tomato).not.toContain('Alta en Proteínas');
