@@ -1241,6 +1241,7 @@ class StateStore {
       geminiModel: 'gemini-2.5-flash'
     });
     this.dietaryPreferences = this.load('fa_dietary_preferences', []);
+    this.dietaryUpdatedAt = localStorage.getItem('fa_dietary_updated_at') || null;
     this.customTags = this.load('fa_custom_tags', []);
     this.theme = localStorage.getItem('fa_theme_mode') || 'light';
     this.cloudUser = this.load('fa_cloud_user', null);
@@ -1253,7 +1254,9 @@ class StateStore {
 
   saveDietaryPreferences(prefs) {
     this.dietaryPreferences = Array.isArray(prefs) ? prefs : [];
+    this.dietaryUpdatedAt = new Date().toISOString();
     this.save('fa_dietary_preferences', this.dietaryPreferences);
+    this.save('fa_dietary_updated_at', this.dietaryUpdatedAt);
   }
 
   addCustomTag(tag) {
@@ -2418,7 +2421,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.53';
+  window.APP_VERSION = 'v0.54';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2450,7 +2453,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.53';
+    this.appVersion = 'v0.54';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -3095,10 +3098,94 @@ class FoodAssistantApp {
         });
       }
 
+      // 4. Fusión de Preferencias Dietéticas y Tags Personalizados (Sincronización multi-dispositivo)
+      let remoteDietary = null;
+      let remoteCustomTags = null;
+      let remoteDietaryUpdatedAt = null;
+
+      try {
+        if (this.supabaseClient?.from) {
+          const settingsRes = await this.supabaseClient.from('user_settings').select('*').eq('user_id', state.cloudUser.id);
+          if (Array.isArray(settingsRes?.data) && settingsRes.data.length > 0) {
+            const sRow = settingsRes.data[0];
+            if (Array.isArray(sRow.dietary_preferences)) remoteDietary = sRow.dietary_preferences;
+            if (Array.isArray(sRow.custom_tags)) remoteCustomTags = sRow.custom_tags;
+            if (sRow.updated_at) remoteDietaryUpdatedAt = sRow.updated_at;
+          }
+        }
+      } catch (e) {
+        // Ignorar si la tabla user_settings no existe
+      }
+
+      if (this.supabaseClient?.auth && typeof this.supabaseClient.auth.getUser === 'function') {
+        try {
+          const authRes = await this.supabaseClient.auth.getUser();
+          const meta = authRes?.data?.user?.user_metadata;
+          if (meta) {
+            if (Array.isArray(meta.dietary_preferences)) {
+              const metaTime = meta.dietary_updated_at ? new Date(meta.dietary_updated_at).getTime() : 0;
+              const rowTime = remoteDietaryUpdatedAt ? new Date(remoteDietaryUpdatedAt).getTime() : 0;
+              if (!remoteDietary || metaTime >= rowTime) {
+                remoteDietary = meta.dietary_preferences;
+                remoteDietaryUpdatedAt = meta.dietary_updated_at;
+              }
+            }
+            if (Array.isArray(meta.custom_tags)) {
+              remoteCustomTags = Array.isArray(remoteCustomTags)
+                ? [...new Set([...remoteCustomTags, ...meta.custom_tags])]
+                : meta.custom_tags;
+            }
+          }
+        } catch (authErr) {
+          // Ignorar si no está disponible auth
+        }
+      }
+
+      if (!remoteDietary && Array.isArray(state.cloudUser?.user_metadata?.dietary_preferences)) {
+        remoteDietary = state.cloudUser.user_metadata.dietary_preferences;
+        remoteDietaryUpdatedAt = state.cloudUser.user_metadata.dietary_updated_at;
+      }
+      if (!remoteCustomTags && Array.isArray(state.cloudUser?.user_metadata?.custom_tags)) {
+        remoteCustomTags = state.cloudUser.user_metadata.custom_tags;
+      }
+
+      if (Array.isArray(remoteDietary)) {
+        const localTime = state.dietaryUpdatedAt ? new Date(state.dietaryUpdatedAt).getTime() : 0;
+        const remoteTime = remoteDietaryUpdatedAt ? new Date(remoteDietaryUpdatedAt).getTime() : 0;
+        if (remoteTime >= localTime || !state.dietaryUpdatedAt) {
+          const localJson = JSON.stringify(state.dietaryPreferences || []);
+          const remoteJson = JSON.stringify(remoteDietary);
+          if (localJson !== remoteJson) {
+            state.dietaryPreferences = [...remoteDietary];
+            state.save('fa_dietary_preferences', state.dietaryPreferences);
+            if (remoteDietaryUpdatedAt) {
+              state.dietaryUpdatedAt = remoteDietaryUpdatedAt;
+              state.save('fa_dietary_updated_at', state.dietaryUpdatedAt);
+            }
+            stateChanged = true;
+          }
+        }
+      }
+
+      if (Array.isArray(remoteCustomTags) && remoteCustomTags.length > 0) {
+        let tagsChanged = false;
+        remoteCustomTags.forEach(t => {
+          if (t && typeof t === 'string' && !state.customTags.some(existing => existing.toLowerCase() === t.toLowerCase())) {
+            state.customTags.push(t.trim());
+            tagsChanged = true;
+          }
+        });
+        if (tagsChanged) {
+          state.save('fa_custom_tags', state.customTags);
+          stateChanged = true;
+        }
+      }
+
       if (stateChanged) {
         state.save('fa_recipes', state.recipes);
         state.save('fa_mealplan', state.mealPlan);
         state.save('fa_shopping', state.shoppingList);
+        this.renderDietaryPreferencesSettings();
         this.render();
       }
 
@@ -3113,10 +3200,10 @@ class FoodAssistantApp {
   async upsertWithSchemaFallback(table, payload) {
     if (!payload || payload.length === 0) return { success: true };
     if (!this.unsupportedColumns) {
-      this.unsupportedColumns = { recipes: new Set(), meal_plans: new Set(), shopping_items: new Set() };
+      this.unsupportedColumns = { recipes: new Set(), meal_plans: new Set(), shopping_items: new Set(), user_settings: new Set() };
     }
     if (!this.preferredConflictTargets) {
-      this.preferredConflictTargets = { recipes: 'user_id,id', meal_plans: 'user_id,id', shopping_items: 'user_id,id' };
+      this.preferredConflictTargets = { recipes: 'user_id,id', meal_plans: 'user_id,id', shopping_items: 'user_id,id', user_settings: 'user_id' };
     }
 
     let conflict = this.preferredConflictTargets[table] || 'user_id,id';
@@ -3288,7 +3375,42 @@ class FoodAssistantApp {
         if (!sRes.success) throw sRes.error;
       }
 
-      // 5. Éxito confirmado: actualizar marca temporal
+      // 5. Preferencias Dietéticas y Tags Personalizados (Sincronización multi-dispositivo)
+      if (this.supabaseClient?.auth && typeof this.supabaseClient.auth.updateUser === 'function') {
+        try {
+          const metaPayload = {
+            dietary_preferences: state.dietaryPreferences || [],
+            custom_tags: state.customTags || [],
+            dietary_updated_at: state.dietaryUpdatedAt || new Date().toISOString()
+          };
+          await this.supabaseClient.auth.updateUser({ data: metaPayload });
+          if (state.cloudUser) {
+            state.cloudUser.user_metadata = {
+              ...(state.cloudUser.user_metadata || {}),
+              ...metaPayload
+            };
+            state.save('fa_cloud_user', state.cloudUser);
+          }
+        } catch (prefErr) {
+          console.warn("[Sync] Error al actualizar user_metadata:", prefErr);
+        }
+      }
+
+      // Opcional: Persistir en tabla user_settings si existe en el backend
+      try {
+        if (typeof this.upsertWithSchemaFallback === 'function') {
+          await this.upsertWithSchemaFallback('user_settings', [{
+            user_id: state.cloudUser.id,
+            dietary_preferences: state.dietaryPreferences || [],
+            custom_tags: state.customTags || [],
+            updated_at: state.dietaryUpdatedAt || new Date().toISOString()
+          }]);
+        }
+      } catch (tableErr) {
+        // user_settings es opcional, user_metadata garantiza la persistencia multi-dispositivo
+      }
+
+      // 6. Éxito confirmado: actualizar marca temporal
       state.lastSyncedAt = new Date().toISOString();
       localStorage.setItem('fa_last_sync', state.lastSyncedAt);
       this.updateUserAccountUI();
@@ -4440,6 +4562,7 @@ class FoodAssistantApp {
     input.value = '';
     this.renderRecipeEditorChips();
     this.initRecipeTagFilters();
+    this.scheduleSyncWithCloud();
   }
 
   attachIngredientAutocomplete(inputElem, dropdownElem, onSelect) {
@@ -6500,6 +6623,7 @@ class FoodAssistantApp {
     this.renderDietaryPreferencesSettings();
     this.renderPlanner();
     this.renderTodayView();
+    this.scheduleSyncWithCloud();
   }
 
   // US-02: Auto-análisis inteligente y etiquetado masivo de recetas guardadas

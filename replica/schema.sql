@@ -110,3 +110,27 @@ create policy "Users own shopping update" on public.shopping_items for update us
 
 drop policy if exists "Users own shopping delete" on public.shopping_items;
 create policy "Users own shopping delete" on public.shopping_items for delete using (auth.uid() = user_id);
+
+-- 4. TABLA DE CONFIGURACIONES Y PREFERENCIAS (User Settings)
+create table if not exists public.user_settings (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  dietary_preferences text[] default array[]::text[],
+  custom_tags text[] default array[]::text[],
+  updated_at timestamptz not null default now(),
+  primary key (user_id)
+);
+
+alter table public.user_settings enable row level security;
+
+drop policy if exists "Users own settings select" on public.user_settings;
+create policy "Users own settings select" on public.user_settings for select using (auth.uid() = user_id);
+
+drop policy if exists "Users own settings insert" on public.user_settings;
+create policy "Users own settings insert" on public.user_settings for insert with check (auth.uid() = user_id);
+
+drop policy if exists "Users own settings update" on public.user_settings;
+create policy "Users own settings update" on public.user_settings for update using (auth.uid() = user_id);
+
+drop policy if exists "Users own settings delete" on public.user_settings;
+create policy "Users own settings delete" on public.user_settings for delete using (auth.uid() = user_id);
+

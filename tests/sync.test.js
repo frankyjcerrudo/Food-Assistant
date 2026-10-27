@@ -517,4 +517,89 @@ describe('US-35 & Bugs Bloqueantes: Sincronización Supabase, IDs Únicos y Esqu
       expect(badge.textContent).toBe('1 de 2');
     });
   });
+
+  // 8. Sincronización multi-dispositivo de Preferencias Dietéticas y Tags Personalizados
+  describe('Multi-dispositivo: Sincronización de Preferencias Dietéticas y Tags Personalizados', () => {
+    it('pushToCloud debe enviar preferencias dietéticas y etiquetas personalizadas a user_metadata', async () => {
+      let updatedUserMetadata = null;
+      let upsertTable = null;
+      let upsertPayload = null;
+
+      const mockSupabase = {
+        auth: {
+          updateUser: vi.fn().mockImplementation(async ({ data }) => {
+            updatedUserMetadata = data;
+            return { data: { user: { user_metadata: data } }, error: null };
+          })
+        },
+        from: vi.fn().mockReturnValue({
+          delete: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ error: null })
+            })
+          }),
+          upsert: vi.fn().mockImplementation(async (payload) => {
+            upsertPayload = payload;
+            return { data: payload, error: null };
+          })
+        })
+      };
+
+      appInstance.supabaseClient = mockSupabase;
+      state.saveDietaryPreferences(['Vegano', 'Sin Gluten']);
+      state.addCustomTag('Airfryer Pro');
+
+      const pushRes = await appInstance.pushToCloud(true);
+      expect(pushRes.success).toBe(true);
+      expect(mockSupabase.auth.updateUser).toHaveBeenCalled();
+      expect(updatedUserMetadata.dietary_preferences).toEqual(['Vegano', 'Sin Gluten']);
+      expect(updatedUserMetadata.custom_tags).toContain('Airfryer Pro');
+    });
+
+    it('pullFromCloud debe descargar preferencias dietéticas y etiquetas de user_metadata y fusionarlas', async () => {
+      const mockSupabase = {
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: {
+              user: {
+                id: 'test-user-uuid-1234',
+                user_metadata: {
+                  dietary_preferences: ['Keto', 'Alta en Proteínas'],
+                  custom_tags: ['MealPrep Rápido'],
+                  dietary_updated_at: '2026-10-27T15:00:00Z'
+                }
+              }
+            },
+            error: null
+          })
+        },
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: [], error: null })
+          })
+        })
+      };
+
+      state.dietaryPreferences = [];
+      state.customTags = [];
+      state.dietaryUpdatedAt = null;
+
+      appInstance.supabaseClient = mockSupabase;
+      const pullRes = await appInstance.pullFromCloud();
+
+      expect(pullRes.success).toBe(true);
+      expect(state.dietaryPreferences).toEqual(['Keto', 'Alta en Proteínas']);
+      expect(state.customTags).toContain('MealPrep Rápido');
+      expect(localStorage.getItem('fa_dietary_preferences')).toBe(JSON.stringify(['Keto', 'Alta en Proteínas']));
+    });
+
+    it('toggleDietaryPreference programa la sincronización con la nube', () => {
+      const scheduleSpy = vi.spyOn(appInstance, 'scheduleSyncWithCloud');
+      appInstance.toggleDietaryPreference('Vegano');
+
+      expect(state.dietaryPreferences).toContain('Vegano');
+      expect(scheduleSpy).toHaveBeenCalled();
+    });
+  });
 });
+

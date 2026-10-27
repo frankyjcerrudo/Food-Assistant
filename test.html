@@ -301,8 +301,8 @@
   <div id="qa-sandbox" style="display: none;"></div>
 
   <!-- Entorno y dependencias de la app -->
-  <script src="config.js?v=0.53"></script>
-  <script src="app.js?v=0.53"></script>
+  <script src="config.js?v=0.54"></script>
+  <script src="app.js?v=0.54"></script>
 
   <script>
     const suites = [];
@@ -2049,7 +2049,7 @@ Bocadillo De Atun Paso A Paso
       });
 
       it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-        expect(window.APP_VERSION).toBe('v0.53');
+        expect(window.APP_VERSION).toBe('v0.54');
 
         const badge = document.createElement('span');
         badge.id = 'app-version-badge';
@@ -2064,8 +2064,8 @@ Bocadillo De Atun Paso A Paso
         };
         fakeApp.initVersion();
 
-        expect(badge.textContent).toBe('v0.53');
-        expect(settingsVer.textContent).toBe('v0.53');
+        expect(badge.textContent).toBe('v0.54');
+        expect(settingsVer.textContent).toBe('v0.54');
 
         document.body.removeChild(badge);
         document.body.removeChild(settingsVer);
@@ -3024,6 +3024,67 @@ Bocadillo De Atun Paso A Paso
             resolvedRes = res;
           });
           expect(resolvedRes).toBe('produce');
+        }
+      );
+
+      it(
+        'Multi-dispositivo: pushToCloud y pullFromCloud sincronizan preferencias dietéticas y custom tags',
+        {
+          purpose: 'Verificar la sincronización bidireccional multi-dispositivo de preferencias dietéticas y etiquetas personalizadas.',
+          assertions: 'pullFromCloud fusiona dietary_preferences y custom_tags desde user_metadata; pushToCloud actualiza user_metadata.'
+        },
+        async () => {
+          let updatedMeta = null;
+          const mockSupabase = {
+            auth: {
+              getUser: async () => ({
+                data: {
+                  user: {
+                    id: 'usr_mock_1',
+                    user_metadata: {
+                      dietary_preferences: ['Keto', 'Alta en Proteínas'],
+                      custom_tags: ['MealPrep Rápido'],
+                      dietary_updated_at: '2026-10-27T15:00:00Z'
+                    }
+                  }
+                },
+                error: null
+              }),
+              updateUser: async ({ data }) => {
+                updatedMeta = data;
+                return { data: { user: { user_metadata: data } }, error: null };
+              }
+            },
+            from: (table) => ({
+              select: () => ({
+                eq: async () => ({ data: [], error: null })
+              }),
+              delete: () => ({
+                in: () => ({
+                  eq: async () => ({ error: null })
+                })
+              }),
+              upsert: async (payload) => ({ data: payload, error: null })
+            })
+          };
+
+          window.state.dietaryPreferences = [];
+          window.state.customTags = [];
+          window.state.dietaryUpdatedAt = null;
+
+          const appInst = new window.FoodAssistantApp();
+          appInst.supabaseClient = mockSupabase;
+
+          const pullRes = await appInst.pullFromCloud();
+          expect(pullRes.success).toBe(true);
+          expect(window.state.dietaryPreferences).toContain('Keto');
+          expect(window.state.dietaryPreferences).toContain('Alta en Proteínas');
+          expect(window.state.customTags).toContain('MealPrep Rápido');
+
+          window.state.saveDietaryPreferences(['Vegano']);
+          const pushRes = await appInst.pushToCloud(true);
+          expect(pushRes.success).toBe(true);
+          expect(updatedMeta.dietary_preferences).toEqual(['Vegano']);
         }
       );
     });

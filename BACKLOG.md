@@ -2,8 +2,8 @@
 
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
-> **Versión Actual**: v0.53  
-> **Última actualización**: Octubre 2026 (implementación US-01: ajuste riguroso y saneamiento de 'Alta en Proteínas' por macros reales v0.53)  
+> **Versión Actual**: v0.54  
+> **Última actualización**: Octubre 2026 (sincronización multi-dispositivo de preferencias dietéticas y tags en Supabase v0.54)  
 
 ---
 
@@ -111,7 +111,7 @@
 
 | ID | Historia de Usuario / Feature | Prioridad | Estado | Criterios de Aceptación (DoD) |
 | :--- | :--- | :---: | :---: | :--- |
-| **US-35** | Sincronización Total y Transparente Multi-Dispositivo con Supabase | 🔴 Alta | `Done` | • **Descarga y Fusión Automática**: Al iniciar sesión o abrir la app con sesión activa en cualquier dispositivo, descarga y fusiona en segundo plano las recetas del usuario (`recipes`), el planificador semanal (`meal_plans`) y la lista de la compra (`shopping_items`).<br>• **Sincronización en Tiempo Real al Mutar**: Subida instantánea (`upsert`) a Supabase al crear/editar/importar recetas (con `sourceUrl` y dominio), cambiar el plan semanal o modificar/tachar ingredientes en la lista.<br>• **Experiencia Transparente e Inadvertida**: Cambiar de teléfono a PC o tablet muestra exactamente los mismos datos sin necesidad de exportaciones ni importaciones manuales.<br>• **Resiliencia Local-First (Offline)**: Si el dispositivo no tiene red, sigue operando al 100% en `localStorage` y envía automáticamente los cambios pendientes a Supabase al recuperar la conexión.<br>• **Indicador Visual Discreto**: Feedback sutil del estado de sincronización en la barra superior o ajustes.<br>• *Estado: Completado y validado en v0.38 con subidas en lote, fallback dinámico de esquema y propagación bidireccional de borrados. Consolida y resuelve BUG-21, BUG-22, BUG-23, BUG-24 y US-45.* |
+| **US-35** | Sincronización Total y Transparente Multi-Dispositivo con Supabase | 🔴 Alta | `In Progress` | • **Descarga y Fusión Automática**: Al iniciar sesión o abrir la app con sesión activa en cualquier dispositivo, descarga y fusiona en segundo plano las recetas del usuario (`recipes`), el planificador semanal (`meal_plans`), la lista de la compra (`shopping_items`) y las preferencias dietéticas/tags personalizados (`dietary_preferences`, `custom_tags`).<br>• **Sincronización en Tiempo Real al Mutar**: Subida instantánea (`upsert`) a Supabase al crear/editar/importar recetas (con `sourceUrl` y dominio), cambiar el plan semanal, modificar/tachar ingredientes en la compra o alternar chips dietéticos.<br>• **Experiencia Transparente e Inadvertida**: Cambiar de teléfono a PC o tablet muestra exactamente los mismos datos (incluyendo preferencias activas como Vegano o Keto) sin necesidad de reconfigurarlos.<br>• **Resiliencia Local-First (Offline)**: Si el dispositivo no tiene red, sigue operando al 100% en `localStorage` y envía automáticamente los cambios pendientes a Supabase al recuperar la conexión.<br>• **Indicador Visual Discreto**: Feedback sutil del estado de sincronización en la barra superior o ajustes.<br>• *Estado: En pruebas por Franky en v0.54 (ampliado para sincronizar preferencias dietéticas y etiquetas personalizadas vía user_metadata y user_settings con debounce y resolución de timestamps).* |
 
 > **Bloqueantes de US-35 resueltos**: BUG-21, BUG-22, BUG-23 y BUG-24 (completados y verificados en v0.38).
 
