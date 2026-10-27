@@ -77,6 +77,13 @@ describe('US-02: Filtros Dietéticos, Selector de Chips & Advertencias Nutricion
       expect(chicken).toContain('Alta en Proteínas');
       expect(chicken).toContain('Cena');
 
+      const shake = analyzeAndInferRecipeTags({
+        title: 'Batido de proteínas sabor vainilla',
+        nutrition: { calories: 120, protein: 21, carbs: 3, fat: 2 },
+        ingredients: [{ name: 'Proteína whey' }, { name: 'Agua' }]
+      });
+      expect(shake).toContain('Alta en Proteínas');
+
       const stew = analyzeAndInferRecipeTags({
         title: 'Guiso de lentejas',
         ingredients: [{ name: 'Lentejas' }]

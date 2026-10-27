@@ -507,17 +507,42 @@ function analyzeAndInferRecipeTags(recipe) {
     }
 
     // Keto / Bajo en Carbos
-    if (!hasHighCarbs && (hasMeat || hasFish || hasEgg || /\b(aguacate|aceite de oliva|frutos secos|nueces|semillas|espinacas?|calabac[ií]n|br[oó]coli|coliflor)\b/i.test(allIngText))) {
+    const nutrition = (typeof getRecipeNutrition === 'function') ? getRecipeNutrition(recipe) : null;
+    const isLowCarbByMacros = nutrition && nutrition.carbs > 0 && nutrition.carbs <= 20;
+    const isKetoByMacros = nutrition && nutrition.carbs > 0 && nutrition.carbs <= 12 && nutrition.fat >= 8;
+    const isLowCarbByIngredients = !hasHighCarbs && (hasMeat || hasFish || hasEgg || /\b(aguacate|aceite de oliva|frutos secos|nueces|semillas|espinacas?|calabac[ií]n|br[oó]coli|coliflor)\b/i.test(allIngText));
+
+    if (isLowCarbByMacros || isLowCarbByIngredients) {
       inferred.add('Bajo en Carbos');
+    }
+    if (isKetoByMacros || (isLowCarbByIngredients && !/\b(frutas?|pl[aá]tano|manzana)\b/i.test(allIngText))) {
       inferred.add('Keto');
     }
 
-    // Alta en Proteínas (por valor nutricional >= 25g o fuentes proteicas clave)
-    const nutrition = (typeof getRecipeNutrition === 'function') ? getRecipeNutrition(recipe) : null;
-    const hasHighProteinValue = nutrition && nutrition.protein >= 25;
-    const hasProteinSource = ingNames.some(name => /\b(pollo|pechuga|pavo|ternera|solomillo|at[uú]n|salm[oó]n|merluza|bacalao|gambas?|langostinos?|huevos?|claras?|tofu|tempeh|seit[aá]n|soja texturizada|reques[oó]n|cottage|prote[ií]na|lentejas?|garbanzos?|alubias?)\b/i.test(name));
-    if (hasHighProteinValue || hasProteinSource) {
+    // Alta en Proteínas:
+    // 1) >= 20g de proteína por ración (umbral de síntesis proteica muscular)
+    // 2) O al menos el 25% de las calorías totales provienen de proteínas (densidad proteica para batidos/snacks)
+    // 3) O fuentes proteicas clave / suplementos (whey, aislado, proteína, claras)
+    const hasHighProteinGrams = nutrition && nutrition.protein >= 20;
+    const hasHighProteinDensity = nutrition && nutrition.calories > 0 && ((nutrition.protein * 4) / nutrition.calories) >= 0.25;
+    const hasProteinSource = ingNames.some(name => /\b(pollo|pechuga|pavo|ternera|solomillo|at[uú]n|salm[oó]n|merluza|bacalao|gambas?|langostinos?|huevos?|claras?|tofu|tempeh|seit[aá]n|soja texturizada|reques[oó]n|cottage|prote[ií]na|whey|aislado|lentejas?|garbanzos?|alubias?)\b/i.test(name)) || /\b(batido de prote[ií]nas?|proteico|proteica|whey)\b/i.test(`${title} ${desc}`);
+
+    if (hasHighProteinGrams || hasHighProteinDensity || hasProteinSource) {
       inferred.add('Alta en Proteínas');
+    }
+  } else {
+    // Si la receta no tiene ingredientes desglosados pero sí nutrición directa
+    const nutrition = (typeof getRecipeNutrition === 'function') ? getRecipeNutrition(recipe) : null;
+    if (nutrition) {
+      if (nutrition.protein >= 20 || (nutrition.calories > 0 && ((nutrition.protein * 4) / nutrition.calories) >= 0.25)) {
+        inferred.add('Alta en Proteínas');
+      }
+      if (nutrition.carbs > 0 && nutrition.carbs <= 20) {
+        inferred.add('Bajo en Carbos');
+      }
+      if (nutrition.carbs > 0 && nutrition.carbs <= 12 && nutrition.fat >= 8) {
+        inferred.add('Keto');
+      }
     }
   }
 
@@ -2376,7 +2401,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.50';
+  window.APP_VERSION = 'v0.51';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2408,7 +2433,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.50';
+    this.appVersion = 'v0.51';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -4032,10 +4057,6 @@ class FoodAssistantApp {
 
     const scale = this.activeServings / r.servings;
     const baseNutrition = getRecipeNutrition(r);
-    const currentTotalCal = Math.round(baseNutrition.calories * this.activeServings);
-    const currentTotalProt = Math.round(baseNutrition.protein * this.activeServings * 10) / 10;
-    const currentTotalCarbs = Math.round(baseNutrition.carbs * this.activeServings * 10) / 10;
-    const currentTotalFat = Math.round(baseNutrition.fat * this.activeServings * 10) / 10;
 
     body.innerHTML = `
       <div style="position: relative; height: 220px; background: #000; overflow: hidden;">
@@ -4098,25 +4119,25 @@ class FoodAssistantApp {
               <span class="material-symbols-outlined icon-sm" style="color: #d9480f;">local_fire_department</span> Información Nutricional
             </div>
             <div class="recipe-nutrition-subtitle" id="recipe-nutrition-subtitle">
-              ${this.activeServings} ${this.activeServings === 1 ? 'persona' : 'personas'} (${baseNutrition.calories} kcal / ración)
+              Por ración individual
             </div>
           </div>
           <div class="recipe-macros-grid">
             <div class="macro-chip macro-cal">
               <span class="macro-chip-label">Calorías</span>
-              <span class="macro-chip-val" id="macro-detail-calories">${currentTotalCal}<span class="macro-chip-unit">kcal</span></span>
+              <span class="macro-chip-val" id="macro-detail-calories">${baseNutrition.calories}<span class="macro-chip-unit">kcal</span></span>
             </div>
             <div class="macro-chip macro-prot">
               <span class="macro-chip-label">Proteínas</span>
-              <span class="macro-chip-val" id="macro-detail-protein">${currentTotalProt}<span class="macro-chip-unit">g</span></span>
+              <span class="macro-chip-val" id="macro-detail-protein">${baseNutrition.protein}<span class="macro-chip-unit">g</span></span>
             </div>
             <div class="macro-chip macro-carbs">
               <span class="macro-chip-label">Carbos</span>
-              <span class="macro-chip-val" id="macro-detail-carbs">${currentTotalCarbs}<span class="macro-chip-unit">g</span></span>
+              <span class="macro-chip-val" id="macro-detail-carbs">${baseNutrition.carbs}<span class="macro-chip-unit">g</span></span>
             </div>
             <div class="macro-chip macro-fat">
               <span class="macro-chip-label">Grasas</span>
-              <span class="macro-chip-val" id="macro-detail-fat">${currentTotalFat}<span class="macro-chip-unit">g</span></span>
+              <span class="macro-chip-val" id="macro-detail-fat">${baseNutrition.fat}<span class="macro-chip-unit">g</span></span>
             </div>
           </div>
         </div>

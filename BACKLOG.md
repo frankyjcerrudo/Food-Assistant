@@ -2,8 +2,8 @@
 
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
-> **Versión Actual**: v0.50  
-> **Última actualización**: Octubre 2026 (implementación US-01: contador de calorías y macros)  
+> **Versión Actual**: v0.51  
+> **Última actualización**: Octubre 2026 (implementación US-01: nutrición por ración individual y umbral flexible de proteínas v0.51)  
 
 ---
 
@@ -17,7 +17,7 @@
 
 | ID | Historia de Usuario / Feature | Prioridad | Estado | Criterios de Aceptación (DoD) |
 | :--- | :--- | :---: | :---: | :--- |
-| **US-01** | Contador de Calorías y Macronutrientes por plato | 🔴 Alta | `In Progress` | • Mostrar desglose de Kcal, Proteínas, Carbohidratos y Grasas en la ficha de cada receta.<br>• Actualización dinámica al cambiar las porciones.<br>• Resumen diario de macros en la vista "Hoy". |
+| **US-01** | Contador de Calorías y Macronutrientes por plato | 🔴 Alta | `In Progress` | • Mostrar desglose de Kcal, Proteínas, Carbohidratos y Grasas por ración individual en la ficha de cada receta.<br>• Selector de porciones para ajustar cantidades de ingredientes en cocina/compra sin alterar el aporte por persona.<br>• Resumen diario de macros personal en la vista "Hoy".<br>• Detección flexible de "Alta en Proteínas" (>=20g o >=25% de kcal proteicas o batidos/suplementos). |
 | **US-02** | Filtros dietéticos y selector de etiquetas por Chips interactivos | 🟡 Media | `Done` | • Sustituir el input de texto libre por selector de chips interactivos en recetas y catálogo.<br>• Categorías y etiquetas dietéticas predefinidas (Keto, Vegano, Sin Gluten, Rápida, Horno, Tupper) y creación de etiquetas personalizadas.<br>• Filtro múltiple combinado con el buscador de recetas.<br>• Advertencias automáticas si un plato asignado al plan incumple el filtro dietético activo.<br>• **Auto-etiquetado inteligente**: Botón en Ajustes para analizar recetas guardadas y asignar chips oportunos (dietéticos, prácticos y momentos) según ingredientes y preparación.<br>• *Consolida US-21.*<br>• *Estado: Completado, probado y aprobado por Franky (v0.45-v0.49): chips interactivos, emojis solo en etiquetas dietéticas, `Alta en Proteínas`, inferencia de `Almuerzo`/`Cena` y suite completa en `test.html`.* |
 | **US-03** | Objetivos nutricionales diarios del usuario | 🟢 Baja | `Backlog` | • En Ajustes, configurar meta diaria de Kcal y Proteína.<br>• Barra de progreso en vista "Hoy" con porcentaje de cumplimiento. |
 

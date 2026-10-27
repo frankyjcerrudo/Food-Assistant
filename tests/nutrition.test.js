@@ -81,7 +81,7 @@ describe('US-01: Contador de Calorías y Macronutrientes por plato y resumen dia
       });
     });
 
-    it('analyzeAndInferRecipeTags asigna "Alta en Proteínas" si protein >= 25', () => {
+    it('analyzeAndInferRecipeTags asigna "Alta en Proteínas" con umbral flexible (>= 20g o >= 25% de kcal proteicas, ej. batido)', () => {
       const highProteinRecipe = {
         title: 'Pechuga a la plancha',
         servings: 1,
@@ -90,6 +90,17 @@ describe('US-01: Contador de Calorías y Macronutrientes por plato y resumen dia
       };
       const tags = analyzeAndInferRecipeTags(highProteinRecipe);
       expect(tags).toContain('Alta en Proteínas');
+
+      // Caso real de Franky: batido de 21g de proteína en 30g de polvos (~115 kcal)
+      const proteinShakeRecipe = {
+        title: 'Batido Proteico Recuperador',
+        description: 'Batido post-entreno con proteína en polvo sabor vainilla y agua',
+        servings: 1,
+        nutrition: { calories: 115, protein: 21, carbs: 2, fat: 1.5 },
+        ingredients: [{ name: 'Proteína whey', amount: 30, unit: 'g' }, { name: 'Agua', amount: 250, unit: 'ml' }]
+      };
+      const shakeTags = analyzeAndInferRecipeTags(proteinShakeRecipe);
+      expect(shakeTags).toContain('Alta en Proteínas');
 
       const lowProteinRecipe = {
         title: 'Ensalada Verde Simple',
@@ -102,8 +113,8 @@ describe('US-01: Contador de Calorías y Macronutrientes por plato y resumen dia
     });
   });
 
-  describe('Modal de Detalle de Receta y escalado interactivo', () => {
-    it('muestra el desglose nutricional en modal-recipe-detail y se escala al cambiar raciones', () => {
+  describe('Modal de Detalle de Receta y desglose nutricional individual', () => {
+    it('muestra el desglose nutricional en modal-recipe-detail por ración individual de forma independiente a los comensales ajustados', () => {
       const sampleRecipe = {
         id: 'rec-test-macros',
         title: 'Salmón con Quinoa',
@@ -118,17 +129,22 @@ describe('US-01: Contador de Calorías y Macronutrientes por plato y resumen dia
 
       const breakdown = document.getElementById('recipe-nutrition-breakdown');
       expect(breakdown).not.toBeNull();
-      // Con 2 raciones activas (el default de la receta):
-      // Las calorías por ración son 400, para 2 raciones el total es 800 kcal
-      expect(breakdown.textContent).toContain('800');
-      expect(breakdown.textContent).toContain('60'); // 30g * 2
+      // Muestra valores por ración individual:
+      expect(breakdown.textContent).toContain('400');
+      expect(breakdown.textContent).toContain('30');
+      expect(breakdown.textContent).toContain('35');
+      expect(breakdown.textContent).toContain('14');
 
-      // Incrementamos las raciones a 3
+      const subtitle = document.getElementById('recipe-nutrition-subtitle');
+      expect(subtitle.textContent).toContain('Por ración individual');
+
+      // Incrementamos las raciones a 3 para cocinar o comprar
       app.adjustServings(1);
       expect(app.activeServings).toBe(3);
       const updatedBreakdown = document.getElementById('recipe-nutrition-breakdown');
-      expect(updatedBreakdown.textContent).toContain('1200'); // 400 * 3
-      expect(updatedBreakdown.textContent).toContain('90'); // 30 * 3
+      // Los macros por ración individual se mantienen fijos para el consumidor:
+      expect(updatedBreakdown.textContent).toContain('400');
+      expect(updatedBreakdown.textContent).toContain('30');
     });
   });
 
