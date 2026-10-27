@@ -1238,8 +1238,18 @@ class StateStore {
     this.settings = this.load('fa_settings', {
       geminiApiKey: '',
       defaultServings: 2,
-      geminiModel: 'gemini-2.5-flash'
+      geminiModel: 'gemini-2.5-flash',
+      nutritionGoals: {
+        enabled: false,
+        calories: 2000,
+        protein: 140,
+        carbs: 200,
+        fat: 65
+      }
     });
+    if (!this.settings.nutritionGoals) {
+      this.settings.nutritionGoals = { enabled: false, calories: 2000, protein: 140, carbs: 200, fat: 65 };
+    }
     this.dietaryPreferences = this.load('fa_dietary_preferences', []);
     this.dietaryUpdatedAt = localStorage.getItem('fa_dietary_updated_at') || null;
     this.customTags = this.load('fa_custom_tags', []);
@@ -1250,6 +1260,18 @@ class StateStore {
       anonKey: window.APP_CONFIG?.supabaseAnonKey || localStorage.getItem('fa_sb_key') || ''
     };
     this.lastSyncedAt = localStorage.getItem('fa_last_sync') || null;
+  }
+
+  saveNutritionGoals(goals) {
+    if (!this.settings) this.settings = {};
+    this.settings.nutritionGoals = {
+      enabled: !!goals?.enabled,
+      calories: Math.max(0, Number(goals?.calories) || 0),
+      protein: Math.max(0, Number(goals?.protein) || 0),
+      carbs: Math.max(0, Number(goals?.carbs) || 0),
+      fat: Math.max(0, Number(goals?.fat) || 0)
+    };
+    this.save('fa_settings', this.settings);
   }
 
   saveDietaryPreferences(prefs) {
@@ -2421,7 +2443,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.54';
+  window.APP_VERSION = 'v0.55';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2453,7 +2475,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.54';
+    this.appVersion = 'v0.55';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -3098,10 +3120,11 @@ class FoodAssistantApp {
         });
       }
 
-      // 4. Fusión de Preferencias Dietéticas y Tags Personalizados (Sincronización multi-dispositivo)
+      // 4. Fusión de Preferencias Dietéticas, Tags Personalizados y Objetivos Nutricionales (US-03)
       let remoteDietary = null;
       let remoteCustomTags = null;
       let remoteDietaryUpdatedAt = null;
+      let remoteGoals = null;
 
       try {
         if (this.supabaseClient?.from) {
@@ -3110,6 +3133,7 @@ class FoodAssistantApp {
             const sRow = settingsRes.data[0];
             if (Array.isArray(sRow.dietary_preferences)) remoteDietary = sRow.dietary_preferences;
             if (Array.isArray(sRow.custom_tags)) remoteCustomTags = sRow.custom_tags;
+            if (sRow.nutrition_goals && typeof sRow.nutrition_goals === 'object') remoteGoals = sRow.nutrition_goals;
             if (sRow.updated_at) remoteDietaryUpdatedAt = sRow.updated_at;
           }
         }
@@ -3135,6 +3159,9 @@ class FoodAssistantApp {
                 ? [...new Set([...remoteCustomTags, ...meta.custom_tags])]
                 : meta.custom_tags;
             }
+            if (meta.nutrition_goals && typeof meta.nutrition_goals === 'object') {
+              if (!remoteGoals) remoteGoals = meta.nutrition_goals;
+            }
           }
         } catch (authErr) {
           // Ignorar si no está disponible auth
@@ -3147,6 +3174,9 @@ class FoodAssistantApp {
       }
       if (!remoteCustomTags && Array.isArray(state.cloudUser?.user_metadata?.custom_tags)) {
         remoteCustomTags = state.cloudUser.user_metadata.custom_tags;
+      }
+      if (!remoteGoals && state.cloudUser?.user_metadata?.nutrition_goals) {
+        remoteGoals = state.cloudUser.user_metadata.nutrition_goals;
       }
 
       if (Array.isArray(remoteDietary)) {
@@ -3181,11 +3211,21 @@ class FoodAssistantApp {
         }
       }
 
+      if (remoteGoals && typeof remoteGoals === 'object') {
+        const localGoalsJson = JSON.stringify(state.settings?.nutritionGoals || {});
+        const remoteGoalsJson = JSON.stringify(remoteGoals);
+        if (localGoalsJson !== remoteGoalsJson) {
+          state.saveNutritionGoals(remoteGoals);
+          stateChanged = true;
+        }
+      }
+
       if (stateChanged) {
         state.save('fa_recipes', state.recipes);
         state.save('fa_mealplan', state.mealPlan);
         state.save('fa_shopping', state.shoppingList);
         this.renderDietaryPreferencesSettings();
+        this.renderNutritionGoalsSettings();
         this.render();
       }
 
@@ -3381,6 +3421,7 @@ class FoodAssistantApp {
           const metaPayload = {
             dietary_preferences: state.dietaryPreferences || [],
             custom_tags: state.customTags || [],
+            nutrition_goals: state.settings?.nutritionGoals || null,
             dietary_updated_at: state.dietaryUpdatedAt || new Date().toISOString()
           };
           await this.supabaseClient.auth.updateUser({ data: metaPayload });
@@ -3403,6 +3444,7 @@ class FoodAssistantApp {
             user_id: state.cloudUser.id,
             dietary_preferences: state.dietaryPreferences || [],
             custom_tags: state.customTags || [],
+            nutrition_goals: state.settings?.nutritionGoals || null,
             updated_at: state.dietaryUpdatedAt || new Date().toISOString()
           }]);
         }
@@ -3590,10 +3632,12 @@ class FoodAssistantApp {
 
     // Settings
     document.getElementById('btn-save-gemini-key')?.addEventListener('click', () => this.saveGeminiKey());
+    document.getElementById('btn-save-nutrition-goals')?.addEventListener('click', () => this.saveNutritionGoalsFromSettings());
     document.getElementById('btn-export-backup')?.addEventListener('click', () => this.exportBackup());
     document.getElementById('input-import-backup')?.addEventListener('change', (e) => this.importBackup(e));
     document.getElementById('btn-reset-demo')?.addEventListener('click', () => this.resetDemoData());
     document.getElementById('btn-auto-tag-recipes')?.addEventListener('click', () => this.autoAnalyzeAndTagAllRecipes());
+    document.getElementById('btn-today-quick-goals')?.addEventListener('click', () => this.openNutritionGoalsModal());
 
     // Modal closes & Light Dismiss (clicking outside the modal window / backdrop closes it)
     document.getElementById('btn-close-recipe-modal')?.addEventListener('click', () => this.closeRecipeModal());
@@ -3774,20 +3818,33 @@ class FoodAssistantApp {
       }
     }
 
-    // Resumen diario de calorías y macronutrientes (US-01)
+    // Resumen diario de calorías y macronutrientes (US-01 & US-03)
     const todayNutrition = this.calculateTodayNutrition(todayPlan);
     const nutritionContainer = document.getElementById('today-nutrition-card');
     if (nutritionContainer) {
+      const goals = state.settings?.nutritionGoals || { enabled: false };
+      const goalsEnabled = !!goals.enabled && (goals.calories > 0 || goals.protein > 0 || goals.carbs > 0 || goals.fat > 0);
+
+      const headerGoalsBtn = `
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-today-quick-goals" onclick="app.openNutritionGoalsModal()" style="padding: 2px 8px; font-size: 11px; height: 26px; border-radius: 12px; display: inline-flex; align-items: center; gap: 4px;" title="Configurar metas nutricionales diarias">
+          <span class="material-symbols-outlined" style="font-size: 14px; color: #d9480f;">flag</span>
+          <span>${goalsEnabled ? 'Objetivos' : 'Fijar metas'}</span>
+        </button>
+      `;
+
       if (todayNutrition.mealCount === 0) {
         nutritionContainer.innerHTML = `
           <div class="today-nutrition-header">
             <div class="today-nutrition-title">
               <span class="material-symbols-outlined icon-sm" style="color: var(--m3-primary);">local_fire_department</span> Resumen Nutricional Diario
             </div>
-            <span class="today-nutrition-meta">0 comidas</span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              ${headerGoalsBtn}
+              <span class="today-nutrition-meta">0 comidas</span>
+            </div>
           </div>
           <div class="today-nutrition-empty">
-            <span style="font-weight: 700; color: var(--m3-on-surface);">0 kcal</span> · Asigna platos a tu día para ver calorías y macronutrientes.
+            <span style="font-weight: 700; color: var(--m3-on-surface);">0 kcal</span> · ${goalsEnabled ? `Asigna platos a tu día para avanzar hacia tus metas (${goals.calories || 2000} kcal).` : 'Asigna platos a tu día para ver calorías y macronutrientes.'}
           </div>
         `;
       } else {
@@ -3796,36 +3853,117 @@ class FoodAssistantApp {
         const carbsPercent = Math.round((todayNutrition.totalCarbs / totalMacroGrams) * 100);
         const fatPercent = Math.max(0, 100 - protPercent - carbsPercent);
 
+        const formatChipWithGoal = (macroKey, label, currentVal, unit, targetVal, isProtein = false) => {
+          const currentNum = Math.round(currentVal);
+          if (!goalsEnabled || !targetVal || targetVal <= 0) {
+            return `
+              <div class="macro-chip macro-${macroKey}">
+                <span class="macro-chip-label">${label}</span>
+                <span class="macro-chip-val" id="today-macro-${macroKey}">${currentNum}<span class="macro-chip-unit">${unit}</span></span>
+              </div>
+            `;
+          }
+
+          const percent = Math.round((currentVal / targetVal) * 100);
+          const diff = currentNum - Math.round(targetVal);
+          let statusClass = 'goal-ok';
+          let statusText = 'En rango';
+
+          if (percent < 85) {
+            statusClass = 'goal-under';
+            statusText = `Faltan ${Math.abs(diff)}${unit}`;
+          } else if (percent > 110) {
+            if (isProtein && percent <= 130) {
+              statusClass = 'goal-super';
+              statusText = '+ Superado';
+            } else {
+              statusClass = 'goal-over';
+              statusText = `+${diff}${unit} exceso`;
+            }
+          }
+
+          const barPercent = Math.min(100, Math.max(0, percent));
+
+          return `
+            <div class="macro-chip macro-${macroKey}" style="align-items: stretch; text-align: left;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                <span class="macro-chip-label" style="margin-bottom: 0;">${label}</span>
+                <span class="goal-status-badge ${statusClass}">${statusText}</span>
+              </div>
+              <div class="macro-chip-val" id="today-macro-${macroKey}" style="text-align: left;">
+                ${currentNum}<span class="macro-chip-unit">${unit}</span>
+              </div>
+              <span class="macro-goal-subtext">de ${targetVal}${unit} (${percent}%)</span>
+              <div class="goal-progress-track">
+                <div class="goal-progress-fill ${statusClass}" style="width: ${barPercent}%;"></div>
+              </div>
+            </div>
+          `;
+        };
+
+        let goalBannerHtml = '';
+        if (goalsEnabled && (goals.calories > 0 || goals.protein > 0)) {
+          const calGoal = Number(goals.calories) || 0;
+          const protGoal = Number(goals.protein) || 0;
+          const calCurrent = todayNutrition.totalCalories;
+          const protCurrent = Math.round(todayNutrition.totalProtein);
+
+          if (calGoal > 0 && calCurrent > calGoal * 1.1) {
+            const excess = calCurrent - calGoal;
+            goalBannerHtml = `
+              <div class="today-goal-banner banner-over">
+                <span class="material-symbols-outlined icon-sm">warning</span>
+                <span>Aviso: El menú planificado para hoy supera tu objetivo diario en <strong>+${excess} kcal</strong> (${Math.round((calCurrent / calGoal) * 100)}%).</span>
+              </div>
+            `;
+          } else if (calGoal > 0 && calCurrent < calGoal * 0.85) {
+            const missing = calGoal - calCurrent;
+            goalBannerHtml = `
+              <div class="today-goal-banner banner-under">
+                <span class="material-symbols-outlined icon-sm">trending_up</span>
+                <span>Plan actual: Faltan <strong>${missing} kcal</strong> para alcanzar tu meta diaria.</span>
+              </div>
+            `;
+          } else if (protGoal > 0 && protCurrent < protGoal * 0.85) {
+            const missingP = protGoal - protCurrent;
+            goalBannerHtml = `
+              <div class="today-goal-banner banner-under">
+                <span class="material-symbols-outlined icon-sm">fitness_center</span>
+                <span>Aporte proteico: Faltan <strong>${missingP}g</strong> de proteína para alcanzar tu meta diaria.</span>
+              </div>
+            `;
+          } else {
+            goalBannerHtml = `
+              <div class="today-goal-banner banner-ok">
+                <span class="material-symbols-outlined icon-sm">check_circle</span>
+                <span>¡Menú equilibrado! Tu plan de comidas de hoy cumple con los objetivos nutricionales configurados.</span>
+              </div>
+            `;
+          }
+        }
+
         nutritionContainer.innerHTML = `
           <div class="today-nutrition-header">
             <div class="today-nutrition-title">
               <span class="material-symbols-outlined icon-sm" style="color: #d9480f;">local_fire_department</span> Resumen Nutricional Diario
             </div>
-            <span class="today-nutrition-meta">${todayNutrition.mealCount} ${todayNutrition.mealCount === 1 ? 'comida' : 'comidas'}</span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              ${headerGoalsBtn}
+              <span class="today-nutrition-meta">${todayNutrition.mealCount} ${todayNutrition.mealCount === 1 ? 'comida' : 'comidas'}</span>
+            </div>
           </div>
           <div class="today-macros-grid">
-            <div class="macro-chip macro-cal">
-              <span class="macro-chip-label">Calorías</span>
-              <span class="macro-chip-val" id="today-macro-calories">${todayNutrition.totalCalories}<span class="macro-chip-unit">kcal</span></span>
-            </div>
-            <div class="macro-chip macro-prot">
-              <span class="macro-chip-label">Proteínas</span>
-              <span class="macro-chip-val" id="today-macro-protein">${Math.round(todayNutrition.totalProtein)}<span class="macro-chip-unit">g</span></span>
-            </div>
-            <div class="macro-chip macro-carbs">
-              <span class="macro-chip-label">Carbos</span>
-              <span class="macro-chip-val" id="today-macro-carbs">${Math.round(todayNutrition.totalCarbs)}<span class="macro-chip-unit">g</span></span>
-            </div>
-            <div class="macro-chip macro-fat">
-              <span class="macro-chip-label">Grasas</span>
-              <span class="macro-chip-val" id="today-macro-fat">${Math.round(todayNutrition.totalFat)}<span class="macro-chip-unit">g</span></span>
-            </div>
+            ${formatChipWithGoal('cal', 'Calorías', todayNutrition.totalCalories, 'kcal', goals.calories)}
+            ${formatChipWithGoal('prot', 'Proteínas', todayNutrition.totalProtein, 'g', goals.protein, true)}
+            ${formatChipWithGoal('carbs', 'Carbos', todayNutrition.totalCarbs, 'g', goals.carbs)}
+            ${formatChipWithGoal('fat', 'Grasas', todayNutrition.totalFat, 'g', goals.fat)}
           </div>
           <div class="macro-ratio-bar" title="Distribución: ${protPercent}% P / ${carbsPercent}% C / ${fatPercent}% G">
             <div class="ratio-segment ratio-prot" style="width: ${protPercent}%;" title="Proteína: ${protPercent}%"></div>
             <div class="ratio-segment ratio-carbs" style="width: ${carbsPercent}%;" title="Carbohidratos: ${carbsPercent}%"></div>
             <div class="ratio-segment ratio-fat" style="width: ${fatPercent}%;" title="Grasa: ${fatPercent}%"></div>
           </div>
+          ${goalBannerHtml}
         `;
       }
     }
@@ -4201,6 +4339,9 @@ class FoodAssistantApp {
         break;
       case 'modal-add-custom-slot':
         this.closeAddCustomSlotModal();
+        break;
+      case 'modal-nutrition-goals':
+        this.closeNutritionGoalsModal();
         break;
       default:
         overlay.classList.remove('active');
@@ -6593,6 +6734,7 @@ class FoodAssistantApp {
     }
 
     this.renderDietaryPreferencesSettings();
+    this.renderNutritionGoalsSettings();
   }
 
   // US-02: Preferencias dietéticas activas en Ajustes
@@ -6624,6 +6766,96 @@ class FoodAssistantApp {
     this.renderPlanner();
     this.renderTodayView();
     this.scheduleSyncWithCloud();
+  }
+
+  // US-03: Objetivos nutricionales diarios en Ajustes
+  renderNutritionGoalsSettings() {
+    const goals = state.settings?.nutritionGoals || { enabled: false, calories: 2000, protein: 140, carbs: 200, fat: 65 };
+    const toggleEnabled = document.getElementById('toggle-nutrition-goals-enabled');
+    const inputCal = document.getElementById('input-goal-calories');
+    const inputProt = document.getElementById('input-goal-protein');
+    const inputCarbs = document.getElementById('input-goal-carbs');
+    const inputFat = document.getElementById('input-goal-fat');
+
+    if (toggleEnabled) toggleEnabled.checked = !!goals.enabled;
+    if (inputCal) inputCal.value = goals.calories || '';
+    if (inputProt) inputProt.value = goals.protein || '';
+    if (inputCarbs) inputCarbs.value = goals.carbs || '';
+    if (inputFat) inputFat.value = goals.fat || '';
+  }
+
+  saveNutritionGoalsFromSettings() {
+    const toggleEnabled = document.getElementById('toggle-nutrition-goals-enabled');
+    const inputCal = document.getElementById('input-goal-calories');
+    const inputProt = document.getElementById('input-goal-protein');
+    const inputCarbs = document.getElementById('input-goal-carbs');
+    const inputFat = document.getElementById('input-goal-fat');
+    const statusMsg = document.getElementById('nutrition-goals-status-msg');
+
+    const newGoals = {
+      enabled: toggleEnabled ? toggleEnabled.checked : true,
+      calories: inputCal ? Number(inputCal.value) : 2000,
+      protein: inputProt ? Number(inputProt.value) : 140,
+      carbs: inputCarbs ? Number(inputCarbs.value) : 200,
+      fat: inputFat ? Number(inputFat.value) : 65
+    };
+
+    state.saveNutritionGoals(newGoals);
+    this.renderTodayView();
+    this.scheduleSyncWithCloud();
+
+    if (statusMsg) {
+      statusMsg.style.display = 'inline';
+      setTimeout(() => { statusMsg.style.display = 'none'; }, 2500);
+    }
+  }
+
+  // Modal rápido de objetivos (US-03)
+  openNutritionGoalsModal() {
+    const modal = document.getElementById('modal-nutrition-goals');
+    if (!modal) return;
+    const goals = state.settings?.nutritionGoals || { enabled: false, calories: 2000, protein: 140, carbs: 200, fat: 65 };
+
+    const toggle = document.getElementById('toggle-modal-goal-enabled');
+    const inputCal = document.getElementById('input-modal-goal-calories');
+    const inputProt = document.getElementById('input-modal-goal-protein');
+    const inputCarbs = document.getElementById('input-modal-goal-carbs');
+    const inputFat = document.getElementById('input-modal-goal-fat');
+
+    if (toggle) toggle.checked = !!goals.enabled;
+    if (inputCal) inputCal.value = goals.calories || '';
+    if (inputProt) inputProt.value = goals.protein || '';
+    if (inputCarbs) inputCarbs.value = goals.carbs || '';
+    if (inputFat) inputFat.value = goals.fat || '';
+
+    modal.classList.add('active');
+  }
+
+  closeNutritionGoalsModal() {
+    const modal = document.getElementById('modal-nutrition-goals');
+    if (modal) modal.classList.remove('active');
+  }
+
+  saveNutritionGoalsFromModal() {
+    const toggle = document.getElementById('toggle-modal-goal-enabled');
+    const inputCal = document.getElementById('input-modal-goal-calories');
+    const inputProt = document.getElementById('input-modal-goal-protein');
+    const inputCarbs = document.getElementById('input-modal-goal-carbs');
+    const inputFat = document.getElementById('input-modal-goal-fat');
+
+    const newGoals = {
+      enabled: toggle ? toggle.checked : true,
+      calories: inputCal ? Number(inputCal.value) : 2000,
+      protein: inputProt ? Number(inputProt.value) : 140,
+      carbs: inputCarbs ? Number(inputCarbs.value) : 200,
+      fat: inputFat ? Number(inputFat.value) : 65
+    };
+
+    state.saveNutritionGoals(newGoals);
+    this.renderNutritionGoalsSettings();
+    this.renderTodayView();
+    this.scheduleSyncWithCloud();
+    this.closeNutritionGoalsModal();
   }
 
   // US-02: Auto-análisis inteligente y etiquetado masivo de recetas guardadas

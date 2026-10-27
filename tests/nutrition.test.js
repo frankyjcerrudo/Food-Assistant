@@ -302,4 +302,163 @@ describe('US-01: Contador de Calorías y Macronutrientes por plato y resumen dia
       expect(macrosTable.querySelector('.card-macro-fat')).not.toBeNull();
     });
   });
+
+  describe('US-03: Objetivos nutricionales diarios del usuario', () => {
+    it('StateStore guarda y carga objetivos nutricionales con valores por defecto', () => {
+      const defaultGoals = state.settings.nutritionGoals;
+      expect(defaultGoals).toBeDefined();
+      expect(defaultGoals.calories).toBe(2000);
+      expect(defaultGoals.protein).toBe(140);
+
+      state.saveNutritionGoals({
+        enabled: true,
+        calories: 2200,
+        protein: 160,
+        carbs: 220,
+        fat: 70
+      });
+
+      expect(state.settings.nutritionGoals.enabled).toBe(true);
+      expect(state.settings.nutritionGoals.calories).toBe(2200);
+      expect(state.settings.nutritionGoals.protein).toBe(160);
+      expect(state.settings.nutritionGoals.carbs).toBe(220);
+      expect(state.settings.nutritionGoals.fat).toBe(70);
+
+      const savedSettings = JSON.parse(localStorage.getItem('fa_settings'));
+      expect(savedSettings.nutritionGoals.protein).toBe(160);
+    });
+
+    it('renderNutritionGoalsSettings rellena el formulario de Ajustes y saveNutritionGoalsFromSettings persiste los cambios', () => {
+      state.saveNutritionGoals({
+        enabled: true,
+        calories: 2500,
+        protein: 175,
+        carbs: 240,
+        fat: 80
+      });
+
+      app.renderNutritionGoalsSettings();
+
+      expect(document.getElementById('toggle-nutrition-goals-enabled').checked).toBe(true);
+      expect(document.getElementById('input-goal-calories').value).toBe('2500');
+      expect(document.getElementById('input-goal-protein').value).toBe('175');
+      expect(document.getElementById('input-goal-carbs').value).toBe('240');
+      expect(document.getElementById('input-goal-fat').value).toBe('80');
+
+      document.getElementById('input-goal-calories').value = '2300';
+      document.getElementById('input-goal-protein').value = '150';
+      app.saveNutritionGoalsFromSettings();
+
+      expect(state.settings.nutritionGoals.calories).toBe(2300);
+      expect(state.settings.nutritionGoals.protein).toBe(150);
+    });
+
+    it('openNutritionGoalsModal abre el modal rápido y saveNutritionGoalsFromModal actualiza el estado', () => {
+      state.saveNutritionGoals({
+        enabled: false,
+        calories: 1900,
+        protein: 130,
+        carbs: 180,
+        fat: 60
+      });
+
+      app.openNutritionGoalsModal();
+      const modal = document.getElementById('modal-nutrition-goals');
+      expect(modal.classList.contains('active')).toBe(true);
+      expect(document.getElementById('input-modal-goal-calories').value).toBe('1900');
+
+      document.getElementById('toggle-modal-goal-enabled').checked = true;
+      document.getElementById('input-modal-goal-calories').value = '2100';
+      document.getElementById('input-modal-goal-protein').value = '155';
+      app.saveNutritionGoalsFromModal();
+
+      expect(modal.classList.contains('active')).toBe(false);
+      expect(state.settings.nutritionGoals.enabled).toBe(true);
+      expect(state.settings.nutritionGoals.calories).toBe(2100);
+      expect(state.settings.nutritionGoals.protein).toBe(155);
+    });
+
+    it('renderTodayView muestra botón rápido de objetivos, barras de progreso y badges según cumplimiento', () => {
+      state.recipes = [
+        {
+          id: 'rec-lunch-goals-test',
+          title: 'Pollo con Verduras Fit',
+          servings: 1,
+          nutrition: { calories: 1000, protein: 70, carbs: 100, fat: 30 }
+        }
+      ];
+
+      const todayKey = toLocalDateKey();
+      state.mealPlan = {
+        [todayKey]: {
+          lunch: { recipeId: 'rec-lunch-goals-test' }
+        }
+      };
+
+      // Objetivos activados: 2000 kcal, 140g proteina (1000 / 2000 = 50% -> Falta)
+      state.saveNutritionGoals({
+        enabled: true,
+        calories: 2000,
+        protein: 140,
+        carbs: 200,
+        fat: 65
+      });
+
+      app.renderTodayView();
+
+      const card = document.getElementById('today-nutrition-card');
+      expect(card).not.toBeNull();
+
+      // Botón de objetivos presente en header
+      const btnGoals = card.querySelector('#btn-today-quick-goals');
+      expect(btnGoals).not.toBeNull();
+
+      // Chips con barras de progreso y badges
+      expect(card.querySelectorAll('.goal-progress-track').length).toBe(4);
+      expect(card.querySelector('.goal-status-badge')).not.toBeNull();
+      expect(card.textContent).toContain('de 2000kcal (50%)');
+      expect(card.textContent).toContain('de 140g (50%)');
+      expect(card.textContent).toContain('Faltan 1000kcal');
+      expect(card.textContent).toContain('Faltan 70g');
+
+      // Alerta de calorías o proteínas por quedar corto
+      const banner = card.querySelector('.today-goal-banner');
+      expect(banner).not.toBeNull();
+      expect(banner.classList.contains('banner-under')).toBe(true);
+    });
+
+    it('renderTodayView con objetivos cumplidos muestra badge "En rango" y banner de éxito', () => {
+      state.recipes = [
+        {
+          id: 'rec-full-day',
+          title: 'Día Perfecto',
+          servings: 1,
+          nutrition: { calories: 2000, protein: 140, carbs: 200, fat: 65 }
+        }
+      ];
+
+      const todayKey = toLocalDateKey();
+      state.mealPlan = {
+        [todayKey]: {
+          lunch: { recipeId: 'rec-full-day' }
+        }
+      };
+
+      state.saveNutritionGoals({
+        enabled: true,
+        calories: 2000,
+        protein: 140,
+        carbs: 200,
+        fat: 65
+      });
+
+      app.renderTodayView();
+
+      const card = document.getElementById('today-nutrition-card');
+      expect(card.textContent).toContain('En rango');
+      const banner = card.querySelector('.today-goal-banner.banner-ok');
+      expect(banner).not.toBeNull();
+      expect(banner.textContent).toContain('Menú equilibrado');
+    });
+  });
 });

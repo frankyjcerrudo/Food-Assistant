@@ -116,9 +116,12 @@ create table if not exists public.user_settings (
   user_id uuid not null references auth.users(id) on delete cascade,
   dietary_preferences text[] default array[]::text[],
   custom_tags text[] default array[]::text[],
+  nutrition_goals jsonb default '{}'::jsonb,
   updated_at timestamptz not null default now(),
   primary key (user_id)
 );
+
+alter table public.user_settings add column if not exists nutrition_goals jsonb default '{}'::jsonb;
 
 alter table public.user_settings enable row level security;
 

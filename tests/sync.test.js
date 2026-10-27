@@ -600,6 +600,73 @@ describe('US-35 & Bugs Bloqueantes: Sincronización Supabase, IDs Únicos y Esqu
       expect(state.dietaryPreferences).toContain('Vegano');
       expect(scheduleSpy).toHaveBeenCalled();
     });
+
+    it('pushToCloud y pullFromCloud sincronizan nutrition_goals en user_settings y user_metadata', async () => {
+      let updatedUserMetadata = null;
+      let upsertSettingsPayload = null;
+
+      const mockSupabase = {
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: 'test-user-goals-1234', user_metadata: {} } },
+            error: null
+          }),
+          updateUser: vi.fn().mockImplementation((payload) => {
+            updatedUserMetadata = payload.data;
+            return Promise.resolve({ data: { user: { user_metadata: payload.data } }, error: null });
+          })
+        },
+        from: vi.fn().mockImplementation((table) => {
+          if (table === 'user_settings') {
+            return {
+              upsert: vi.fn().mockImplementation((payload) => {
+                upsertSettingsPayload = Array.isArray(payload) ? payload[0] : payload;
+                return Promise.resolve({ data: payload, error: null });
+              }),
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  maybeSingle: vi.fn().mockResolvedValue({
+                    data: {
+                      nutrition_goals: { enabled: true, calories: 2300, protein: 165, carbs: 210, fat: 70 }
+                    },
+                    error: null
+                  })
+                })
+              })
+            };
+          }
+          return {
+            upsert: vi.fn().mockResolvedValue({ data: null, error: null }),
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null })
+            })
+          };
+        })
+      };
+
+      state.cloudUser = { id: 'test-user-goals-1234' };
+      state.saveNutritionGoals({
+        enabled: true,
+        calories: 2300,
+        protein: 165,
+        carbs: 210,
+        fat: 70
+      });
+
+      appInstance.supabaseClient = mockSupabase;
+      const pushRes = await appInstance.pushToCloud(true);
+      expect(pushRes.success).toBe(true);
+      expect(updatedUserMetadata.nutrition_goals).toBeDefined();
+      expect(updatedUserMetadata.nutrition_goals.protein).toBe(165);
+      expect(upsertSettingsPayload.nutrition_goals.calories).toBe(2300);
+
+      // Reset local and pull from cloud
+      state.settings.nutritionGoals = null;
+      const pullRes = await appInstance.pullFromCloud();
+      expect(pullRes.success).toBe(true);
+      expect(state.settings.nutritionGoals.protein).toBe(165);
+      expect(state.settings.nutritionGoals.calories).toBe(2300);
+    });
   });
 });
 
