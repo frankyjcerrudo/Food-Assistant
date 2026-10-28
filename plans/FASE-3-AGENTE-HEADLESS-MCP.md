@@ -19,7 +19,7 @@ Para que un asistente externo opere sobre estos datos de forma segura sin expone
 flowchart LR
   Mobile["📱 Móvil del Usuario (Voz / Gemini / Claude / ChatGPT / Bot)"]
   Edge["⚡ Supabase Edge Function (food-assistant-agent)"]
-  Gemini["🧠 Gemini 2.5 Flash (Function Calling)"]
+  Gemini["🧠 Gemini 3.8 Flash (Function Calling)"]
   DB[("🗄️ Supabase PostgreSQL (recipes, meal_plans, shopping_items, user_settings)")]
   App["🍲 Food Assistant PWA (Sincronización transparente US-35)"]
 
@@ -73,7 +73,7 @@ Pensado para **Atajos de Voz del móvil (Android Action Blocks / HTTP Shortcuts 
      - `meal_plans` de los 7 días de la semana actual (calculada en ISO 8601 Lunes-Domingo)
      - `shopping_items` pendientes (`is_checked = false`)
   3. Construye el mismo prompt de sistema (`buildAiSystemInstruction`) y las mismas declaraciones `AI_TOOLS_DECLARATIONS` creadas en la **Fase 1** (`create_and_save_recipe`, `set_weekly_plan`, `manage_shopping_list`).
-  4. Invoca a Gemini (`gemini-2.5-flash`) con `x-goog-api-key`.
+  4. Invoca a Gemini (`gemini-3.8-flash`) con `x-goog-api-key`.
   5. Ejecuta todas las `functionCalls` directamente contra Supabase mediante `.upsert()` en `public.recipes`, `public.meal_plans` y `public.shopping_items` con `updated_at: new Date().toISOString()`.
   6. Devuelve un JSON pensado para ser leído en voz alta por el asistente del móvil:
      ```json

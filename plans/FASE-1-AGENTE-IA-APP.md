@@ -17,7 +17,7 @@
   - `state.shoppingList`: Array de artículos (`id`, `name`, `amount`, `unit`, `aisle`, `isChecked`, `recipeOrigin`).
   - `state.dietaryPreferences`: Array de chips dietéticos activos (ej. `["Vegano", "Sin Gluten", "Alta en Proteínas"]`).
   - `state.settings.nutritionGoals`: `{ enabled, calories, protein, carbs, fat }`.
-  - `state.settings.defaultServings`: Número de raciones por defecto.
+  - `state.settings.geminiModel`: `'gemini-3.8-flash'` (por defecto).
 
 ---
 
