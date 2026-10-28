@@ -396,4 +396,30 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
       globalThis.fetch = origFetch;
     }
   });
+
+  it('US-17: sugiere crear recetas nuevas cuando faltan desayunos o meriendas para la preferencia dietética activa y no impone foto por defecto', async () => {
+    state.saveDietaryPreferences(['Alta en Proteínas']);
+    const gaps = appInstance.getDietarySlotGaps();
+    expect(gaps.map(g => g.tag)).toContain('Desayuno');
+
+    const input = document.getElementById('ai-chat-input');
+    const history = document.getElementById('chat-history-container');
+    input.value = 'Planifica mi semana';
+    await appInstance.handleAiChatSubmit();
+
+    expect(history.textContent).toContain('Crear');
+    expect(history.textContent).toContain('a medida');
+
+    // Verificar que al crear una receta nueva sin imagen no se añade foto de Unsplash por defecto
+    const createdRes = appInstance.executeAiToolCall({
+      name: 'create_and_save_recipe',
+      args: {
+        title: 'Tortitas Proteicas de Avena y Claras',
+        tags: ['Desayuno', 'Alta en Proteínas'],
+        ingredients: [{ name: 'Claras de huevo', amount: 150, unit: 'ml' }],
+        instructions: [{ step: 1, text: 'Batir y cocinar en sartén 4 minutos.' }]
+      }
+    });
+    expect(createdRes.recipe.imageUrl).toBe('');
+  });
 });

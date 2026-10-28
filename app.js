@@ -2050,7 +2050,6 @@ const RecipeParser = {
       else if (Array.isArray(schema.image) && schema.image.length > 0) imageUrl = typeof schema.image[0] === 'string' ? schema.image[0] : (schema.image[0]?.url || '');
       else if (schema.image.url) imageUrl = schema.image.url;
     }
-    if (!imageUrl) imageUrl = "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop&q=80";
 
     const rawIngredients = schema.recipeIngredient || schema.ingredients || [];
     const ingredients = [];
@@ -2483,7 +2482,7 @@ const RecipeParser = {
       id: generateId('rec-'),
       title: title || 'Receta de Notas',
       description: 'Receta importada desde texto estructurado.',
-      imageUrl: candidateImage || 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop&q=80',
+      imageUrl: candidateImage || '',
       prepTimeMinutes: prepTimeMinutes,
       cookTimeMinutes: cookTimeMinutes,
       servings: servings,
@@ -2501,7 +2500,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.71';
+  window.APP_VERSION = 'v0.72';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2533,7 +2532,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.71';
+    this.appVersion = 'v0.72';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -4537,7 +4536,13 @@ class FoodAssistantApp {
               </button>
             </div>
             <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px; min-width: 0;">
-              <img src="${recipe.imageUrl}" alt="" style="width: 48px; height: 48px; border-radius: 10px; object-fit: cover; flex-shrink: 0;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\\'http://www.w3.org/2000/svg\\\' viewBox=\\\'0 0 48 48\\\'><rect width=\\\'48\\\' height=\\\'48\\\' rx=\\\'10\\\' fill=\\\'%23f1f3f4\\\'/><text x=\\\'50%25\\\' y=\\\'55%25\\\' dominant-baseline=\\\'middle\\\' text-anchor=\\\'middle\\\' font-size=\\\'20\\\'>🍲</text></svg>'">
+              ${recipe.imageUrl ? `
+                <img src="${recipe.imageUrl}" alt="" style="width: 48px; height: 48px; border-radius: 10px; object-fit: cover; flex-shrink: 0;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\\'http://www.w3.org/2000/svg\\\' viewBox=\\\'0 0 48 48\\\'><rect width=\\\'48\\\' height=\\\'48\\\' rx=\\\'10\\\' fill=\\\'%23f1f3f4\\\'/><text x=\\\'50%25\\\' y=\\\'55%25\\\' dominant-baseline=\\\'middle\\\' text-anchor=\\\'middle\\\' font-size=\\\'20\\\'>🍲</text></svg>'">
+              ` : `
+                <div style="width: 48px; height: 48px; border-radius: 10px; background: var(--m3-surface-container-high); color: var(--m3-primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                  <span class="material-symbols-outlined">restaurant</span>
+                </div>
+              `}
               <div style="flex: 1; min-width: 0; overflow: hidden;">
                 <div class="slot-recipe-name" title="${recipe.title}">${recipe.title}</div>
                 ${warningBadgeHtml}
@@ -4638,7 +4643,13 @@ class FoodAssistantApp {
       return `
       <article class="recipe-card" onclick="app.openRecipeDetail('${rec.id}')">
         <div class="recipe-image-wrap">
-          <img class="recipe-img" src="${rec.imageUrl}" alt="${rec.title}" loading="lazy">
+          ${rec.imageUrl ? `
+            <img class="recipe-img" src="${rec.imageUrl}" alt="${rec.title}" loading="lazy">
+          ` : `
+            <div class="recipe-img-placeholder" style="width: 100%; height: 100%; background: var(--m3-surface-container-high); color: var(--m3-on-surface-variant); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;">
+              <span class="material-symbols-outlined" style="font-size: 36px; opacity: 0.55;">restaurant_menu</span>
+            </div>
+          `}
           <div class="recipe-time-badge">
             <span class="material-symbols-outlined icon-sm">schedule</span> ${rec.prepTimeMinutes + rec.cookTimeMinutes} min
           </div>
@@ -4915,9 +4926,11 @@ class FoodAssistantApp {
     const baseNutrition = getRecipeNutrition(r);
 
     body.innerHTML = `
+      ${r.imageUrl ? `
       <div style="position: relative; height: 220px; background: #000; overflow: hidden;">
         <img src="${r.imageUrl}" alt="${r.title}" style="width: 100%; height: 100%; object-fit: cover;">
       </div>
+      ` : ''}
       
       <div style="padding: 18px;">
         ${this.isReviewingImport ? `
@@ -5118,7 +5131,7 @@ class FoodAssistantApp {
     document.getElementById('edit-recipe-prep').value = "15";
     document.getElementById('edit-recipe-cook').value = "20";
     document.getElementById('edit-recipe-servings').value = state.settings.defaultServings || "2";
-    document.getElementById('edit-recipe-image').value = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80";
+    document.getElementById('edit-recipe-image').value = "";
     document.getElementById('edit-recipe-tags').value = "Cena, Saludable";
     const calEl = document.getElementById('edit-recipe-calories');
     const proEl = document.getElementById('edit-recipe-protein');
@@ -5705,7 +5718,7 @@ class FoodAssistantApp {
 
     const id = document.getElementById('edit-recipe-id').value || generateId('rec-');
     const description = document.getElementById('edit-recipe-desc').value.trim();
-    const imageUrl = document.getElementById('edit-recipe-image')?.value.trim() || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80';
+    const imageUrl = document.getElementById('edit-recipe-image')?.value.trim() || '';
     const prepTimeMinutes = parseInt(document.getElementById('edit-recipe-prep').value, 10) || 0;
     const cookTimeMinutes = parseInt(document.getElementById('edit-recipe-cook').value, 10) || 0;
     const servings = parseInt(document.getElementById('edit-recipe-servings').value, 10) || 2;
@@ -6042,7 +6055,13 @@ class FoodAssistantApp {
             </button>
           </div>
           <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; min-width: 0;">
-            <img src="${recipe.imageUrl}" alt="" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\\'http://www.w3.org/2000/svg\\\' viewBox=\\\'0 0 48 48\\\'><rect width=\\\'48\\\' height=\\\'48\\\' rx=\\\'8\\\' fill=\\\'%23f1f3f4\\\'/><text x=\\\'50%25\\\' y=\\\'55%25\\\' dominant-baseline=\\\'middle\\\' text-anchor=\\\'middle\\\' font-size=\\\'18\\\'>🍲</text></svg>'">
+            ${recipe.imageUrl ? `
+              <img src="${recipe.imageUrl}" alt="" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\\'http://www.w3.org/2000/svg\\\' viewBox=\\\'0 0 48 48\\\'><rect width=\\\'48\\\' height=\\\'48\\\' rx=\\\'8\\\' fill=\\\'%23f1f3f4\\\'/><text x=\\\'50%25\\\' y=\\\'55%25\\\' dominant-baseline=\\\'middle\\\' text-anchor=\\\'middle\\\' font-size=\\\'18\\\'>🍲</text></svg>'">
+            ` : `
+              <div style="width: 36px; height: 36px; border-radius: 6px; background: var(--m3-surface-container-high); color: var(--m3-primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <span class="material-symbols-outlined icon-sm">restaurant</span>
+              </div>
+            `}
             <div style="flex: 1; min-width: 0; overflow: hidden;">
               <div class="slot-recipe-name" title="${recipe.title}">${recipe.title}</div>
               ${warningHtml}
@@ -6093,7 +6112,13 @@ class FoodAssistantApp {
             </div>
           </div>
           <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; min-width: 0;">
-            <img src="${recipe.imageUrl}" alt="" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\\'http://www.w3.org/2000/svg\\\' viewBox=\\\'0 0 48 48\\\'><rect width=\\\'48\\\' height=\\\'48\\\' rx=\\\'8\\\' fill=\\\'%23f1f3f4\\\'/><text x=\\\'50%25\\\' y=\\\'55%25\\\' dominant-baseline=\\\'middle\\\' text-anchor=\\\'middle\\\' font-size=\\\'18\\\'>🍲</text></svg>'">
+            ${recipe.imageUrl ? `
+              <img src="${recipe.imageUrl}" alt="" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\\'http://www.w3.org/2000/svg\\\' viewBox=\\\'0 0 48 48\\\'><rect width=\\\'48\\\' height=\\\'48\\\' rx=\\\'8\\\' fill=\\\'%23f1f3f4\\\'/><text x=\\\'50%25\\\' y=\\\'55%25\\\' dominant-baseline=\\\'middle\\\' text-anchor=\\\'middle\\\' font-size=\\\'18\\\'>🍲</text></svg>'">
+            ` : `
+              <div style="width: 36px; height: 36px; border-radius: 6px; background: var(--m3-surface-container-high); color: var(--m3-primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <span class="material-symbols-outlined icon-sm">restaurant</span>
+              </div>
+            `}
             <div style="flex: 1; min-width: 0; overflow: hidden;">
               <div class="slot-recipe-name" title="${recipe.title}">${recipe.title}</div>
               ${warningHtml}
@@ -6682,7 +6707,13 @@ class FoodAssistantApp {
         <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--m3-surface-container-low); border: 1px solid var(--m3-outline-variant); border-radius: var(--radius-md); cursor: pointer;"
              onclick="app.selectRecipeForSlot('${r.id}')">
           <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; padding-right: 8px;">
-            <img src="${r.imageUrl}" alt="" style="width: 42px; height: 42px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\\'http://www.w3.org/2000/svg\\\' viewBox=\\\'0 0 48 48\\\'><rect width=\\\'48\\\' height=\\\'48\\\' rx=\\\'8\\\' fill=\\\'%23f1f3f4\\\'/><text x=\\\'50%25\\\' y=\\\'55%25\\\' dominant-baseline=\\\'middle\\\' text-anchor=\\\'middle\\\' font-size=\\\'18\\\'>🍲</text></svg>'">
+            ${r.imageUrl ? `
+              <img src="${r.imageUrl}" alt="" style="width: 42px; height: 42px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\\'http://www.w3.org/2000/svg\\\' viewBox=\\\'0 0 48 48\\\'><rect width=\\\'48\\\' height=\\\'48\\\' rx=\\\'8\\\' fill=\\\'%23f1f3f4\\\'/><text x=\\\'50%25\\\' y=\\\'55%25\\\' dominant-baseline=\\\'middle\\\' text-anchor=\\\'middle\\\' font-size=\\\'18\\\'>🍲</text></svg>'">
+            ` : `
+              <div style="width: 42px; height: 42px; border-radius: 6px; background: var(--m3-surface-container-high); color: var(--m3-primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <span class="material-symbols-outlined icon-sm">restaurant</span>
+              </div>
+            `}
             <div style="min-width: 0;">
               <strong style="font-size: 13px; color: var(--m3-on-surface); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${r.title}</strong>
               <div style="font-size: 11px; color: var(--m3-on-surface-variant); display: flex; align-items: center; gap: 6px; margin-top: 2px;">
@@ -7347,6 +7378,25 @@ class FoodAssistantApp {
   // ==========================================================================
   // GEMINI AI AGENT INTEGRATION (US-17, BUG-15, US-37, US-39)
   // ==========================================================================
+  getDietarySlotGaps() {
+    const activePrefs = Array.isArray(state.dietaryPreferences) ? state.dietaryPreferences : [];
+    if (activePrefs.length === 0) return [];
+
+    const allRecipes = Array.isArray(state.recipes) ? state.recipes : [];
+    const compliantRecipes = allRecipes.filter(r => checkDietaryCompliance(r, activePrefs).compliant);
+    const hasTagCI = (recipe, tag) =>
+      Array.isArray(recipe?.tags) && recipe.tags.some(t => String(t).toLowerCase() === tag.toLowerCase());
+
+    const slotDefs = [
+      { slot: 'breakfast', tag: 'Desayuno', label: 'Desayunos' },
+      { slot: 'lunch', tag: 'Almuerzo', label: 'Almuerzos' },
+      { slot: 'snack', tag: 'Merienda', label: 'Meriendas' },
+      { slot: 'dinner', tag: 'Cena', label: 'Cenas' }
+    ];
+
+    return slotDefs.filter(def => compliantRecipes.filter(r => hasTagCI(r, def.tag)).length < 2);
+  }
+
   isWeeklyPlanPrompt(prompt) {
     if (!prompt || typeof prompt !== 'string') return false;
     return /planifica|semana|men[uú]|hueco|vac[ií]|rellena|completa|platos\s+en\s+el\s+plan|plan\s+semanal|aparecer\s+muchas\s+comidas|dejado\s+vac|desayunos\s+y\s+meriendas/i.test(prompt);
@@ -7355,7 +7405,7 @@ class FoodAssistantApp {
   isAiActionPrompt(prompt) {
     if (!prompt || typeof prompt !== 'string') return false;
     if (this.isWeeklyPlanPrompt(prompt)) return true;
-    return /asigna|pon\s+en\s+el|cambia\s+el|actualiza\s+el\s+plan|crea\s+una\s+receta|inventa|nueva\s+receta|compra|a[ñn]ade|apunta|agrega|quita|borra|elimina|tacha/i.test(prompt);
+    return /asigna|pon\s+en\s+el|cambia\s+el|actualiza\s+el\s+plan|crea\s+una\s+receta|crea\s+recetas|inventa|nueva\s+receta|compra|a[ñn]ade|apunta|agrega|quita|borra|elimina|tacha/i.test(prompt);
   }
 
   buildAiSystemInstruction() {
@@ -7377,13 +7427,17 @@ class FoodAssistantApp {
     }).join('\n');
 
     const pendingShop = (state.shoppingList || []).filter(i => !i.isChecked).map(i => `${i.name} (${i.amount || 1} ${i.unit || ''})`).join(', ') || 'Vacía';
+    const slotGaps = this.getDietarySlotGaps();
+    const gapNotice = slotGaps.length > 0
+      ? `\nAVISO DE COBERTURA DEL CATÁLOGO: El usuario no tiene recetas guardadas para [${slotGaps.map(g => g.label).join(', ')}] que cumplan estrictamente con [${prefs}]. Al planificar la semana con "set_weekly_plan", rellena esos huecos con las mejores opciones actuales de su catálogo (sin dejar huecos vacíos) y SUGIÉRELE expresamente en tu mensaje crear recetas nuevas de ${slotGaps.map(g => g.label).join(' y ')} adaptadas a (${prefs}) para esos huecos.`
+      : '';
 
     return `Eres el Agente Gastronómico Inteligente de Food Assistant.
 Fecha actual: ${todayKey}.
 Raciones por defecto en casa: ${state.settings?.defaultServings || 2}.
 Preferencias dietéticas del usuario (RESPETAR SIEMPRE): ${prefs}.
 Objetivos nutricionales diarios del usuario: ${goals}.
-Lista de la compra pendiente: ${pendingShop}.
+Lista de la compra pendiente: ${pendingShop}.${gapNotice}
 
 CATÁLOGO DE RECETAS DEL USUARIO:
 ${recipesCatalog || '(Sin recetas guardadas)'}
@@ -7393,8 +7447,8 @@ ${currentPlanSummary}
 
 INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
 1. Cuando el usuario pida crear, planificar, completar o modificar su menú semanal (o indique que faltan comidas o que hay huecos vacíos), DEBES invocar SIEMPRE la herramienta "set_weekly_plan" con los 7 días de la semana (${weekDays.map(w => `${w.dayName}=${w.dateKey}`).join(', ')}) y las 4 comidas de cada día ("breakfast", "lunch", "snack" y "dinner") usando los IDs reales del catálogo. NUNCA dejes desayunos, almuerzos, meriendas ni cenas vacíos.
-2. Si para Desayuno ("breakfast") o Merienda ("snack") no hay suficientes recetas con una etiqueta nutricional como "Alta en Proteínas", elige igualmente las mejores recetas de Desayuno y Merienda del catálogo del usuario para que las 4 comidas de los 7 días queden siempre completas.
-3. Si faltan recetas adecuadas o el usuario pide crear/inventar una receta nueva, usa "create_and_save_recipe" para guardarla en el catálogo.
+2. Si para Desayuno ("breakfast") o Merienda ("snack") no hay suficientes recetas con una etiqueta nutricional como "Alta en Proteínas", elige igualmente las mejores recetas de Desayuno y Merienda del catálogo del usuario para que las 4 comidas de los 7 días queden siempre completas, y pregúntale al usuario si quiere que le crees recetas nuevas específicas para esos huecos.
+3. Si faltan recetas adecuadas o el usuario pide crear/inventar recetas nuevas para esos huecos, usa "create_and_save_recipe" para guardarlas en el catálogo y asígnalas al plan con "set_weekly_plan".
 4. Si el usuario pide añadir, tachar o eliminar cosas de la lista de la compra, usa "manage_shopping_list".
 5. PROHIBIDO mostrar identificadores internos (como "rec-...") en tu respuesta de texto al usuario. En el texto visible escribe únicamente los nombres de los platos. Responde siempre en español de forma cercana, minimalista, clara y directa.`;
   }
@@ -7825,7 +7879,7 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
         id: (args.id && !state.recipes.some(r => r.id === args.id)) ? String(args.id) : generateId('rec-'),
         title: String(args.title || 'Receta creada con IA').trim(),
         description: String(args.description || 'Receta generada a medida con IA.').trim(),
-        imageUrl: args.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80',
+        imageUrl: args.imageUrl ? String(args.imageUrl).trim() : '',
         prepTimeMinutes: Math.max(0, parseInt(args.prepTimeMinutes, 10) || 10),
         cookTimeMinutes: Math.max(0, parseInt(args.cookTimeMinutes, 10) || 15),
         servings: Math.max(1, parseInt(args.servings, 10) || state.settings?.defaultServings || 2),
@@ -8102,6 +8156,8 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
       }
 
       const executedResults = this.executeAiToolCalls(rawToolCalls);
+      const hasWeeklyPlanExecuted = executedResults.some(r => r.tool === 'set_weekly_plan');
+      const slotGaps = hasWeeklyPlanExecuted ? this.getDietarySlotGaps() : [];
 
       let displayMessage = agentResult.text;
       if (!displayMessage && executedResults.length > 0) {
@@ -8112,6 +8168,12 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
           return '';
         }).filter(Boolean);
         displayMessage = summaries.join('\n\n');
+      }
+
+      if (slotGaps.length > 0 && !/crear|inventar|nuevas recetas/i.test(displayMessage || '')) {
+        const gapLabels = slotGaps.map(g => g.label.toLowerCase()).join(' y ');
+        const prefList = (state.dietaryPreferences || []).join(', ');
+        displayMessage = `${displayMessage}\n\n💡 **Nota**: En tu recetario tienes pocas o ninguna opción de **${gapLabels}** que cumplan con **${prefList}**, así que he completado la semana apoyándome en tus mejores opciones actuales. ¿Quieres que cree nuevas recetas a medida para esos huecos y las asigne al plan?`;
       }
 
       if (!Array.isArray(this.aiChatHistory)) this.aiChatHistory = [];
@@ -8133,6 +8195,16 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
             btn.innerHTML = '<span class="material-symbols-outlined icon-sm">calendar_month</span> Ver en Planificador';
             btn.onclick = () => this.switchView('view-planner');
             actionsContainer.appendChild(btn);
+
+            if (slotGaps.length > 0) {
+              const createMissingBtn = document.createElement('button');
+              createMissingBtn.type = 'button';
+              createMissingBtn.className = 'btn btn-tonal btn-sm';
+              const gapLabelText = slotGaps.map(g => g.label).join(' y ');
+              createMissingBtn.innerHTML = `<span class="material-symbols-outlined icon-sm">auto_awesome</span> Crear ${gapLabelText} a medida`;
+              createMissingBtn.onclick = () => this.triggerCreateMissingSlotRecipes(slotGaps);
+              actionsContainer.appendChild(createMissingBtn);
+            }
           } else if (res.tool === 'create_and_save_recipe') {
             const btn = document.createElement('button');
             btn.type = 'button';
@@ -8182,6 +8254,18 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
     const input = document.getElementById('ai-chat-input');
     if (input) {
       input.value = "Planifica mi menú semanal equilibrado de lunes a domingo con mis recetas guardadas.";
+      this.handleAiChatSubmit();
+    }
+  }
+
+  triggerCreateMissingSlotRecipes(gaps = null) {
+    const activeGaps = Array.isArray(gaps) && gaps.length > 0 ? gaps : this.getDietarySlotGaps();
+    const gapTags = activeGaps.length > 0 ? activeGaps.map(g => g.tag).join(' y ') : 'Desayuno y Merienda';
+    const prefs = (state.dietaryPreferences || []).join(', ') || 'saludables';
+    this.switchView('view-ai');
+    const input = document.getElementById('ai-chat-input');
+    if (input) {
+      input.value = `Crea recetas nuevas de ${gapTags} que cumplan con ${prefs} y asígnalas en mi Plan semanal.`;
       this.handleAiChatSubmit();
     }
   }
