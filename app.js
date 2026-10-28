@@ -7322,79 +7322,538 @@ class FoodAssistantApp {
     });
   }
 
-  // GEMINI AI INTEGRATION
-  async callGeminiApi(prompt, systemInstruction = "") {
+  // ==========================================================================
+  // GEMINI AI AGENT INTEGRATION (US-17, BUG-15, US-37, US-39)
+  // ==========================================================================
+  buildAiSystemInstruction() {
+    const todayKey = toLocalDateKey(new Date());
+    const weekDays = this.getPlannerWeekDates();
+    const prefs = (state.dietaryPreferences || []).join(', ') || 'Ninguna restricción específica';
+    const goals = state.settings?.nutritionGoals?.enabled
+      ? `${state.settings.nutritionGoals.calories} kcal, ${state.settings.nutritionGoals.protein}g Proteínas, ${state.settings.nutritionGoals.carbs}g Carbos, ${state.settings.nutritionGoals.fat}g Grasas`
+      : 'Sin metas numéricas estrictas activas';
+
+    const recipesCatalog = (state.recipes || []).map(r => {
+      const nut = getRecipeNutrition(r);
+      return `- ID: "${r.id}" | Título: "${r.title}" | Tags: [${(r.tags || []).join(', ')}] | Tiempo: ${(r.prepTimeMinutes || 0) + (r.cookTimeMinutes || 0)} min | Macros/ración: ${nut.calories} kcal, P:${nut.protein}g, C:${nut.carbs}g, G:${nut.fat}g`;
+    }).join('\n');
+
+    const currentPlanSummary = weekDays.map(d => {
+      const dayPlan = state.getDayPlan(d.dateKey, d.dayName);
+      return `- ${d.dayName} (${d.dateKey}): Desayuno=${dayPlan.breakfast || 'vacío'}, Almuerzo=${dayPlan.lunch || 'vacío'}, Merienda=${dayPlan.snack || 'vacío'}, Cena=${dayPlan.dinner || 'vacío'}`;
+    }).join('\n');
+
+    const pendingShop = (state.shoppingList || []).filter(i => !i.isChecked).map(i => `${i.name} (${i.amount || 1} ${i.unit || ''})`).join(', ') || 'Vacía';
+
+    return `Eres el Agente Gastronómico Inteligente de Food Assistant.
+Fecha actual: ${todayKey}.
+Raciones por defecto en casa: ${state.settings?.defaultServings || 2}.
+Preferencias dietéticas del usuario (RESPETAR SIEMPRE): ${prefs}.
+Objetivos nutricionales diarios del usuario: ${goals}.
+Lista de la compra pendiente: ${pendingShop}.
+
+CATÁLOGO DE RECETAS DEL USUARIO:
+${recipesCatalog || '(Sin recetas guardadas)'}
+
+PLAN SEMANAL ACTUAL (Semana visible):
+${currentPlanSummary}
+
+INSTRUCCIONES DE CONTROL (FUNCTION CALLING):
+1. Cuando el usuario pida crear o modificar su menú semanal, USA la herramienta "set_weekly_plan" con los dateKey exactos (${weekDays.map(w => `${w.dayName}=${w.dateKey}`).join(', ')}) y los IDs reales de las recetas.
+2. Si faltan recetas adecuadas para cumplir sus preferencias dietéticas o sus gustos en algún día, o si pide crear/inventar una receta, usa "create_and_save_recipe" para crearla en el catálogo y asígnala si procede.
+3. Si el usuario pide añadir, tachar o eliminar cosas de la lista de la compra, usa "manage_shopping_list".
+4. Responde siempre en español de forma cercana, minimalista, clara y directa.`;
+  }
+
+  async callGeminiAgent(prompt, systemInstruction = "", enableTools = true) {
     const apiKey = state.settings.geminiApiKey?.trim();
     if (!apiKey) {
-      return this.simulateGeminiDemoResponse(prompt);
+      return this.simulateGeminiAgentResponse(prompt);
     }
 
     const model = state.settings.geminiModel || 'gemini-2.5-flash';
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    // US-39: La clave nunca va en la URL (?key=), se envía en la cabecera x-goog-api-key
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
     const payload = {
       contents: [{ role: "user", parts: [{ text: prompt }] }]
     };
 
-    if (systemInstruction) {
-      payload.systemInstruction = { parts: [{ text: systemInstruction }] };
+    const effectiveSystemInstruction = systemInstruction || this.buildAiSystemInstruction();
+    if (effectiveSystemInstruction) {
+      payload.systemInstruction = { parts: [{ text: effectiveSystemInstruction }] };
+    }
+
+    if (enableTools) {
+      payload.tools = [{ functionDeclarations: AI_TOOLS_DECLARATIONS }];
     }
 
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey
+      },
       body: JSON.stringify(payload)
     });
 
     if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error?.message || "Error al conectar con Gemini API");
+      let errMsg = "Error al conectar con Gemini API";
+      try {
+        const err = await response.json();
+        errMsg = err.error?.message || errMsg;
+      } catch (e) {}
+      throw new Error(errMsg);
     }
 
     const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    const textParts = [];
+    const toolCalls = [];
+
+    parts.forEach(part => {
+      if (typeof part.text === 'string' && part.text.trim()) {
+        textParts.push(part.text);
+      }
+      if (part.functionCall && part.functionCall.name) {
+        toolCalls.push({
+          name: part.functionCall.name,
+          args: part.functionCall.args || {}
+        });
+      }
+    });
+
+    this.lastAiToolCalls = toolCalls;
+    return {
+      text: textParts.join('\n').trim(),
+      toolCalls
+    };
+  }
+
+  async callGeminiApi(prompt, systemInstruction = "") {
+    const res = await this.callGeminiAgent(prompt, systemInstruction, false);
+    return res.text || "";
+  }
+
+  buildSimulatedWeeklyPlanArgs(mode = 'replace') {
+    const activePrefs = Array.isArray(state.dietaryPreferences) ? state.dietaryPreferences : [];
+    const allRecipes = Array.isArray(state.recipes) ? state.recipes : [];
+    const compliantRecipes = activePrefs.length > 0
+      ? allRecipes.filter(r => checkDietaryCompliance(r, activePrefs).compliant)
+      : allRecipes;
+    const pool = compliantRecipes.length > 0 ? compliantRecipes : allRecipes;
+
+    const filterByTag = (tag, allowNonBreakfastFallback = false) => {
+      const strictCompliant = pool.filter(r => Array.isArray(r.tags) && r.tags.some(t => String(t).toLowerCase() === tag.toLowerCase()));
+      if (strictCompliant.length > 0) return strictCompliant;
+      if (allowNonBreakfastFallback) {
+        const nonBreakfast = pool.filter(r => !Array.isArray(r.tags) || !r.tags.includes('Desayuno'));
+        if (nonBreakfast.length > 0) return nonBreakfast;
+      }
+      return pool;
+    };
+
+    const breakfastList = filterByTag('Desayuno', false);
+    const lunchList = filterByTag('Almuerzo', true);
+    const snackList = filterByTag('Merienda', false);
+    const dinnerList = filterByTag('Cena', true);
+
+    const weekDays = this.getPlannerWeekDates();
+    const days = weekDays.map((wDay, idx) => {
+      const pick = (list, offset = 0) => list.length > 0 ? list[(idx + offset) % list.length].id : null;
+      return {
+        dateKey: wDay.dateKey,
+        dayName: wDay.dayName,
+        breakfast: pick(breakfastList, 0),
+        lunch: pick(lunchList, 0),
+        snack: pick(snackList, 0),
+        dinner: pick(dinnerList, 1)
+      };
+    });
+
+    return { mode, days };
+  }
+
+  simulateGeminiAgentResponse(prompt) {
+    const lower = (prompt || '').toLowerCase();
+
+    // 1. Planificación semanal estructurada respetando preferencias dietéticas (BUG-15 + US-17)
+    if (lower.includes('planifica') || lower.includes('semana') || lower.includes('menú') || lower.includes('menu')) {
+      const planArgs = this.buildSimulatedWeeklyPlanArgs('replace');
+      this.lastAiProposedPlan = planArgs;
+      const findTitle = (id) => state.recipes.find(r => r.id === id)?.title || 'Comida libre';
+      const summaryLines = planArgs.days.map(d =>
+        `- **${d.dayName}**: ${findTitle(d.lunch)} (Almuerzo) / ${findTitle(d.dinner)} (Cena)`
+      ).join('\n');
+
+      const prefNote = (state.dietaryPreferences && state.dietaryPreferences.length > 0)
+        ? ` respetando tus preferencias (**${state.dietaryPreferences.join(', ')}**)`
+        : '';
+
+      return {
+        text: `¡He analizado tus recetas guardadas${prefNote} y he aplicado este menú semanal equilibrado en tu calendario!\n\n${summaryLines}`,
+        toolCalls: [
+          {
+            name: 'set_weekly_plan',
+            args: planArgs
+          }
+        ]
+      };
+    }
+
+    // 2. Creación de receta nueva o aprovechamiento de nevera (US-17)
+    if (lower.includes('crea') || lower.includes('inventa') || lower.includes('receta') || lower.includes('pollo') || lower.includes('nevera') || lower.includes('tengo') || lower.includes('15 min')) {
+      const isQuickDinner = lower.includes('15 min') || lower.includes('proteína') || lower.includes('proteina');
+      const newRecipeArgs = isQuickDinner ? {
+        id: generateId('rec-'),
+        title: "Salteado Express de Pollo, Espinacas y Huevo Rico en Proteínas",
+        description: "Cena saludable lista en 15 minutos con alto aporte proteico y baja en carbohidratos.",
+        prepTimeMinutes: 5,
+        cookTimeMinutes: 10,
+        servings: state.settings?.defaultServings || 2,
+        tags: ["Cena", "Rápida", "Saludable", "Alta en Proteínas", "Sin Gluten"],
+        ingredients: [
+          { name: "Pechuga de pollo", amount: 350, unit: "g" },
+          { name: "Espinacas frescas", amount: 150, unit: "g" },
+          { name: "Huevos camperos", amount: 2, unit: "ud" },
+          { name: "Aceite de oliva virgen extra", amount: 15, unit: "ml" }
+        ],
+        instructions: [
+          { step: 1, text: "Corta la pechuga de pollo en tiras y dórala en la sartén con aceite de oliva durante 6 minutos.", timerMinutes: 6 },
+          { step: 2, text: "Añade las espinacas frescas y saltea durante 2 minutos hasta que reduzcan.", timerMinutes: 2 },
+          { step: 3, text: "Incorpora los huevos encima y cuaja durante 2 minutos más.", timerMinutes: 2 }
+        ],
+        nutrition: { calories: 390, protein: 48, carbs: 4, fat: 18 }
+      } : {
+        id: generateId('rec-'),
+        title: "Pechugas Salteadas con Dados de Patata y Calabacín al Romero",
+        description: "Receta casera de aprovechamiento con pollo jugoso, calabacín tierno y patatas doradas al romero.",
+        prepTimeMinutes: 10,
+        cookTimeMinutes: 15,
+        servings: state.settings?.defaultServings || 2,
+        tags: ["Almuerzo", "Cena", "Saludable", "Rápida", "Sin Gluten"],
+        ingredients: [
+          { name: "Pechugas de pollo", amount: 350, unit: "g" },
+          { name: "Patatas medianas", amount: 2, unit: "ud" },
+          { name: "Calabacín", amount: 1, unit: "ud" },
+          { name: "Aceite de oliva virgen extra", amount: 20, unit: "ml" },
+          { name: "Romero fresco", amount: 1, unit: "rama" }
+        ],
+        instructions: [
+          { step: 1, text: "Dora las patatas en dados en una sartén con aceite durante 10 minutos a fuego medio-alto.", timerMinutes: 10 },
+          { step: 2, text: "Añade el pollo en dados y cocina 5 minutos hasta dorar.", timerMinutes: 5 },
+          { step: 3, text: "Incorpora el calabacín y el romero, saltea 5 minutos más y sirve caliente.", timerMinutes: 5 }
+        ],
+        nutrition: { calories: 410, protein: 42, carbs: 26, fat: 13 }
+      };
+
+      return {
+        text: `He creado y guardado en tu recetario la receta **${newRecipeArgs.title}** (${newRecipeArgs.prepTimeMinutes + newRecipeArgs.cookTimeMinutes} min | ${newRecipeArgs.nutrition.protein}g de proteína por ración).`,
+        toolCalls: [
+          {
+            name: 'create_and_save_recipe',
+            args: newRecipeArgs
+          }
+        ]
+      };
+    }
+
+    // 3. Gestión de lista de la compra por voz / chat (US-17)
+    if (lower.includes('compra') || lower.includes('añade') || lower.includes('anade') || lower.includes('apunta')) {
+      const cleaned = prompt
+        .replace(/^(?:por favor\s+)?(?:a[ñn]ade|apunta|mete|pon|agrega)\s+/i, '')
+        .replace(/\s+(?:a|en)\s+la\s+(?:lista\s+de\s+la\s+)?compra.*$/i, '')
+        .trim();
+      const rawParts = cleaned
+        ? cleaned.split(/\s*,\s*|\s+y\s+/i).map(s => s.trim()).filter(Boolean)
+        : ['Leche', 'Aguacates'];
+
+      const items = rawParts.map(part => {
+        const parsed = RecipeParser.parseIngredientLine(part);
+        const single = Array.isArray(parsed) ? parsed[0] : parsed;
+        return {
+          name: single?.name || part,
+          amount: single?.amount || 1,
+          unit: single?.unit || 'ud'
+        };
+      });
+
+      return {
+        text: `¡Hecho! He añadido **${items.map(i => i.name).join(', ')}** a tu Lista de la Compra clasificados por pasillo.`,
+        toolCalls: [
+          {
+            name: 'manage_shopping_list',
+            args: {
+              action: 'add',
+              items
+            }
+          }
+        ]
+      };
+    }
+
+    return {
+      text: `He tomado nota de tu consulta. Puedes pedirme que **planifique tu menú semanal**, que **cree recetas nuevas** o que **añada ingredientes a tu lista de la compra** (y configurar tu clave de API de Gemini en Ajustes cuando quieras).`,
+      toolCalls: []
+    };
   }
 
   simulateGeminiDemoResponse(prompt) {
-    const lower = prompt.toLowerCase();
-    
-    if (lower.includes('planifica') || lower.includes('semana') || lower.includes('menú')) {
-      return `¡He analizado tus recetas guardadas y he preparado un menú semanal equilibrado para ti!
+    return this.simulateGeminiAgentResponse(prompt).text;
+  }
 
-- **Lunes**: Pasta al Pesto Genovés (Almuerzo) / Salmón a la Plancha (Cena)
-- **Martes**: Pechugas al Limón (Almuerzo) / Ensalada Mediterránea (Cena)
-- **Miércoles**: Ensalada Mediterránea (Almuerzo) / Pasta al Pesto (Cena)
-- **Jueves**: Pechugas al Limón (Almuerzo) / Salmón con Espárragos (Cena)
-- **Viernes**: Salmón a la Plancha (Almuerzo) / Pechugas al Limón (Cena)
-- **Sábado**: Pasta al Pesto (Almuerzo) / Cena Ligera
-- **Domingo**: Pollo Asado con Patatas (Almuerzo Familiar)`;
+  resolveRecipeIdForAgent(ref) {
+    if (!ref || typeof ref !== 'string') return null;
+    const trimmed = ref.trim();
+    if (!trimmed || trimmed.toLowerCase() === 'null' || trimmed.toLowerCase() === 'vacío' || trimmed.toLowerCase() === 'vacio') {
+      return null;
+    }
+    const exact = state.recipes.find(r => r.id === trimmed);
+    if (exact) return exact.id;
+
+    const normRef = normalizeIngredientText(trimmed);
+    const byTitle = state.recipes.find(r => normalizeIngredientText(r.title || '') === normRef) ||
+                    state.recipes.find(r => normalizeIngredientText(r.title || '').includes(normRef) || normRef.includes(normalizeIngredientText(r.title || '')));
+    return byTitle ? byTitle.id : null;
+  }
+
+  executeAiToolCall(toolCall) {
+    if (!toolCall || !toolCall.name) return null;
+    const name = toolCall.name;
+    const args = toolCall.args || {};
+
+    if (name === 'create_and_save_recipe') {
+      const nowIso = new Date().toISOString();
+      const rawIngredients = Array.isArray(args.ingredients) ? args.ingredients : [];
+      const normalizedIngredients = rawIngredients.map((ing, idx) => {
+        const ingName = String(ing?.name || `Ingrediente ${idx + 1}`).trim();
+        return {
+          id: ing?.id || generateId('ing-'),
+          name: ingName,
+          amount: Number(ing?.amount) || 1,
+          unit: RecipeParser.normalizeUnit(ing?.unit || 'ud'),
+          aisle: ing?.aisle || categorizeIngredientAisle(ingName)
+        };
+      });
+
+      const rawInstructions = Array.isArray(args.instructions) ? args.instructions : [];
+      const normalizedInstructions = rawInstructions.map((inst, idx) => {
+        const text = typeof inst === 'string' ? inst : String(inst?.text || '').trim();
+        const detectedTimer = RecipeParser.extractTimerMinutes(text);
+        return {
+          step: Number(inst?.step) || (idx + 1),
+          text,
+          timerMinutes: typeof inst?.timerMinutes === 'number' ? inst.timerMinutes : (detectedTimer || 0)
+        };
+      }).filter(s => s.text);
+
+      const newRecipe = {
+        id: (args.id && !state.recipes.some(r => r.id === args.id)) ? String(args.id) : generateId('rec-'),
+        title: String(args.title || 'Receta creada con IA').trim(),
+        description: String(args.description || 'Receta generada a medida con IA.').trim(),
+        imageUrl: args.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80',
+        prepTimeMinutes: Math.max(0, parseInt(args.prepTimeMinutes, 10) || 10),
+        cookTimeMinutes: Math.max(0, parseInt(args.cookTimeMinutes, 10) || 15),
+        servings: Math.max(1, parseInt(args.servings, 10) || state.settings?.defaultServings || 2),
+        tags: Array.isArray(args.tags) ? [...args.tags] : [],
+        ingredients: normalizedIngredients,
+        instructions: normalizedInstructions.length > 0 ? normalizedInstructions : [{ step: 1, text: "Prepara y mezcla los ingredientes.", timerMinutes: 5 }],
+        nutrition: args.nutrition && typeof args.nutrition === 'object' ? {
+          calories: Number(args.nutrition.calories) || 0,
+          protein: Number(args.nutrition.protein) || 0,
+          carbs: Number(args.nutrition.carbs) || 0,
+          fat: Number(args.nutrition.fat) || 0
+        } : null,
+        createdAt: nowIso,
+        updatedAt: nowIso
+      };
+
+      if (!newRecipe.nutrition || !newRecipe.nutrition.calories) {
+        newRecipe.nutrition = estimateRecipeNutrition(newRecipe);
+      }
+
+      if (typeof analyzeAndInferRecipeTags === 'function') {
+        const inferred = analyzeAndInferRecipeTags(newRecipe);
+        const lowerSet = new Set(newRecipe.tags.map(t => String(t).toLowerCase().trim()));
+        inferred.forEach(tag => {
+          const l = tag.toLowerCase().trim();
+          if (!lowerSet.has(l) && l !== 'general') {
+            newRecipe.tags.push(tag);
+            lowerSet.add(l);
+            state.addCustomTag && state.addCustomTag(tag);
+          }
+        });
+      }
+
+      state.recipes.unshift(newRecipe);
+      state.save('fa_recipes', state.recipes);
+      this.scheduleSyncWithCloud();
+      this.render();
+
+      return {
+        tool: 'create_and_save_recipe',
+        recipeId: newRecipe.id,
+        title: newRecipe.title,
+        recipe: newRecipe
+      };
     }
 
-    if (lower.includes('pollo') || lower.includes('nevera') || lower.includes('tengo')) {
-      return `Con el pollo, calabacín y patatas te sugiero preparar unas **Pechugas Salteadas con Dados de Patata y Calabacín al Romero**:
+    if (name === 'set_weekly_plan') {
+      const mode = args.mode === 'merge' ? 'merge' : 'replace';
+      const daysInput = Array.isArray(args.days) ? args.days : [];
+      const weekDays = this.getPlannerWeekDates();
+      let daysUpdated = 0;
 
-- **Tiempo**: 25 min | **Porciones**: 2
-- **Ingredientes**:
-  - 350g de pechugas de pollo en dados
-  - 2 patatas medianas en cubos
-  - 1 calabacín en rodajas
-  - Aceite de oliva, romero y ajo
+      daysInput.forEach(dayEntry => {
+        if (!dayEntry) return;
+        let targetDateKey = dayEntry.dateKey;
+        let targetDayName = dayEntry.dayName;
 
-- **Paso a paso**:
-1. Dora las patatas en una sartén con aceite durante 10 min a fuego medio-alto.
-2. Añade el pollo en dados y cocina 5 min hasta dorar.
-3. Incorpora el calabacín y romero, saltea 5 min más y sirve caliente.`;
+        if ((!targetDateKey || !/^\d{4}-\d{2}-\d{2}$/.test(targetDateKey)) && targetDayName) {
+          const matchedDay = weekDays.find(w => normalizeIngredientText(w.dayName) === normalizeIngredientText(targetDayName));
+          if (matchedDay) {
+            targetDateKey = matchedDay.dateKey;
+            targetDayName = matchedDay.dayName;
+          }
+        }
+        if (!targetDateKey) return;
+
+        const dayData = state.getDayPlan(targetDateKey, targetDayName);
+        ['breakfast', 'lunch', 'snack', 'dinner'].forEach(slotKey => {
+          if (slotKey in dayEntry && dayEntry[slotKey] !== undefined) {
+            const rawVal = dayEntry[slotKey];
+            if (rawVal === null || rawVal === '' || String(rawVal).toUpperCase() === 'CLEAR') {
+              if (mode === 'replace') dayData[slotKey] = null;
+            } else {
+              const resolvedId = this.resolveRecipeIdForAgent(String(rawVal));
+              if (resolvedId) {
+                if (mode === 'replace' || !dayData[slotKey]) {
+                  dayData[slotKey] = resolvedId;
+                }
+              }
+            }
+          }
+        });
+        dayData.updatedAt = new Date().toISOString();
+        daysUpdated++;
+      });
+
+      this.lastAiProposedPlan = { mode, days: daysInput };
+      state.save('fa_mealplan', state.mealPlan);
+      this.scheduleSyncWithCloud();
+      this.render();
+
+      return {
+        tool: 'set_weekly_plan',
+        mode,
+        daysUpdated
+      };
     }
 
-    return `He tomado nota de tu consulta. Puedes configurar tu clave de API gratuita de Gemini en la pestaña de Ajustes para obtener respuestas 100% personalizadas en tiempo real.`;
+    if (name === 'manage_shopping_list') {
+      const action = String(args.action || 'add').toLowerCase();
+      const items = Array.isArray(args.items) ? args.items : [];
+      let affectedCount = 0;
+
+      if (action === 'add_from_current_plan') {
+        const weekDays = this.getPlannerWeekDates();
+        weekDays.forEach(wDay => {
+          const dayPlan = state.getDayPlan(wDay.dateKey, wDay.dayName);
+          ['breakfast', 'lunch', 'snack', 'dinner'].forEach(slotKey => {
+            const recId = dayPlan[slotKey];
+            const rec = recId ? state.recipes.find(r => r.id === recId) : null;
+            if (rec && Array.isArray(rec.ingredients)) {
+              rec.ingredients.forEach(ing => {
+                state.shoppingList.push({
+                  id: generateId('shop-'),
+                  name: ing.name,
+                  amount: Number(ing.amount) || 1,
+                  unit: RecipeParser.normalizeUnit(ing.unit || 'ud'),
+                  aisle: ing.aisle || categorizeIngredientAisle(ing.name),
+                  isChecked: false,
+                  recipeOrigin: rec.title,
+                  updatedAt: new Date().toISOString()
+                });
+                affectedCount++;
+              });
+            }
+          });
+        });
+      } else if (action === 'add') {
+        items.forEach(item => {
+          if (!item || !item.name) return;
+          const cleanName = String(item.name).trim();
+          if (!cleanName) return;
+          state.shoppingList.push({
+            id: generateId('shop-'),
+            name: cleanName,
+            amount: Number(item.amount) || 1,
+            unit: RecipeParser.normalizeUnit(item.unit || 'ud'),
+            aisle: item.aisle || categorizeIngredientAisle(cleanName),
+            isChecked: false,
+            recipeOrigin: 'Asistente IA',
+            updatedAt: new Date().toISOString()
+          });
+          affectedCount++;
+        });
+      } else if (action === 'check') {
+        items.forEach(item => {
+          const normTarget = normalizeIngredientText(item?.name || '');
+          if (!normTarget) return;
+          state.shoppingList.forEach(shopItem => {
+            if (normalizeIngredientText(shopItem.name).includes(normTarget)) {
+              shopItem.isChecked = true;
+              shopItem.updatedAt = new Date().toISOString();
+              affectedCount++;
+            }
+          });
+        });
+      } else if (action === 'remove') {
+        const toRemoveNorms = items.map(i => normalizeIngredientText(i?.name || '')).filter(Boolean);
+        const remaining = [];
+        state.shoppingList.forEach(shopItem => {
+          const normName = normalizeIngredientText(shopItem.name);
+          if (toRemoveNorms.some(t => normName.includes(t))) {
+            state.trackDeletion && state.trackDeletion('shoppingItems', shopItem.id);
+            affectedCount++;
+          } else {
+            remaining.push(shopItem);
+          }
+        });
+        state.shoppingList = remaining;
+      }
+
+      state.save('fa_shopping', state.shoppingList);
+      this.scheduleSyncWithCloud();
+      this.render();
+
+      return {
+        tool: 'manage_shopping_list',
+        action,
+        count: affectedCount
+      };
+    }
+
+    return null;
+  }
+
+  executeAiToolCalls(toolCalls) {
+    if (!Array.isArray(toolCalls) || toolCalls.length === 0) return [];
+    const results = [];
+    toolCalls.forEach(tc => {
+      const res = this.executeAiToolCall(tc);
+      if (res) results.push(res);
+    });
+    return results;
   }
 
   async handleAiChatSubmit() {
     const input = document.getElementById('ai-chat-input');
-    const text = input.value.trim();
+    const text = input?.value.trim() || '';
     if (!text) return;
 
     const history = document.getElementById('chat-history-container');
+    if (!history) return;
     
     const userBubble = document.createElement('div');
     userBubble.style = 'background-color: var(--m3-primary); color: white; padding: 10px 14px; border-radius: var(--radius-lg); font-size: 13px; line-height: 1.45; align-self: flex-end; max-width: 85%;';
@@ -7410,14 +7869,60 @@ class FoodAssistantApp {
     history.scrollTop = history.scrollHeight;
 
     try {
-      const recipeSummary = state.recipes.map(r => `- ${r.title} (${r.tags.join(', ')})`).join('\n');
-      const systemPrompt = `Eres el asistente gastronómico de Food Assistant. El usuario tiene guardadas estas recetas:\n${recipeSummary}\nResponde en español de forma minimalista, clara y directa.`;
+      const systemPrompt = this.buildAiSystemInstruction();
+      const agentResult = await this.callGeminiAgent(text, systemPrompt, true);
+      const executedResults = this.executeAiToolCalls(agentResult.toolCalls || []);
 
-      const aiResponse = await this.callGeminiApi(text, systemPrompt);
-      aiBubble.innerHTML = aiResponse.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      let displayMessage = agentResult.text;
+      if (!displayMessage && executedResults.length > 0) {
+        const summaries = executedResults.map(r => {
+          if (r.tool === 'create_and_save_recipe') return `He creado la receta **${r.title}**.`;
+          if (r.tool === 'set_weekly_plan') return `He actualizado tu **Planificador Semanal** (${r.daysUpdated} días).`;
+          if (r.tool === 'manage_shopping_list') return `He actualizado tu **Lista de la Compra** (${r.count} artículos).`;
+          return '';
+        }).filter(Boolean);
+        displayMessage = summaries.join(' ');
+      }
 
-      if (text.toLowerCase().includes('planifica') || text.toLowerCase().includes('semana')) {
+      // US-37: Saneamiento estricto antes de aplicar formato Markdown ligero
+      aiBubble.innerHTML = formatSafeAiMarkdown(displayMessage || 'Acción completada.');
+
+      if (executedResults.length > 0) {
+        const actionsContainer = document.createElement('div');
+        actionsContainer.style = 'display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;';
+
+        executedResults.forEach(res => {
+          if (res.tool === 'set_weekly_plan') {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-primary btn-sm';
+            btn.innerHTML = '<span class="material-symbols-outlined icon-sm">calendar_month</span> Ver en Planificador';
+            btn.onclick = () => this.switchView('view-planner');
+            actionsContainer.appendChild(btn);
+          } else if (res.tool === 'create_and_save_recipe') {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-tonal btn-sm';
+            btn.innerHTML = '<span class="material-symbols-outlined icon-sm">restaurant_menu</span> Abrir Receta';
+            btn.onclick = () => {
+              this.switchView('view-recipes');
+              this.openRecipeDetail(res.recipeId);
+            };
+            actionsContainer.appendChild(btn);
+          } else if (res.tool === 'manage_shopping_list') {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-tonal btn-sm';
+            btn.innerHTML = '<span class="material-symbols-outlined icon-sm">shopping_cart</span> Ver Lista de la Compra';
+            btn.onclick = () => this.switchView('view-shopping');
+            actionsContainer.appendChild(btn);
+          }
+        });
+
+        aiBubble.appendChild(actionsContainer);
+      } else if (text.toLowerCase().includes('planifica') || text.toLowerCase().includes('semana')) {
         const applyBtn = document.createElement('button');
+        applyBtn.type = 'button';
         applyBtn.className = 'btn btn-primary btn-sm';
         applyBtn.style.marginTop = '10px';
         applyBtn.innerHTML = '<span class="material-symbols-outlined icon-sm">calendar_month</span> Aplicar este menú al Planificador';
@@ -7426,32 +7931,23 @@ class FoodAssistantApp {
         aiBubble.appendChild(applyBtn);
       }
     } catch (err) {
-      aiBubble.innerHTML = `<span style="color: var(--m3-error);">Error: ${err.message}</span>`;
+      // US-37: Mostrar mensajes de error con textContent para impedir XSS
+      aiBubble.innerHTML = '';
+      const errSpan = document.createElement('span');
+      errSpan.style.color = 'var(--m3-error)';
+      errSpan.textContent = `Error: ${err?.message || 'Error desconocido'}`;
+      aiBubble.appendChild(errSpan);
     }
 
     history.scrollTop = history.scrollHeight;
   }
 
-  applySampleAiPlan() {
-    const breakfastRecipes = state.recipes.filter(r => r.tags.includes('Desayuno'));
-    const lunchRecipes = state.recipes.filter(r => r.tags.includes('Almuerzo') || !r.tags.includes('Desayuno'));
-    const snackRecipes = state.recipes.filter(r => r.tags.includes('Merienda'));
-    const dinnerRecipes = state.recipes.filter(r => r.tags.includes('Cena') || !r.tags.includes('Desayuno'));
-    const all = state.recipes;
-
-    let i = 0;
-    const weekDays = this.getPlannerWeekDates();
-    weekDays.forEach(wDay => {
-      const dayData = state.getDayPlan(wDay.dateKey, wDay.dayName);
-      dayData.breakfast = (breakfastRecipes[i % breakfastRecipes.length] || all[i % all.length])?.id || null;
-      dayData.lunch = (lunchRecipes[i % lunchRecipes.length] || all[(i + 1) % all.length])?.id || null;
-      dayData.snack = (snackRecipes[i % snackRecipes.length] || all[(i + 2) % all.length])?.id || null;
-      dayData.dinner = (dinnerRecipes[i % dinnerRecipes.length] || all[(i + 3) % all.length])?.id || null;
-      i++;
+  applySampleAiPlan(planOverride = null) {
+    const targetPlan = planOverride || this.lastAiProposedPlan || this.buildSimulatedWeeklyPlanArgs('replace');
+    this.executeAiToolCall({
+      name: 'set_weekly_plan',
+      args: targetPlan
     });
-    state.save('fa_mealplan', state.mealPlan);
-    this.scheduleSyncWithCloud();
-    this.render();
     this.showToast("¡Menú semanal organizado con éxito en tu calendario!", 'success');
     this.switchView('view-planner');
   }
@@ -8086,6 +8582,125 @@ class FoodAssistantApp {
   }
 }
 
+// ==========================================================================
+// US-17, US-37 & BUG-15: AI AGENT TOOLS DECLARATIONS & SAFE MARKDOWN FORMATTER
+// ==========================================================================
+function formatSafeAiMarkdown(rawText) {
+  if (!rawText || typeof rawText !== 'string') return '';
+  const escaped = rawText
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+  return escaped
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^[ \t]*[\-\*][ \t]+(.*)$/gm, '• $1')
+    .replace(/\n/g, '<br>');
+}
+
+const AI_TOOLS_DECLARATIONS = [
+  {
+    name: "create_and_save_recipe",
+    description: "Crea y guarda una nueva receta completa en el catálogo del usuario cuando no tiene una receta adecuada o pide inventar una receta nueva.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        id: { type: "STRING", description: "ID opcional sugerido para la receta" },
+        title: { type: "STRING", description: "Título de la receta" },
+        description: { type: "STRING", description: "Descripción breve del plato" },
+        prepTimeMinutes: { type: "INTEGER", description: "Minutos de preparación" },
+        cookTimeMinutes: { type: "INTEGER", description: "Minutos de cocción" },
+        servings: { type: "INTEGER", description: "Número de raciones" },
+        tags: { type: "ARRAY", items: { type: "STRING" }, description: "Etiquetas de la receta (ej. Cena, Rápida, Sin Gluten, Alta en Proteínas)" },
+        ingredients: {
+          type: "ARRAY",
+          items: {
+            type: "OBJECT",
+            properties: {
+              name: { type: "STRING" },
+              amount: { type: "NUMBER" },
+              unit: { type: "STRING" }
+            },
+            required: ["name", "amount", "unit"]
+          }
+        },
+        instructions: {
+          type: "ARRAY",
+          items: {
+            type: "OBJECT",
+            properties: {
+              step: { type: "INTEGER" },
+              text: { type: "STRING" },
+              timerMinutes: { type: "INTEGER" }
+            },
+            required: ["step", "text"]
+          }
+        },
+        nutrition: {
+          type: "OBJECT",
+          properties: {
+            calories: { type: "INTEGER" },
+            protein: { type: "INTEGER" },
+            carbs: { type: "INTEGER" },
+            fat: { type: "INTEGER" }
+          }
+        }
+      },
+      required: ["title", "ingredients", "instructions"]
+    }
+  },
+  {
+    name: "set_weekly_plan",
+    description: "Asigna o actualiza el menú semanal del usuario en el Planificador (meal_plans) usando los IDs reales de las recetas para cada fecha y momento de comida.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        mode: { type: "STRING", description: "'replace' para aplicar todos los slots indicados o 'merge' para rellenar solo los huecos vacíos" },
+        days: {
+          type: "ARRAY",
+          items: {
+            type: "OBJECT",
+            properties: {
+              dateKey: { type: "STRING", description: "Fecha ISO local YYYY-MM-DD" },
+              dayName: { type: "STRING", description: "Nombre del día (Lunes..Domingo)" },
+              breakfast: { type: "STRING", description: "ID de la receta de Desayuno" },
+              lunch: { type: "STRING", description: "ID de la receta de Almuerzo" },
+              snack: { type: "STRING", description: "ID de la receta de Merienda" },
+              dinner: { type: "STRING", description: "ID de la receta de Cena" }
+            },
+            required: ["dateKey"]
+          }
+        }
+      },
+      required: ["days"]
+    }
+  },
+  {
+    name: "manage_shopping_list",
+    description: "Añade, marca como comprados o elimina artículos de la lista de la compra, o vuelca los ingredientes del plan semanal actual.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        action: { type: "STRING", description: "'add' | 'check' | 'remove' | 'add_from_current_plan'" },
+        items: {
+          type: "ARRAY",
+          items: {
+            type: "OBJECT",
+            properties: {
+              name: { type: "STRING" },
+              amount: { type: "NUMBER" },
+              unit: { type: "STRING" }
+            },
+            required: ["name"]
+          }
+        }
+      },
+      required: ["action"]
+    }
+  }
+];
+
 // Global App Instance
 let app;
 if (typeof window !== 'undefined') {
@@ -8114,6 +8729,9 @@ if (typeof window !== 'undefined') {
   window.analyzeAndInferRecipeTags = analyzeAndInferRecipeTags;
   window.estimateRecipeNutrition = estimateRecipeNutrition;
   window.getRecipeNutrition = getRecipeNutrition;
+  window.formatSafeAiMarkdown = formatSafeAiMarkdown;
+  window.AI_TOOLS_DECLARATIONS = AI_TOOLS_DECLARATIONS;
+  window.checkDietaryCompliance = checkDietaryCompliance;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -8135,6 +8753,9 @@ if (typeof module !== 'undefined' && module.exports) {
     generateId,
     analyzeAndInferRecipeTags,
     estimateRecipeNutrition,
-    getRecipeNutrition
+    getRecipeNutrition,
+    formatSafeAiMarkdown,
+    AI_TOOLS_DECLARATIONS,
+    checkDietaryCompliance
   };
 }

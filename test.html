@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Food Assistant - Informe Detallado de Calidad y Tests</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.66">
+  <link rel="stylesheet" href="styles.css?v=0.67">
   <style>
     :root {
       --qa-pass: #059669;
@@ -301,8 +301,8 @@
   <div id="qa-sandbox" style="display: none;"></div>
 
   <!-- Entorno y dependencias de la app -->
-  <script src="config.js?v=0.66"></script>
-  <script src="app.js?v=0.66"></script>
+  <script src="config.js?v=0.67"></script>
+  <script src="app.js?v=0.67"></script>
 
   <script>
     const suites = [];
@@ -3992,6 +3992,53 @@ Bocadillo De Atun Paso A Paso
           expect(copiedDay.customSlots.length).toBe(1);
           expect(copiedDay.customSlots[0].name).toBe('Post-Entreno');
           expect(copiedDay.customSlots[0].id).not.toBe('cslot-orig-test');
+        }
+      );
+
+      dietIt(
+        'US-17, BUG-15, US-37 & US-39: Agente IA con Function Calling (crear receta, aplicar menú semanal exacto, gestionar compra y saneamiento XSS)',
+        'Verificar que formatSafeAiMarkdown escapa XSS, buildAiSystemInstruction inyecta dieta/macros y executeAiToolCall ejecuta set_weekly_plan, create_and_save_recipe y manage_shopping_list.',
+        'formatSafeAiMarkdown, executeAiToolCall(set_weekly_plan, create_and_save_recipe, manage_shopping_list)',
+        (app) => {
+          const safe = W.formatSafeAiMarkdown('<script>alert(1)</script> **Menú**');
+          expect(safe).toContain('&lt;script&gt;');
+          expect(safe).toContain('<strong>Menú</strong>');
+
+          W.state.saveDietaryPreferences(['Sin Gluten']);
+          const sys = app.buildAiSystemInstruction();
+          expect(sys).toContain('Sin Gluten');
+
+          const createRes = app.executeAiToolCall({
+            name: 'create_and_save_recipe',
+            args: {
+              id: 'rec-qa-ai-bowl',
+              title: 'Salmón Teriyaki Express',
+              ingredients: [{ name: 'Salmón', amount: 250, unit: 'g' }],
+              instructions: [{ step: 1, text: 'Cocinar 8 minutos a la plancha.' }]
+            }
+          });
+          expect(createRes.recipeId).toBe('rec-qa-ai-bowl');
+
+          const weekDays = app.getPlannerWeekDates();
+          const planRes = app.executeAiToolCall({
+            name: 'set_weekly_plan',
+            args: {
+              mode: 'replace',
+              days: [{ dateKey: weekDays[0].dateKey, dayName: 'Lunes', dinner: 'rec-qa-ai-bowl' }]
+            }
+          });
+          expect(planRes.daysUpdated).toBe(1);
+          expect(W.state.mealPlan[weekDays[0].dateKey].dinner).toBe('rec-qa-ai-bowl');
+
+          const shopRes = app.executeAiToolCall({
+            name: 'manage_shopping_list',
+            args: {
+              action: 'add',
+              items: [{ name: 'Aguacates', amount: 2, unit: 'ud' }]
+            }
+          });
+          expect(shopRes.count).toBe(1);
+          expect(W.state.shoppingList.some(i => i.name === 'Aguacates')).toBe(true);
         }
       );
     });
