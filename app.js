@@ -2497,7 +2497,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.66';
+  window.APP_VERSION = 'v0.68';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2529,7 +2529,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.66';
+    this.appVersion = 'v0.68';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -3527,11 +3527,12 @@ class FoodAssistantApp {
         });
       }
 
-      // 4. Fusión de Preferencias Dietéticas, Tags Personalizados y Objetivos Nutricionales (US-03)
+      // 4. Fusión de Preferencias Dietéticas, Tags Personalizados, Objetivos Nutricionales (US-03) y Clave Gemini
       let remoteDietary = null;
       let remoteCustomTags = null;
       let remoteDietaryUpdatedAt = null;
       let remoteGoals = null;
+      let remoteGeminiKey = null;
 
       try {
         if (this.supabaseClient?.from) {
@@ -3541,6 +3542,7 @@ class FoodAssistantApp {
             if (Array.isArray(sRow.dietary_preferences)) remoteDietary = sRow.dietary_preferences;
             if (Array.isArray(sRow.custom_tags)) remoteCustomTags = sRow.custom_tags;
             if (sRow.nutrition_goals && typeof sRow.nutrition_goals === 'object') remoteGoals = sRow.nutrition_goals;
+            if (typeof sRow.gemini_api_key === 'string' && sRow.gemini_api_key.trim()) remoteGeminiKey = sRow.gemini_api_key.trim();
             if (sRow.updated_at) remoteDietaryUpdatedAt = sRow.updated_at;
           }
         }
@@ -3569,6 +3571,9 @@ class FoodAssistantApp {
             if (meta.nutrition_goals && typeof meta.nutrition_goals === 'object') {
               if (!remoteGoals) remoteGoals = meta.nutrition_goals;
             }
+            if (typeof meta.gemini_api_key === 'string' && meta.gemini_api_key.trim()) {
+              remoteGeminiKey = meta.gemini_api_key.trim();
+            }
           }
         } catch (authErr) {
           // Ignorar si no está disponible auth
@@ -3584,6 +3589,9 @@ class FoodAssistantApp {
       }
       if (!remoteGoals && state.cloudUser?.user_metadata?.nutrition_goals) {
         remoteGoals = state.cloudUser.user_metadata.nutrition_goals;
+      }
+      if (!remoteGeminiKey && typeof state.cloudUser?.user_metadata?.gemini_api_key === 'string') {
+        remoteGeminiKey = state.cloudUser.user_metadata.gemini_api_key.trim();
       }
 
       if (Array.isArray(remoteDietary)) {
@@ -3627,10 +3635,18 @@ class FoodAssistantApp {
         }
       }
 
+      if (remoteGeminiKey && remoteGeminiKey !== (state.settings?.geminiApiKey || '')) {
+        if (!state.settings) state.settings = {};
+        state.settings.geminiApiKey = remoteGeminiKey;
+        state.save('fa_settings', state.settings);
+        stateChanged = true;
+      }
+
       if (stateChanged) {
         state.save('fa_recipes', state.recipes);
         state.save('fa_mealplan', state.mealPlan);
         state.save('fa_shopping', state.shoppingList);
+        this.renderSettings();
         this.renderDietaryPreferencesSettings();
         this.renderNutritionGoalsSettings();
         this.initRecipeTagFilters();
@@ -3845,13 +3861,14 @@ class FoodAssistantApp {
         if (!sRes.success) throw sRes.error;
       }
 
-      // 5. Preferencias Dietéticas y Tags Personalizados (Sincronización multi-dispositivo)
+      // 5. Preferencias Dietéticas, Tags Personalizados, Objetivos y Clave Gemini (Sincronización multi-dispositivo)
       if (this.supabaseClient?.auth && typeof this.supabaseClient.auth.updateUser === 'function') {
         try {
           const metaPayload = {
             dietary_preferences: state.dietaryPreferences || [],
             custom_tags: state.customTags || [],
             nutrition_goals: state.settings?.nutritionGoals || null,
+            gemini_api_key: state.settings?.geminiApiKey || '',
             dietary_updated_at: state.dietaryUpdatedAt || new Date().toISOString()
           };
           await this.supabaseClient.auth.updateUser({ data: metaPayload });
@@ -8503,7 +8520,8 @@ INSTRUCCIONES DE CONTROL (FUNCTION CALLING):
     state.settings.geminiApiKey = key;
     state.save('fa_settings', state.settings);
     this.renderSettings();
-    this.showToast("Clave de Gemini guardada con éxito.", 'success');
+    this.scheduleSyncWithCloud();
+    this.showToast("Clave de Gemini guardada y sincronizada en tu cuenta.", 'success');
   }
 
   exportBackup() {

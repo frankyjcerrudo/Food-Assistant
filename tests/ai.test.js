@@ -239,4 +239,38 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
       globalThis.fetch = origFetch;
     }
   });
+
+  it('US-35 & US-17: saveGeminiKey sincroniza la clave con la nube y pullFromCloud la recupera en otros dispositivos', async () => {
+    document.body.innerHTML += '<input id="input-gemini-key" value="AIzaSyMultiDeviceKey999"><div id="gemini-key-status"></div>';
+    const syncSpy = vi.spyOn(appInstance, 'scheduleSyncWithCloud');
+
+    appInstance.saveGeminiKey();
+    expect(state.settings.geminiApiKey).toBe('AIzaSyMultiDeviceKey999');
+    expect(syncSpy).toHaveBeenCalled();
+
+    // Simular otro dispositivo con clave vacía recibiendo user_metadata desde Supabase
+    state.settings.geminiApiKey = '';
+    state.cloudUser = { id: 'usr-sync-1', email: 'test@example.com' };
+    appInstance.supabaseClient = {
+      from: () => ({
+        select: () => ({
+          eq: async () => ({ data: [], error: null })
+        })
+      }),
+      auth: {
+        getUser: async () => ({
+          data: {
+            user: {
+              user_metadata: {
+                gemini_api_key: 'AIzaSyFromCloudDevice777'
+              }
+            }
+          }
+        })
+      }
+    };
+
+    await appInstance.pullFromCloud();
+    expect(state.settings.geminiApiKey).toBe('AIzaSyFromCloudDevice777');
+  });
 });
