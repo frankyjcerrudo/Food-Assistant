@@ -20,7 +20,7 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
     state.settings = {
       geminiApiKey: '',
       defaultServings: 2,
-      geminiModel: 'gemini-2.5-flash',
+      geminiModel: 'gemini-3.8-flash',
       nutritionGoals: { enabled: true, calories: 2100, protein: 150, carbs: 200, fat: 65 }
     };
 
@@ -79,6 +79,7 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
 
       const [calledUrl, calledOptions] = fetchSpy.mock.calls[0];
       expect(calledUrl).not.toContain('key=');
+      expect(calledUrl).toContain('models/gemini-3.8-flash:generateContent');
       expect(calledUrl).not.toContain('AIzaSyTestSecretKey123');
       expect(calledOptions.headers['x-goog-api-key']).toBe('AIzaSyTestSecretKey123');
 

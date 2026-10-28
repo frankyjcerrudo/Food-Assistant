@@ -1280,7 +1280,7 @@ class StateStore {
     this.settings = this.load('fa_settings', {
       geminiApiKey: '',
       defaultServings: 2,
-      geminiModel: 'gemini-2.5-flash',
+      geminiModel: 'gemini-3.8-flash',
       nutritionGoals: {
         enabled: false,
         calories: 2000,
@@ -1289,6 +1289,10 @@ class StateStore {
         fat: 65
       }
     });
+    if (!this.settings.geminiModel || this.settings.geminiModel === 'gemini-2.5-flash' || this.settings.geminiModel === 'gemini-1.5-flash') {
+      this.settings.geminiModel = 'gemini-3.8-flash';
+      this.save('fa_settings', this.settings);
+    }
     if (!this.settings.nutritionGoals) {
       this.settings.nutritionGoals = { enabled: false, calories: 2000, protein: 140, carbs: 200, fat: 65 };
     }
@@ -2497,7 +2501,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.68';
+  window.APP_VERSION = 'v0.69';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2529,7 +2533,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.68';
+    this.appVersion = 'v0.69';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -7388,7 +7392,8 @@ INSTRUCCIONES DE CONTROL (FUNCTION CALLING):
       return this.simulateGeminiAgentResponse(prompt);
     }
 
-    const model = state.settings.geminiModel || 'gemini-2.5-flash';
+    const rawModel = state.settings.geminiModel || 'gemini-3.8-flash';
+    const model = (rawModel === 'gemini-2.5-flash' || rawModel === 'gemini-1.5-flash') ? 'gemini-3.8-flash' : rawModel;
     // US-39: La clave nunca va en la URL (?key=), se envía en la cabecera x-goog-api-key
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
@@ -8310,7 +8315,7 @@ INSTRUCCIONES DE CONTROL (FUNCTION CALLING):
     const status = document.getElementById('gemini-key-status');
     if (status) {
       if (state.settings.geminiApiKey) {
-        status.innerHTML = '<span style="color: var(--color-brand); font-weight: 500;">✓ Clave configurada (Gemini 2.5 Flash activo)</span>';
+        status.innerHTML = '<span style="color: var(--color-brand); font-weight: 500;">✓ Clave configurada (Gemini 3.8 Flash activo)</span>';
       } else {
         status.innerHTML = '<span style="color: var(--m3-on-surface-variant);">Modo Asistente Simulado activo (sin coste ni clave)</span>';
       }
