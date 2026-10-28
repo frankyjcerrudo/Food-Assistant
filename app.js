@@ -2485,7 +2485,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.59';
+  window.APP_VERSION = 'v0.60';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2517,7 +2517,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.59';
+    this.appVersion = 'v0.60';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -5286,6 +5286,51 @@ class FoodAssistantApp {
     renderTimerSlot();
   }
 
+  recalculateEditorNutrition() {
+    const servings = parseInt(document.getElementById('edit-recipe-servings')?.value, 10) || 2;
+    const ingredients = [];
+    document.querySelectorAll('#edit-ingredients-container .edit-ing-row').forEach(row => {
+      const name = row.querySelector('.ing-name')?.value.trim();
+      const amountVal = row.querySelector('.ing-amount')?.value;
+      const unit = row.querySelector('.ing-unit')?.value.trim();
+      const aisle = row.querySelector('.ing-aisle')?.value;
+
+      if (name) {
+        ingredients.push({
+          id: generateId('ing-'),
+          name: name,
+          amount: amountVal !== "" && amountVal !== undefined ? parseFloat(amountVal) : null,
+          unit: unit,
+          aisle: aisle
+        });
+      }
+    });
+
+    const estimated = typeof estimateRecipeNutrition === 'function'
+      ? estimateRecipeNutrition({ servings, ingredients })
+      : null;
+
+    if (estimated) {
+      const calEl = document.getElementById('edit-recipe-calories');
+      const proEl = document.getElementById('edit-recipe-protein');
+      const carbEl = document.getElementById('edit-recipe-carbs');
+      const fatEl = document.getElementById('edit-recipe-fat');
+
+      if (calEl) calEl.value = estimated.calories > 0 ? estimated.calories : "";
+      if (proEl) proEl.value = estimated.protein > 0 ? estimated.protein : "";
+      if (carbEl) carbEl.value = estimated.carbs > 0 ? estimated.carbs : "";
+      if (fatEl) fatEl.value = estimated.fat > 0 ? estimated.fat : "";
+
+      [calEl, proEl, carbEl, fatEl].forEach(el => {
+        if (el) {
+          el.style.transition = 'background-color 0.3s ease';
+          el.style.backgroundColor = 'var(--m3-primary-container)';
+          setTimeout(() => { el.style.backgroundColor = ''; }, 600);
+        }
+      });
+    }
+  }
+
   saveRecipeEdit() {
     const title = document.getElementById('edit-recipe-title').value.trim();
     if (!title) {
@@ -5359,9 +5404,8 @@ class FoodAssistantApp {
         carbs: !isNaN(carbVal) ? Math.max(0, Math.round(carbVal * 10) / 10) : 0,
         fat: !isNaN(fatVal) ? Math.max(0, Math.round(fatVal * 10) / 10) : 0
       };
-    } else if (existing?.nutrition) {
-      nutrition = { ...existing.nutrition };
     } else {
+      // Si el usuario vació los campos de macros, recalcular forzosamente a partir de los ingredientes y raciones actuales
       const estimated = typeof estimateRecipeNutrition === 'function'
         ? estimateRecipeNutrition({ servings, ingredients })
         : null;

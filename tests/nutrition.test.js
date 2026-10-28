@@ -527,4 +527,86 @@ describe('US-01: Contador de Calorías y Macronutrientes por plato y resumen dia
       expect(alertBanner.textContent).toContain('faltan 66g de carbos');
     });
   });
+
+  describe('Edición de recetas y recálculo de macronutrientes (v0.60)', () => {
+    it('el botón #btn-recalculate-macros existe en el DOM', () => {
+      const btn = document.getElementById('btn-recalculate-macros');
+      expect(btn).not.toBeNull();
+      expect(btn.textContent).toContain('Recalcular');
+    });
+
+    it('recalculateEditorNutrition rellena los inputs de macronutrientes con la estimación de los ingredientes actuales', () => {
+      // Configurar inputs en el modal
+      document.getElementById('edit-recipe-servings').value = '2';
+      const container = document.getElementById('edit-ingredients-container');
+      container.innerHTML = `
+        <div class="edit-ing-row">
+          <input class="ing-name" value="Pechuga de pollo">
+          <input class="ing-amount" value="400">
+          <input class="ing-unit" value="g">
+          <select class="ing-aisle"><option value="carniceria">carniceria</option></select>
+        </div>
+        <div class="edit-ing-row">
+          <input class="ing-name" value="Arroz">
+          <input class="ing-amount" value="200">
+          <input class="ing-unit" value="g">
+          <select class="ing-aisle"><option value="despensa">despensa</option></select>
+        </div>
+      `;
+
+      // Vaciar inputs de macros primero
+      document.getElementById('edit-recipe-calories').value = '';
+      document.getElementById('edit-recipe-protein').value = '';
+      document.getElementById('edit-recipe-carbs').value = '';
+      document.getElementById('edit-recipe-fat').value = '';
+
+      app.recalculateEditorNutrition();
+
+      const cal = parseFloat(document.getElementById('edit-recipe-calories').value);
+      const pro = parseFloat(document.getElementById('edit-recipe-protein').value);
+      const carb = parseFloat(document.getElementById('edit-recipe-carbs').value);
+      const fat = parseFloat(document.getElementById('edit-recipe-fat').value);
+
+      expect(cal).toBeGreaterThan(0);
+      expect(pro).toBeGreaterThan(0);
+      expect(carb).toBeGreaterThan(0);
+      expect(fat).toBeGreaterThanOrEqual(0);
+    });
+
+    it('saveRecipeEdit recalcula y actualiza la nutrición si el usuario vacía los campos de macros en una receta existente', () => {
+      // Receta existente con valores manuales antiguos
+      const existing = {
+        id: 'rec-test-manual',
+        title: 'Pollo con arroz manual',
+        servings: 2,
+        tags: [],
+        ingredients: [
+          { id: 'ing-1', name: 'Pechuga de pollo', amount: 400, unit: 'g', aisle: 'carniceria' },
+          { id: 'ing-2', name: 'Arroz', amount: 200, unit: 'g', aisle: 'despensa' }
+        ],
+        instructions: [{ step: 1, text: 'Cocinar' }],
+        nutrition: { calories: 999, protein: 99, carbs: 99, fat: 99 }
+      };
+      state.recipes = [existing];
+
+      // Abrir modal de edición con la receta existente
+      app.openEditRecipeModal(existing);
+
+      // Usuario borra los 4 campos para forzar recálculo
+      document.getElementById('edit-recipe-calories').value = '';
+      document.getElementById('edit-recipe-protein').value = '';
+      document.getElementById('edit-recipe-carbs').value = '';
+      document.getElementById('edit-recipe-fat').value = '';
+
+      app.saveRecipeEdit();
+
+      const saved = state.recipes.find(r => r.id === 'rec-test-manual');
+      expect(saved).toBeDefined();
+      // Ya NO debe conservar los 999/99 antiguos, sino los recalculados automáticamente
+      expect(saved.nutrition.calories).not.toBe(999);
+      expect(saved.nutrition.calories).toBeGreaterThan(300);
+      expect(saved.nutrition.protein).not.toBe(99);
+      expect(saved.nutrition.protein).toBeGreaterThan(20);
+    });
+  });
 });
