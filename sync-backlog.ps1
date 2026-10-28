@@ -320,13 +320,41 @@ if ($UpdateExisting) {
                     Write-Host " [SIMULADO]" -ForegroundColor Yellow
                 } else {
                     $patchPayload = @{
-                        title = $item.Title
-                        body  = $item.Body
+                        title  = $item.Title
+                        body   = $item.Body
+                        labels = $item.Labels
                     }
                     $jsonBytes = [System.Text.Encoding]::UTF8.GetBytes(($patchPayload | ConvertTo-Json -Depth 5))
                     try {
                         $null = Invoke-RestMethod -Uri "https://api.github.com/repos/$Owner/$Repo/issues/$issueNum" `
                             -Method Patch -Headers $headersRest -Body $jsonBytes -ContentType "application/json; charset=utf-8"
+
+                        # Sincronizar también Prioridad y Status en el tablero de GitHub Projects v2
+                        $issueNodeId = $existing.node_id
+                        if ($issueNodeId) {
+                            $addMutation = @"
+{"query": "mutation { addProjectV2ItemById(input: { projectId: \"$ProjectId\", contentId: \"$issueNodeId\" }) { item { id } } }"}
+"@
+                            $addRes = Invoke-RestMethod -Uri "https://api.github.com/graphql" -Method Post -Headers $headersGql -Body $addMutation
+                            $projectItemId = $addRes.data.addProjectV2ItemById.item.id
+
+                            $prioOptId = $priorityOptions[$item.Priority]
+                            if ($projectItemId -and $prioOptId) {
+                                $updatePrioGql = @"
+{"query": "mutation { updateProjectV2ItemFieldValue(input: { projectId: \"$ProjectId\", itemId: \"$projectItemId\", fieldId: \"$fieldPriorityId\", value: { singleSelectOptionId: \"$prioOptId\" } }) { projectV2Item { id } } }"}
+"@
+                                $null = Invoke-RestMethod -Uri "https://api.github.com/graphql" -Method Post -Headers $headersGql -Body $updatePrioGql
+                            }
+
+                            $statusOptId = $statusOptions[$item.ProjectStatus]
+                            if ($projectItemId -and $statusOptId) {
+                                $updateStatusGql = @"
+{"query": "mutation { updateProjectV2ItemFieldValue(input: { projectId: \"$ProjectId\", itemId: \"$projectItemId\", fieldId: \"$fieldStatusId\", value: { singleSelectOptionId: \"$statusOptId\" } }) { projectV2Item { id } } }"}
+"@
+                                $null = Invoke-RestMethod -Uri "https://api.github.com/graphql" -Method Post -Headers $headersGql -Body $updateStatusGql
+                            }
+                        }
+
                         Write-Host " [OK]" -ForegroundColor Green
                         $updatedCount++
                         Start-Sleep -Milliseconds 400
