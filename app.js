@@ -2497,7 +2497,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.63';
+  window.APP_VERSION = 'v0.64';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2529,7 +2529,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.63';
+    this.appVersion = 'v0.64';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -5489,12 +5489,13 @@ class FoodAssistantApp {
       instructions
     };
 
+    const baseRecipe = existing || (this.isReviewingImport ? this.pendingImportRecipe : null) || {};
     const finalRecipe = {
-      ...(existing || {}),
+      ...baseRecipe,
       ...updatedRecipe,
-      sourceUrl: existing?.sourceUrl || updatedRecipe.sourceUrl || '',
-      sourceDomain: existing?.sourceDomain || updatedRecipe.sourceDomain || '',
-      createdAt: existing?.createdAt || existing?.updatedAt || new Date().toISOString(),
+      sourceUrl: baseRecipe.sourceUrl || updatedRecipe.sourceUrl || '',
+      sourceDomain: baseRecipe.sourceDomain || updatedRecipe.sourceDomain || '',
+      createdAt: baseRecipe.createdAt || baseRecipe.updatedAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 

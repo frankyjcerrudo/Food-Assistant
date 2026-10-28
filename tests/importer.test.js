@@ -818,4 +818,34 @@ Bocadillo De Atun Paso A Paso
     expect(parsed.instructions[1].text).not.toContain('<p>');
     expect(parsed.instructions[1].timerMinutes).toBe(20);
   });
+
+  it('BUG-09: editar una receta importada (guardada o en borrador de revisión) conserva sourceUrl y sourceDomain', () => {
+    const htmlPath = path.resolve(process.cwd(), 'index.html');
+    document.documentElement.innerHTML = fs.readFileSync(htmlPath, 'utf-8');
+    const app = new window.FoodAssistantApp();
+    const importedRecipe = {
+      id: 'rec-imported-bug09',
+      title: 'Paella Original',
+      description: 'Receta tradicional',
+      prepTimeMinutes: 15,
+      cookTimeMinutes: 30,
+      servings: 4,
+      tags: ['Almuerzo'],
+      sourceUrl: 'https://www.directoalpaladar.com/recetas-de-arroces/paella',
+      sourceDomain: 'directoalpaladar.com',
+      ingredients: [{ id: 'ing-1', name: 'Arroz', amount: 400, unit: 'g', aisle: 'pantry' }],
+      instructions: [{ step: 1, text: 'Cocer el arroz', timerMinutes: 20 }]
+    };
+
+    window.state.recipes = [importedRecipe];
+    app.openEditRecipeModal(importedRecipe.id);
+    document.getElementById('edit-recipe-title').value = 'Paella Editada por Franky';
+    app.saveRecipeEdit();
+
+    const saved = window.state.recipes.find(r => r.id === 'rec-imported-bug09');
+    expect(saved).toBeDefined();
+    expect(saved.title).toBe('Paella Editada por Franky');
+    expect(saved.sourceUrl).toBe('https://www.directoalpaladar.com/recetas-de-arroces/paella');
+    expect(saved.sourceDomain).toBe('directoalpaladar.com');
+  });
 });
