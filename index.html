@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#ffffff">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.72">
+  <link rel="stylesheet" href="styles.css?v=0.73">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%231a73e8'/><path d='M30 30h40v40H30z' fill='%23ffffff'/></svg>">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -25,7 +25,7 @@
         <span class="material-symbols-outlined">restaurant_menu</span>
       </div>
       <h1 class="brand-name">Food Assistant</h1>
-      <span class="app-version-badge" id="app-version-badge" title="Versión de Food Assistant">v0.72</span>
+      <span class="app-version-badge" id="app-version-badge" title="Versión de Food Assistant">v0.73</span>
     </div>
     <div class="header-actions">
       <!-- Theme quick toggle -->
@@ -92,6 +92,34 @@
     <div class="m3-search-bar">
       <span class="material-symbols-outlined">search</span>
       <input type="text" class="m3-search-input" id="recipes-search-input" placeholder="Buscar recetas o ingredientes...">
+      <button type="button" class="btn btn-tonal btn-sm" id="btn-toggle-fridge-panel" style="border-radius: var(--radius-full); font-size: 12px; padding: 4px 10px; gap: 4px; flex-shrink: 0;">
+        <span class="material-symbols-outlined icon-sm">kitchen</span>
+        <span>Nevera</span>
+      </button>
+    </div>
+
+    <!-- US-34: Fridge Reverse Search Panel ("¿Qué cocino con mi nevera?") -->
+    <div id="fridge-reverse-search-panel" style="display: none; background: var(--m3-surface-container-low); border: 1px solid var(--m3-outline-variant); border-radius: var(--radius-lg); padding: 12px; margin-bottom: 12px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px;">
+        <div style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; color: var(--m3-on-surface);">
+          <span class="material-symbols-outlined icon-sm" style="color: var(--m3-primary);">kitchen</span>
+          <span>¿Qué cocino con lo que tengo en la nevera?</span>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-clear-fridge-ingredients" style="font-size: 11px; padding: 2px 6px; display: none;">
+          Limpiar
+        </button>
+      </div>
+      <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+        <input type="text" class="form-input" id="input-fridge-ingredient" placeholder="Ej. pollo, calabacín, huevos..." style="font-size: 12px; padding: 6px 10px;">
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-add-fridge-ingredient" style="flex-shrink: 0;">
+          <span class="material-symbols-outlined icon-sm">add</span> Añadir
+        </button>
+      </div>
+      <div id="fridge-chips-container" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;"></div>
+      <button type="button" class="btn btn-primary btn-sm" id="btn-ai-invent-from-fridge" style="display: none; width: 100%; justify-content: center; gap: 6px; font-size: 12px;">
+        <span class="material-symbols-outlined icon-sm">auto_awesome</span>
+        <span>Inventar receta a medida con estos ingredientes (IA)</span>
+      </button>
     </div>
     
     <div class="chips-scroll-container" id="recipes-tag-filters">
@@ -232,6 +260,9 @@
       </button>
       <button class="m3-filter-chip" data-prompt="Añade aguacates, leche y pechuga de pollo a la lista de la compra.">
         <span class="material-symbols-outlined icon-sm">add_shopping_cart</span> Añadir a la compra
+      </button>
+      <button class="m3-filter-chip" data-prompt="Planifica mi semana en modo Batch Cooking (cocinar doble para reutilizar sobras al día siguiente).">
+        <span class="material-symbols-outlined icon-sm">takeout_dining</span> Batch Cooking / Tuppers
       </button>
     </div>
 
@@ -487,7 +518,7 @@
         <span class="material-symbols-outlined" style="color: var(--m3-primary);">system_update</span> Versión y Actualizaciones
       </h3>
       <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px;">
-        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.72</strong>
+        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.73</strong>
       </p>
       <div style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
         Si acabas de desplegar o notas que algún cambio no aparece, pulsa el botón para limpiar la caché del Service Worker y cargar el código más reciente.
@@ -708,6 +739,18 @@
         </div>
         <span class="material-symbols-outlined choice-arrow">chevron_right</span>
       </button>
+
+      <!-- Option 4: Multimodal AI / Photo / Social (US-30) -->
+      <button type="button" class="recipe-choice-card" id="btn-choice-ai">
+        <div class="choice-icon-wrap" style="background: var(--m3-primary-container); color: var(--m3-on-primary-container);">
+          <span class="material-symbols-outlined">auto_awesome</span>
+        </div>
+        <div class="choice-text-wrap">
+          <div class="choice-title">Foto, Redes Sociales o IA (Gemini)</div>
+          <div class="choice-desc">Sube foto de un libro/plato, pega texto de Instagram/TikTok o descríbela</div>
+        </div>
+        <span class="material-symbols-outlined choice-arrow">chevron_right</span>
+      </button>
     </div>
   </div>
 </dialog>
@@ -889,13 +932,16 @@
       Pega el enlace o el texto de una receta para a&ntilde;adirla a tu colecci&oacute;n.
     </p>
 
-    <!-- Import Tabs: URL vs Texto -->
-    <div style="display: flex; gap: 8px; margin-bottom: 14px; background: var(--m3-surface-container); padding: 4px; border-radius: var(--radius-md);">
-      <button type="button" id="tab-import-url" class="btn btn-sm active" style="flex: 1; border-radius: var(--radius-sm); font-size: 12px; padding: 6px 10px; background: var(--m3-surface); color: var(--m3-on-surface); box-shadow: var(--elevation-1);">
+    <!-- Import Tabs: URL vs Texto vs Foto/IA (US-30) -->
+    <div style="display: flex; gap: 6px; margin-bottom: 14px; background: var(--m3-surface-container); padding: 4px; border-radius: var(--radius-md);">
+      <button type="button" id="tab-import-url" class="btn btn-sm active" style="flex: 1; border-radius: var(--radius-sm); font-size: 12px; padding: 6px 8px; background: var(--m3-surface); color: var(--m3-on-surface); box-shadow: var(--elevation-1);">
         <span class="material-symbols-outlined icon-sm">language</span> Enlace Web
       </button>
-      <button type="button" id="tab-import-text" class="btn btn-sm btn-ghost" style="flex: 1; border-radius: var(--radius-sm); font-size: 12px; padding: 6px 10px; color: var(--m3-on-surface-variant);">
+      <button type="button" id="tab-import-text" class="btn btn-sm btn-ghost" style="flex: 1; border-radius: var(--radius-sm); font-size: 12px; padding: 6px 8px; color: var(--m3-on-surface-variant);">
         <span class="material-symbols-outlined icon-sm">description</span> Texto / Notas
+      </button>
+      <button type="button" id="tab-import-ai" class="btn btn-sm btn-ghost" style="flex: 1; border-radius: var(--radius-sm); font-size: 12px; padding: 6px 8px; color: var(--m3-on-surface-variant);">
+        <span class="material-symbols-outlined icon-sm">auto_awesome</span> Foto / IA
       </button>
     </div>
 
@@ -937,6 +983,24 @@
         </div>
         <div class="form-group" style="margin-bottom: 8px;">
           <textarea class="form-textarea" id="import-text-input" rows="7" placeholder="Pega aqu&iacute; el texto copiado de cualquier web o nota...&#10;&#10;Ejemplo:&#10;Lasa&ntilde;a de verduras&#10;Para 4 personas&#10;Ingredientes:&#10;Placas de lasa&ntilde;a 12&#10;Berenjena 1&#10;Tomate triturado 400 g&#10;Sal al gusto&#10;&#10;Instrucciones:&#10;1. Cortar las verduras..." style="font-size: 12px; font-family: inherit;"></textarea>
+        </div>
+      </div>
+
+      <!-- Section AI Multimodal: Photo / Social Media / Prompt (US-30) -->
+      <div id="section-import-ai" style="display: none;">
+        <div class="form-group" style="margin-bottom: 10px;">
+          <label class="form-label" style="font-size: 12px; margin-bottom: 6px;">1. Foto de libro de cocina, nota manuscrita o plato (opcional)</label>
+          <input type="file" id="import-image-input" accept="image/*" class="form-input" style="font-size: 12px; padding: 6px;">
+          <div id="import-image-preview-wrap" style="display: none; margin-top: 8px; align-items: center; gap: 10px;">
+            <img id="import-image-preview" src="" alt="Vista previa" style="width: 56px; height: 56px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--m3-outline-variant);">
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-clear-import-image" style="font-size: 11px; color: var(--m3-error);">
+              <span class="material-symbols-outlined icon-sm">delete</span> Quitar foto
+            </button>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom: 8px;">
+          <label class="form-label" style="font-size: 12px; margin-bottom: 6px;">2. Descripción de Instagram/TikTok o idea para que Gemini cree la receta</label>
+          <textarea class="form-textarea" id="import-ai-prompt-input" rows="5" placeholder="Pega aquí el texto desordenado de un Reel/TikTok o describe lo que quieres (ej. 'Tortitas de avena y plátano altas en proteína en 10 minutos')..." style="font-size: 12px; font-family: inherit;"></textarea>
         </div>
       </div>
 
@@ -993,6 +1057,14 @@
       <button type="button" class="m3-filter-chip dietary-chip" id="btn-toggle-picker-dietary-only">
         <span class="material-symbols-outlined icon-sm">eco</span> Solo aptas para mis dietas
       </button>
+    </div>
+    <!-- US-65: Cook Double / Leftovers Toggle -->
+    <div style="display: flex; align-items: center; justify-content: space-between; background: var(--m3-surface-container-low); border: 1px solid var(--m3-outline-variant); border-radius: var(--radius-md); padding: 8px 12px; margin-bottom: 10px;">
+      <label for="toggle-picker-cook-double" style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 500; color: var(--m3-on-surface); cursor: pointer; margin: 0;">
+        <span class="material-symbols-outlined icon-sm" style="color: var(--m3-primary);">takeout_dining</span>
+        <span>🍱 Cocinar doble para sobras (asignar también mañana)</span>
+      </label>
+      <input type="checkbox" id="toggle-picker-cook-double" class="grocery-checkbox" style="margin: 0;">
     </div>
     <div style="max-height: 56vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;" id="picker-recipes-list"></div>
   </div>
@@ -1347,7 +1419,7 @@
   </div>
 </div>
 
-<script src="config.js?v=0.72"></script>
-<script src="app.js?v=0.72"></script>
+<script src="config.js?v=0.73"></script>
+<script src="app.js?v=0.73"></script>
 </body>
 </html>

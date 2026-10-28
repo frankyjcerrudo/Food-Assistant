@@ -2500,7 +2500,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.72';
+  window.APP_VERSION = 'v0.73';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2532,7 +2532,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.72';
+    this.appVersion = 'v0.73';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -2545,6 +2545,9 @@ class FoodAssistantApp {
     this.editorSelectedTags = new Set();
     this.pickerOnlyDietary = false;
     
+    // US-34: Fridge Reverse Search state
+    this.fridgeIngredients = [];
+
     // Cook mode state
     this.cookStepIndex = 0;
     this.timerInterval = null;
@@ -3986,6 +3989,7 @@ class FoodAssistantApp {
     });
     document.getElementById('tab-import-url')?.addEventListener('click', () => this.switchImportTab('url'));
     document.getElementById('tab-import-text')?.addEventListener('click', () => this.switchImportTab('text'));
+    document.getElementById('tab-import-ai')?.addEventListener('click', () => this.switchImportTab('ai'));
     document.getElementById('btn-execute-import')?.addEventListener('click', () => this.handleRecipeImport());
     document.getElementById('btn-confirm-save-import')?.addEventListener('click', () => this.confirmSaveImportRecipe());
     document.getElementById('btn-review-edit-recipe')?.addEventListener('click', () => this.editImportReview());
@@ -3998,7 +4002,27 @@ class FoodAssistantApp {
     document.getElementById('btn-paste-clipboard')?.addEventListener('click', () => this.handleClipboardPaste());
     document.getElementById('btn-force-cache-update')?.addEventListener('click', () => this.forceUpdateApp());
 
-    // Unified Recipe Creation Choice (Manual vs Link vs Text)
+    // Image file preview in AI import tab (US-30)
+    document.getElementById('import-image-input')?.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      const previewWrap = document.getElementById('import-image-preview-wrap');
+      const previewImg = document.getElementById('import-image-preview');
+      if (file && previewWrap && previewImg) {
+        const url = URL.createObjectURL(file);
+        previewImg.src = url;
+        previewWrap.style.display = 'flex';
+      }
+    });
+    document.getElementById('btn-clear-import-image')?.addEventListener('click', () => {
+      const input = document.getElementById('import-image-input');
+      const previewWrap = document.getElementById('import-image-preview-wrap');
+      const previewImg = document.getElementById('import-image-preview');
+      if (input) input.value = '';
+      if (previewImg) previewImg.src = '';
+      if (previewWrap) previewWrap.style.display = 'none';
+    });
+
+    // Unified Recipe Creation Choice (Manual vs Link vs Text vs AI)
     document.getElementById('btn-open-create-recipe')?.addEventListener('click', () => this.openAddRecipeChoiceModal());
     document.getElementById('btn-close-recipe-add-choice')?.addEventListener('click', () => this.closeAddRecipeChoiceModal());
     document.getElementById('btn-choice-manual')?.addEventListener('click', () => {
@@ -4012,6 +4036,10 @@ class FoodAssistantApp {
     document.getElementById('btn-choice-text')?.addEventListener('click', () => {
       this.closeAddRecipeChoiceModal();
       this.openImportModal('text');
+    });
+    document.getElementById('btn-choice-ai')?.addEventListener('click', () => {
+      this.closeAddRecipeChoiceModal();
+      this.openImportModal('ai');
     });
 
     // Recipe CRUD
@@ -4039,6 +4067,18 @@ class FoodAssistantApp {
       searchInput.addEventListener('input', () => this.applyRecipeFilters());
     }
     this.initRecipeTagFilters();
+
+    // US-34: Nevera reverse search events
+    document.getElementById('btn-toggle-fridge-panel')?.addEventListener('click', () => this.toggleFridgePanel());
+    document.getElementById('btn-add-fridge-ingredient')?.addEventListener('click', () => this.addFridgeIngredient());
+    document.getElementById('input-fridge-ingredient')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.addFridgeIngredient();
+      }
+    });
+    document.getElementById('btn-clear-fridge-ingredients')?.addEventListener('click', () => this.clearFridgeIngredients());
+    document.getElementById('btn-ai-invent-from-fridge')?.addEventListener('click', () => this.generateRecipeFromFridgeWithAi());
 
     // Recipe Editor Custom Tag (US-02)
     document.getElementById('btn-add-custom-tag')?.addEventListener('click', () => this.handleAddCustomTagFromEditor());
@@ -4515,6 +4555,7 @@ class FoodAssistantApp {
 
     const standardHtml = STANDARD_SLOTS.map(s => {
       const recId = todayPlan[s.key];
+      const isLeftover = todayPlan.leftoverSlots && todayPlan.leftoverSlots[s.key];
       const recipe = state.recipes.find(r => r.id === recId);
 
       if (recipe) {
@@ -4531,9 +4572,16 @@ class FoodAssistantApp {
               <span class="slot-label">
                 <span class="material-symbols-outlined icon-sm">${s.icon}</span> ${s.label}
               </span>
-              <button class="btn-ghost btn-sm" onclick="event.stopPropagation(); app.clearSlot('${todayStr}', '${s.key}')" title="Quitar plato" style="padding: 2px 4px; color: var(--m3-on-surface-variant);">
-                <span class="material-symbols-outlined icon-sm">close</span>
-              </button>
+              <div style="display: flex; align-items: center; gap: 4px;">
+                ${isLeftover ? `
+                  <span style="background: var(--m3-secondary-container); color: var(--m3-on-secondary-container); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: var(--radius-full); display: inline-flex; align-items: center; gap: 2px;">
+                    <span class="material-symbols-outlined" style="font-size: 12px;">takeout_dining</span> Sobras
+                  </span>
+                ` : ''}
+                <button class="btn-ghost btn-sm" onclick="event.stopPropagation(); app.clearSlot('${todayStr}', '${s.key}')" title="Quitar plato" style="padding: 2px 4px; color: var(--m3-on-surface-variant);">
+                  <span class="material-symbols-outlined icon-sm">close</span>
+                </button>
+              </div>
             </div>
             <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px; min-width: 0;">
               ${recipe.imageUrl ? `
@@ -4635,11 +4683,17 @@ class FoodAssistantApp {
       return;
     }
 
-    const sortedList = this.getSortedRecipes(recipesList);
+    const sortedList = (this.fridgeIngredients && this.fridgeIngredients.length > 0)
+      ? recipesList
+      : this.getSortedRecipes(recipesList);
     const showCardMacros = !!(state.settings?.nutritionGoals?.enabled);
 
     grid.innerHTML = sortedList.map(rec => {
       const nut = showCardMacros ? getRecipeNutrition(rec) : null;
+      const fridgeMatch = (this.fridgeIngredients && this.fridgeIngredients.length > 0)
+        ? this.getRecipeFridgeMatch(rec)
+        : null;
+
       return `
       <article class="recipe-card" onclick="app.openRecipeDetail('${rec.id}')">
         <div class="recipe-image-wrap">
@@ -4653,6 +4707,12 @@ class FoodAssistantApp {
           <div class="recipe-time-badge">
             <span class="material-symbols-outlined icon-sm">schedule</span> ${rec.prepTimeMinutes + rec.cookTimeMinutes} min
           </div>
+          ${fridgeMatch && fridgeMatch.matchCount > 0 ? `
+            <div style="position: absolute; bottom: 8px; left: 8px; background: rgba(0, 0, 0, 0.75); color: #81c995; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-full); display: flex; align-items: center; gap: 4px; backdrop-filter: blur(4px);">
+              <span class="material-symbols-outlined" style="font-size: 13px;">check_circle</span>
+              <span>Tienes ${fridgeMatch.matchCount}/${fridgeMatch.totalCount} ingr.</span>
+            </div>
+          ` : ''}
         </div>
         <div class="recipe-body">
           <h3 class="recipe-title">${rec.title}</h3>
@@ -4744,6 +4804,105 @@ class FoodAssistantApp {
     });
   }
 
+  // US-34: NEVERA REVERSE SEARCH METHODS
+  toggleFridgePanel() {
+    const panel = document.getElementById('fridge-reverse-search-panel');
+    if (!panel) return;
+    const isVisible = panel.style.display !== 'none';
+    panel.style.display = isVisible ? 'none' : 'block';
+    if (!isVisible) {
+      document.getElementById('input-fridge-ingredient')?.focus();
+    }
+  }
+
+  addFridgeIngredient(name) {
+    const raw = typeof name === 'string' ? name : document.getElementById('input-fridge-ingredient')?.value;
+    const clean = (raw || '').trim().toLowerCase();
+    if (!clean) return;
+    if (!this.fridgeIngredients.includes(clean)) {
+      this.fridgeIngredients.push(clean);
+    }
+    const input = document.getElementById('input-fridge-ingredient');
+    if (input) input.value = '';
+    this.renderFridgeChips();
+    this.applyRecipeFilters();
+  }
+
+  removeFridgeIngredient(name) {
+    this.fridgeIngredients = this.fridgeIngredients.filter(i => i !== name.toLowerCase());
+    this.renderFridgeChips();
+    this.applyRecipeFilters();
+  }
+
+  clearFridgeIngredients() {
+    this.fridgeIngredients = [];
+    this.renderFridgeChips();
+    this.applyRecipeFilters();
+  }
+
+  renderFridgeChips() {
+    const container = document.getElementById('fridge-chips-container');
+    const clearBtn = document.getElementById('btn-clear-fridge-ingredients');
+    const inventBtn = document.getElementById('btn-ai-invent-from-fridge');
+    if (!container) return;
+
+    if (this.fridgeIngredients.length === 0) {
+      container.innerHTML = '<span style="font-size: 11px; color: var(--m3-on-surface-variant); font-style: italic;">Añade los ingredientes que tienes para encontrar recetas compatibles...</span>';
+      if (clearBtn) clearBtn.style.display = 'none';
+      if (inventBtn) inventBtn.style.display = 'none';
+      return;
+    }
+
+    if (clearBtn) clearBtn.style.display = 'inline-flex';
+    if (inventBtn) inventBtn.style.display = 'flex';
+
+    container.innerHTML = this.fridgeIngredients.map(ing => `
+      <span class="m3-filter-chip active" style="font-size: 11px; padding: 2px 8px; border-radius: var(--radius-full); display: inline-flex; align-items: center; gap: 4px; background: var(--m3-primary-container); color: var(--m3-on-primary-container);">
+        <span>${ing}</span>
+        <button type="button" onclick="app.removeFridgeIngredient('${ing.replace(/'/g, "\\'")}')" style="background: none; border: none; padding: 0; cursor: pointer; display: flex; align-items: center; color: inherit;">
+          <span class="material-symbols-outlined" style="font-size: 14px;">close</span>
+        </button>
+      </span>
+    `).join('');
+  }
+
+  getRecipeFridgeMatch(recipe) {
+    if (!this.fridgeIngredients || this.fridgeIngredients.length === 0) {
+      return { matchCount: 0, totalCount: recipe?.ingredients?.length || 0, percent: 0, matchedNames: [] };
+    }
+    const ingredients = Array.isArray(recipe?.ingredients) ? recipe.ingredients : [];
+    const matchedNames = [];
+    ingredients.forEach(ing => {
+      const ingNorm = normalizeIngredientText(ing?.name || '');
+      const hasMatch = this.fridgeIngredients.some(f => {
+        const fNorm = normalizeIngredientText(f);
+        return ingNorm.includes(fNorm) || fNorm.includes(ingNorm);
+      });
+      if (hasMatch) {
+        matchedNames.push(ing.name);
+      }
+    });
+
+    const totalCount = ingredients.length || 1;
+    const matchCount = matchedNames.length;
+    const percent = Math.round((matchCount / totalCount) * 100);
+    return { matchCount, totalCount, percent, matchedNames };
+  }
+
+  generateRecipeFromFridgeWithAi() {
+    if (this.fridgeIngredients.length === 0) {
+      this.showToast("Añade al menos un ingrediente a la nevera.", "warning");
+      return;
+    }
+    const ingredientsList = this.fridgeIngredients.join(', ');
+    this.switchView('view-ai');
+    const input = document.getElementById('ai-chat-input');
+    if (input) {
+      input.value = `Tengo en la nevera: ${ingredientsList}. Inventa y crea una receta deliciosa, equilibrada y saludable aprovechando estos ingredientes y guárdala en mi recetario.`;
+      this.handleAiChatSubmit();
+    }
+  }
+
   applyRecipeFilters() {
     const searchInput = document.getElementById('recipes-search-input');
     const term = (searchInput?.value || '').toLowerCase().trim();
@@ -4767,8 +4926,24 @@ class FoodAssistantApp {
         if (!titleMatch && !tagsMatch && !ingMatch) return false;
       }
 
+      // 3. US-34: Nevera reverse search (si hay ingredientes en nevera, mostrar preferentemente las que tengan al menos 1 coincidencia)
+      if (this.fridgeIngredients.length > 0) {
+        const match = this.getRecipeFridgeMatch(r);
+        if (match.matchCount === 0) return false;
+      }
+
       return true;
     });
+
+    // Si la nevera está activa, ordenar por mayor porcentaje y número de ingredientes coincidentes
+    if (this.fridgeIngredients.length > 0) {
+      filtered.sort((a, b) => {
+        const matchA = this.getRecipeFridgeMatch(a);
+        const matchB = this.getRecipeFridgeMatch(b);
+        if (matchB.matchCount !== matchA.matchCount) return matchB.matchCount - matchA.matchCount;
+        return matchB.percent - matchA.percent;
+      });
+    }
 
     this.renderRecipesGrid(filtered);
 
@@ -4776,15 +4951,16 @@ class FoodAssistantApp {
     const badge = document.getElementById('recipes-count-badge');
     const subtitle = document.getElementById('recipes-count-subtitle');
     if (badge) {
-      if (this.selectedRecipeTags.size > 0 || term) {
+      if (this.selectedRecipeTags.size > 0 || term || this.fridgeIngredients.length > 0) {
         badge.textContent = `${filtered.length} de ${state.recipes.length}`;
       } else {
         badge.textContent = `${state.recipes.length}`;
       }
     }
     if (subtitle) {
-      if (this.selectedRecipeTags.size > 0 || term) {
+      if (this.selectedRecipeTags.size > 0 || term || this.fridgeIngredients.length > 0) {
         const filtersDesc = [];
+        if (this.fridgeIngredients.length > 0) filtersDesc.push(`Nevera: ${this.fridgeIngredients.join(', ')}`);
         if (this.selectedRecipeTags.size > 0) filtersDesc.push(`etiquetas: ${Array.from(this.selectedRecipeTags).join(', ')}`);
         if (term) filtersDesc.push(`"${term}"`);
         subtitle.textContent = `${filtered.length} receta${filtered.length === 1 ? '' : 's'} (${filtersDesc.join(' + ')}).`;
@@ -6035,6 +6211,8 @@ class FoodAssistantApp {
 
   renderSlotCard(dateStr, slotType, slotLabel, iconName, recipeId) {
     const recipe = state.recipes.find(r => r.id === recipeId);
+    const dayData = state.mealPlan[dateStr];
+    const isLeftover = dayData?.leftoverSlots && dayData.leftoverSlots[slotType];
 
     if (recipe) {
       const comp = checkDietaryCompliance(recipe, state.dietaryPreferences);
@@ -6050,9 +6228,16 @@ class FoodAssistantApp {
             <span class="slot-label">
               <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
             </span>
-            <button class="btn-ghost btn-sm" onclick="event.stopPropagation(); app.clearSlot('${dateStr}', '${slotType}')" title="Quitar receta" style="padding: 2px 4px;">
-              <span class="material-symbols-outlined icon-sm">close</span>
-            </button>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              ${isLeftover ? `
+                <span style="background: var(--m3-secondary-container); color: var(--m3-on-secondary-container); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: var(--radius-full); display: inline-flex; align-items: center; gap: 2px;" title="Cocinado el día anterior para sobras">
+                  <span class="material-symbols-outlined" style="font-size: 12px;">takeout_dining</span> Sobras
+                </span>
+              ` : ''}
+              <button class="btn-ghost btn-sm" onclick="event.stopPropagation(); app.clearSlot('${dateStr}', '${slotType}')" title="Quitar receta" style="padding: 2px 4px;">
+                <span class="material-symbols-outlined icon-sm">close</span>
+              </button>
+            </div>
           </div>
           <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; min-width: 0;">
             ${recipe.imageUrl ? `
@@ -6736,7 +6921,7 @@ class FoodAssistantApp {
     this.closeDialogModal(this.modalRecipePicker);
   }
 
-  selectRecipeForSlot(recipeId) {
+  selectRecipeForSlot(recipeId, cookDoubleOverride = null) {
     if (this.pickerTarget) {
       const { dateStr, slotKey, isCustom } = this.pickerTarget;
       const dayData = state.getDayPlan(dateStr);
@@ -6751,10 +6936,34 @@ class FoodAssistantApp {
       }
       dayData.updatedAt = new Date().toISOString();
 
+      // US-65: Batch cooking / Cocinar doble para sobras
+      const checkbox = document.getElementById('toggle-picker-cook-double');
+      const shouldCookDouble = (cookDoubleOverride !== null) ? !!cookDoubleOverride : (checkbox && checkbox.checked);
+
+      if (shouldCookDouble) {
+        const parts = dateStr.split('-').map(Number);
+        if (parts.length === 3) {
+          const currentDate = new Date(parts[0], parts[1] - 1, parts[2]);
+          const nextDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate() + 1);
+          const nextDateKey = toLocalDateKey(nextDate);
+          const nextDayData = state.getDayPlan(nextDateKey);
+
+          // Asignar al mismo slot o a Almuerzo si se cocinó de cena
+          const targetNextSlot = (!isCustom && slotKey === 'dinner') ? 'lunch' : (isCustom ? 'lunch' : slotKey);
+          nextDayData[targetNextSlot] = recipeId;
+          if (!nextDayData.leftoverSlots) nextDayData.leftoverSlots = {};
+          nextDayData.leftoverSlots[targetNextSlot] = true;
+          nextDayData.updatedAt = new Date().toISOString();
+        }
+      }
+
       state.save('fa_mealplan', state.mealPlan);
       this.closePickerModal();
       this.scheduleSyncWithCloud();
       this.render();
+      if (shouldCookDouble) {
+        this.showToast("¡Plato asignado para hoy y programado como sobras para mañana!", "success");
+      }
     }
   }
 
@@ -7394,12 +7603,16 @@ class FoodAssistantApp {
       { slot: 'dinner', tag: 'Cena', label: 'Cenas' }
     ];
 
-    return slotDefs.filter(def => compliantRecipes.filter(r => hasTagCI(r, def.tag)).length < 2);
+    // Para una semana completa de 7 días se necesitan al menos 3 opciones distintas por momento de comida
+    return slotDefs.filter(def => compliantRecipes.filter(r => hasTagCI(r, def.tag)).length < 3);
   }
 
   isWeeklyPlanPrompt(prompt) {
     if (!prompt || typeof prompt !== 'string') return false;
-    return /planifica|semana|men[uú]|hueco|vac[ií]|rellena|completa|platos\s+en\s+el\s+plan|plan\s+semanal|aparecer\s+muchas\s+comidas|dejado\s+vac|desayunos\s+y\s+meriendas/i.test(prompt);
+    // Si el usuario pide un solo día específico ("día de hoy", "hoy", "mañana", "lunes", etc.), NO forzar semana completa
+    const isSingleDay = /\b(hoy|dia\s+de\s+hoy|d[ií]a\s+de\s+hoy|ma[ñn]ana|solo\s+hoy|este\s+d[ií]a)\b/i.test(prompt);
+    if (isSingleDay) return false;
+    return /planifica\s+(?:mi\s+)?(?:semana|men[uú]\s+semanal)|semana|men[uú]\s+semanal|hueco|vac[ií]|rellena\s+la\s+semana|completa\s+la\s+semana|platos\s+en\s+el\s+plan|plan\s+semanal|aparecer\s+muchas\s+comidas|dejado\s+vac|desayunos\s+y\s+meriendas|batch\s+cooking/i.test(prompt);
   }
 
   isAiActionPrompt(prompt) {
@@ -8271,6 +8484,250 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
   }
 
 // ==========================================================================
+  // US-30: MULTIMODAL AI RECIPE IMPORTER & GENERATOR (SCHEMA + IMAGE COMPRESSION + GEMINI)
+  // ==========================================================================
+  async compressImageToBase64(file, maxWidth = 1024, maxHeight = 1024, quality = 0.8) {
+    if (!file) return null;
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+          if (width > maxWidth || height > maxHeight) {
+            if (width > height) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            } else {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL(file.type || 'image/jpeg', quality);
+          const base64Data = dataUrl.split(',')[1];
+          resolve({
+            dataUrl,
+            base64Data,
+            mimeType: file.type || 'image/jpeg'
+          });
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  normalizeAiExtractedRecipe(rawJson, sourceUrl = '') {
+    if (!rawJson || typeof rawJson !== 'object') {
+      throw new Error("Respuesta inválida recibida de la IA.");
+    }
+    const title = String(rawJson.title || 'Receta Importada con IA').trim();
+    const description = String(rawJson.description || 'Receta extraída y adaptada mediante Gemini IA.').trim();
+    const prepTimeMinutes = Math.max(0, parseInt(rawJson.prepTimeMinutes, 10) || 10);
+    const cookTimeMinutes = Math.max(0, parseInt(rawJson.cookTimeMinutes, 10) || 15);
+    const servings = Math.max(1, parseInt(rawJson.servings, 10) || state.settings?.defaultServings || 2);
+
+    const rawIngs = Array.isArray(rawJson.ingredients) ? rawJson.ingredients : [];
+    const ingredients = rawIngs.map((ing, idx) => {
+      const name = String(ing?.name || `Ingrediente ${idx + 1}`).trim();
+      const unit = RecipeParser.normalizeUnit(ing?.unit || 'ud');
+      return {
+        id: generateId('ing-'),
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        amount: ing?.amount !== null && ing?.amount !== undefined && !isNaN(ing.amount) ? Number(ing.amount) : 1,
+        unit: unit,
+        aisle: ing?.aisle || categorizeIngredientAisle(name)
+      };
+    }).filter(i => i.name);
+
+    const rawSteps = Array.isArray(rawJson.instructions) ? rawJson.instructions : [];
+    let stepNum = 1;
+    const instructions = rawSteps.map(step => {
+      const text = typeof step === 'string' ? step : String(step?.text || '').trim();
+      if (!text) return null;
+      const detectedTimer = RecipeParser.extractTimerMinutes(text);
+      return {
+        step: stepNum++,
+        text,
+        timerMinutes: typeof step?.timerMinutes === 'number' ? step.timerMinutes : (detectedTimer || 0)
+      };
+    }).filter(Boolean);
+
+    let nutrition = null;
+    if (rawJson.nutrition && typeof rawJson.nutrition === 'object') {
+      nutrition = {
+        calories: Number(rawJson.nutrition.calories) || 0,
+        protein: Number(rawJson.nutrition.protein) || 0,
+        carbs: Number(rawJson.nutrition.carbs) || 0,
+        fat: Number(rawJson.nutrition.fat) || 0
+      };
+    } else {
+      nutrition = estimateRecipeNutrition({ title, ingredients, servings });
+    }
+
+    const tags = Array.isArray(rawJson.tags) ? [...rawJson.tags] : [];
+
+    const recipe = {
+      id: generateId('rec-'),
+      title,
+      description,
+      imageUrl: rawJson.imageUrl || '',
+      prepTimeMinutes,
+      cookTimeMinutes,
+      servings,
+      tags,
+      nutrition,
+      ingredients,
+      instructions,
+      sourceUrl: sourceUrl || '',
+      sourceDomain: sourceUrl ? RecipeParser.getDomain(sourceUrl) : 'Gemini IA',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    if (typeof analyzeAndInferRecipeTags === 'function') {
+      const inferred = analyzeAndInferRecipeTags(recipe);
+      const lowerSet = new Set(recipe.tags.map(t => String(t).toLowerCase().trim()));
+      inferred.forEach(t => {
+        const l = t.toLowerCase().trim();
+        if (!lowerSet.has(l) && l !== 'general') {
+          recipe.tags.push(t);
+          lowerSet.add(l);
+          state.addCustomTag && state.addCustomTag(t);
+        }
+      });
+    }
+
+    return recipe;
+  }
+
+  async extractRecipeWithGemini({ text = '', imageBase64 = null, mimeType = 'image/jpeg', sourceUrl = '' } = {}) {
+    const apiKey = state.settings.geminiApiKey?.trim();
+    if (!apiKey) {
+      // Fallback simulado cuando el usuario no tiene clave
+      const sampleText = text || 'Receta extraída de foto';
+      const isProteic = /prote[ií]n/i.test(sampleText);
+      return this.normalizeAiExtractedRecipe({
+        title: isProteic ? "Bowl Fitness Proteico Multimodal" : "Plato Casero Tradicional Multimodal",
+        description: "Receta procesada e interpretada automáticamente a partir del contenido multimedia proporcionado.",
+        prepTimeMinutes: 10,
+        cookTimeMinutes: 15,
+        servings: state.settings?.defaultServings || 2,
+        tags: ["Saludable", isProteic ? "Alta en Proteínas" : "Almuerzo"],
+        ingredients: [
+          { name: "Pechuga de pollo o tofu", amount: 250, unit: "g" },
+          { name: "Verduras variadas salteadas", amount: 200, unit: "g" },
+          { name: "Aceite de oliva virgen extra", amount: 15, unit: "ml" },
+          { name: "Arroz integral o quinoa", amount: 150, unit: "g" }
+        ],
+        instructions: [
+          { step: 1, text: "Cocina el arroz o base de cereal según indicaciones del paquete.", timerMinutes: 12 },
+          { step: 2, text: "Saltea el pollo o tofu en dados en una sartén caliente con aceite de oliva.", timerMinutes: 6 },
+          { step: 3, text: "Añade las verduras troceadas, salpimenta al gusto y combina todos los ingredientes en un plato o bowl.", timerMinutes: 4 }
+        ],
+        nutrition: { calories: 430, protein: 42, carbs: 38, fat: 12 }
+      }, sourceUrl);
+    }
+
+    const parts = [];
+    if (imageBase64) {
+      parts.push({
+        inlineData: {
+          mimeType: mimeType || 'image/jpeg',
+          data: imageBase64
+        }
+      });
+    }
+    const promptText = `Eres un asistente culinario experto. Analiza este texto o imagen de receta y extrae de forma limpia todos los campos estructurados en formato JSON estricto.
+Texto o contexto: ${text || '(Sin texto adicional, analiza la imagen adjunta)'}
+
+REGLAS CRÍTICAS:
+- Devuelve SOLAMENTE un bloque JSON válido, sin texto adicional antes ni después ni bloques \`\`\`json.
+- Estructura requerida:
+{
+  "title": "string con el nombre del plato",
+  "description": "string breve de 1-2 frases descriptivas",
+  "prepTimeMinutes": número entero,
+  "cookTimeMinutes": número entero,
+  "servings": número entero de raciones,
+  "tags": ["array", "de", "etiquetas"],
+  "ingredients": [
+    { "name": "nombre limpio", "amount": número, "unit": "g|ml|ud|cda|cdta|pizca..." }
+  ],
+  "instructions": [
+    { "step": 1, "text": "descripción del paso", "timerMinutes": 0 }
+  ],
+  "nutrition": {
+    "calories": número entero kcal por ración,
+    "protein": gramos,
+    "carbs": gramos,
+    "fat": gramos
+  }
+}`;
+    parts.push({ text: promptText });
+
+    const rawModel = state.settings.geminiModel || 'gemini-3.8-flash';
+    const primaryModel = (rawModel === 'gemini-2.5-flash' || rawModel === 'gemini-1.5-flash') ? 'gemini-3.8-flash' : rawModel;
+    const candidateModels = [...new Set([
+      primaryModel,
+      'gemini-3.8-flash',
+      'gemini-3.6-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-3.1-flash-lite'
+    ])];
+
+    let lastError = null;
+    let data = null;
+
+    for (const model of candidateModels) {
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+        const resp = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey
+          },
+          body: JSON.stringify({
+            contents: [{ parts }]
+          })
+        });
+
+        if (resp.ok) {
+          data = await resp.json();
+          break;
+        }
+        const errJson = await resp.json().catch(() => ({}));
+        lastError = new Error(errJson.error?.message || `HTTP ${resp.status}`);
+      } catch (e) {
+        lastError = e;
+      }
+    }
+
+    if (!data) {
+      throw lastError || new Error("No se pudo conectar con Gemini para extraer la receta.");
+    }
+
+    const rawResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const cleanJsonText = rawResponseText
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
+
+    const parsedJson = JSON.parse(cleanJsonText);
+    return this.normalizeAiExtractedRecipe(parsedJson, sourceUrl);
+  }
+
+  // ==========================================================================
   // UNIVERSAL RECIPE IMPORTER (US-15: SCHEMA.ORG JSON-LD & TEXT PARSER)
   // ==========================================================================
   openImportModal(defaultTab = 'url') {
@@ -8315,39 +8772,52 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
   switchImportTab(tab) {
     const tabUrl = document.getElementById('tab-import-url');
     const tabText = document.getElementById('tab-import-text');
+    const tabAi = document.getElementById('tab-import-ai');
     const secUrl = document.getElementById('section-import-url');
     const secText = document.getElementById('section-import-text');
+    const secAi = document.getElementById('section-import-ai');
     const status = document.getElementById('import-status-indicator');
     if (status) status.style.display = 'none';
     const corsBanner = document.getElementById('import-cors-banner');
     if (corsBanner) corsBanner.style.display = 'none';
+
+    // Reset styles
+    [tabUrl, tabText, tabAi].forEach(t => {
+      if (t) {
+        t.style.background = 'transparent';
+        t.style.color = 'var(--m3-on-surface-variant)';
+        t.style.boxShadow = 'none';
+        t.classList.remove('active');
+      }
+    });
+    [secUrl, secText, secAi].forEach(s => {
+      if (s) s.style.display = 'none';
+    });
 
     if (tab === 'url') {
       if (tabUrl) {
         tabUrl.style.background = 'var(--m3-surface)';
         tabUrl.style.color = 'var(--m3-on-surface)';
         tabUrl.style.boxShadow = 'var(--elevation-1)';
-      }
-      if (tabText) {
-        tabText.style.background = 'transparent';
-        tabText.style.color = 'var(--m3-on-surface-variant)';
-        tabText.style.boxShadow = 'none';
+        tabUrl.classList.add('active');
       }
       if (secUrl) secUrl.style.display = 'block';
-      if (secText) secText.style.display = 'none';
-    } else {
+    } else if (tab === 'text') {
       if (tabText) {
         tabText.style.background = 'var(--m3-surface)';
         tabText.style.color = 'var(--m3-on-surface)';
         tabText.style.boxShadow = 'var(--elevation-1)';
-      }
-      if (tabUrl) {
-        tabUrl.style.background = 'transparent';
-        tabUrl.style.color = 'var(--m3-on-surface-variant)';
-        tabUrl.style.boxShadow = 'none';
+        tabText.classList.add('active');
       }
       if (secText) secText.style.display = 'block';
-      if (secUrl) secUrl.style.display = 'none';
+    } else if (tab === 'ai') {
+      if (tabAi) {
+        tabAi.style.background = 'var(--m3-surface)';
+        tabAi.style.color = 'var(--m3-on-surface)';
+        tabAi.style.boxShadow = 'var(--elevation-1)';
+        tabAi.classList.add('active');
+      }
+      if (secAi) secAi.style.display = 'block';
     }
   }
 
@@ -8382,6 +8852,10 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
   async handleRecipeImport() {
     let url = document.getElementById('import-url-input')?.value.trim() || '';
     const text = document.getElementById('import-text-input')?.value.trim() || '';
+    const aiPrompt = document.getElementById('import-ai-prompt-input')?.value.trim() || '';
+    const imageInput = document.getElementById('import-image-input');
+    const imageFile = imageInput?.files?.[0] || null;
+
     const status = document.getElementById('import-status-indicator');
     const previewBox = document.getElementById('import-preview-box');
     const corsBanner = document.getElementById('import-cors-banner');
@@ -8389,11 +8863,19 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
     const btnConfirm = document.getElementById('btn-confirm-save-import');
 
     const isUrlActive = document.getElementById('section-import-url')?.style.display !== 'none';
-    const targetInput = isUrlActive ? url : text;
+    const isAiActive = document.getElementById('section-import-ai')?.style.display !== 'none';
+    const isTextActive = !isUrlActive && !isAiActive;
 
-    if (!targetInput) {
-      const inputEl = document.getElementById(isUrlActive ? 'import-url-input' : 'import-text-input');
-      this.highlightInputError(inputEl, isUrlActive ? "Por favor, introduce una URL de receta." : "Por favor, pega el texto de la receta.");
+    if (isUrlActive && !url) {
+      this.highlightInputError(document.getElementById('import-url-input'), "Por favor, introduce una URL de receta.");
+      return;
+    }
+    if (isTextActive && !text) {
+      this.highlightInputError(document.getElementById('import-text-input'), "Por favor, pega el texto de la receta.");
+      return;
+    }
+    if (isAiActive && !aiPrompt && !imageFile) {
+      this.highlightInputError(document.getElementById('import-ai-prompt-input'), "Sube una foto o describe la receta que deseas.");
       return;
     }
 
@@ -8401,13 +8883,27 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
     if (status) {
       status.style.display = 'block';
       status.style.color = 'var(--m3-primary)';
-      status.innerHTML = '<span class="material-symbols-outlined icon-sm" style="animation: spin 1s linear infinite; vertical-align: middle;">sync</span> Analizando receta y extrayendo ingredientes...';
+      status.innerHTML = '<span class="material-symbols-outlined icon-sm" style="animation: spin 1s linear infinite; vertical-align: middle;">sync</span> Analizando receta con IA y extrayendo ingredientes...';
     }
 
     try {
       let extractedRecipe = null;
 
-      if (isUrlActive) {
+      if (isAiActive) {
+        // Mode 3: Multimodal AI (Photo / Social / Prompt)
+        let imageBase64 = null;
+        let mimeType = 'image/jpeg';
+        if (imageFile) {
+          const compressed = await this.compressImageToBase64(imageFile);
+          imageBase64 = compressed?.base64Data || null;
+          mimeType = compressed?.mimeType || 'image/jpeg';
+        }
+        extractedRecipe = await this.extractRecipeWithGemini({
+          text: aiPrompt,
+          imageBase64,
+          mimeType
+        });
+      } else if (isUrlActive) {
         // Mode 1: URL or Raw JSON-LD in URL field
         if (url.startsWith('{') || url.includes('<script')) {
           const jsonLd = RecipeParser.extractJsonLdFromHtml(url) || JSON.parse(url);
@@ -8516,6 +9012,19 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
             throw new Error(`La página web parece no existir o devolver error 404 ("${cleanUrl}"). Asegúrate de copiar la URL completa de una receta.`);
           }
 
+          // US-30: Fallback con IA si la extracción clásica de la URL descargada no obtuvo ingredientes reconocibles
+          if ((!extractedRecipe || !extractedRecipe.ingredients || extractedRecipe.ingredients.length === 0) && html && fetchSuccess) {
+            try {
+              const plainText = RecipeParser.htmlToText(html).substring(0, 4000);
+              extractedRecipe = await this.extractRecipeWithGemini({
+                text: `Página web de receta: ${cleanUrl}\n\nTexto extraído de la página:\n${plainText}`,
+                sourceUrl: cleanUrl
+              });
+            } catch (aiUrlErr) {
+              console.warn("Fallo en fallback IA para URL:", aiUrlErr);
+            }
+          }
+
           if (!extractedRecipe || !extractedRecipe.ingredients || extractedRecipe.ingredients.length === 0) {
             if (fetchSuccess) {
               if (corsBanner) corsBanner.style.display = 'none';
@@ -8528,10 +9037,18 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
       } else {
         // Mode 2: Text / Raw Paste
         extractedRecipe = RecipeParser.parseRecipeText(text);
+        // US-30: Fallback con IA si el texto pegado no tiene formato de receta convencional (ej. texto social de Instagram)
+        if (!extractedRecipe || !extractedRecipe.ingredients || extractedRecipe.ingredients.length === 0) {
+          try {
+            extractedRecipe = await this.extractRecipeWithGemini({ text });
+          } catch (aiTextErr) {
+            console.warn("Fallo en fallback IA para texto pegado:", aiTextErr);
+          }
+        }
       }
 
       if (!extractedRecipe || !extractedRecipe.title || !extractedRecipe.ingredients || extractedRecipe.ingredients.length === 0) {
-        throw new Error("No se pudieron detectar ingredientes válidos en el texto introducido. Comprueba que contenga la lista de ingredientes.");
+        throw new Error("No se pudieron detectar ingredientes válidos en el contenido introducido. Comprueba que contenga la lista de ingredientes o prueba en la pestaña 'Foto / IA'.");
       }
 
       // Store in memory for confirmation

@@ -423,3 +423,162 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
     expect(createdRes.recipe.imageUrl).toBe('');
   });
 });
+
+describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batch Cooking (US-30, US-34, US-65)', () => {
+  let appInstance;
+
+  beforeEach(() => {
+    localStorage.clear();
+    state.recipes = JSON.parse(JSON.stringify(SEED_RECIPES));
+    state.mealPlan = state.generateInitialMealPlan();
+    state.shoppingList = [];
+    state.dietaryPreferences = [];
+    state.settings = {
+      geminiApiKey: '',
+      defaultServings: 2,
+      geminiModel: 'gemini-3.8-flash',
+      nutritionGoals: { enabled: true, calories: 2100, protein: 150, carbs: 200, fat: 65 }
+    };
+
+    document.body.innerHTML = `
+      <div id="view-ai" class="view-panel">
+        <div id="chat-history-container"></div>
+        <input type="text" id="ai-chat-input" value="">
+        <button id="btn-send-ai-chat">Enviar</button>
+      </div>
+      <div id="view-planner" class="view-panel">
+        <div id="planner-days-container"></div>
+      </div>
+      <div id="view-recipes" class="view-panel">
+        <input type="text" id="recipes-search-input" value="">
+        <div id="recipes-tag-filters"></div>
+        <span id="recipes-count-badge"></span>
+        <span id="recipes-count-subtitle"></span>
+        <button id="btn-toggle-fridge-panel"></button>
+        <div id="fridge-reverse-search-panel" style="display: none;">
+          <input type="text" id="input-fridge-ingredient" value="">
+          <button id="btn-add-fridge-ingredient"></button>
+          <button id="btn-clear-fridge-ingredients"></button>
+          <div id="fridge-chips-container"></div>
+          <button id="btn-ai-invent-from-fridge"></button>
+        </div>
+        <div id="recipes-cards-grid"></div>
+      </div>
+      <div id="view-shopping" class="view-panel">
+        <p id="shopping-summary-text"></p>
+        <div id="shopping-aisles-container"></div>
+      </div>
+      <dialog id="modal-recipe-import" class="modal-overlay">
+        <div id="section-import-url" style="display: block;">
+          <input type="url" id="import-url-input">
+        </div>
+        <div id="section-import-text" style="display: none;">
+          <textarea id="import-text-input"></textarea>
+        </div>
+        <div id="section-import-ai" style="display: none;">
+          <input type="file" id="import-image-input">
+          <textarea id="import-ai-prompt-input"></textarea>
+        </div>
+        <div id="import-preview-box" style="display: none;"></div>
+        <div id="import-status-indicator" style="display: none;"></div>
+        <button id="btn-execute-import"></button>
+        <button id="btn-confirm-save-import"></button>
+      </dialog>
+      <dialog id="modal-recipe-picker" class="modal-overlay">
+        <input type="checkbox" id="toggle-picker-cook-double">
+        <div id="picker-recipes-list"></div>
+      </dialog>
+      <dialog id="modal-recipe-detail" class="modal-overlay">
+        <div id="recipe-modal-body"></div>
+        <div id="recipe-detail-normal-actions"></div>
+        <div id="recipe-detail-review-actions"></div>
+      </dialog>
+    `;
+    appInstance = new FoodAssistantApp();
+  });
+
+  it('US-30: normalizeAiExtractedRecipe normaliza JSON de Gemini y calcula tags y macros automáticamente', () => {
+    const rawAiJson = {
+      title: 'Salteado de Tofu con Brócoli y Arroz',
+      description: 'Plato vegetal rápido y nutritivo.',
+      prepTimeMinutes: 10,
+      cookTimeMinutes: 15,
+      servings: 2,
+      tags: ['Saludable', 'Vegano'],
+      ingredients: [
+        { name: 'Tofu firme', amount: 200, unit: 'g' },
+        { name: 'Brócoli', amount: 150, unit: 'g' },
+        { name: 'Salsa de soja', amount: 2, unit: 'cda' }
+      ],
+      instructions: [
+        { step: 1, text: 'Cortar el tofu en dados y dorar 6 minutos.', timerMinutes: 6 },
+        { step: 2, text: 'Añadir el brócoli y cocinar 8 minutos al vapor con salsa de soja.' }
+      ]
+    };
+
+    const normalized = appInstance.normalizeAiExtractedRecipe(rawAiJson, 'https://instagram.com/p/test');
+    expect(normalized.id).toMatch(/^rec-/);
+    expect(normalized.title).toBe('Salteado de Tofu con Brócoli y Arroz');
+    expect(normalized.ingredients.length).toBe(3);
+    expect(normalized.instructions.length).toBe(2);
+    expect(normalized.instructions[0].timerMinutes).toBe(6);
+    expect(normalized.instructions[1].timerMinutes).toBe(8); // Detectado automáticamente del texto "8 minutos"
+    expect(normalized.sourceUrl).toBe('https://instagram.com/p/test');
+    expect(normalized.sourceDomain).toBe('instagram.com');
+  });
+
+  it('US-30: extractRecipeWithGemini devuelve receta limpia en modo simulado cuando no hay API key', async () => {
+    state.settings.geminiApiKey = '';
+    const res = await appInstance.extractRecipeWithGemini({ text: 'Bowl alto en proteínas con pollo y arroz' });
+    expect(res).toBeTruthy();
+    expect(res.title).toContain('Multimodal');
+    expect(res.ingredients.length).toBeGreaterThan(0);
+    expect(res.instructions.length).toBeGreaterThan(0);
+  });
+
+  it('US-34: Fridge Reverse Search añade ingredientes, filtra recetas y ordena por mayor coincidencia', () => {
+    // Añadimos pechuga de pollo y patata
+    appInstance.addFridgeIngredient('pollo');
+    appInstance.addFridgeIngredient('patatas');
+
+    expect(appInstance.fridgeIngredients).toEqual(['pollo', 'patatas']);
+
+    // Pollo al limón tiene pollo y patatas
+    const lemonChicken = state.recipes.find(r => r.id === 'rec-lemon-chicken');
+    const matchChicken = appInstance.getRecipeFridgeMatch(lemonChicken);
+    expect(matchChicken.matchCount).toBeGreaterThanOrEqual(1);
+
+    // Salmón a la plancha no tiene ni pollo ni patatas
+    const salmonBowl = state.recipes.find(r => r.id === 'rec-salmon-bowl');
+    const matchSalmon = appInstance.getRecipeFridgeMatch(salmonBowl);
+    expect(matchSalmon.matchCount).toBe(0);
+
+    // Limpiar nevera
+    appInstance.clearFridgeIngredients();
+    expect(appInstance.fridgeIngredients.length).toBe(0);
+  });
+
+  it('US-65: selectRecipeForSlot con cookDouble asigna el plato al slot de hoy y programa sobras para el día siguiente', () => {
+    const today = new Date();
+    const todayStr = window.toLocalDateKey(today);
+    const nextDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+    const nextStr = window.toLocalDateKey(nextDay);
+
+    appInstance.pickerTarget = { dateStr: todayStr, slotKey: 'dinner', isCustom: false };
+    appInstance.selectRecipeForSlot('rec-lemon-chicken', true);
+
+    const todayPlan = state.mealPlan[todayStr];
+    const nextDayPlan = state.mealPlan[nextStr];
+
+    expect(todayPlan.dinner).toBe('rec-lemon-chicken');
+    // Para cena con cookDouble se programa como almuerzo del día siguiente con badge de sobras
+    expect(nextDayPlan.lunch).toBe('rec-lemon-chicken');
+    expect(nextDayPlan.leftoverSlots?.lunch).toBe(true);
+  });
+
+  it('Fase 1 Refinamiento: "Planifica mi dia de hoy" no activa semana completa de 7 dias', () => {
+    expect(appInstance.isWeeklyPlanPrompt('Planifica mi menú semanal de lunes a domingo')).toBe(true);
+    expect(appInstance.isWeeklyPlanPrompt('Planifica mi dia de hoy')).toBe(false);
+    expect(appInstance.isWeeklyPlanPrompt('Dime qué comer hoy')).toBe(false);
+  });
+});
