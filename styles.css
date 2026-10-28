@@ -2756,3 +2756,282 @@ dialog.modal-overlay::backdrop {
   box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.18) !important;
 }
 
+/* ==========================================================================
+   US-04: COPY / DUPLICATE ANY WEEK PLAN MODAL (v0.66)
+   ========================================================================== */
+.copy-week-modal-content {
+  max-width: 520px;
+  width: 94%;
+  padding: 22px 20px;
+  border-radius: var(--radius-xl);
+  display: flex;
+  flex-direction: column;
+  max-height: 88vh;
+}
+
+.copy-week-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--m3-outline-variant);
+}
+
+.copy-week-icon-circle {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: var(--m3-primary-container);
+  color: var(--m3-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.copy-week-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--m3-on-surface);
+}
+
+.copy-week-subtitle {
+  font-size: 12px;
+  color: var(--m3-on-surface-variant);
+  margin: 2px 0 0 0;
+}
+
+.copy-week-body {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.copy-week-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.copy-week-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--m3-primary);
+}
+
+.copy-week-sources-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 175px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.copy-week-source-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--m3-outline-variant);
+  background: var(--m3-surface-container-low);
+  color: var(--m3-on-surface);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.copy-week-source-card:hover {
+  background: var(--m3-surface-container);
+  border-color: var(--m3-outline);
+}
+
+.copy-week-source-card.active {
+  background: var(--m3-primary-container);
+  color: var(--m3-on-primary-container);
+  border-color: var(--m3-primary);
+  box-shadow: var(--elevation-1);
+}
+
+.copy-source-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.copy-source-title {
+  font-size: 13px;
+  font-weight: 600;
+  display: block;
+}
+
+.copy-source-range {
+  font-size: 11px;
+  color: var(--m3-on-surface-variant);
+  display: block;
+  margin-top: 1px;
+}
+
+.copy-week-source-card.active .copy-source-range {
+  color: var(--m3-on-primary-container);
+  opacity: 0.85;
+}
+
+.copy-week-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--m3-surface-container-high);
+  color: var(--m3-on-surface-variant);
+  white-space: nowrap;
+}
+
+.copy-week-source-card.active .copy-week-badge {
+  background: var(--m3-primary);
+  color: var(--m3-on-primary);
+}
+
+.copy-week-custom-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: var(--m3-surface-container-lowest);
+  border: 1px dashed var(--m3-outline-variant);
+  flex-wrap: wrap;
+}
+
+.copy-week-picker-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--m3-on-surface-variant);
+}
+
+.copy-week-date-input {
+  width: auto;
+  min-width: 145px;
+  padding: 5px 10px;
+  font-size: 12px;
+  height: 32px;
+}
+
+.copy-week-preview-box {
+  background: var(--m3-surface-container-low);
+  border: 1px solid var(--m3-outline-variant);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  max-height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.copy-preview-day-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--m3-outline-variant);
+}
+
+.copy-preview-day-row:last-child {
+  border-bottom: none;
+}
+
+.copy-preview-day-name {
+  font-weight: 700;
+  color: var(--m3-on-surface);
+  min-width: 78px;
+  flex-shrink: 0;
+}
+
+.copy-preview-day-meals {
+  color: var(--m3-on-surface-variant);
+  flex: 1;
+  line-height: 1.35;
+}
+
+.copy-week-mode-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+@media (max-width: 460px) {
+  .copy-week-mode-selector {
+    grid-template-columns: 1fr;
+  }
+}
+
+.copy-mode-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--m3-outline-variant);
+  background: var(--m3-surface-container-low);
+  color: var(--m3-on-surface);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.copy-mode-card:hover {
+  background: var(--m3-surface-container);
+}
+
+.copy-mode-card.active {
+  border-color: var(--m3-primary);
+  background: var(--m3-primary-container);
+  color: var(--m3-on-primary-container);
+}
+
+.copy-mode-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.copy-mode-title {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.copy-mode-desc {
+  font-size: 11px;
+  opacity: 0.85;
+  line-height: 1.3;
+}
+
+.copy-week-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--m3-outline-variant);
+}
+
+

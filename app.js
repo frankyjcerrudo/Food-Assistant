@@ -2497,7 +2497,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.65';
+  window.APP_VERSION = 'v0.66';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2529,12 +2529,14 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.65';
+    this.appVersion = 'v0.66';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
     this.pickerTarget = null;
     this.plannerWeekOffset = 0; // 0: current week, -1: previous, +1: next (US-05)
+    this.copyWeekSourceMondayKey = null; // US-04: selected source week Monday key
+    this.copyWeekMode = 'replace'; // 'replace' | 'merge' (US-04)
     this.selectedRecipeTags = new Set();
     this.editorSelectedTags = new Set();
     this.pickerOnlyDietary = false;
@@ -2625,6 +2627,7 @@ class FoodAssistantApp {
     this.modalRecipeEdit = document.getElementById('modal-recipe-edit');
     this.modalAuth = document.getElementById('modal-auth');
     this.modalShoppingPreview = document.getElementById('modal-shopping-preview');
+    this.modalCopyWeek = document.getElementById('modal-copy-week');
     this.modalConfirmDialog = document.getElementById('modal-confirm-dialog');
     this.cookModeOverlay = document.getElementById('cook-mode-overlay');
     this._confirmDialogResolver = null;
@@ -4864,6 +4867,9 @@ class FoodAssistantApp {
       case 'modal-nutrition-goals':
         this.closeNutritionGoalsModal();
         break;
+      case 'modal-copy-week':
+        this.closeCopyWeekModal();
+        break;
       case 'modal-confirm-dialog':
         this.closeConfirmDialog(false);
         break;
@@ -6180,6 +6186,423 @@ class FoodAssistantApp {
     this.scheduleSyncWithCloud();
     this.closeAddCustomSlotModal();
     this.render();
+  }
+
+  // ==========================================================================
+  // US-04: COPIAR O DUPLICAR PLAN DE CUALQUIER SEMANA (ANTERIOR, HISTÓRICA O POR FECHA)
+  // ==========================================================================
+  getWeekMealStats(weekDays) {
+    let mealCount = 0;
+    let customSlotsCount = 0;
+    const sampleTitles = [];
+
+    if (!Array.isArray(weekDays)) {
+      return { mealCount: 0, customSlotsCount: 0, sampleTitles: [] };
+    }
+
+    weekDays.forEach(wDay => {
+      const day = state.mealPlan?.[wDay.dateKey];
+      if (!day) return;
+      STANDARD_SLOTS.forEach(s => {
+        const rId = day[s.key];
+        if (rId) {
+          mealCount++;
+          const rec = state.recipes.find(r => r.id === rId);
+          if (rec && sampleTitles.length < 3 && !sampleTitles.includes(rec.title)) {
+            sampleTitles.push(rec.title);
+          }
+        }
+      });
+      if (Array.isArray(day.customSlots)) {
+        day.customSlots.forEach(cs => {
+          customSlotsCount++;
+          if (cs && cs.recipeId) {
+            mealCount++;
+            const rec = state.recipes.find(r => r.id === cs.recipeId);
+            if (rec && sampleTitles.length < 3 && !sampleTitles.includes(rec.title)) {
+              sampleTitles.push(rec.title);
+            }
+          }
+        });
+      }
+    });
+
+    return { mealCount, customSlotsCount, sampleTitles };
+  }
+
+  getAvailableSourceWeeks() {
+    const targetWeekDays = this.getPlannerWeekDates();
+    const targetMonday = targetWeekDays[0].date;
+    const targetMondayKey = targetWeekDays[0].dateKey;
+
+    const prevMonday = new Date(targetMonday.getFullYear(), targetMonday.getMonth(), targetMonday.getDate() - 7);
+    const prevMondayKey = toLocalDateKey(prevMonday);
+
+    const mondayKeysSet = new Set([prevMondayKey]);
+
+    // Collect all weeks that have at least one planned meal or custom slot in state.mealPlan
+    Object.keys(state.mealPlan || {}).forEach(dateKey => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return;
+      const d = parseLocalDateKey(dateKey);
+      const mKey = toLocalDateKey(getMondayOfWeek(d));
+      if (mKey && mKey !== targetMondayKey) {
+        mondayKeysSet.add(mKey);
+      }
+    });
+
+    // If user picked a custom week via date input, ensure it's included
+    if (this.copyWeekSourceMondayKey && this.copyWeekSourceMondayKey !== targetMondayKey) {
+      mondayKeysSet.add(this.copyWeekSourceMondayKey);
+    }
+
+    const candidates = [];
+    mondayKeysSet.forEach(mKey => {
+      const mDate = parseLocalDateKey(mKey);
+      const wDays = getWeekDates(mDate);
+      const stats = this.getWeekMealStats(wDays);
+      const isImmediatePrev = (mKey === prevMondayKey);
+
+      // Keep immediate previous week, currently selected custom week, or any week with meals/customSlots
+      if (isImmediatePrev || mKey === this.copyWeekSourceMondayKey || stats.mealCount > 0 || stats.customSlotsCount > 0) {
+        const diffDays = Math.round((mDate.getTime() - targetMonday.getTime()) / (1000 * 60 * 60 * 24));
+        const diffWeeks = Math.round(diffDays / 7);
+        let relativeLabel = 'Otra semana';
+        if (diffWeeks === -1) relativeLabel = 'Semana inmediatamente anterior';
+        else if (diffWeeks === 1) relativeLabel = 'Semana siguiente';
+        else if (diffWeeks < -1) relativeLabel = `Hace ${Math.abs(diffWeeks)} semanas`;
+        else if (diffWeeks > 1) relativeLabel = `Dentro de ${diffWeeks} semanas`;
+
+        candidates.push({
+          mondayKey: mKey,
+          mondayDate: mDate,
+          rangeLabel: formatWeekRange(wDays),
+          relativeLabel,
+          isImmediatePrev,
+          mealCount: stats.mealCount,
+          customSlotsCount: stats.customSlotsCount,
+          sampleTitles: stats.sampleTitles
+        });
+      }
+    });
+
+    // Sort: immediate previous week first, then most recent first
+    candidates.sort((a, b) => {
+      if (a.isImmediatePrev && !b.isImmediatePrev) return -1;
+      if (!a.isImmediatePrev && b.isImmediatePrev) return 1;
+      return b.mondayDate.getTime() - a.mondayDate.getTime();
+    });
+
+    return candidates;
+  }
+
+  openCopyWeekModal() {
+    const modal = document.getElementById('modal-copy-week') || this.modalCopyWeek;
+    const targetWeekDays = this.getPlannerWeekDates();
+    const targetMonday = targetWeekDays[0].date;
+    const prevMonday = new Date(targetMonday.getFullYear(), targetMonday.getMonth(), targetMonday.getDate() - 7);
+    const prevMondayKey = toLocalDateKey(prevMonday);
+
+    // Default to immediate previous week if it has meals, or the first week with meals, otherwise immediate previous week
+    const candidates = this.getAvailableSourceWeeks();
+    const prevCandidate = candidates.find(c => c.mondayKey === prevMondayKey);
+    const firstWithMeals = candidates.find(c => c.mealCount > 0 || c.customSlotsCount > 0);
+
+    if (prevCandidate && (prevCandidate.mealCount > 0 || prevCandidate.customSlotsCount > 0)) {
+      this.copyWeekSourceMondayKey = prevMondayKey;
+    } else if (firstWithMeals) {
+      this.copyWeekSourceMondayKey = firstWithMeals.mondayKey;
+    } else {
+      this.copyWeekSourceMondayKey = prevMondayKey;
+    }
+
+    this.copyWeekMode = 'replace';
+    const dateInput = document.getElementById('input-copy-week-date');
+    if (dateInput) dateInput.value = this.copyWeekSourceMondayKey;
+
+    this.renderCopyWeekModal();
+    if (modal) {
+      this.openDialogModal(modal);
+    }
+  }
+
+  closeCopyWeekModal() {
+    const modal = document.getElementById('modal-copy-week') || this.modalCopyWeek;
+    if (modal) {
+      this.closeDialogModal(modal);
+    }
+  }
+
+  selectCopyWeekSource(mondayKey) {
+    if (!mondayKey) return;
+    const targetWeekDays = this.getPlannerWeekDates();
+    if (mondayKey === targetWeekDays[0].dateKey) {
+      this.showToast('La semana de origen no puede ser la misma semana de destino.', 'warning');
+      return;
+    }
+    this.copyWeekSourceMondayKey = mondayKey;
+    const dateInput = document.getElementById('input-copy-week-date');
+    if (dateInput) dateInput.value = mondayKey;
+    this.renderCopyWeekModal();
+  }
+
+  selectCopyWeekFromDateInput(dateVal) {
+    if (!dateVal) return;
+    const pickedDate = parseLocalDateKey(dateVal);
+    const pickedMondayKey = toLocalDateKey(getMondayOfWeek(pickedDate));
+    const targetWeekDays = this.getPlannerWeekDates();
+
+    if (pickedMondayKey === targetWeekDays[0].dateKey) {
+      this.showToast('Esa fecha pertenece a la semana actual de destino. Elige otra semana.', 'warning');
+      return;
+    }
+
+    this.copyWeekSourceMondayKey = pickedMondayKey;
+    this.renderCopyWeekModal();
+  }
+
+  setCopyWeekMode(mode) {
+    this.copyWeekMode = mode === 'merge' ? 'merge' : 'replace';
+    this.renderCopyWeekModal();
+  }
+
+  renderCopyWeekModal() {
+    const targetWeekDays = this.getPlannerWeekDates();
+    const targetLabelEl = document.getElementById('copy-week-target-label');
+    if (targetLabelEl) {
+      targetLabelEl.textContent = `Destino: ${formatWeekRange(targetWeekDays)}`;
+    }
+
+    const sourcesListEl = document.getElementById('copy-week-sources-list');
+    const candidates = this.getAvailableSourceWeeks();
+
+    if (sourcesListEl) {
+      sourcesListEl.innerHTML = candidates.map(c => {
+        const isSelected = c.mondayKey === this.copyWeekSourceMondayKey;
+        const subtitleText = c.sampleTitles.length > 0
+          ? `${c.rangeLabel} · ${c.sampleTitles.slice(0, 2).join(', ')}${c.sampleTitles.length > 2 ? '…' : ''}`
+          : c.rangeLabel;
+
+        return `
+          <button type="button" class="copy-week-source-card ${isSelected ? 'active' : ''}" data-monday="${c.mondayKey}" onclick="app.selectCopyWeekSource('${c.mondayKey}')">
+            <div class="copy-source-left">
+              <span class="material-symbols-outlined icon-sm">${c.isImmediatePrev ? 'history' : 'date_range'}</span>
+              <div style="min-width: 0;">
+                <span class="copy-source-title">${c.relativeLabel}</span>
+                <span class="copy-source-range">${subtitleText}</span>
+              </div>
+            </div>
+            <span class="copy-week-badge">${c.mealCount} ${c.mealCount === 1 ? 'comida' : 'comidas'}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    // Render preview of selected source week
+    const previewBox = document.getElementById('copy-week-preview-box');
+    const previewBadge = document.getElementById('copy-week-preview-badge');
+    const confirmBtn = document.getElementById('btn-confirm-copy-week');
+    const sourceMonday = parseLocalDateKey(this.copyWeekSourceMondayKey);
+    const sourceWeekDays = getWeekDates(sourceMonday);
+    const sourceStats = this.getWeekMealStats(sourceWeekDays);
+
+    if (previewBadge) {
+      previewBadge.textContent = `${sourceStats.mealCount} ${sourceStats.mealCount === 1 ? 'comida' : 'comidas'}${sourceStats.customSlotsCount > 0 ? ` · ${sourceStats.customSlotsCount} extra` : ''}`;
+    }
+
+    if (previewBox) {
+      if (sourceStats.mealCount === 0 && sourceStats.customSlotsCount === 0) {
+        previewBox.innerHTML = `
+          <div style="text-align: center; padding: 14px 8px; color: var(--m3-on-surface-variant); font-size: 12px;">
+            <span class="material-symbols-outlined" style="font-size: 22px; display: block; margin-bottom: 4px; opacity: 0.7;">event_busy</span>
+            La semana seleccionada (${formatWeekRange(sourceWeekDays)}) no tiene platos ni momentos personalizados asignados.
+          </div>
+        `;
+      } else {
+        previewBox.innerHTML = sourceWeekDays.map(wDay => {
+          const day = state.mealPlan?.[wDay.dateKey];
+          const entries = [];
+          if (day) {
+            STANDARD_SLOTS.forEach(s => {
+              const rId = day[s.key];
+              if (rId) {
+                const rec = state.recipes.find(r => r.id === rId);
+                entries.push(`${s.label}: <strong>${rec ? rec.title : 'Plato'}</strong>`);
+              }
+            });
+            if (Array.isArray(day.customSlots)) {
+              day.customSlots.forEach(cs => {
+                if (cs.recipeId) {
+                  const rec = state.recipes.find(r => r.id === cs.recipeId);
+                  entries.push(`${cs.name || 'Extra'}: <strong>${rec ? rec.title : 'Plato'}</strong>`);
+                } else {
+                  entries.push(`${cs.name || 'Extra'} <em>(momento vacío)</em>`);
+                }
+              });
+            }
+          }
+          return `
+            <div class="copy-preview-day-row">
+              <span class="copy-preview-day-name">${wDay.dayName}</span>
+              <span class="copy-preview-day-meals">${entries.length > 0 ? entries.join(' · ') : '<em style="opacity: 0.6;">Sin comidas</em>'}</span>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    // Update mode buttons
+    const replaceBtn = document.getElementById('btn-copy-mode-replace');
+    const mergeBtn = document.getElementById('btn-copy-mode-merge');
+    if (replaceBtn) replaceBtn.classList.toggle('active', this.copyWeekMode === 'replace');
+    if (mergeBtn) mergeBtn.classList.toggle('active', this.copyWeekMode === 'merge');
+
+    if (confirmBtn) {
+      confirmBtn.disabled = (sourceStats.mealCount === 0 && sourceStats.customSlotsCount === 0);
+    }
+  }
+
+  /**
+   * Copia el plan de una semana origen (identificada por su Lunes o cualquier fecha de esa semana)
+   * hacia la semana actualmente activa en el planificador (o hacia targetMondayKey si se especifica).
+   */
+  async copyWeekPlanFrom(sourceDateOrMondayKey, options = {}) {
+    const {
+      mode = this.copyWeekMode || 'replace',
+      targetMondayKey = null,
+      skipConfirm = false
+    } = options;
+
+    const sourceMonday = getMondayOfWeek(parseLocalDateKey(sourceDateOrMondayKey));
+    const sourceMondayKey = toLocalDateKey(sourceMonday);
+    const sourceWeekDays = getWeekDates(sourceMonday);
+
+    const targetWeekDays = targetMondayKey
+      ? getWeekDates(parseLocalDateKey(targetMondayKey))
+      : this.getPlannerWeekDates();
+    const resolvedTargetMondayKey = targetWeekDays[0].dateKey;
+
+    if (sourceMondayKey === resolvedTargetMondayKey) {
+      this.showToast('No puedes copiar una semana sobre sí misma.', 'warning');
+      return { copied: false, reason: 'same_week' };
+    }
+
+    const sourceStats = this.getWeekMealStats(sourceWeekDays);
+    if (sourceStats.mealCount === 0 && sourceStats.customSlotsCount === 0) {
+      this.showToast('La semana de origen no tiene comidas asignadas para copiar.', 'warning');
+      return { copied: false, reason: 'empty_source' };
+    }
+
+    const targetStats = this.getWeekMealStats(targetWeekDays);
+
+    // Si la semana destino ya tiene platos y estamos en modo reemplazar, pedir confirmación segura (US-04 / US-18)
+    if (mode === 'replace' && (targetStats.mealCount > 0 || targetStats.customSlotsCount > 0) && !skipConfirm) {
+      const confirmed = await this.showConfirmDialog({
+        title: '¿Reemplazar plan de la semana?',
+        message: `La semana de destino (${formatWeekRange(targetWeekDays)}) ya tiene ${targetStats.mealCount} ${targetStats.mealCount === 1 ? 'comida asignada' : 'comidas asignadas'}.\n\n¿Deseas reemplazarla con el plan del ${formatWeekRange(sourceWeekDays)}?`,
+        confirmText: 'Sí, reemplazar semana',
+        cancelText: 'Cancelar',
+        danger: true,
+        icon: 'sync_alt'
+      });
+      if (!confirmed) {
+        return { copied: false, reason: 'cancelled' };
+      }
+    }
+
+    const nowIso = new Date().toISOString();
+    let copiedMealsCount = 0;
+    let copiedCustomSlotsCount = 0;
+
+    for (let i = 0; i < 7; i++) {
+      const srcDayInfo = sourceWeekDays[i];
+      const tgtDayInfo = targetWeekDays[i];
+      const srcDay = state.mealPlan?.[srcDayInfo.dateKey];
+      const tgtDay = state.getDayPlan(tgtDayInfo.dateKey, tgtDayInfo.dayName);
+
+      if (mode === 'replace') {
+        STANDARD_SLOTS.forEach(s => {
+          const val = srcDay ? (srcDay[s.key] || null) : null;
+          tgtDay[s.key] = val;
+          if (val) copiedMealsCount++;
+        });
+
+        const srcCustom = (srcDay && Array.isArray(srcDay.customSlots)) ? srcDay.customSlots : [];
+        tgtDay.customSlots = srcCustom.map(cs => {
+          if (cs.recipeId) copiedMealsCount++;
+          copiedCustomSlotsCount++;
+          return {
+            id: generateId('cslot-'),
+            name: cs.name || 'Momento Extra',
+            icon: cs.icon || 'lunch_dining',
+            recipeId: cs.recipeId || null
+          };
+        });
+      } else {
+        // Merge mode: solo rellena huecos vacíos y añade momentos personalizados que no existan por nombre
+        if (srcDay) {
+          STANDARD_SLOTS.forEach(s => {
+            const srcVal = srcDay[s.key] || null;
+            if (srcVal && !tgtDay[s.key]) {
+              tgtDay[s.key] = srcVal;
+              copiedMealsCount++;
+            }
+          });
+
+          const srcCustom = Array.isArray(srcDay.customSlots) ? srcDay.customSlots : [];
+          if (!Array.isArray(tgtDay.customSlots)) tgtDay.customSlots = [];
+
+          srcCustom.forEach(cs => {
+            const existingCustom = tgtDay.customSlots.find(
+              tcs => (tcs.name || '').trim().toLowerCase() === (cs.name || '').trim().toLowerCase()
+            );
+            if (!existingCustom) {
+              tgtDay.customSlots.push({
+                id: generateId('cslot-'),
+                name: cs.name || 'Momento Extra',
+                icon: cs.icon || 'lunch_dining',
+                recipeId: cs.recipeId || null
+              });
+              copiedCustomSlotsCount++;
+              if (cs.recipeId) copiedMealsCount++;
+            } else if (!existingCustom.recipeId && cs.recipeId) {
+              existingCustom.recipeId = cs.recipeId;
+              copiedMealsCount++;
+            }
+          });
+        }
+      }
+
+      tgtDay.dayName = tgtDayInfo.dayName;
+      tgtDay.updatedAt = nowIso;
+    }
+
+    state.save('fa_mealplan', state.mealPlan);
+    this.scheduleSyncWithCloud();
+    this.render();
+
+    this.showToast(
+      `¡Semana copiada con éxito (${copiedMealsCount} ${copiedMealsCount === 1 ? 'comida' : 'comidas'})!`,
+      'success'
+    );
+
+    return {
+      copied: true,
+      copiedMealsCount,
+      copiedCustomSlotsCount,
+      sourceMondayKey,
+      targetMondayKey: resolvedTargetMondayKey
+    };
+  }
+
+  async confirmCopyWeekPlan(skipConfirm = false) {
+    if (!this.copyWeekSourceMondayKey) return { copied: false };
+    const selectedSource = this.copyWeekSourceMondayKey;
+    const selectedMode = this.copyWeekMode || 'replace';
+    this.closeCopyWeekModal();
+    return await this.copyWeekPlanFrom(selectedSource, {
+      mode: selectedMode,
+      skipConfirm
+    });
   }
 
   openPickerModal(dateStr, slotKey, isCustom = false) {
