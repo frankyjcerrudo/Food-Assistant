@@ -1968,6 +1968,18 @@ const RecipeParser = {
         recipe.tags.push('Mambo');
       }
     }
+    if (typeof analyzeAndInferRecipeTags === 'function') {
+      if (!Array.isArray(recipe.tags)) recipe.tags = [];
+      const inferred = analyzeAndInferRecipeTags(recipe);
+      const existingLower = new Set(recipe.tags.map(t => String(t).toLowerCase().trim()));
+      inferred.forEach(tag => {
+        const lower = tag.toLowerCase().trim();
+        if (!existingLower.has(lower) && lower !== 'general' && lower !== 'importada') {
+          recipe.tags.push(tag);
+          existingLower.add(lower);
+        }
+      });
+    }
   },
 
   isRecipeType(typeVal) {
@@ -2485,7 +2497,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.60';
+  window.APP_VERSION = 'v0.61';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2517,7 +2529,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.60';
+    this.appVersion = 'v0.61';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -2553,7 +2565,15 @@ class FoodAssistantApp {
     if (!Array.isArray(state.recipes) || state.recipes.length === 0) return;
     let changed = false;
     state.recipes.forEach(r => {
-      if (!r || !Array.isArray(r.tags)) return;
+      if (!r) return;
+      if (!Array.isArray(r.tags)) r.tags = [];
+
+      // 1. Limpiar la etiqueta obsoleta "General" si existe
+      if (r.tags.some(t => t && String(t).trim().toLowerCase() === 'general')) {
+        r.tags = r.tags.filter(t => t && String(t).trim().toLowerCase() !== 'general');
+        changed = true;
+      }
+
       const inferred = (typeof analyzeAndInferRecipeTags === 'function') ? analyzeAndInferRecipeTags(r) : [];
       const hasTag = r.tags.includes('Alta en Proteínas');
       const shouldHave = inferred.includes('Alta en Proteínas');
@@ -2561,14 +2581,25 @@ class FoodAssistantApp {
       if (hasTag && !shouldHave) {
         r.tags = r.tags.filter(t => t !== 'Alta en Proteínas');
         changed = true;
-      } else if (!hasTag && shouldHave) {
-        r.tags.push('Alta en Proteínas');
-        changed = true;
       }
+
+      // 2. Añadir automáticamente todas las etiquetas inferidas que falten
+      const currentLower = new Set(r.tags.map(t => String(t).toLowerCase().trim()));
+      inferred.forEach(tag => {
+        const lower = tag.toLowerCase().trim();
+        if (!currentLower.has(lower) && lower !== 'general') {
+          r.tags.push(tag);
+          currentLower.add(lower);
+          changed = true;
+        }
+      });
     });
 
     if (changed) {
       state.save('fa_recipes', state.recipes);
+      if (typeof this.initRecipeTagFilters === 'function') {
+        this.initRecipeTagFilters();
+      }
       if (typeof this.scheduleSyncWithCloud === 'function') {
         this.scheduleSyncWithCloud();
       }
@@ -2740,6 +2771,12 @@ class FoodAssistantApp {
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
           this.flushSync();
+        } else if (document.visibilityState === 'visible') {
+          this.sanitizeRecipeProteinTags();
+          this.render();
+          if (this.supabaseClient && state.cloudUser?.id) {
+            this.syncDataWithCloud(true);
+          }
         }
       });
       window.addEventListener('pagehide', () => {
@@ -3622,6 +3659,8 @@ class FoodAssistantApp {
 
     this.updateSyncIndicator("Sincronizando con la nube...", 'syncing');
     const pullRes = await this.pullFromCloud();
+    this.sanitizeRecipeProteinTags();
+    this.render();
     const pushRes = await this.pushToCloud(silent);
     return { pull: pullRes, push: pushRes };
   }
@@ -5437,6 +5476,22 @@ class FoodAssistantApp {
       updatedAt: new Date().toISOString()
     };
 
+    if (ingredients.length > 0 && typeof analyzeAndInferRecipeTags === 'function') {
+      const inferred = analyzeAndInferRecipeTags(finalRecipe);
+      if (finalRecipe.tags.includes('Alta en Proteínas') && !inferred.includes('Alta en Proteínas')) {
+        finalRecipe.tags = finalRecipe.tags.filter(t => t !== 'Alta en Proteínas');
+      }
+      const existingLower = new Set(finalRecipe.tags.map(t => String(t).toLowerCase().trim()));
+      inferred.forEach(tag => {
+        const lower = tag.toLowerCase().trim();
+        if (!existingLower.has(lower) && lower !== 'general') {
+          finalRecipe.tags.push(tag);
+          existingLower.add(lower);
+          state.addCustomTag && state.addCustomTag(tag);
+        }
+      });
+    }
+
     if (existingIdx >= 0) {
       state.recipes[existingIdx] = finalRecipe;
     } else {
@@ -6938,6 +6993,20 @@ class FoodAssistantApp {
     }
     const existingIdx = state.recipes.findIndex(r => r.id === newRecipe.id);
     const existing = existingIdx >= 0 ? state.recipes[existingIdx] : null;
+
+    if (!Array.isArray(newRecipe.tags)) newRecipe.tags = [];
+    if (typeof analyzeAndInferRecipeTags === 'function') {
+      const inferred = analyzeAndInferRecipeTags(newRecipe);
+      const existingLower = new Set(newRecipe.tags.map(t => String(t).toLowerCase().trim()));
+      inferred.forEach(tag => {
+        const lower = tag.toLowerCase().trim();
+        if (!existingLower.has(lower) && lower !== 'general' && lower !== 'importada') {
+          newRecipe.tags.push(tag);
+          existingLower.add(lower);
+          state.addCustomTag && state.addCustomTag(tag);
+        }
+      });
+    }
 
     newRecipe.createdAt = newRecipe.createdAt || existing?.createdAt || existing?.updatedAt || new Date().toISOString();
     newRecipe.updatedAt = new Date().toISOString();

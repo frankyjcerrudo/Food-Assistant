@@ -165,8 +165,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
   });
 
   it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-    expect(window.APP_VERSION).toBe('v0.60');
-    expect(appInstance.appVersion).toBe('v0.60');
+    expect(window.APP_VERSION).toBe('v0.61');
+    expect(appInstance.appVersion).toBe('v0.61');
 
     const badge = document.createElement('span');
     badge.id = 'app-version-badge';
@@ -176,8 +176,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     document.body.appendChild(settingsVer);
 
     appInstance.initVersion();
-    expect(badge.textContent).toBe('v0.60');
-    expect(settingsVer.textContent).toBe('v0.60');
+    expect(badge.textContent).toBe('v0.61');
+    expect(settingsVer.textContent).toBe('v0.61');
 
     document.body.removeChild(badge);
     document.body.removeChild(settingsVer);

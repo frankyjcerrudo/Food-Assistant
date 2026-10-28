@@ -474,5 +474,41 @@ describe('US-02: Filtros Dietéticos, Selector de Chips & Advertencias Nutricion
       expect(rec.tags).toContain('Rápida');
       expect(rec.updatedAt).toBeDefined();
     });
+
+    it('v0.61: al importar receta nueva o al iniciar/volver a la app (PWA), se asignan automáticamente las etiquetas inferidas', () => {
+      const parsed = window.RecipeParser.parseRecipeText(
+        "Crema de calabaza rápida\nIngredientes:\n- 400g Calabaza\n- 1 Cebolla\nInstrucciones:\n1. Cocer 15 minutos y triturar."
+      );
+      expect(parsed.tags).toContain('Vegano');
+      expect(parsed.tags).toContain('Vegetariano');
+      expect(parsed.tags).toContain('Sin Gluten');
+      expect(parsed.tags).toContain('Sin Lactosa');
+      expect(parsed.tags).toContain('Cena');
+
+      // Simular receta añadida sin etiquetas y apertura/reanudación de la app
+      state.recipes = [
+        {
+          id: 'rec-untagged-startup',
+          title: 'Salmón al horno con espárragos',
+          prepTimeMinutes: 10,
+          cookTimeMinutes: 15,
+          servings: 2,
+          tags: [],
+          ingredients: [
+            { name: 'Salmón fresco', amount: 300, unit: 'g', aisle: 'fish' },
+            { name: 'Espárragos trigueros', amount: 200, unit: 'g', aisle: 'produce' }
+          ],
+          instructions: [{ step: 1, text: 'Hornear a 200 grados durante 15 minutos.' }]
+        }
+      ];
+
+      app.sanitizeRecipeProteinTags();
+      const salmon = state.recipes.find(r => r.id === 'rec-untagged-startup');
+      expect(salmon.tags).toContain('Horno');
+      expect(salmon.tags).toContain('Rápida');
+      expect(salmon.tags).toContain('Sin Gluten');
+      expect(salmon.tags).toContain('Sin Lactosa');
+      expect(salmon.tags).toContain('Alta en Proteínas');
+    });
   });
 });
