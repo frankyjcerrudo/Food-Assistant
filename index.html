@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#ffffff">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.61">
+  <link rel="stylesheet" href="styles.css?v=0.62">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%231a73e8'/><path d='M30 30h40v40H30z' fill='%23ffffff'/></svg>">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -351,7 +351,7 @@
       <div class="goals-switch-card">
         <div class="goals-switch-info">
           <span class="goals-switch-label">Activar seguimiento</span>
-          <span class="goals-switch-desc">Muestra el balance y progreso en la pestaña Hoy</span>
+          <span class="goals-switch-desc">Muestra el progreso en Hoy y los valores nutricionales en las tarjetas de Recetas</span>
         </div>
         <label class="m3-switch" for="toggle-nutrition-goals-enabled">
           <input type="checkbox" id="toggle-nutrition-goals-enabled">
@@ -405,6 +405,11 @@
             <span class="nutrient-unit">g</span>
           </div>
         </div>
+      </div>
+
+      <div class="nutrition-estimation-disclaimer" id="settings-nutrition-disclaimer">
+        <span class="material-symbols-outlined">info</span>
+        <span>Los valores nutricionales calculados para las recetas son una <strong>estimación orientativa</strong> y dependen de cada receta (creada a mano o importada por los usuarios). Úsalos únicamente como referencia aproximada.</span>
       </div>
 
       <div style="display: flex; gap: 8px; align-items: center; margin-top: 12px;">
@@ -473,7 +478,7 @@
         <span class="material-symbols-outlined" style="color: var(--m3-primary);">system_update</span> Versión y Actualizaciones
       </h3>
       <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px;">
-        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.61</strong>
+        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.62</strong>
       </p>
       <div style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
         Si acabas de desplegar o notas que algún cambio no aparece, pulsa el botón para limpiar la caché del Service Worker y cargar el código más reciente.
@@ -1124,7 +1129,7 @@
     <div class="goals-switch-card">
       <div class="goals-switch-info">
         <span class="goals-switch-label">Activar seguimiento</span>
-        <span class="goals-switch-desc">Compara tu ingesta diaria en la pestaña Hoy</span>
+        <span class="goals-switch-desc">Muestra tu balance en Hoy y los valores nutricionales en las tarjetas de Recetas</span>
       </div>
       <label class="m3-switch" for="toggle-modal-goal-enabled">
         <input type="checkbox" id="toggle-modal-goal-enabled">
@@ -1181,6 +1186,11 @@
       </div>
     </div>
 
+    <div class="nutrition-estimation-disclaimer" id="modal-nutrition-disclaimer">
+      <span class="material-symbols-outlined">info</span>
+      <span>Los valores nutricionales calculados son una <strong>estimación orientativa</strong> según los ingredientes creados a mano o importados en cada receta. Úsalos solo como referencia aproximada.</span>
+    </div>
+
     <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
       <button type="button" class="btn btn-secondary btn-sm" onclick="app.closeNutritionGoalsModal()">Cancelar</button>
       <button type="button" class="btn btn-primary btn-sm" id="btn-modal-save-nutrition-goals" onclick="app.saveNutritionGoalsFromModal()">
@@ -1226,7 +1236,7 @@
   </div>
 </div>
 
-<script src="config.js?v=0.61"></script>
-<script src="app.js?v=0.61"></script>
+<script src="config.js?v=0.62"></script>
+<script src="app.js?v=0.62"></script>
 </body>
 </html>

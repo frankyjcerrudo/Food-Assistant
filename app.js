@@ -2497,7 +2497,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.61';
+  window.APP_VERSION = 'v0.62';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2529,7 +2529,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.61';
+    this.appVersion = 'v0.62';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -4207,6 +4207,10 @@ class FoodAssistantApp {
             <div class="ratio-segment ratio-fat" style="width: ${fatPercent}%;" title="Grasa: ${fatPercent}%"></div>
           </div>
           ${goalBannerHtml}
+          <div class="nutrition-estimation-disclaimer" id="today-nutrition-disclaimer">
+            <span class="material-symbols-outlined">info</span>
+            <span>Valores orientativos calculados a partir de recetas creadas a mano o importadas; úsalos solo como una estimación aproximada.</span>
+          </div>
         `;
       }
     }
@@ -4331,9 +4335,10 @@ class FoodAssistantApp {
     }
 
     const sortedList = this.getSortedRecipes(recipesList);
+    const showCardMacros = !!(state.settings?.nutritionGoals?.enabled);
 
     grid.innerHTML = sortedList.map(rec => {
-      const nut = getRecipeNutrition(rec);
+      const nut = showCardMacros ? getRecipeNutrition(rec) : null;
       return `
       <article class="recipe-card" onclick="app.openRecipeDetail('${rec.id}')">
         <div class="recipe-image-wrap">
@@ -4346,8 +4351,9 @@ class FoodAssistantApp {
           <h3 class="recipe-title">${rec.title}</h3>
           <p class="recipe-desc">${rec.description}</p>
 
+          ${showCardMacros && nut ? `
           <!-- Tabla compacta de valores nutricionales por ración (US-01) -->
-          <div class="recipe-card-macros" title="Valores nutricionales por ración individual">
+          <div class="recipe-card-macros" title="Valores nutricionales orientativos por ración individual">
             <div class="card-macro-item card-macro-cal" title="Calorías">
               <span class="card-macro-lbl">Calorías</span>
               <span class="card-macro-val">${nut.calories}<span class="card-macro-unit">kcal</span></span>
@@ -4365,6 +4371,7 @@ class FoodAssistantApp {
               <span class="card-macro-val">${Math.round(nut.fat)}<span class="card-macro-unit">g</span></span>
             </div>
           </div>
+          ` : ''}
 
           <div class="recipe-tags">
             ${rec.sourceDomain ? `
@@ -4686,6 +4693,10 @@ class FoodAssistantApp {
               <span class="macro-chip-label">Grasas</span>
               <span class="macro-chip-val" id="macro-detail-fat">${baseNutrition.fat}<span class="macro-chip-unit">g</span></span>
             </div>
+          </div>
+          <div class="nutrition-estimation-disclaimer" id="recipe-detail-nutrition-disclaimer">
+            <span class="material-symbols-outlined">info</span>
+            <span>Los valores nutricionales calculados son una <strong>estimación orientativa</strong> que depende de cada receta (creada a mano o importada por los usuarios). No deben tomarse al pie de la letra, sino solo como referencia aproximada.</span>
           </div>
         </div>
 
@@ -7119,6 +7130,7 @@ class FoodAssistantApp {
 
     state.saveNutritionGoals(newGoals);
     this.renderTodayView();
+    this.applyRecipeFilters();
     this.scheduleSyncWithCloud();
 
     if (statusMsg) {
@@ -7171,6 +7183,7 @@ class FoodAssistantApp {
     state.saveNutritionGoals(newGoals);
     this.renderNutritionGoalsSettings();
     this.renderTodayView();
+    this.applyRecipeFilters();
     this.scheduleSyncWithCloud();
     this.closeNutritionGoalsModal();
   }

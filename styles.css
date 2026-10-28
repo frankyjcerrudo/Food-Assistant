@@ -2517,3 +2517,25 @@ body {
 
 
 
+
+/* Disclaimer informativo sobre estimación nutricional (v0.62) */
+.nutrition-estimation-disclaimer {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--m3-surface-container);
+  border: 1px solid var(--m3-outline-variant);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--m3-on-surface-variant);
+}
+
+.nutrition-estimation-disclaimer .material-symbols-outlined {
+  font-size: 15px;
+  color: var(--m3-primary);
+  flex-shrink: 0;
+  margin-top: 1px;
+}

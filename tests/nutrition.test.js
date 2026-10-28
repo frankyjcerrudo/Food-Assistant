@@ -288,8 +288,8 @@ describe('US-01: Contador de Calorías y Macronutrientes por plato y resumen dia
     });
   });
 
-  describe('Catálogo de Recetas con Tabla de Macros (US-01)', () => {
-    it('renderRecipesGrid incluye la tabla de valores nutricionales por ración en cada tarjeta', () => {
+  describe('Catálogo de Recetas con Tabla de Macros condicional y Aviso de Estimación (US-01 / v0.62)', () => {
+    it('renderRecipesGrid muestra la tabla de valores nutricionales en la tarjeta solo si está activado el seguimiento de objetivos nutricionales', () => {
       state.recipes = [
         {
           id: 'rec-card-macro-test',
@@ -304,13 +304,21 @@ describe('US-01: Contador de Calorías y Macronutrientes por plato y resumen dia
         }
       ];
 
+      // 1. Con seguimiento desactivado: NO debe mostrarse la tabla en la tarjeta de la pestaña Recetas
+      state.saveNutritionGoals({ enabled: false, calories: 2000, protein: 140, carbs: 200, fat: 65 });
       app.renderRecipesGrid(state.recipes);
 
       const grid = document.getElementById('recipes-cards-grid');
       expect(grid).not.toBeNull();
-      const card = grid.querySelector('.recipe-card');
+      let card = grid.querySelector('.recipe-card');
       expect(card).not.toBeNull();
+      expect(card.querySelector('.recipe-card-macros')).toBeNull();
 
+      // 2. Con seguimiento activado: SÍ debe mostrarse la tabla en la tarjeta
+      state.saveNutritionGoals({ enabled: true, calories: 2000, protein: 140, carbs: 200, fat: 65 });
+      app.renderRecipesGrid(state.recipes);
+
+      card = grid.querySelector('.recipe-card');
       const macrosTable = card.querySelector('.recipe-card-macros');
       expect(macrosTable).not.toBeNull();
       expect(macrosTable.textContent).toContain('380');
@@ -321,6 +329,36 @@ describe('US-01: Contador de Calorías y Macronutrientes por plato y resumen dia
       expect(macrosTable.querySelector('.card-macro-prot')).not.toBeNull();
       expect(macrosTable.querySelector('.card-macro-carbs')).not.toBeNull();
       expect(macrosTable.querySelector('.card-macro-fat')).not.toBeNull();
+    });
+
+    it('v0.62: muestra el aviso informativo de estimación nutricional en detalle de receta, Hoy, Ajustes y modal de objetivos', () => {
+      // 1. En Ajustes y Modal de Objetivos (HTML estático)
+      const settingsDisclaimer = document.getElementById('settings-nutrition-disclaimer');
+      const modalDisclaimer = document.getElementById('modal-nutrition-disclaimer');
+      expect(settingsDisclaimer).not.toBeNull();
+      expect(settingsDisclaimer.textContent).toContain('estimación orientativa');
+      expect(modalDisclaimer).not.toBeNull();
+      expect(modalDisclaimer.textContent).toContain('estimación orientativa');
+
+      // 2. En Detalle de Receta
+      app.openRecipeDetail(state.recipes[0].id);
+      const detailDisclaimer = document.getElementById('recipe-detail-nutrition-disclaimer');
+      expect(detailDisclaimer).not.toBeNull();
+      expect(detailDisclaimer.textContent).toContain('estimación orientativa');
+
+      // 3. En pestaña Hoy (con comida planificada)
+      const todayKey = toLocalDateKey();
+      state.mealPlan[todayKey] = {
+        breakfast: state.recipes[0].id,
+        lunch: null,
+        snack: null,
+        dinner: null,
+        customSlots: []
+      };
+      app.renderTodayView();
+      const todayDisclaimer = document.getElementById('today-nutrition-disclaimer');
+      expect(todayDisclaimer).not.toBeNull();
+      expect(todayDisclaimer.textContent).toContain('estimación aproximada');
     });
   });
 
