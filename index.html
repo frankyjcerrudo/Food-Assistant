@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#ffffff">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.64">
+  <link rel="stylesheet" href="styles.css?v=0.65">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%231a73e8'/><path d='M30 30h40v40H30z' fill='%23ffffff'/></svg>">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -25,7 +25,7 @@
         <span class="material-symbols-outlined">restaurant_menu</span>
       </div>
       <h1 class="brand-name">Food Assistant</h1>
-      <span class="app-version-badge" id="app-version-badge" title="Versión de Food Assistant">v0.45</span>
+      <span class="app-version-badge" id="app-version-badge" title="Versión de Food Assistant">v0.65</span>
     </div>
     <div class="header-actions">
       <!-- Theme quick toggle -->
@@ -478,7 +478,7 @@
         <span class="material-symbols-outlined" style="color: var(--m3-primary);">system_update</span> Versión y Actualizaciones
       </h3>
       <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px;">
-        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.64</strong>
+        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.65</strong>
       </p>
       <div style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
         Si acabas de desplegar o notas que algún cambio no aparece, pulsa el botón para limpiar la caché del Service Worker y cargar el código más reciente.
@@ -528,7 +528,7 @@
 </div>
 
 <!-- MODAL: CLOUD AUTH (LOGIN & REGISTER & GOOGLE AUTH) -->
-<div class="modal-overlay" id="modal-auth">
+<dialog class="modal-overlay" id="modal-auth" closedby="any" aria-labelledby="auth-modal-title">
   <div class="modal-content" style="padding: 24px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
       <div style="display: flex; align-items: center; gap: 8px;">
@@ -611,10 +611,10 @@
       </div>
     </div>
   </div>
-</div>
+</dialog>
 
 <!-- MODAL: RECIPE DETAIL -->
-<div class="modal-overlay" id="modal-recipe-detail">
+<dialog class="modal-overlay" id="modal-recipe-detail" closedby="any" aria-label="Detalle de la receta">
   <div class="modal-content">
     <div class="modal-header-bar">
       <!-- Normal Mode Actions (saved recipe) -->
@@ -646,10 +646,10 @@
     </div>
     <div id="recipe-modal-body"></div>
   </div>
-</div>
+</dialog>
 
 <!-- MODAL: ADD RECIPE CHOICE (UNIFIED ENTRY POINT) -->
-<div class="modal-overlay" id="modal-recipe-add-choice">
+<dialog class="modal-overlay" id="modal-recipe-add-choice" closedby="any" aria-label="Añadir Receta">
   <div class="modal-content" style="padding: 22px; max-width: 460px; width: 92%; border-radius: var(--radius-xl);">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
       <h3 style="font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin: 0;">
@@ -701,10 +701,10 @@
       </button>
     </div>
   </div>
-</div>
+</dialog>
 
 <!-- MODAL: RECIPE EDITOR (CREATE & EDIT) -->
-<div class="modal-overlay" id="modal-recipe-edit">
+<dialog class="modal-overlay" id="modal-recipe-edit" closedby="any" aria-labelledby="recipe-edit-modal-title">
   <div class="modal-content" style="padding: 0; max-width: 620px; width: 92%; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; border-radius: var(--radius-xl);">
     <!-- Pinned Header -->
     <div class="modal-header-bar" style="padding: 14px 18px; flex-shrink: 0; background: var(--m3-surface);">
@@ -862,10 +862,10 @@
       </button>
     </div>
   </div>
-</div>
+</dialog>
 
 <!-- MODAL: UNIVERSAL RECIPE IMPORTER -->
-<div class="modal-overlay" id="modal-recipe-import">
+<dialog class="modal-overlay" id="modal-recipe-import" closedby="any" aria-label="Importador de Recetas">
   <div class="modal-content" style="padding: 20px; max-width: 500px; width: 92%; max-height: 88vh; display: flex; flex-direction: column;">
     <!-- Modal Header -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
@@ -970,9 +970,9 @@
       </div>
     </div>
   </div>
-</div>
+</dialog>
 <!-- MODAL: RECIPE PICKER FOR PLANNER SLOT -->
-<div class="modal-overlay" id="modal-recipe-picker">
+<dialog class="modal-overlay" id="modal-recipe-picker" closedby="any" aria-labelledby="picker-modal-title">
   <div class="modal-content" style="padding: 16px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
       <h3 style="font-size: 15px; font-weight: 500;" id="picker-modal-title">Elegir Plato</h3>
@@ -987,10 +987,10 @@
     </div>
     <div style="max-height: 56vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;" id="picker-recipes-list"></div>
   </div>
-</div>
+</dialog>
 
 <!-- MODAL: PREVIEW & CUSTOMIZE INGREDIENTS BEFORE ADDING TO SHOPPING LIST -->
-<div class="modal-overlay" id="modal-shopping-preview">
+<dialog class="modal-overlay" id="modal-shopping-preview" closedby="any" aria-labelledby="shopping-preview-title">
   <div class="modal-content" style="padding: 20px; max-width: 580px;">
     <!-- Header -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--m3-outline-variant); padding-bottom: 12px;">
@@ -1051,10 +1051,10 @@
       </div>
     </div>
   </div>
-</div>
+</dialog>
 
 <!-- MODAL: ADD CUSTOM MEAL SLOT (MEDIA MAÑANA, POST-ENTRENO, MERIENDA, ETC.) -->
-<div class="modal-overlay" id="modal-add-custom-slot">
+<dialog class="modal-overlay" id="modal-add-custom-slot" closedby="any" aria-label="Añadir Momento de Comida">
   <div class="modal-content" style="padding: 20px; max-width: 480px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--m3-outline-variant); padding-bottom: 10px;">
       <h3 style="font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
@@ -1105,10 +1105,10 @@
       </button>
     </div>
   </div>
-</div>
+</dialog>
 
 <!-- MODAL: OBJETIVOS NUTRICIONALES DIARIOS (US-03) -->
-<div class="modal-overlay" id="modal-nutrition-goals">
+<dialog class="modal-overlay" id="modal-nutrition-goals" closedby="any" aria-label="Objetivos Nutricionales">
   <div class="modal-content" style="max-width: 440px; padding: 22px 20px;">
     <div class="modal-goals-header">
       <div class="modal-goals-title-group">
@@ -1198,7 +1198,30 @@
       </button>
     </div>
   </div>
-</div>
+</dialog>
+
+<!-- MODAL: MATERIAL 3 CONFIRMATION DIALOG (US-18 / US-55) -->
+<dialog class="modal-overlay" id="modal-confirm-dialog" closedby="any" aria-labelledby="confirm-dialog-title">
+  <div class="modal-content confirm-dialog-content">
+    <div class="confirm-dialog-header">
+      <div class="confirm-dialog-icon" id="confirm-dialog-icon-wrap">
+        <span class="material-symbols-outlined" id="confirm-dialog-icon">warning</span>
+      </div>
+      <h3 class="confirm-dialog-title" id="confirm-dialog-title">Confirmar acción</h3>
+    </div>
+    <p class="confirm-dialog-message" id="confirm-dialog-message"></p>
+    <div id="confirm-dialog-input-wrap" style="display: none; margin-bottom: 16px;">
+      <input type="email" class="form-input" id="confirm-dialog-input" placeholder="usuario@gmail.com">
+    </div>
+    <div class="confirm-dialog-actions">
+      <button type="button" class="btn btn-secondary btn-sm" id="btn-confirm-dialog-cancel" autofocus>Cancelar</button>
+      <button type="button" class="btn btn-primary btn-sm" id="btn-confirm-dialog-accept">Confirmar</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- TOAST / SNACKBAR CONTAINER (Material 3 non-blocking notifications) -->
+<div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 
 <!-- COOK MODE FULLSCREEN -->
 <div class="cook-mode-overlay" id="cook-mode-overlay">
@@ -1236,7 +1259,7 @@
   </div>
 </div>
 
-<script src="config.js?v=0.64"></script>
-<script src="app.js?v=0.64"></script>
+<script src="config.js?v=0.65"></script>
+<script src="app.js?v=0.65"></script>
 </body>
 </html>

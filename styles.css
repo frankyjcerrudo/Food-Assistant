@@ -1127,20 +1127,42 @@ body {
   padding-bottom: 48px;
 }
 
-/* Modals */
+/* Modals (Native <dialog> Top-Layer + Material 3 - US-18 / US-55) */
 .modal-overlay {
   display: none;
   position: fixed;
   inset: 0;
   z-index: 100;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  margin: 0;
+  border: none;
   background-color: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(3px);
   align-items: center;
   justify-content: center;
   padding: 16px;
   cursor: pointer;
+  box-sizing: border-box;
+  overscroll-behavior: contain;
 }
 
+dialog.modal-overlay:modal {
+  background-color: transparent;
+  backdrop-filter: none;
+  overscroll-behavior: contain;
+}
+
+dialog.modal-overlay::backdrop {
+  background-color: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(3px);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+.modal-overlay[open],
 .modal-overlay.active {
   display: flex;
 }
@@ -2547,3 +2569,190 @@ body {
   background: var(--m3-surface-container-low);
   box-shadow: none;
 }
+
+/* ==========================================================================
+   US-18 / US-55: MATERIAL 3 CONFIRMATION DIALOG & NON-BLOCKING TOASTS (v0.65)
+   ========================================================================== */
+.confirm-dialog-content {
+  max-width: 400px;
+  width: 92%;
+  padding: 24px;
+  border-radius: 28px;
+  background-color: var(--m3-surface-container-high, var(--m3-surface));
+}
+
+.confirm-dialog-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.confirm-dialog-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--m3-primary-container);
+  color: var(--m3-primary);
+}
+
+.confirm-dialog-icon.is-danger {
+  background-color: var(--m3-error-container, rgba(220, 38, 38, 0.14));
+  color: var(--m3-error, #dc2626);
+}
+
+.confirm-dialog-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--m3-on-surface);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.confirm-dialog-message {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--m3-on-surface-variant);
+  text-align: center;
+  margin: 0 0 20px 0;
+  white-space: pre-line;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.btn-danger {
+  background-color: var(--m3-error, #dc2626);
+  color: #ffffff;
+  border: none;
+}
+
+.btn-danger:hover {
+  filter: brightness(0.92);
+}
+
+/* Material 3 Toast / Snackbar Notification System */
+.toast-container {
+  position: fixed;
+  bottom: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 250;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: min(92vw, 420px);
+  pointer-events: none;
+}
+
+.m3-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background-color: #1e293b;
+  color: #f8fafc;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+  animation: toastSlideIn 0.22s cubic-bezier(0.2, 0, 0, 1);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+:root[data-theme="dark"] .m3-toast {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+.m3-toast.toast-hiding {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.m3-toast-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.m3-toast.toast-success .m3-toast-icon {
+  color: #4ade80;
+}
+:root[data-theme="dark"] .m3-toast.toast-success .m3-toast-icon {
+  color: #16a34a;
+}
+
+.m3-toast.toast-warning .m3-toast-icon {
+  color: #fbbf24;
+}
+:root[data-theme="dark"] .m3-toast.toast-warning .m3-toast-icon {
+  color: #d97706;
+}
+
+.m3-toast.toast-error .m3-toast-icon {
+  color: #f87171;
+}
+:root[data-theme="dark"] .m3-toast.toast-error .m3-toast-icon {
+  color: #dc2626;
+}
+
+.m3-toast.toast-info .m3-toast-icon {
+  color: #60a5fa;
+}
+:root[data-theme="dark"] .m3-toast.toast-info .m3-toast-icon {
+  color: #2563eb;
+}
+
+.m3-toast-message {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.m3-toast-close {
+  background: transparent;
+  border: none;
+  color: inherit;
+  opacity: 0.7;
+  cursor: pointer;
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+}
+
+.m3-toast-close:hover {
+  opacity: 1;
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Inline validation error state */
+.form-input.input-error,
+.form-textarea.input-error {
+  border-color: var(--m3-error, #dc2626) !important;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.18) !important;
+}
+

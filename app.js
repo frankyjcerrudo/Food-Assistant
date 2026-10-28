@@ -2497,7 +2497,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.64';
+  window.APP_VERSION = 'v0.65';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2529,7 +2529,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.64';
+    this.appVersion = 'v0.65';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -2625,7 +2625,248 @@ class FoodAssistantApp {
     this.modalRecipeEdit = document.getElementById('modal-recipe-edit');
     this.modalAuth = document.getElementById('modal-auth');
     this.modalShoppingPreview = document.getElementById('modal-shopping-preview');
+    this.modalConfirmDialog = document.getElementById('modal-confirm-dialog');
     this.cookModeOverlay = document.getElementById('cook-mode-overlay');
+    this._confirmDialogResolver = null;
+    this._confirmDialogMode = 'confirm';
+  }
+
+  // ==========================================================================
+  // US-18 / US-55: NATIVE <dialog> MODAL SYSTEM & MATERIAL 3 TOASTS
+  // ==========================================================================
+  openDialogModal(el) {
+    if (!el) return;
+    el.classList.add('active');
+    if (typeof el.showModal === 'function' && !el.open) {
+      try {
+        el.showModal();
+      } catch (e) {
+        el.setAttribute('open', '');
+      }
+    }
+  }
+
+  closeDialogModal(el) {
+    if (!el) return;
+    el.classList.remove('active');
+    if (typeof el.close === 'function' && el.open) {
+      try {
+        el.close();
+      } catch (e) {
+        el.removeAttribute('open');
+      }
+    } else if (el.hasAttribute && el.hasAttribute('open')) {
+      el.removeAttribute('open');
+    }
+  }
+
+  showToast(message, type = 'info', duration = 3200) {
+    if (!message || typeof document === 'undefined') return null;
+    let container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      container.className = 'toast-container';
+      container.setAttribute('aria-live', 'polite');
+      container.setAttribute('aria-atomic', 'true');
+      document.body.appendChild(container);
+    }
+
+    const icons = {
+      success: 'check_circle',
+      warning: 'warning',
+      error: 'error',
+      info: 'info'
+    };
+    const iconName = icons[type] || icons.info;
+
+    const toast = document.createElement('div');
+    toast.className = `m3-toast toast-${type}`;
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    toast.innerHTML = `
+      <span class="material-symbols-outlined m3-toast-icon">${iconName}</span>
+      <span class="m3-toast-message"></span>
+      <button type="button" class="m3-toast-close" aria-label="Cerrar aviso">
+        <span class="material-symbols-outlined" style="font-size: 16px;">close</span>
+      </button>
+    `;
+    toast.querySelector('.m3-toast-message').textContent = message;
+
+    const dismiss = () => {
+      if (!toast.parentNode) return;
+      toast.classList.add('toast-hiding');
+      setTimeout(() => {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      }, 180);
+    };
+
+    toast.querySelector('.m3-toast-close')?.addEventListener('click', dismiss);
+    container.appendChild(toast);
+
+    if (duration > 0) {
+      setTimeout(dismiss, duration);
+    }
+    return toast;
+  }
+
+  highlightInputError(inputEl, message, toastType = 'warning') {
+    if (inputEl) {
+      inputEl.classList.add('input-error');
+      if (typeof inputEl.focus === 'function') inputEl.focus();
+      const clearErr = () => {
+        inputEl.classList.remove('input-error');
+        inputEl.removeEventListener('input', clearErr);
+      };
+      inputEl.addEventListener('input', clearErr);
+      setTimeout(clearErr, 2600);
+    }
+    if (message) {
+      this.showToast(message, toastType);
+    }
+  }
+
+  ensureConfirmDialogElement() {
+    let dialog = document.getElementById('modal-confirm-dialog');
+    if (!dialog && typeof document !== 'undefined') {
+      dialog = document.createElement('dialog');
+      dialog.className = 'modal-overlay';
+      dialog.id = 'modal-confirm-dialog';
+      dialog.setAttribute('closedby', 'any');
+      dialog.setAttribute('aria-labelledby', 'confirm-dialog-title');
+      dialog.innerHTML = `
+        <div class="modal-content confirm-dialog-content">
+          <div class="confirm-dialog-header">
+            <div class="confirm-dialog-icon" id="confirm-dialog-icon-wrap">
+              <span class="material-symbols-outlined" id="confirm-dialog-icon">warning</span>
+            </div>
+            <h3 class="confirm-dialog-title" id="confirm-dialog-title">Confirmar acción</h3>
+          </div>
+          <p class="confirm-dialog-message" id="confirm-dialog-message"></p>
+          <div id="confirm-dialog-input-wrap" style="display: none; margin-bottom: 16px;">
+            <input type="email" class="form-input" id="confirm-dialog-input" placeholder="usuario@gmail.com">
+          </div>
+          <div class="confirm-dialog-actions">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-confirm-dialog-cancel" autofocus>Cancelar</button>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-confirm-dialog-accept">Confirmar</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(dialog);
+      this.bindConfirmDialogEvents(dialog);
+    }
+    this.modalConfirmDialog = dialog;
+    return dialog;
+  }
+
+  bindConfirmDialogEvents(dialog) {
+    if (!dialog || dialog._confirmBound) return;
+    dialog._confirmBound = true;
+
+    const cancelBtn = dialog.querySelector('#btn-confirm-dialog-cancel');
+    const acceptBtn = dialog.querySelector('#btn-confirm-dialog-accept');
+    const inputEl = dialog.querySelector('#confirm-dialog-input');
+
+    cancelBtn?.addEventListener('click', () => this.closeConfirmDialog(false));
+    acceptBtn?.addEventListener('click', () => this.closeConfirmDialog(true));
+    inputEl?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.closeConfirmDialog(true);
+      }
+    });
+
+    dialog.addEventListener('close', () => {
+      if (this._confirmDialogResolver) {
+        this.closeConfirmDialog(false);
+      }
+    });
+  }
+
+  showConfirmDialog(options = {}) {
+    const dialog = this.ensureConfirmDialogElement();
+    if (!dialog) return Promise.resolve(false);
+    this.bindConfirmDialogEvents(dialog);
+
+    const {
+      title = 'Confirmar acción',
+      message = '',
+      confirmText = 'Confirmar',
+      cancelText = 'Cancelar',
+      danger = false,
+      icon = danger ? 'warning' : 'help',
+      input = false,
+      defaultValue = '',
+      placeholder = ''
+    } = options;
+
+    this._confirmDialogMode = input ? 'prompt' : 'confirm';
+
+    const titleEl = dialog.querySelector('#confirm-dialog-title');
+    const msgEl = dialog.querySelector('#confirm-dialog-message');
+    const iconEl = dialog.querySelector('#confirm-dialog-icon');
+    const iconWrap = dialog.querySelector('#confirm-dialog-icon-wrap');
+    const acceptBtn = dialog.querySelector('#btn-confirm-dialog-accept');
+    const cancelBtn = dialog.querySelector('#btn-confirm-dialog-cancel');
+    const inputWrap = dialog.querySelector('#confirm-dialog-input-wrap');
+    const inputEl = dialog.querySelector('#confirm-dialog-input');
+
+    if (titleEl) titleEl.textContent = title;
+    if (msgEl) msgEl.textContent = message;
+    if (iconEl) iconEl.textContent = icon;
+    if (iconWrap) iconWrap.classList.toggle('is-danger', !!danger);
+    if (acceptBtn) {
+      acceptBtn.textContent = confirmText;
+      acceptBtn.classList.toggle('btn-danger', !!danger);
+      acceptBtn.classList.toggle('btn-primary', !danger);
+    }
+    if (cancelBtn) cancelBtn.textContent = cancelText;
+
+    if (inputWrap && inputEl) {
+      if (input) {
+        inputWrap.style.display = 'block';
+        inputEl.value = defaultValue;
+        inputEl.placeholder = placeholder;
+      } else {
+        inputWrap.style.display = 'none';
+        inputEl.value = '';
+      }
+    }
+
+    this.openDialogModal(dialog);
+    if (input && inputEl && typeof inputEl.focus === 'function') {
+      setTimeout(() => inputEl.focus(), 50);
+    } else if (cancelBtn && typeof cancelBtn.focus === 'function') {
+      setTimeout(() => cancelBtn.focus(), 50);
+    }
+
+    return new Promise((resolve) => {
+      this._confirmDialogResolver = resolve;
+    });
+  }
+
+  showPromptDialog(options = {}) {
+    return this.showConfirmDialog({ ...options, input: true });
+  }
+
+  closeConfirmDialog(accepted = false) {
+    const dialog = this.modalConfirmDialog || document.getElementById('modal-confirm-dialog');
+    const resolver = this._confirmDialogResolver;
+    const mode = this._confirmDialogMode;
+    this._confirmDialogResolver = null;
+
+    let result = !!accepted;
+    if (mode === 'prompt') {
+      const inputEl = dialog?.querySelector('#confirm-dialog-input');
+      const val = (inputEl?.value || '').trim();
+      result = accepted && val ? val : null;
+    }
+
+    if (dialog) {
+      this.closeDialogModal(dialog);
+    }
+    if (typeof resolver === 'function') {
+      resolver(result);
+    }
   }
 
   // ==========================================================================
@@ -2878,11 +3119,11 @@ class FoodAssistantApp {
 
   openAuthModal() {
     this.updateUserAccountUI();
-    this.modalAuth.classList.add('active');
+    this.openDialogModal(this.modalAuth);
   }
 
   closeAuthModal() {
-    this.modalAuth.classList.remove('active');
+    this.closeDialogModal(this.modalAuth);
     const errBox = document.getElementById('auth-error-msg');
     if (errBox) errBox.style.display = 'none';
   }
@@ -2976,7 +3217,7 @@ class FoodAssistantApp {
     this.updateUserAccountUI();
     this.closeAuthModal();
     this.syncDataWithCloud(true);
-    alert(`¡Bienvenido a Food Assistant, ${state.cloudUser.name}! Tu cuenta está conectada.`);
+    this.showToast(`¡Bienvenido a Food Assistant, ${state.cloudUser.name}! Tu cuenta está conectada.`, 'success');
   }
 
   async handleGoogleAuth() {
@@ -2990,11 +3231,20 @@ class FoodAssistantApp {
         });
         if (error) throw error;
       } catch (err) {
-        alert("Error al conectar con Google OAuth: " + err.message);
+        this.showToast("Error al conectar con Google OAuth: " + err.message, 'error');
       }
     } else {
-      // Local/Simulated Google OAuth sign-in flow
-      const demoEmail = prompt("Acceso con cuenta de Google. Introduce tu correo de Google:", "usuario@gmail.com");
+      // Local/Simulated Google OAuth sign-in flow using native Material 3 dialog
+      const typedEmail = document.getElementById('auth-email')?.value.trim();
+      const demoEmail = typedEmail || await this.showPromptDialog({
+        title: 'Acceso con Google',
+        message: 'Introduce tu correo de Google para continuar en modo local:',
+        defaultValue: 'usuario@gmail.com',
+        placeholder: 'usuario@gmail.com',
+        confirmText: 'Continuar',
+        cancelText: 'Cancelar',
+        icon: 'account_circle'
+      });
       if (!demoEmail) return;
 
       const userName = demoEmail.split('@')[0];
@@ -3008,7 +3258,7 @@ class FoodAssistantApp {
       this.updateUserAccountUI();
       this.closeAuthModal();
       this.syncDataWithCloud(true);
-      alert(`¡Sesión iniciada con Google (${state.cloudUser.email})! Tu cuenta está conectada.`);
+      this.showToast(`¡Sesión iniciada con Google (${state.cloudUser.email})!`, 'success');
     }
   }
 
@@ -3020,7 +3270,7 @@ class FoodAssistantApp {
     state.save('fa_cloud_user', null);
     this.updateUserAccountUI();
     this.closeAuthModal();
-    alert("Has cerrado sesión. Tus datos continúan disponibles localmente.");
+    this.showToast("Has cerrado sesión. Tus datos continúan disponibles localmente.", 'info');
   }
 
   // BUG-24: Sincronización diferida con debounce para mutaciones frecuentes
@@ -3636,7 +3886,7 @@ class FoodAssistantApp {
       this.updateSyncIndicator(`Sincronizado a las ${new Date(state.lastSyncedAt).toLocaleTimeString()}`, 'success');
 
       if (!silent) {
-        alert("¡Datos sincronizados correctamente con la nube!");
+        this.showToast("¡Datos sincronizados correctamente con la nube!", 'success');
       }
       return { success: true };
     } catch (err) {
@@ -3644,7 +3894,7 @@ class FoodAssistantApp {
       console.warn("Error durante la sincronización con Supabase:", err);
       this.updateSyncIndicator(`Error de sincronización: ${err.message || 'Error de conexión'}`, 'error');
       if (!silent) {
-        alert("Error al sincronizar con la nube: " + (err.message || 'Fallo de conexión'));
+        this.showToast("Error al sincronizar con la nube: " + (err.message || 'Fallo de conexión'), 'error');
       }
       return { success: false, error: err };
     }
@@ -3825,7 +4075,12 @@ class FoodAssistantApp {
     document.getElementById('btn-cook-next-step')?.addEventListener('click', () => this.nextCookStep());
     document.getElementById('btn-cook-prev-step')?.addEventListener('click', () => this.prevCookStep());
 
-    // Backdrop click dismiss: closes modal when user clicks outside the dialog content
+    // Bind Confirm Dialog if present in DOM
+    if (this.modalConfirmDialog) {
+      this.bindConfirmDialogEvents(this.modalConfirmDialog);
+    }
+
+    // Backdrop click dismiss & native <dialog> close sync (modern-web-guidance light-dismiss fallback)
     document.querySelectorAll('.modal-overlay').forEach(overlay => {
       let isBackdropClick = false;
       overlay.addEventListener('mousedown', (e) => {
@@ -3836,6 +4091,11 @@ class FoodAssistantApp {
           this.closeModalByElement(overlay);
         }
         isBackdropClick = false;
+      });
+      overlay.addEventListener('close', () => {
+        if (overlay.classList.contains('active')) {
+          this.closeModalByElement(overlay);
+        }
       });
     });
 
@@ -4524,7 +4784,7 @@ class FoodAssistantApp {
     this.activeServings = recipe.servings;
     this.updateRecipeDetailActionBars();
     this.renderRecipeModalContent();
-    this.modalRecipeDetail.classList.add('active');
+    this.openDialogModal(this.modalRecipeDetail);
   }
 
   openImportReview(recipe) {
@@ -4535,7 +4795,7 @@ class FoodAssistantApp {
     this.activeServings = recipe.servings || 2;
     this.updateRecipeDetailActionBars();
     this.renderRecipeModalContent();
-    this.modalRecipeDetail.classList.add('active');
+    this.openDialogModal(this.modalRecipeDetail);
   }
 
   updateRecipeDetailActionBars() {
@@ -4554,19 +4814,19 @@ class FoodAssistantApp {
     this.isReviewingImport = false;
     this.pendingImportRecipe = null;
     this.activeRecipe = null;
-    this.modalRecipeDetail.classList.remove('active');
+    this.closeDialogModal(this.modalRecipeDetail);
     this.updateRecipeDetailActionBars();
   }
 
   editImportReview() {
     const draft = this.pendingImportRecipe || this.activeRecipe;
     if (!draft) return;
-    this.modalRecipeDetail.classList.remove('active');
+    this.closeDialogModal(this.modalRecipeDetail);
     this.openEditRecipeModal(draft);
   }
 
   closeRecipeModal() {
-    this.modalRecipeDetail.classList.remove('active');
+    this.closeDialogModal(this.modalRecipeDetail);
     if (this.isReviewingImport) {
       this.isReviewingImport = false;
       this.pendingImportRecipe = null;
@@ -4604,8 +4864,11 @@ class FoodAssistantApp {
       case 'modal-nutrition-goals':
         this.closeNutritionGoalsModal();
         break;
+      case 'modal-confirm-dialog':
+        this.closeConfirmDialog(false);
+        break;
       default:
-        overlay.classList.remove('active');
+        this.closeDialogModal(overlay);
         break;
     }
   }
@@ -4777,30 +5040,42 @@ class FoodAssistantApp {
     `;
   }
 
-  deleteCurrentRecipe() {
-    if (!this.activeRecipe) return;
-    if (confirm(`¿Eliminar la receta "${this.activeRecipe.title}"?`)) {
-      const deletedId = this.activeRecipe.id;
+  async deleteCurrentRecipe(skipConfirm = false) {
+    if (!this.activeRecipe) return false;
+    const recipeToDelete = this.activeRecipe;
+    const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
+      title: 'Eliminar receta',
+      message: `¿Eliminar la receta "${recipeToDelete.title}" de tu recetario? Esta acción no se puede deshacer.`,
+      confirmText: 'Eliminar',
+      cancelText: 'Cancelar',
+      danger: true,
+      icon: 'delete'
+    });
+    if (confirmed) {
+      const deletedId = recipeToDelete.id;
       state.recipes = state.recipes.filter(r => r.id !== deletedId);
       state.save('fa_recipes', state.recipes);
       state.trackDeletion('recipes', deletedId);
       this.closeRecipeModal();
       this.render();
+      this.showToast(`Receta "${recipeToDelete.title}" eliminada.`, 'info');
       // Propagar borrado inmediatamente a Supabase (BUG-23)
       this.pushToCloud(true);
+      return true;
     }
+    return false;
   }
 
   // UNIFIED RECIPE ADD CHOICE
   openAddRecipeChoiceModal() {
     if (this.modalRecipeAddChoice) {
-      this.modalRecipeAddChoice.classList.add('active');
+      this.openDialogModal(this.modalRecipeAddChoice);
     }
   }
 
   closeAddRecipeChoiceModal() {
     if (this.modalRecipeAddChoice) {
-      this.modalRecipeAddChoice.classList.remove('active');
+      this.closeDialogModal(this.modalRecipeAddChoice);
     }
   }
 
@@ -4834,7 +5109,7 @@ class FoodAssistantApp {
     this.addIngredientRow({ name: "", amount: "", unit: "", aisle: "produce" });
     this.addStepRow({ step: 1, text: "", timerMinutes: 0 });
 
-    this.modalRecipeEdit.classList.add('active');
+    this.openDialogModal(this.modalRecipeEdit);
   }
 
   openEditRecipeModal(recipeOrId) {
@@ -4877,11 +5152,11 @@ class FoodAssistantApp {
     stepContainer.innerHTML = "";
     (r.instructions || []).forEach(step => this.addStepRow(step));
 
-    this.modalRecipeEdit.classList.add('active');
+    this.openDialogModal(this.modalRecipeEdit);
   }
 
   closeEditModal() {
-    this.modalRecipeEdit.classList.remove('active');
+    this.closeDialogModal(this.modalRecipeEdit);
     if (this.isReviewingImport && this.pendingImportRecipe) {
       this.openImportReview(this.pendingImportRecipe);
     }
@@ -5393,9 +5668,10 @@ class FoodAssistantApp {
   }
 
   saveRecipeEdit() {
-    const title = document.getElementById('edit-recipe-title').value.trim();
+    const titleInput = document.getElementById('edit-recipe-title');
+    const title = titleInput?.value.trim() || '';
     if (!title) {
-      alert("Por favor, introduce el título de la receta.");
+      this.highlightInputError(titleInput, "Por favor, introduce el título de la receta.");
       return;
     }
 
@@ -5548,8 +5824,8 @@ class FoodAssistantApp {
       this.cookStepIndex++;
       this.renderCookStep();
     } else {
-      alert("¡Enhorabuena! Has completado todos los pasos de la receta. ¡A disfrutar!");
       this.exitCookMode();
+      this.showToast("¡Enhorabuena! Has completado todos los pasos de la receta. ¡A disfrutar!", 'success');
     }
   }
 
@@ -5567,6 +5843,14 @@ class FoodAssistantApp {
     document.getElementById('cook-recipe-title').textContent = r.title;
     document.getElementById('cook-step-indicator').textContent = `Paso ${step.step} de ${r.instructions.length}`;
     document.getElementById('cook-step-text').textContent = step.text;
+
+    const nextBtn = document.getElementById('btn-cook-next-step');
+    if (nextBtn) {
+      const isLast = this.cookStepIndex >= r.instructions.length - 1;
+      nextBtn.innerHTML = isLast
+        ? 'Finalizar <span class="material-symbols-outlined icon-sm">check_circle</span>'
+        : 'Siguiente <span class="material-symbols-outlined icon-sm">arrow_forward</span>';
+    }
 
     const timerBox = document.getElementById('cook-timer-box');
     clearInterval(this.timerInterval);
@@ -5852,13 +6136,13 @@ class FoodAssistantApp {
     if (nameInput) nameInput.value = '';
     if (iconSelect) iconSelect.value = 'lunch_dining';
 
-    if (modal) modal.classList.add('active');
+    if (modal) this.openDialogModal(modal);
     setTimeout(() => { if (nameInput) nameInput.focus(); }, 100);
   }
 
   closeAddCustomSlotModal() {
     const modal = document.getElementById('modal-add-custom-slot');
-    if (modal) modal.classList.remove('active');
+    if (modal) this.closeDialogModal(modal);
   }
 
   selectCustomSlotPreset(name, icon) {
@@ -5878,7 +6162,7 @@ class FoodAssistantApp {
     const icon = iconSelect?.value || 'lunch_dining';
 
     if (!name) {
-      alert("Por favor, introduce el nombre del momento de comida (ej. Media Mañana, Post-Entreno...).");
+      this.highlightInputError(nameInput, "Por favor, introduce el nombre del momento de comida (ej. Media Mañana, Post-Entreno...).");
       return;
     }
 
@@ -5923,7 +6207,7 @@ class FoodAssistantApp {
     }
 
     this.renderPickerRecipesList();
-    this.modalRecipePicker.classList.add('active');
+    this.openDialogModal(this.modalRecipePicker);
   }
 
   renderPickerRecipesList() {
@@ -5973,7 +6257,7 @@ class FoodAssistantApp {
   }
 
   closePickerModal() {
-    this.modalRecipePicker.classList.remove('active');
+    this.closeDialogModal(this.modalRecipePicker);
   }
 
   selectRecipeForSlot(recipeId) {
@@ -6092,10 +6376,10 @@ class FoodAssistantApp {
     this.render();
   }
 
-  clearCompletedGroceries() {
+  async clearCompletedGroceries(skipConfirm = false) {
     if (!state.shoppingList || state.shoppingList.length === 0) {
-      alert("La lista de la compra ya está vacía.");
-      return;
+      this.showToast("La lista de la compra ya está vacía.", 'info');
+      return false;
     }
 
     const completed = state.shoppingList.filter(i => i.isChecked);
@@ -6104,7 +6388,15 @@ class FoodAssistantApp {
       const count = completed.length;
       const total = state.shoppingList.length;
       if (count === total) {
-        if (confirm(`\u00BFEliminar los ${count} art\u00EDculos comprados y vaciar la lista?`)) {
+        const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
+          title: 'Vaciar lista comprada',
+          message: `¿Eliminar los ${count} artículos comprados y vaciar la lista?`,
+          confirmText: 'Vaciar lista',
+          cancelText: 'Cancelar',
+          danger: true,
+          icon: 'delete_sweep'
+        });
+        if (confirmed) {
           state.shoppingList.forEach(item => {
             if (item.id) state.trackDeletion('shoppingItems', item.id);
           });
@@ -6112,9 +6404,19 @@ class FoodAssistantApp {
           state.save('fa_shopping', state.shoppingList);
           this.scheduleSyncWithCloud();
           this.render();
+          this.showToast("Lista de la compra vaciada.", 'info');
+          return true;
         }
       } else {
-        if (confirm(`\u00BFEliminar los ${count} art\u00EDculos marcados como comprados?`)) {
+        const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
+          title: 'Limpiar comprados',
+          message: `¿Eliminar los ${count} artículos marcados como comprados?`,
+          confirmText: 'Eliminar comprados',
+          cancelText: 'Cancelar',
+          danger: true,
+          icon: 'remove_done'
+        });
+        if (confirmed) {
           completed.forEach(item => {
             if (item.id) state.trackDeletion('shoppingItems', item.id);
           });
@@ -6122,11 +6424,21 @@ class FoodAssistantApp {
           state.save('fa_shopping', state.shoppingList);
           this.scheduleSyncWithCloud();
           this.render();
+          this.showToast(`Se eliminaron ${count} artículos comprados.`, 'info');
+          return true;
         }
       }
     } else {
       // Ningún artículo está marcado con el checkbox
-      if (confirm("No hay artículos marcados como comprados.\n\n¿Deseas vaciar toda la lista de la compra?")) {
+      const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
+        title: 'Vaciar toda la lista',
+        message: "No hay artículos marcados como comprados.\n\n¿Deseas vaciar toda la lista de la compra?",
+        confirmText: 'Vaciar todo',
+        cancelText: 'Cancelar',
+        danger: true,
+        icon: 'delete_sweep'
+      });
+      if (confirmed) {
         state.shoppingList.forEach(item => {
           if (item.id) state.trackDeletion('shoppingItems', item.id);
         });
@@ -6134,8 +6446,11 @@ class FoodAssistantApp {
         state.save('fa_shopping', state.shoppingList);
         this.scheduleSyncWithCloud();
         this.render();
+        this.showToast("Lista de la compra vaciada.", 'info');
+        return true;
       }
     }
+    return false;
   }
 
   handleManualAddGrocery() {
@@ -6196,7 +6511,7 @@ class FoodAssistantApp {
   openShoppingPreviewForRecipe(recipeId) {
     const recipe = state.recipes.find(r => r.id === recipeId);
     if (!recipe || !recipe.ingredients || recipe.ingredients.length === 0) {
-      alert("Esta receta no tiene ingredientes definidos.");
+      this.showToast("Esta receta no tiene ingredientes definidos.", 'warning');
       return;
     }
 
@@ -6239,7 +6554,7 @@ class FoodAssistantApp {
 
     this.renderShoppingPreview();
     if (this.modalShoppingPreview) {
-      this.modalShoppingPreview.classList.add('active');
+      this.openDialogModal(this.modalShoppingPreview);
     }
   }
 
@@ -6292,7 +6607,7 @@ class FoodAssistantApp {
     }
 
     if (recipeOccurrences.size === 0) {
-      alert("No hay recetas asignadas en el plan semanal para generar la lista.");
+      this.showToast("No hay recetas asignadas en el plan semanal para generar la lista.", 'warning');
       return;
     }
 
@@ -6325,7 +6640,7 @@ class FoodAssistantApp {
     });
 
     if (groups.length === 0) {
-      alert("Las recetas del plan no tienen ingredientes configurados.");
+      this.showToast("Las recetas del plan no tienen ingredientes configurados.", 'warning');
       return;
     }
 
@@ -6349,7 +6664,7 @@ class FoodAssistantApp {
 
     this.renderShoppingPreview();
     if (this.modalShoppingPreview) {
-      this.modalShoppingPreview.classList.add('active');
+      this.openDialogModal(this.modalShoppingPreview);
     }
   }
 
@@ -6485,7 +6800,7 @@ class FoodAssistantApp {
 
   closeShoppingPreviewModal() {
     if (this.modalShoppingPreview) {
-      this.modalShoppingPreview.classList.remove('active');
+      this.closeDialogModal(this.modalShoppingPreview);
     }
     this.shoppingPreviewState = null;
   }
@@ -6510,7 +6825,7 @@ class FoodAssistantApp {
     });
 
     if (selectedItems.length === 0) {
-      alert("Por favor, selecciona al menos un ingrediente para añadir.");
+      this.showToast("Por favor, selecciona al menos un ingrediente para añadir.", 'warning');
       return;
     }
 
@@ -6553,12 +6868,12 @@ class FoodAssistantApp {
     this.closeShoppingPreviewModal();
     this.render();
     this.switchView('view-shopping');
-    alert(`\u00A1Se han a\u00F1adido ${addedCount} ingredientes a tu lista de la compra!`);
+    this.showToast(`\u00A1Se han a\u00F1adido ${addedCount} ingredientes a tu lista de la compra!`, 'success');
   }
 
   copyShoppingList() {
     if (!state.shoppingList || !state.shoppingList.length) {
-      alert("No hay artículos en la lista de la compra para copiar.");
+      this.showToast("No hay artículos en la lista de la compra para copiar.", 'info');
       return;
     }
 
@@ -6580,7 +6895,7 @@ class FoodAssistantApp {
     });
 
     navigator.clipboard.writeText(text).then(() => {
-      alert("¡Lista copiada al portapapeles!");
+      this.showToast("¡Lista copiada al portapapeles!", 'success');
     });
   }
 
@@ -6714,7 +7029,7 @@ class FoodAssistantApp {
     state.save('fa_mealplan', state.mealPlan);
     this.scheduleSyncWithCloud();
     this.render();
-    alert("¡Menú completo (desayunos, almuerzos, meriendas y cenas) organizado con éxito en tu calendario!");
+    this.showToast("¡Menú semanal organizado con éxito en tu calendario!", 'success');
     this.switchView('view-planner');
   }
 
@@ -6732,7 +7047,7 @@ class FoodAssistantApp {
   // ==========================================================================
   openImportModal(defaultTab = 'url') {
     if (this.modalRecipeImport) {
-      this.modalRecipeImport.classList.add('active');
+      this.openDialogModal(this.modalRecipeImport);
     }
     const urlInput = document.getElementById('import-url-input');
     if (urlInput) urlInput.value = '';
@@ -6765,7 +7080,7 @@ class FoodAssistantApp {
   }
 
   closeImportModal() {
-    this.modalRecipeImport.classList.remove('active');
+    this.closeDialogModal(this.modalRecipeImport);
     this.pendingImportRecipe = null;
   }
 
@@ -6849,7 +7164,8 @@ class FoodAssistantApp {
     const targetInput = isUrlActive ? url : text;
 
     if (!targetInput) {
-      alert(isUrlActive ? "Por favor, introduce una URL de receta." : "Por favor, pega el texto de la receta.");
+      const inputEl = document.getElementById(isUrlActive ? 'import-url-input' : 'import-text-input');
+      this.highlightInputError(inputEl, isUrlActive ? "Por favor, introduce una URL de receta." : "Por favor, pega el texto de la receta.");
       return;
     }
 
@@ -7169,12 +7485,12 @@ class FoodAssistantApp {
     if (inputCarbs) inputCarbs.value = goals.carbs || '';
     if (inputFat) inputFat.value = goals.fat || '';
 
-    modal.classList.add('active');
+    this.openDialogModal(modal);
   }
 
   closeNutritionGoalsModal() {
     const modal = document.getElementById('modal-nutrition-goals');
-    if (modal) modal.classList.remove('active');
+    if (modal) this.closeDialogModal(modal);
   }
 
   saveNutritionGoalsFromModal() {
@@ -7268,7 +7584,7 @@ class FoodAssistantApp {
     state.settings.geminiApiKey = key;
     state.save('fa_settings', state.settings);
     this.renderSettings();
-    alert("Clave de Gemini guardada con éxito.");
+    this.showToast("Clave de Gemini guardada con éxito.", 'success');
   }
 
   exportBackup() {
@@ -7307,16 +7623,24 @@ class FoodAssistantApp {
 
         this.syncDataWithCloud(true);
         this.render();
-        alert("¡Copia de seguridad restaurada con éxito!");
+        this.showToast("¡Copia de seguridad restaurada con éxito!", 'success');
       } catch (err) {
-        alert("Error al importar el archivo JSON.");
+        this.showToast("Error al importar el archivo JSON.", 'error');
       }
     };
     reader.readAsText(file);
   }
 
-  resetDemoData() {
-    if (confirm("¿Restablecer todas las recetas y el plan a los valores iniciales de demostración?")) {
+  async resetDemoData(skipConfirm = false) {
+    const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
+      title: 'Restablecer datos de demostración',
+      message: "¿Restablecer todas las recetas y el plan a los valores iniciales de demostración? Se perderán los cambios locales no exportados.",
+      confirmText: 'Restablecer datos',
+      cancelText: 'Cancelar',
+      danger: true,
+      icon: 'restart_alt'
+    });
+    if (confirmed) {
       localStorage.removeItem('fa_recipes');
       localStorage.removeItem('fa_mealplan');
       localStorage.removeItem('fa_shopping');
@@ -7332,8 +7656,10 @@ class FoodAssistantApp {
       try { localStorage.setItem('fa_recipes_seeded', 'v8'); } catch (e) {}
       this.syncDataWithCloud(true);
       this.render();
-      alert("Datos restablecidos.");
+      this.showToast("Datos restablecidos a los valores iniciales.", 'info');
+      return true;
     }
+    return false;
   }
 }
 

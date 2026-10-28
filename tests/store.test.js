@@ -66,7 +66,7 @@ describe('StateStore & Data Model Normalization', () => {
     expect(snack.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('BUG-10: las recetas de ejemplo no reaparecen tras ser borradas y resetDemoData clona por valor', () => {
+  it('BUG-10: las recetas de ejemplo no reaparecen tras ser borradas y resetDemoData clona por valor', async () => {
     const store = new StateStore();
     const initialSeedId = store.recipes[0].id;
     const originalTitle = store.recipes[0].title;
@@ -82,14 +82,7 @@ describe('StateStore & Data Model Normalization', () => {
 
     // resetDemoData clona sin compartir referencia mutante con SEED_RECIPES
     const app = new window.FoodAssistantApp();
-    const origConfirm = window.confirm;
-    const origAlert = window.alert;
-    window.confirm = () => true;
-    window.alert = () => {};
-
-    app.resetDemoData();
-    window.confirm = origConfirm;
-    window.alert = origAlert;
+    await app.resetDemoData(true);
 
     expect(window.state.recipes.some(r => r.id === initialSeedId)).toBe(true);
 

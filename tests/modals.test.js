@@ -165,8 +165,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
   });
 
   it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-    expect(window.APP_VERSION).toBe('v0.64');
-    expect(appInstance.appVersion).toBe('v0.64');
+    expect(window.APP_VERSION).toBe('v0.65');
+    expect(appInstance.appVersion).toBe('v0.65');
 
     const badge = document.createElement('span');
     badge.id = 'app-version-badge';
@@ -176,8 +176,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     document.body.appendChild(settingsVer);
 
     appInstance.initVersion();
-    expect(badge.textContent).toBe('v0.64');
-    expect(settingsVer.textContent).toBe('v0.64');
+    expect(badge.textContent).toBe('v0.65');
+    expect(settingsVer.textContent).toBe('v0.65');
 
     document.body.removeChild(badge);
     document.body.removeChild(settingsVer);
@@ -303,6 +303,47 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     expect(container.querySelector('.step-title-text').textContent).toBe('Paso 1');
 
     document.body.removeChild(container);
+  });
+
+  it('US-18 & US-55: Todos los modales usan <dialog> nativo, showConfirmDialog reemplaza confirm() y showToast evita popups intrusivos', async () => {
+    const indexHtml = fs.readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf-8');
+    // Ningún .modal-overlay en index.html debe ser un <div>
+    expect(indexHtml).not.toMatch(/<div[^>]*class="modal-overlay"/);
+    expect(indexHtml).toMatch(/<dialog[^>]*class="modal-overlay"[^>]*id="modal-confirm-dialog"/);
+
+    // Cero llamadas a alert(), confirm() o prompt() en app.js
+    expect(appCode).not.toMatch(/\b(alert|confirm|prompt)\s*\(/);
+
+    // Prueba de showToast no bloqueante
+    const toastEl = appInstance.showToast('Receta guardada', 'success', 0);
+    expect(toastEl).not.toBeNull();
+    expect(toastEl.classList.contains('toast-success')).toBe(true);
+    expect(toastEl.textContent).toContain('Receta guardada');
+
+    // Prueba de showConfirmDialog con <dialog> nativo (Aceptar y Cancelar)
+    const acceptPromise = appInstance.showConfirmDialog({
+      title: 'Eliminar receta',
+      message: '¿Seguro que deseas eliminarla?',
+      confirmText: 'Eliminar',
+      danger: true
+    });
+    const confirmDialog = document.getElementById('modal-confirm-dialog');
+    expect(confirmDialog).not.toBeNull();
+    expect(confirmDialog.tagName.toLowerCase()).toBe('dialog');
+    expect(confirmDialog.classList.contains('active')).toBe(true);
+
+    confirmDialog.querySelector('#btn-confirm-dialog-accept').click();
+    const accepted = await acceptPromise;
+    expect(accepted).toBe(true);
+    expect(confirmDialog.classList.contains('active')).toBe(false);
+
+    const cancelPromise = appInstance.showConfirmDialog({
+      title: 'Vaciar lista',
+      message: '¿Vaciar lista?'
+    });
+    confirmDialog.querySelector('#btn-confirm-dialog-cancel').click();
+    const cancelled = await cancelPromise;
+    expect(cancelled).toBe(false);
   });
 });
 

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Food Assistant - Informe Detallado de Calidad y Tests</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.64">
+  <link rel="stylesheet" href="styles.css?v=0.65">
   <style>
     :root {
       --qa-pass: #059669;
@@ -301,8 +301,8 @@
   <div id="qa-sandbox" style="display: none;"></div>
 
   <!-- Entorno y dependencias de la app -->
-  <script src="config.js?v=0.64"></script>
-  <script src="app.js?v=0.64"></script>
+  <script src="config.js?v=0.65"></script>
+  <script src="app.js?v=0.65"></script>
 
   <script>
     const suites = [];
@@ -482,7 +482,7 @@
           purpose: 'Asegurar que las recetas semilla borradas persisten su eliminación y que el reseteo no comparte referencias mutables con SEED_RECIPES.',
           assertions: 'Borra una receta semilla, verifica que no reaparece al recargar StateStore, y que resetDemoData clona por valor sin alterar la constante SEED_RECIPES.'
         },
-        () => {
+        async () => {
           const store = new window.StateStore();
           const initialSeedId = store.recipes[0].id;
           const originalTitle = store.recipes[0].title;
@@ -498,14 +498,7 @@
 
           // resetDemoData clona sin compartir referencia mutante
           const app = new window.FoodAssistantApp();
-          const origConfirm = window.confirm;
-          const origAlert = window.alert;
-          window.confirm = () => true;
-          window.alert = () => {};
-
-          app.resetDemoData();
-          window.confirm = origConfirm;
-          window.alert = origAlert;
+          await app.resetDemoData(true);
 
           expect(window.state.recipes.some(r => r.id === initialSeedId)).toBe(true);
 
@@ -2049,7 +2042,7 @@ Bocadillo De Atun Paso A Paso
       });
 
       it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-        expect(window.APP_VERSION).toBe('v0.64');
+        expect(window.APP_VERSION).toBe('v0.65');
 
         const badge = document.createElement('span');
         badge.id = 'app-version-badge';
@@ -2064,8 +2057,8 @@ Bocadillo De Atun Paso A Paso
         };
         fakeApp.initVersion();
 
-        expect(badge.textContent).toBe('v0.64');
-        expect(settingsVer.textContent).toBe('v0.64');
+        expect(badge.textContent).toBe('v0.65');
+        expect(settingsVer.textContent).toBe('v0.65');
 
         document.body.removeChild(badge);
         document.body.removeChild(settingsVer);
