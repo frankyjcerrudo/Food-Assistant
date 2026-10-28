@@ -2501,7 +2501,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.69';
+  window.APP_VERSION = 'v0.70';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2533,7 +2533,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.69';
+    this.appVersion = 'v0.70';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -7393,9 +7393,15 @@ INSTRUCCIONES DE CONTROL (FUNCTION CALLING):
     }
 
     const rawModel = state.settings.geminiModel || 'gemini-3.8-flash';
-    const model = (rawModel === 'gemini-2.5-flash' || rawModel === 'gemini-1.5-flash') ? 'gemini-3.8-flash' : rawModel;
-    // US-39: La clave nunca va en la URL (?key=), se envía en la cabecera x-goog-api-key
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    const primaryModel = (rawModel === 'gemini-2.5-flash' || rawModel === 'gemini-1.5-flash') ? 'gemini-3.8-flash' : rawModel;
+    // Cascada automática anti-saturación (High Demand / 503 / 429) entre modelos activos de la familia 3.x
+    const candidateModels = [...new Set([
+      primaryModel,
+      'gemini-3.8-flash',
+      'gemini-3.6-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-3.1-flash-lite'
+    ])];
 
     const payload = {
       contents: [{ role: "user", parts: [{ text: prompt }] }]
@@ -7410,25 +7416,51 @@ INSTRUCCIONES DE CONTROL (FUNCTION CALLING):
       payload.tools = [{ functionDeclarations: AI_TOOLS_DECLARATIONS }];
     }
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey
-      },
-      body: JSON.stringify(payload)
-    });
+    let lastErrMsg = "Error al conectar con Gemini API";
+    let data = null;
 
-    if (!response.ok) {
+    for (let i = 0; i < candidateModels.length; i++) {
+      const model = candidateModels[i];
+      // US-39: La clave nunca va en la URL (?key=), se envía en la cabecera x-goog-api-key
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        data = await response.json();
+        break;
+      }
+
       let errMsg = "Error al conectar con Gemini API";
       try {
         const err = await response.json();
         errMsg = err.error?.message || errMsg;
       } catch (e) {}
-      throw new Error(errMsg);
+      lastErrMsg = errMsg;
+
+      const isTransientOrModelIssue =
+        response.status === 503 ||
+        response.status === 429 ||
+        response.status === 404 ||
+        /high demand|overloaded|try again later|no longer available|not found|quota|rate limit/i.test(errMsg);
+
+      // Si es un error de clave inválida (400/401/403 API key not valid), no reintentar con otros modelos
+      if (!isTransientOrModelIssue || /api key not valid|invalid api key/i.test(errMsg)) {
+        break;
+      }
     }
 
-    const data = await response.json();
+    if (!data) {
+      throw new Error(lastErrMsg);
+    }
+
     const parts = data.candidates?.[0]?.content?.parts || [];
     const textParts = [];
     const toolCalls = [];

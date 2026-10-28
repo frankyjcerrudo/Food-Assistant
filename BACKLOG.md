@@ -2,7 +2,7 @@
 
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
-> **Versión Actual**: v0.69  
+> **Versión Actual**: v0.70  
 > **Última actualización**: Octubre 2026 (cierre de US-04 ampliado aprobado por Franky en v0.66)
 
 ---

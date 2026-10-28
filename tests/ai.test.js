@@ -274,4 +274,37 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
     await appInstance.pullFromCloud();
     expect(state.settings.geminiApiKey).toBe('AIzaSyFromCloudDevice777');
   });
+
+  it('US-17: callGeminiAgent hace fallback automático a gemini-3.6-flash / 3.5-flash-lite cuando 3.8-flash tiene High Demand (503)', async () => {
+    state.settings.geminiApiKey = 'AIzaSyTestFallbackKey';
+    let callCount = 0;
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
+      callCount++;
+      if (url.includes('gemini-3.8-flash')) {
+        return {
+          ok: false,
+          status: 503,
+          json: async () => ({
+            error: { message: 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.' }
+          })
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: 'Respuesta desde modelo de respaldo.' }] } }]
+        })
+      };
+    });
+
+    try {
+      const res = await appInstance.callGeminiAgent('Planifica mi semana');
+      expect(res.text).toBe('Respuesta desde modelo de respaldo.');
+      expect(callCount).toBe(2);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
 });
