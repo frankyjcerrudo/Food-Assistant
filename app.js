@@ -2497,7 +2497,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.62';
+  window.APP_VERSION = 'v0.63';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2529,7 +2529,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.62';
+    this.appVersion = 'v0.63';
     this.activeView = 'view-today';
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -4002,16 +4002,27 @@ class FoodAssistantApp {
     const nutritionContainer = document.getElementById('today-nutrition-card');
     if (nutritionContainer) {
       const goals = state.settings?.nutritionGoals || { enabled: false };
-      const goalsEnabled = !!goals.enabled && (goals.calories > 0 || goals.protein > 0 || goals.carbs > 0 || goals.fat > 0);
+      const goalsEnabled = !!goals.enabled;
+      nutritionContainer.classList.toggle('is-collapsed-zen', !goalsEnabled);
 
       const headerGoalsBtn = `
         <button type="button" class="btn-today-goals-trigger" id="btn-today-quick-goals" onclick="app.openNutritionGoalsModal()" title="Configurar metas nutricionales diarias">
           <span class="material-symbols-outlined" style="font-size: 14px; color: var(--m3-primary);">tune</span>
-          <span>${goalsEnabled ? 'Objetivos' : 'Fijar metas'}</span>
+          <span>${goalsEnabled ? 'Objetivos' : 'Configurar / Activar'}</span>
         </button>
       `;
 
-      if (todayNutrition.mealCount === 0) {
+      if (!goalsEnabled) {
+        nutritionContainer.innerHTML = `
+          <div class="today-nutrition-header" style="margin-bottom: 0;">
+            <div class="today-nutrition-title" style="font-size: 12px; font-weight: 500; color: var(--m3-on-surface-variant);">
+              <span class="material-symbols-outlined icon-sm" style="color: var(--m3-on-surface-variant); font-size: 16px;">local_fire_department</span>
+              <span>Seguimiento nutricional desactivado</span>
+            </div>
+            ${headerGoalsBtn}
+          </div>
+        `;
+      } else if (todayNutrition.mealCount === 0) {
         nutritionContainer.innerHTML = `
           <div class="today-nutrition-header">
             <div class="today-nutrition-title">

@@ -216,7 +216,7 @@ describe('US-01: Contador de Calorías y Macronutrientes por plato y resumen dia
       expect(dailyTotals.fat).toBe(28);
     });
 
-    it('renderTodayView renderiza la tarjeta de nutrición de hoy con chips y ratio bar', () => {
+    it('renderTodayView pliega el resumen en Modo Zen sin cifras si el seguimiento está desactivado y muestra chips/ratio bar al activarlo (v0.63)', () => {
       const recipe = {
         id: 'rec-lunch-macro',
         title: 'Plato Combinado',
@@ -230,10 +230,23 @@ describe('US-01: Contador de Calorías y Macronutrientes por plato y resumen dia
         lunch: { recipeId: 'rec-lunch-macro' }
       };
 
+      // 1. Con seguimiento desactivado (por defecto): barra plegada sin cifras ni calorías
+      state.saveNutritionGoals({ enabled: false, calories: 2000, protein: 140, carbs: 200, fat: 65 });
       app.renderTodayView();
 
       const card = document.getElementById('today-nutrition-card');
       expect(card).not.toBeNull();
+      expect(card.classList.contains('is-collapsed-zen')).toBe(true);
+      expect(card.textContent).toContain('Seguimiento nutricional desactivado');
+      expect(card.textContent).toContain('Configurar / Activar');
+      expect(card.textContent).not.toContain('500');
+      expect(card.querySelector('.macro-ratio-bar')).toBeNull();
+
+      // 2. Con seguimiento activado: despliega resumen completo con cifras y barra de proporción
+      state.saveNutritionGoals({ enabled: true, calories: 2000, protein: 140, carbs: 200, fat: 65 });
+      app.renderTodayView();
+
+      expect(card.classList.contains('is-collapsed-zen')).toBe(false);
       expect(card.textContent).toContain('500');
       expect(card.textContent).toContain('35g');
       expect(card.textContent).toContain('50g');
@@ -346,7 +359,8 @@ describe('US-01: Contador de Calorías y Macronutrientes por plato y resumen dia
       expect(detailDisclaimer).not.toBeNull();
       expect(detailDisclaimer.textContent).toContain('estimación orientativa');
 
-      // 3. En pestaña Hoy (con comida planificada)
+      // 3. En pestaña Hoy (con seguimiento activo y comida planificada)
+      state.saveNutritionGoals({ enabled: true, calories: 2000, protein: 140, carbs: 200, fat: 65 });
       const todayKey = toLocalDateKey();
       state.mealPlan[todayKey] = {
         breakfast: state.recipes[0].id,

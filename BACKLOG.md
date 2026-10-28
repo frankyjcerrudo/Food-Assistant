@@ -2,7 +2,7 @@
 
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
-> **Versión Actual**: v0.62  
+> **Versión Actual**: v0.63  
 > **Última actualización**: Octubre 2026 (calibración rigurosa de Alta en Proteínas con exclusión de dulces hipercalóricos e inclusión de comidas reales v0.59)  
 
 ---

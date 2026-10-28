@@ -2539,3 +2539,11 @@ body {
   flex-shrink: 0;
   margin-top: 1px;
 }
+
+/* Barra compacta Modo Zen cuando el seguimiento nutricional está desactivado (v0.63) */
+.today-nutrition-card.is-collapsed-zen {
+  padding: 9px 14px;
+  border-radius: var(--radius-md);
+  background: var(--m3-surface-container-low);
+  box-shadow: none;
+}
