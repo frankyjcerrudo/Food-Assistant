@@ -307,4 +307,93 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
       globalThis.fetch = origFetch;
     }
   });
+
+  it('US-17 & BUG-15: formatSafeAiMarkdown limpia códigos internos (rec-...) y formatea cursivas (*plato*) sin dejar asteriscos crudos', () => {
+    const raw = '• **Lunes (26 Oct)**: Desayuno: *Porridge cremoso de avena* (*rec-porridge-bowl*) | Merienda: Batido de proteínas (`rec-aafe6e6d-45e5-4328-b41c-b62ec9e3e69a`)';
+    const html = formatSafeAiMarkdown(raw);
+
+    expect(html).not.toContain('rec-porridge-bowl');
+    expect(html).not.toContain('rec-aafe6e6d');
+    expect(html).toContain('<strong>Lunes (26 Oct)</strong>');
+    expect(html).toContain('<em>Porridge cremoso de avena</em>');
+    expect(html).toContain('Batido de proteínas');
+  });
+
+  it('US-17 & BUG-15: set_weekly_plan con completeWeek rellena las 4 comidas de los 7 días incluso con preferencia Alta en Proteínas activa', () => {
+    state.saveDietaryPreferences(['Alta en Proteínas']);
+    const weekDays = appInstance.getPlannerWeekDates();
+
+    // Simular que Gemini solo envió lunch y dinner para 2 días omitiendo breakfast y snack
+    const res = appInstance.executeAiToolCall({
+      name: 'set_weekly_plan',
+      args: {
+        mode: 'replace',
+        completeWeek: true,
+        days: [
+          {
+            dateKey: weekDays[0].dateKey,
+            dayName: 'Lunes',
+            lunch: 'rec-lemon-chicken',
+            dinner: 'rec-salmon-bowl'
+          }
+        ]
+      }
+    });
+
+    expect(res.daysUpdated).toBe(7);
+    weekDays.forEach((wDay) => {
+      const dayPlan = state.getDayPlan(wDay.dateKey, wDay.dayName);
+      expect(dayPlan.breakfast).toBeTruthy();
+      expect(dayPlan.lunch).toBeTruthy();
+      expect(dayPlan.snack).toBeTruthy();
+      expect(dayPlan.dinner).toBeTruthy();
+    });
+  });
+
+  it('US-17 & BUG-15: handleAiChatSubmit fuerza functionCallingConfig ANY y aplica el plan automáticamente aunque el modelo solo responda en texto', async () => {
+    state.settings.geminiApiKey = 'AIzaSyTestForcePlan';
+    const origFetch = globalThis.fetch;
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: '• Lunes: Desayuno: Porridge Cremoso de Avena | Almuerzo: Salmón a la Plancha | Merienda: Tostas de Hummus | Cena: Pasta al Pesto'
+                }
+              ]
+            }
+          }
+        ]
+      })
+    });
+    globalThis.fetch = fetchSpy;
+
+    try {
+      const input = document.getElementById('ai-chat-input');
+      const history = document.getElementById('chat-history-container');
+      input.value = 'Quiero que pongas los platos en el Plan semanal sin dejar comidas vacías';
+      await appInstance.handleAiChatSubmit();
+
+      const [, calledOpts] = fetchSpy.mock.calls[0];
+      const payloadSent = JSON.parse(calledOpts.body);
+      expect(payloadSent.toolConfig?.functionCallingConfig?.mode).toBe('ANY');
+
+      const weekDays = appInstance.getPlannerWeekDates();
+      weekDays.forEach(w => {
+        const dp = state.getDayPlan(w.dateKey, w.dayName);
+        expect(dp.breakfast).toBeTruthy();
+        expect(dp.lunch).toBeTruthy();
+        expect(dp.snack).toBeTruthy();
+        expect(dp.dinner).toBeTruthy();
+      });
+
+      expect(history.textContent).toContain('Ver en Planificador');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
 });

@@ -2501,7 +2501,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.70';
+  window.APP_VERSION = 'v0.71';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2533,8 +2533,9 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.70';
+    this.appVersion = 'v0.71';
     this.activeView = 'view-today';
+    this.aiChatHistory = [];
     this.activeRecipe = null;
     this.activeServings = 2;
     this.pickerTarget = null;
@@ -7346,6 +7347,17 @@ class FoodAssistantApp {
   // ==========================================================================
   // GEMINI AI AGENT INTEGRATION (US-17, BUG-15, US-37, US-39)
   // ==========================================================================
+  isWeeklyPlanPrompt(prompt) {
+    if (!prompt || typeof prompt !== 'string') return false;
+    return /planifica|semana|men[uú]|hueco|vac[ií]|rellena|completa|platos\s+en\s+el\s+plan|plan\s+semanal|aparecer\s+muchas\s+comidas|dejado\s+vac|desayunos\s+y\s+meriendas/i.test(prompt);
+  }
+
+  isAiActionPrompt(prompt) {
+    if (!prompt || typeof prompt !== 'string') return false;
+    if (this.isWeeklyPlanPrompt(prompt)) return true;
+    return /asigna|pon\s+en\s+el|cambia\s+el|actualiza\s+el\s+plan|crea\s+una\s+receta|inventa|nueva\s+receta|compra|a[ñn]ade|apunta|agrega|quita|borra|elimina|tacha/i.test(prompt);
+  }
+
   buildAiSystemInstruction() {
     const todayKey = toLocalDateKey(new Date());
     const weekDays = this.getPlannerWeekDates();
@@ -7379,11 +7391,12 @@ ${recipesCatalog || '(Sin recetas guardadas)'}
 PLAN SEMANAL ACTUAL (Semana visible):
 ${currentPlanSummary}
 
-INSTRUCCIONES DE CONTROL (FUNCTION CALLING):
-1. Cuando el usuario pida crear o modificar su menú semanal, USA la herramienta "set_weekly_plan" con los dateKey exactos (${weekDays.map(w => `${w.dayName}=${w.dateKey}`).join(', ')}) y los IDs reales de las recetas.
-2. Si faltan recetas adecuadas para cumplir sus preferencias dietéticas o sus gustos en algún día, o si pide crear/inventar una receta, usa "create_and_save_recipe" para crearla en el catálogo y asígnala si procede.
-3. Si el usuario pide añadir, tachar o eliminar cosas de la lista de la compra, usa "manage_shopping_list".
-4. Responde siempre en español de forma cercana, minimalista, clara y directa.`;
+INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
+1. Cuando el usuario pida crear, planificar, completar o modificar su menú semanal (o indique que faltan comidas o que hay huecos vacíos), DEBES invocar SIEMPRE la herramienta "set_weekly_plan" con los 7 días de la semana (${weekDays.map(w => `${w.dayName}=${w.dateKey}`).join(', ')}) y las 4 comidas de cada día ("breakfast", "lunch", "snack" y "dinner") usando los IDs reales del catálogo. NUNCA dejes desayunos, almuerzos, meriendas ni cenas vacíos.
+2. Si para Desayuno ("breakfast") o Merienda ("snack") no hay suficientes recetas con una etiqueta nutricional como "Alta en Proteínas", elige igualmente las mejores recetas de Desayuno y Merienda del catálogo del usuario para que las 4 comidas de los 7 días queden siempre completas.
+3. Si faltan recetas adecuadas o el usuario pide crear/inventar una receta nueva, usa "create_and_save_recipe" para guardarla en el catálogo.
+4. Si el usuario pide añadir, tachar o eliminar cosas de la lista de la compra, usa "manage_shopping_list".
+5. PROHIBIDO mostrar identificadores internos (como "rec-...") en tu respuesta de texto al usuario. En el texto visible escribe únicamente los nombres de los platos. Responde siempre en español de forma cercana, minimalista, clara y directa.`;
   }
 
   async callGeminiAgent(prompt, systemInstruction = "", enableTools = true) {
@@ -7403,8 +7416,18 @@ INSTRUCCIONES DE CONTROL (FUNCTION CALLING):
       'gemini-3.1-flash-lite'
     ])];
 
+    const historyTurns = Array.isArray(this.aiChatHistory)
+      ? this.aiChatHistory.slice(-6).map(m => ({
+          role: m.role === 'model' ? 'model' : 'user',
+          parts: [{ text: String(m.text || '') }]
+        }))
+      : [];
+
     const payload = {
-      contents: [{ role: "user", parts: [{ text: prompt }] }]
+      contents: [
+        ...historyTurns,
+        { role: "user", parts: [{ text: prompt }] }
+      ]
     };
 
     const effectiveSystemInstruction = systemInstruction || this.buildAiSystemInstruction();
@@ -7414,6 +7437,13 @@ INSTRUCCIONES DE CONTROL (FUNCTION CALLING):
 
     if (enableTools) {
       payload.tools = [{ functionDeclarations: AI_TOOLS_DECLARATIONS }];
+      if (this.isAiActionPrompt(prompt)) {
+        payload.toolConfig = {
+          functionCallingConfig: {
+            mode: "ANY"
+          }
+        };
+      }
     }
 
     let lastErrMsg = "Error al conectar con Gemini API";
@@ -7497,11 +7527,35 @@ INSTRUCCIONES DE CONTROL (FUNCTION CALLING):
       : allRecipes;
     const pool = compliantRecipes.length > 0 ? compliantRecipes : allRecipes;
 
+    // Restricciones estrictas (alergias / dieta ética) frente a metas de macros (ej. Alta en Proteínas)
+    const macroPrefs = new Set(['Alta en Proteínas', 'Baja en Carbohidratos', 'Baja en Calorías', 'Baja en Grasas']);
+    const strictPrefs = activePrefs.filter(p => !macroPrefs.has(p));
+    const strictCompliantPool = strictPrefs.length > 0
+      ? allRecipes.filter(r => checkDietaryCompliance(r, strictPrefs).compliant)
+      : allRecipes;
+    const safePool = strictCompliantPool.length > 0 ? strictCompliantPool : allRecipes;
+
+    const hasTagCI = (recipe, tag) =>
+      Array.isArray(recipe?.tags) && recipe.tags.some(t => String(t).toLowerCase() === tag.toLowerCase());
+
     const filterByTag = (tag, allowNonBreakfastFallback = false) => {
-      const strictCompliant = pool.filter(r => Array.isArray(r.tags) && r.tags.some(t => String(t).toLowerCase() === tag.toLowerCase()));
-      if (strictCompliant.length > 0) return strictCompliant;
+      const strictMatch = pool.filter(r => hasTagCI(r, tag));
+      if (strictMatch.length > 0) return strictMatch;
+
+      // Si no hay p.ej. ningún Desayuno o Merienda con etiqueta "Alta en Proteínas",
+      // usar los Desayunos / Meriendas del catálogo que respetan las alergias estrictas, ordenados por proteína
+      const safeTagMatch = safePool.filter(r => hasTagCI(r, tag));
+      if (safeTagMatch.length > 0) {
+        return [...safeTagMatch].sort((a, b) => (getRecipeNutrition(b).protein || 0) - (getRecipeNutrition(a).protein || 0));
+      }
+
+      if (tag.toLowerCase() === 'merienda') {
+        const snackOrBreakfast = safePool.filter(r => hasTagCI(r, 'Desayuno') || /batido|yogur|hummus|tosta|fruta|avena|snack/i.test(r.title || ''));
+        if (snackOrBreakfast.length > 0) return snackOrBreakfast;
+      }
+
       if (allowNonBreakfastFallback) {
-        const nonBreakfast = pool.filter(r => !Array.isArray(r.tags) || !r.tags.includes('Desayuno'));
+        const nonBreakfast = pool.filter(r => !hasTagCI(r, 'Desayuno') && !hasTagCI(r, 'Merienda'));
         if (nonBreakfast.length > 0) return nonBreakfast;
       }
       return pool;
@@ -7532,12 +7586,13 @@ INSTRUCCIONES DE CONTROL (FUNCTION CALLING):
     const lower = (prompt || '').toLowerCase();
 
     // 1. Planificación semanal estructurada respetando preferencias dietéticas (BUG-15 + US-17)
-    if (lower.includes('planifica') || lower.includes('semana') || lower.includes('menú') || lower.includes('menu')) {
+    if (this.isWeeklyPlanPrompt(prompt)) {
       const planArgs = this.buildSimulatedWeeklyPlanArgs('replace');
+      planArgs.completeWeek = true;
       this.lastAiProposedPlan = planArgs;
       const findTitle = (id) => state.recipes.find(r => r.id === id)?.title || 'Comida libre';
       const summaryLines = planArgs.days.map(d =>
-        `- **${d.dayName}**: ${findTitle(d.lunch)} (Almuerzo) / ${findTitle(d.dinner)} (Cena)`
+        `- **${d.dayName}**: Desayuno: ${findTitle(d.breakfast)} | Almuerzo: ${findTitle(d.lunch)} | Merienda: ${findTitle(d.snack)} | Cena: ${findTitle(d.dinner)}`
       ).join('\n');
 
       const prefNote = (state.dietaryPreferences && state.dietaryPreferences.length > 0)
@@ -7545,7 +7600,7 @@ INSTRUCCIONES DE CONTROL (FUNCTION CALLING):
         : '';
 
       return {
-        text: `¡He analizado tus recetas guardadas${prefNote} y he aplicado este menú semanal equilibrado en tu calendario!\n\n${summaryLines}`,
+        text: `¡He analizado tus recetas guardadas${prefNote} y he completado las 4 comidas de lunes a domingo en tu Planificador Semanal!\n\n${summaryLines}`,
         toolCalls: [
           {
             name: 'set_weekly_plan',
@@ -7662,13 +7717,78 @@ INSTRUCCIONES DE CONTROL (FUNCTION CALLING):
     if (!trimmed || trimmed.toLowerCase() === 'null' || trimmed.toLowerCase() === 'vacío' || trimmed.toLowerCase() === 'vacio') {
       return null;
     }
+
+    // 1. Coincidencia exacta por ID
     const exact = state.recipes.find(r => r.id === trimmed);
     if (exact) return exact.id;
 
-    const normRef = normalizeIngredientText(trimmed);
+    // 2. Si el texto incluye un ID explícito tipo rec-... (ej. "Porridge (*rec-porridge-bowl*)")
+    const embeddedIdMatch = trimmed.match(/\brec-[a-zA-Z0-9_-]+\b/);
+    if (embeddedIdMatch) {
+      const byEmbeddedId = state.recipes.find(r => r.id === embeddedIdMatch[0]);
+      if (byEmbeddedId) return byEmbeddedId.id;
+    }
+
+    // 3. Limpiar formato Markdown o paréntesis residuales y buscar por título normalizado
+    const cleanTitleRef = trimmed
+      .replace(/\s*\([\s*`'"]*rec-[a-zA-Z0-9_-]+[\s*`'"]*\)/gi, '')
+      .replace(/[*`'"]/g, '')
+      .trim();
+
+    const normRef = normalizeIngredientText(cleanTitleRef);
+    if (!normRef) return null;
+
     const byTitle = state.recipes.find(r => normalizeIngredientText(r.title || '') === normRef) ||
                     state.recipes.find(r => normalizeIngredientText(r.title || '').includes(normRef) || normRef.includes(normalizeIngredientText(r.title || '')));
     return byTitle ? byTitle.id : null;
+  }
+
+  extractWeeklyPlanFromAiText(aiText) {
+    const fallbackPlan = this.buildSimulatedWeeklyPlanArgs('replace');
+    if (!aiText || typeof aiText !== 'string') {
+      return { ...fallbackPlan, completeWeek: true };
+    }
+
+    const weekDays = this.getPlannerWeekDates();
+    const lines = aiText.split(/\r?\n/);
+
+    lines.forEach((line) => {
+      const matchedDayIdx = weekDays.findIndex(w => {
+        const normDay = normalizeIngredientText(w.dayName);
+        return normDay && normalizeIngredientText(line).includes(normDay);
+      });
+      if (matchedDayIdx === -1) return;
+
+      const dayTarget = fallbackPlan.days[matchedDayIdx];
+      const slotPatterns = [
+        { slot: 'breakfast', regex: /desayuno\s*:\s*([^|\n•]+)/i },
+        { slot: 'lunch', regex: /(?:almuerzo|comida)\s*:\s*([^|\n•]+)/i },
+        { slot: 'snack', regex: /merienda\s*:\s*([^|\n•]+)/i },
+        { slot: 'dinner', regex: /cena\s*:\s*([^|\n•]+)/i }
+      ];
+
+      slotPatterns.forEach(({ slot, regex }) => {
+        const m = line.match(regex);
+        if (m && m[1]) {
+          const resolved = this.resolveRecipeIdForAgent(m[1]);
+          if (resolved) {
+            dayTarget[slot] = resolved;
+          }
+        }
+      });
+    });
+
+    return { mode: 'replace', days: fallbackPlan.days, completeWeek: true };
+  }
+
+  buildWeeklyPlanSummaryText() {
+    const weekDays = this.getPlannerWeekDates();
+    const findTitle = (id) => state.recipes.find(r => r.id === id)?.title || 'Plato asignado';
+    const lines = weekDays.map(w => {
+      const dp = state.getDayPlan(w.dateKey, w.dayName);
+      return `- **${w.dayName}**: Desayuno: ${findTitle(dp.breakfast)} | Almuerzo: ${findTitle(dp.lunch)} | Merienda: ${findTitle(dp.snack)} | Cena: ${findTitle(dp.dinner)}`;
+    }).join('\n');
+    return `He actualizado tu **Planificador Semanal** completo (7 días, 4 comidas diarias):\n\n${lines}`;
   }
 
   executeAiToolCall(toolCall) {
@@ -7756,9 +7876,11 @@ INSTRUCCIONES DE CONTROL (FUNCTION CALLING):
       const mode = args.mode === 'merge' ? 'merge' : 'replace';
       const daysInput = Array.isArray(args.days) ? args.days : [];
       const weekDays = this.getPlannerWeekDates();
-      let daysUpdated = 0;
+      const fallbackPlan = this.buildSimulatedWeeklyPlanArgs('replace');
+      const shouldCompleteAllWeek = args.completeWeek === true || daysInput.length >= 5;
+      const updatedDateKeys = new Set();
 
-      daysInput.forEach(dayEntry => {
+      daysInput.forEach((dayEntry, idx) => {
         if (!dayEntry) return;
         let targetDateKey = dayEntry.dateKey;
         let targetDayName = dayEntry.dayName;
@@ -7770,28 +7892,63 @@ INSTRUCCIONES DE CONTROL (FUNCTION CALLING):
             targetDayName = matchedDay.dayName;
           }
         }
+        if (!targetDateKey && weekDays[idx]) {
+          targetDateKey = weekDays[idx].dateKey;
+          targetDayName = weekDays[idx].dayName;
+        }
         if (!targetDateKey) return;
 
+        const weekDayIdx = Math.max(0, weekDays.findIndex(w => w.dateKey === targetDateKey));
+        const fallbackDay = fallbackPlan.days[weekDayIdx] || fallbackPlan.days[0];
         const dayData = state.getDayPlan(targetDateKey, targetDayName);
+
         ['breakfast', 'lunch', 'snack', 'dinner'].forEach(slotKey => {
-          if (slotKey in dayEntry && dayEntry[slotKey] !== undefined) {
-            const rawVal = dayEntry[slotKey];
-            if (rawVal === null || rawVal === '' || String(rawVal).toUpperCase() === 'CLEAR') {
-              if (mode === 'replace') dayData[slotKey] = null;
-            } else {
-              const resolvedId = this.resolveRecipeIdForAgent(String(rawVal));
-              if (resolvedId) {
-                if (mode === 'replace' || !dayData[slotKey]) {
-                  dayData[slotKey] = resolvedId;
-                }
-              }
+          const rawVal = dayEntry[slotKey];
+          const isExplicitClear = typeof rawVal === 'string' && rawVal.trim().toUpperCase() === 'CLEAR';
+
+          if (isExplicitClear) {
+            if (mode === 'replace') dayData[slotKey] = null;
+            return;
+          }
+
+          if (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '') {
+            const resolvedId = this.resolveRecipeIdForAgent(String(rawVal));
+            if (resolvedId && (mode === 'replace' || !dayData[slotKey])) {
+              dayData[slotKey] = resolvedId;
             }
           }
+
+          // Si el hueco sigue vacío (porque Gemini omitió desayunos/meriendas o envió un ID no válido),
+          // rellenarlo automáticamente con una receta compatible para ese momento del día
+          if (!dayData[slotKey] && fallbackDay && fallbackDay[slotKey]) {
+            dayData[slotKey] = fallbackDay[slotKey];
+          }
         });
+
         dayData.updatedAt = new Date().toISOString();
-        daysUpdated++;
+        updatedDateKeys.add(targetDateKey);
       });
 
+      // Si es una planificación semanal completa (o rellenar la semana), garantizar los 7 días con sus 4 comidas
+      if (shouldCompleteAllWeek) {
+        weekDays.forEach((wDay, idx) => {
+          const dayData = state.getDayPlan(wDay.dateKey, wDay.dayName);
+          const fallbackDay = fallbackPlan.days[idx] || fallbackPlan.days[0];
+          let modified = false;
+          ['breakfast', 'lunch', 'snack', 'dinner'].forEach(slotKey => {
+            if (!dayData[slotKey] && fallbackDay && fallbackDay[slotKey]) {
+              dayData[slotKey] = fallbackDay[slotKey];
+              modified = true;
+            }
+          });
+          if (modified || !updatedDateKeys.has(wDay.dateKey)) {
+            dayData.updatedAt = new Date().toISOString();
+            updatedDateKeys.add(wDay.dateKey);
+          }
+        });
+      }
+
+      const daysUpdated = updatedDateKeys.size;
       this.lastAiProposedPlan = { mode, days: daysInput };
       state.save('fa_mealplan', state.mealPlan);
       this.scheduleSyncWithCloud();
@@ -7925,18 +8082,41 @@ INSTRUCCIONES DE CONTROL (FUNCTION CALLING):
     try {
       const systemPrompt = this.buildAiSystemInstruction();
       const agentResult = await this.callGeminiAgent(text, systemPrompt, true);
-      const executedResults = this.executeAiToolCalls(agentResult.toolCalls || []);
+      const isWeeklyIntent = this.isWeeklyPlanPrompt(text);
+
+      const rawToolCalls = Array.isArray(agentResult.toolCalls) ? [...agentResult.toolCalls] : [];
+      if (isWeeklyIntent) {
+        rawToolCalls.forEach(tc => {
+          if (tc.name === 'set_weekly_plan') {
+            tc.args = { ...(tc.args || {}), completeWeek: true };
+          }
+        });
+        // Red de seguridad: si el modelo devolvió el menú en texto sin emitir functionCall, extraerlo y aplicarlo
+        if (!rawToolCalls.some(tc => tc.name === 'set_weekly_plan')) {
+          const extractedArgs = this.extractWeeklyPlanFromAiText(agentResult.text);
+          rawToolCalls.push({
+            name: 'set_weekly_plan',
+            args: extractedArgs
+          });
+        }
+      }
+
+      const executedResults = this.executeAiToolCalls(rawToolCalls);
 
       let displayMessage = agentResult.text;
       if (!displayMessage && executedResults.length > 0) {
         const summaries = executedResults.map(r => {
           if (r.tool === 'create_and_save_recipe') return `He creado la receta **${r.title}**.`;
-          if (r.tool === 'set_weekly_plan') return `He actualizado tu **Planificador Semanal** (${r.daysUpdated} días).`;
+          if (r.tool === 'set_weekly_plan') return this.buildWeeklyPlanSummaryText();
           if (r.tool === 'manage_shopping_list') return `He actualizado tu **Lista de la Compra** (${r.count} artículos).`;
           return '';
         }).filter(Boolean);
-        displayMessage = summaries.join(' ');
+        displayMessage = summaries.join('\n\n');
       }
+
+      if (!Array.isArray(this.aiChatHistory)) this.aiChatHistory = [];
+      this.aiChatHistory.push({ role: 'user', text });
+      this.aiChatHistory.push({ role: 'model', text: displayMessage || 'Acción completada.' });
 
       // US-37: Saneamiento estricto antes de aplicar formato Markdown ligero
       aiBubble.innerHTML = formatSafeAiMarkdown(displayMessage || 'Acción completada.');
@@ -7974,15 +8154,6 @@ INSTRUCCIONES DE CONTROL (FUNCTION CALLING):
         });
 
         aiBubble.appendChild(actionsContainer);
-      } else if (text.toLowerCase().includes('planifica') || text.toLowerCase().includes('semana')) {
-        const applyBtn = document.createElement('button');
-        applyBtn.type = 'button';
-        applyBtn.className = 'btn btn-primary btn-sm';
-        applyBtn.style.marginTop = '10px';
-        applyBtn.innerHTML = '<span class="material-symbols-outlined icon-sm">calendar_month</span> Aplicar este menú al Planificador';
-        applyBtn.onclick = () => this.applySampleAiPlan();
-        aiBubble.appendChild(document.createElement('br'));
-        aiBubble.appendChild(applyBtn);
       }
     } catch (err) {
       // US-37: Mostrar mensajes de error con textContent para impedir XSS
@@ -8642,15 +8813,23 @@ INSTRUCCIONES DE CONTROL (FUNCTION CALLING):
 // ==========================================================================
 function formatSafeAiMarkdown(rawText) {
   if (!rawText || typeof rawText !== 'string') return '';
-  const escaped = rawText
+  // Limpiar cualquier identificador interno rec-... que el modelo haya podido filtrar en el texto visible
+  const cleaned = rawText
+    .replace(/\s*\([\s*`'"]*rec-[a-zA-Z0-9_-]+[\s*`'"]*\)/gi, '')
+    .replace(/\s*\[[\s*`'"]*rec-[a-zA-Z0-9_-]+[\s*`'"]*\]/gi, '')
+    .replace(/[*`'"]*\brec-[a-zA-Z0-9_-]+\b[*`'"]*/gi, '');
+
+  const escaped = cleaned
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
   return escaped
+    .replace(/^[ \t]*[\-\*•][ \t]+(.*)$/gm, '• $1')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/^[ \t]*[\-\*][ \t]+(.*)$/gm, '• $1')
+    .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
+    .replace(/`([^`\n]+)`/g, '<em>$1</em>')
     .replace(/\n/g, '<br>');
 }
 
@@ -8707,7 +8886,7 @@ const AI_TOOLS_DECLARATIONS = [
   },
   {
     name: "set_weekly_plan",
-    description: "Asigna o actualiza el menú semanal del usuario en el Planificador (meal_plans) usando los IDs reales de las recetas para cada fecha y momento de comida.",
+    description: "Asigna o actualiza el menú semanal completo del usuario en el Planificador (los 7 días de Lunes a Domingo con las 4 comidas de cada día: breakfast, lunch, snack y dinner) usando los IDs reales de las recetas.",
     parameters: {
       type: "OBJECT",
       properties: {
@@ -8719,12 +8898,12 @@ const AI_TOOLS_DECLARATIONS = [
             properties: {
               dateKey: { type: "STRING", description: "Fecha ISO local YYYY-MM-DD" },
               dayName: { type: "STRING", description: "Nombre del día (Lunes..Domingo)" },
-              breakfast: { type: "STRING", description: "ID de la receta de Desayuno" },
-              lunch: { type: "STRING", description: "ID de la receta de Almuerzo" },
-              snack: { type: "STRING", description: "ID de la receta de Merienda" },
-              dinner: { type: "STRING", description: "ID de la receta de Cena" }
+              breakfast: { type: "STRING", description: "ID de la receta de Desayuno (obligatorio)" },
+              lunch: { type: "STRING", description: "ID de la receta de Almuerzo (obligatorio)" },
+              snack: { type: "STRING", description: "ID de la receta de Merienda (obligatorio)" },
+              dinner: { type: "STRING", description: "ID de la receta de Cena (obligatorio)" }
             },
-            required: ["dateKey"]
+            required: ["dateKey", "breakfast", "lunch", "snack", "dinner"]
           }
         }
       },
