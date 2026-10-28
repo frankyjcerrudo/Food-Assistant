@@ -3,7 +3,7 @@
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
 > **Versión Actual**: v0.66  
-> **Última actualización**: Octubre 2026 (inicio de US-04 ampliado a copiar cualquier semana en v0.66; cierre de US-18 y US-55 en v0.65)
+> **Última actualización**: Octubre 2026 (cierre de US-04 ampliado aprobado por Franky en v0.66)
 
 ---
 
@@ -27,7 +27,7 @@
 
 | ID | Historia de Usuario / Feature | Prioridad | Estado | Criterios de Aceptación (DoD) |
 | :--- | :--- | :---: | :---: | :--- |
-| **US-04** | Duplicar o copiar plan de cualquier semana (semana anterior, históricas o por fecha) | 🔴 Alta | `In Progress` | • Botón "Copiar semana" en el planificador semanal.<br>• Modal `<dialog id="modal-copy-week">` con acceso directo a la semana inmediatamente anterior, listado de semanas con comidas planificadas y selector de fecha libre.<br>• Previsualización en vivo (de Lunes a Domingo) de la semana origen antes de aplicar.<br>• Modos de copia: **Reemplazar semana completa** o **Combinar (solo huecos vacíos)**.<br>• Confirmación de sobreescritura con modal Material 3 si la semana destino ya tiene platos asignados.<br>• Respeto íntegro de los momentos de comida personalizados (`customSlots` con IDs nuevos). |
+| **US-04** | Duplicar o copiar plan de cualquier semana (semana anterior, históricas o por fecha) | 🔴 Alta | `Done` | • Botón "Copiar semana" en el planificador semanal.<br>• Modal `<dialog id="modal-copy-week">` con acceso directo a la semana inmediatamente anterior, listado de semanas con comidas planificadas y selector de fecha libre.<br>• Previsualización en vivo (de Lunes a Domingo) de la semana origen antes de aplicar.<br>• Modos de copia: **Reemplazar semana completa** o **Combinar (solo huecos vacíos)**.<br>• Confirmación de sobreescritura con modal Material 3 si la semana destino ya tiene platos asignados.<br>• Respeto íntegro de los momentos de comida personalizados (`customSlots` con IDs nuevos).<br>• *Estado: Completado, probado y aprobado por Franky (v0.66).* |
 | **US-05** | Motor de Calendario Semanal ISO 8601 con navegación entre semanas | 🔴 Alta | `Done` | • El calendario semanal empieza siempre en Lunes (ISO 8601) con fin de semana claramente agrupado al final.<br>• Navegación fluida entre semanas (+1 / -1 semana) manteniendo la fecha actual identificada.<br>• Persistencia dinámica por claves de fecha ISO `YYYY-MM-DD` (creando días bajo demanda sin duplicados ni slots desordenados).<br>• *Estado: Completado y validado en v0.24-v0.25. Consolida US-22. Relacionado: BUG-07, BUG-08, BUG-17.* |
 | **US-14** | Comidas flexibles en planificador (Desayunos, meriendas, snacks) | 🔴 Alta | `Done` | • Soporte configurable para personas que comen >3 veces al día.<br>• Habilitar/deshabilitar Desayuno, Media Mañana, Almuerzo, Merienda, Cena, Post-entreno.<br>• Interfaz responsiva que acomode las nuevas filas sin scroll horizontal roto. |
 | **US-19** | Mover recetas por la semana y cambiar momentos | 🟡 Media | `Backlog` | • Drag & drop táctil o menú contextual "Mover a..." en cada tarjeta.<br>• Permitir mover de un día a otro o de almuerzo a cena sin tener que borrar y buscar de nuevo. |
