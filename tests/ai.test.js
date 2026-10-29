@@ -746,4 +746,34 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
       expect(dayPlan.dinner).toBeTruthy();
     });
   });
+
+  it('v0.78: Modelos obsoletos como gemini-2.5-flash-lite se migran automáticamente a gemini-3.8-flash y nunca se llaman en fetch', async () => {
+    state.settings.geminiModel = 'gemini-2.5-flash-lite';
+    state.settings.geminiApiKey = 'test-key';
+
+    const calledEndpoints = [];
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
+      calledEndpoints.push(url);
+      return {
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: '{"title": "Receta Test", "ingredients": [{"name": "Pollo", "amount": 100, "unit": "g"}], "instructions": [{"step": 1, "text": "Cocinar"}]}' }] } }]
+        })
+      };
+    });
+
+    try {
+      await appInstance.extractRecipeWithGemini({ text: 'Pollo salteado' });
+      expect(state.settings.geminiModel).toBe('gemini-3.8-flash');
+      expect(calledEndpoints.length).toBeGreaterThan(0);
+      calledEndpoints.forEach(ep => {
+        expect(ep).not.toContain('gemini-2.5-flash-lite');
+        expect(ep).not.toContain('gemini-2.5');
+        expect(ep).toContain('gemini-3.8-flash');
+      });
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
 });

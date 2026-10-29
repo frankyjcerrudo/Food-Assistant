@@ -1320,7 +1320,7 @@ class StateStore {
         fat: 65
       }
     });
-    if (!this.settings.geminiModel || this.settings.geminiModel === 'gemini-2.5-flash' || this.settings.geminiModel === 'gemini-1.5-flash') {
+    if (!this.settings.geminiModel || String(this.settings.geminiModel).includes('2.5') || String(this.settings.geminiModel).includes('1.5') || String(this.settings.geminiModel).includes('2.0')) {
       this.settings.geminiModel = 'gemini-3.8-flash';
       this.save('fa_settings', this.settings);
     }
@@ -2531,7 +2531,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.77';
+  window.APP_VERSION = 'v0.78';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2563,7 +2563,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v0.77';
+    this.appVersion = window.APP_VERSION || 'v0.78';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -7723,16 +7723,13 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       return this.simulateGeminiAgentResponse(prompt);
     }
 
-    const rawModel = state.settings.geminiModel || 'gemini-3.5-flash-lite';
-    const primaryModel = (rawModel === 'gemini-2.5-flash' || rawModel === 'gemini-1.5-flash') ? 'gemini-3.5-flash-lite' : rawModel;
-    // Cascada automática anti-saturación (High Demand / 503 / 429) priorizando modelos de baja latencia
-    const candidateModels = [...new Set([
-      primaryModel,
-      'gemini-3.5-flash-lite',
-      'gemini-3.8-flash',
-      'gemini-2.5-flash-lite',
-      'gemini-2.0-flash'
-    ])];
+    let rawModel = state.settings.geminiModel || 'gemini-3.8-flash';
+    if (String(rawModel).includes('2.5') || String(rawModel).includes('1.5') || String(rawModel).includes('2.0')) {
+      rawModel = 'gemini-3.8-flash';
+      state.settings.geminiModel = 'gemini-3.8-flash';
+      state.save && state.save('fa_settings', state.settings);
+    }
+    const candidateModels = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
 
     const historyTurns = Array.isArray(this.aiChatHistory)
       ? this.aiChatHistory.slice(-6).map(m => ({
@@ -9084,14 +9081,13 @@ REGLAS CRÍTICAS:
 }`;
     parts.push({ text: promptText });
 
-    const rawModel = state.settings.geminiModel || 'gemini-3.5-flash-lite';
-    const primaryModel = (rawModel === 'gemini-2.5-flash' || rawModel === 'gemini-1.5-flash') ? 'gemini-3.5-flash-lite' : rawModel;
-    const candidateModels = [...new Set([
-      primaryModel,
-      'gemini-3.5-flash-lite',
-      'gemini-3.8-flash',
-      'gemini-2.5-flash-lite'
-    ])];
+    let rawModel = state.settings.geminiModel || 'gemini-3.8-flash';
+    if (String(rawModel).includes('2.5') || String(rawModel).includes('1.5') || String(rawModel).includes('2.0')) {
+      rawModel = 'gemini-3.8-flash';
+      state.settings.geminiModel = 'gemini-3.8-flash';
+      state.save && state.save('fa_settings', state.settings);
+    }
+    const candidateModels = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
 
     let lastError = null;
     let data = null;
@@ -9478,7 +9474,10 @@ REGLAS CRÍTICAS:
     } catch (err) {
       if (status) {
         status.style.color = 'var(--m3-error)';
-        status.textContent = 'Aviso: ' + err.message;
+        const cleanMsg = /is no longer available/i.test(err?.message || '')
+          ? 'Modelo de IA desactualizado. Se ha actualizado automáticamente a gemini-3.8-flash. Por favor, pulsa "Analizar e Importar" de nuevo.'
+          : err.message;
+        status.textContent = 'Aviso: ' + cleanMsg;
       }
       if (previewBox) previewBox.style.display = 'none';
       if (btnExecute) btnExecute.style.display = 'inline-flex';
