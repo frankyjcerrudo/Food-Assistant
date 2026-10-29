@@ -940,4 +940,73 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
       globalThis.fetch = origFetch;
     }
   });
+
+  it('v0.87: callGeminiAgent usa gemini-3.5-flash-lite por defecto cuando no hay modelo explícito configurado', async () => {
+    state.settings.geminiApiKey = 'AIzaSyLiteDefault';
+    delete state.settings.geminiModel;
+    state.settings.aiProvider = 'gemini';
+
+    const origFetch = globalThis.fetch;
+    let calledUrl = null;
+    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
+      calledUrl = url;
+      return {
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: '¡Hola Franky! Respuesta desde Gemini 3.5 Flash-Lite.' }] } }]
+        })
+      };
+    });
+
+    try {
+      const res = await appInstance.callGeminiAgent('Hola');
+      expect(calledUrl).toContain('models/gemini-3.5-flash-lite:generateContent');
+      expect(res.text).toContain('Gemini 3.5 Flash-Lite');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it('v0.87: callGeminiAgent recupera automáticamente si gemini-2.5-flash devuelve error "not available to new users", conmutando a gemini-3.5-flash-lite', async () => {
+    state.settings.geminiApiKey = 'AIzaSyNewProjectKey';
+    state.settings.geminiModel = 'gemini-2.5-flash';
+    state.settings.aiProvider = 'gemini';
+
+    const calledUrls = [];
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
+      calledUrls.push(url);
+      if (url.includes('gemini-2.5-flash')) {
+        return {
+          ok: false,
+          status: 404,
+          json: async () => ({
+            error: {
+              code: 404,
+              message: 'The model models/gemini-2.5-flash is not available to new users. Please use gemini-3.5-flash-lite or gemini-3.8-flash.',
+              status: 'NOT_FOUND'
+            }
+          })
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: '¡Hola Franky! Asistente activo con Gemini 3.5 Flash-Lite.' }] } }]
+        })
+      };
+    });
+
+    try {
+      const res = await appInstance.callGeminiAgent('Planifica mi semana');
+      expect(calledUrls.length).toBe(2);
+      expect(calledUrls[0]).toContain('gemini-2.5-flash');
+      expect(calledUrls[1]).toContain('gemini-3.5-flash-lite');
+      expect(res.text).toContain('Gemini 3.5 Flash-Lite');
+      // Verifica que la configuración se actualiza permanentemente
+      expect(state.settings.geminiModel).toBe('gemini-3.5-flash-lite');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
 });

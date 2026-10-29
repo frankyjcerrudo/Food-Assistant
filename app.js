@@ -1319,7 +1319,7 @@ class StateStore {
     this.settings = this.load('fa_settings', {
       geminiApiKey: '',
       defaultServings: 2,
-      geminiModel: 'gemini-2.5-flash',
+      geminiModel: 'gemini-3.5-flash-lite',
       nutritionGoals: {
         enabled: false,
         calories: 2000,
@@ -1329,7 +1329,7 @@ class StateStore {
       }
     });
     if (!this.settings.geminiModel || this.settings.geminiModel === 'gemini-2.5-flash-lite' || this.settings.geminiModel === 'gemini-1.5-flash') {
-      this.settings.geminiModel = 'gemini-2.5-flash';
+      this.settings.geminiModel = 'gemini-3.5-flash-lite';
       this.save('fa_settings', this.settings);
     }
     if (!this.settings.nutritionGoals) {
@@ -2539,7 +2539,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.86';
+  window.APP_VERSION = 'v0.87';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2571,7 +2571,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v0.86';
+    this.appVersion = window.APP_VERSION || 'v0.87';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -7809,10 +7809,10 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       return this.simulateGeminiAgentResponse(prompt);
     }
 
-    let rawModel = state.settings.geminiModel || 'gemini-3.8-flash';
+    let rawModel = state.settings.geminiModel || 'gemini-3.5-flash-lite';
     if (rawModel === 'gemini-2.5-flash-lite' || rawModel === 'gemini-1.5-flash') {
-      rawModel = 'gemini-3.8-flash';
-      state.settings.geminiModel = 'gemini-3.8-flash';
+      rawModel = 'gemini-3.5-flash-lite';
+      state.settings.geminiModel = 'gemini-3.5-flash-lite';
       state.save && state.save('fa_settings', state.settings);
     }
     const candidateModels = [rawModel];
@@ -7892,7 +7892,33 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
         response.status === 404 ||
         /high demand|overloaded|try again later|no longer available|not found|quota|rate limit|resource exhausted|exceeded/i.test(errMsg);
 
-      // Si es límite de cuota (429) en gemini-3.8-flash (límite de 20/día), intentar gemini-2.5-flash (1.500 req/día)
+      // Si el modelo 2.5 flash no está disponible para nuevos usuarios o proyectos (política de Google restringiendo 2.5 a favor de 3.5), conmutar transparentemente a gemini-3.5-flash-lite
+      if (model === 'gemini-2.5-flash' && (/not available.*(new users|new projects)|not supported for new|permission denied|deprecated|not found/i.test(errMsg) || response.status === 404)) {
+        try {
+          const fallbackEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`;
+          const fbController = new AbortController();
+          const fbTimeout = setTimeout(() => fbController.abort(), 6000);
+          const fbResponse = await fetch(fallbackEndpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey
+            },
+            body: JSON.stringify(payload),
+            signal: fbController.signal
+          });
+          clearTimeout(fbTimeout);
+          if (fbResponse.ok) {
+            data = await fbResponse.json();
+            // Actualizar permanentemente a gemini-3.5-flash-lite en ajustes del usuario
+            state.settings.geminiModel = 'gemini-3.5-flash-lite';
+            state.save && state.save('fa_settings', state.settings);
+            break;
+          }
+        } catch (fbErr) {}
+      }
+
+      // Si es límite de cuota (429) en gemini-3.8-flash (límite de 20/día), intentar gemini-2.5-flash o gemini-3.5-flash-lite
       if ((response.status === 429 || /quota|limit: 20/i.test(errMsg)) && model === 'gemini-3.8-flash') {
         try {
           const fallbackEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
@@ -7911,6 +7937,25 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
           if (fbResponse.ok) {
             data = await fbResponse.json();
             break;
+          } else {
+            // Si 2.5-flash no está disponible para nuevos usuarios, probar gemini-3.5-flash-lite
+            const liteEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`;
+            const liteController = new AbortController();
+            const liteTimeout = setTimeout(() => liteController.abort(), 6000);
+            const liteResponse = await fetch(liteEndpoint, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-goog-api-key": apiKey
+              },
+              body: JSON.stringify(payload),
+              signal: liteController.signal
+            });
+            clearTimeout(liteTimeout);
+            if (liteResponse.ok) {
+              data = await liteResponse.json();
+              break;
+            }
           }
         } catch (fbErr) {}
       }
@@ -9684,7 +9729,25 @@ REGLAS CRÍTICAS:
           break;
         }
         const errJson = await resp.json().catch(() => ({}));
-        lastError = new Error(errJson.error?.message || `HTTP ${resp.status}`);
+        const errMsg = errJson.error?.message || `HTTP ${resp.status}`;
+        lastError = new Error(errMsg);
+
+        if (model === 'gemini-2.5-flash' && (/not available.*(new users|new projects)|not supported for new|permission denied|deprecated|not found/i.test(errMsg) || resp.status === 404)) {
+          try {
+            const fbResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+              body: JSON.stringify({ contents: [{ parts }] })
+            });
+            if (fbResp.ok) {
+              data = await fbResp.json();
+              state.settings.geminiModel = 'gemini-3.5-flash-lite';
+              state.save && state.save('fa_settings', state.settings);
+              break;
+            }
+          } catch (fbE) {}
+        }
+
         if (resp.status === 503 || resp.status === 429) {
           await new Promise(r => setTimeout(r, 600));
         }
@@ -10118,7 +10181,7 @@ REGLAS CRÍTICAS:
       modelWrapper.style.display = (currentProvider === 'gemini') ? 'block' : 'none';
     }
     if (selectModel) {
-      selectModel.value = state.settings.geminiModel || 'gemini-2.5-flash';
+      selectModel.value = state.settings.geminiModel || 'gemini-3.5-flash-lite';
       selectModel.onchange = (e) => {
         state.settings.geminiModel = e.target.value;
         state.save && state.save('fa_settings', state.settings);
@@ -10455,7 +10518,7 @@ Autenticación: API Key → Bearer → ${tk}`;
     state.settings.geminiApiKey = key;
     const provider = document.getElementById('select-ai-provider')?.value || 'gemini';
     state.settings.aiProvider = provider;
-    const model = document.getElementById('select-gemini-model')?.value || 'gemini-2.5-flash';
+    const model = document.getElementById('select-gemini-model')?.value || 'gemini-3.5-flash-lite';
     state.settings.geminiModel = model;
     state.save('fa_settings', state.settings);
     this.renderSettings();
