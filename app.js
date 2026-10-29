@@ -234,12 +234,19 @@ function estimateRecipeNutrition(recipe) {
 
   ingredients.forEach(ing => {
     if (!ing || !ing.name) return;
-    const name = ing.name.toLowerCase();
+    const name = ing.name.toLowerCase().trim();
     const amount = Number(ing.amount) || 1;
-    const unit = (ing.unit || 'ud').toLowerCase();
+    const unit = (ing.unit || 'ud').toLowerCase().trim();
 
-    // Estimación de peso en gramos
+    // 0. Especias, sal, hierbas y condimentos secos: aporte calórico y de macros prácticamente nulo
+    if (/\b(sal|pimienta|especias?|or[eé]gano|perejil|albahaca|romero|tomillo|piment[oó]n|curry|canela|laurel|comino|nuez\s+moscada)\b/i.test(name)) {
+      return;
+    }
+
+    // 1. Estimación de peso en gramos
     let grams = 100;
+    const isOilOrFat = /\b(aceite|oliva|girasol|mantequilla|ghee|manteca)\b/i.test(name);
+
     if (unit === 'g' || unit === 'gr' || unit === 'gramo' || unit === 'gramos') {
       grams = amount;
     } else if (unit === 'kg' || unit === 'kilo' || unit === 'kilos') {
@@ -248,38 +255,62 @@ function estimateRecipeNutrition(recipe) {
       const ml = unit === 'l' ? amount * 1000 : (unit === 'cl' ? amount * 10 : amount);
       grams = ml;
     } else if (unit === 'cda' || unit === 'cucharada' || unit === 'cucharadas') {
-      grams = amount * 15;
-    } else if (unit === 'cdta' || unit === 'cucharadita' || unit === 'cucharaditas') {
+      grams = isOilOrFat ? amount * 10 : amount * 15;
+    } else if (unit === 'cdta' || unit === 'cucharadita' || unit === 'cucharaditas' || /\b(pel[ií]n|chorrito|chorro|gota|gotas|toque|pizca|spray)\b/i.test(unit)) {
       grams = amount * 5;
     } else if (unit === 'rebanada' || unit === 'rebanadas' || unit === 'loncha' || unit === 'lonchas' || unit === 'tostada' || unit === 'tostadas') {
       grams = amount * 35;
     } else if (unit === 'taza' || unit === 'tazas' || unit === 'vaso' || unit === 'vasos') {
       grams = amount * 200;
-    } else if (unit === 'diente' || unit === 'dientes' || unit === 'pizca' || unit === 'pizcas') {
+    } else if (unit === 'diente' || unit === 'dientes') {
       grams = amount * 5;
     } else {
-      if (/\b(huevo|huevos)\b/i.test(name)) grams = amount * 60;
-      else if (/\b(aguacate)\b/i.test(name)) grams = amount * 150;
-      else if (/\b(patata|patatas|papas?|manzana|manzanas|pera|peras|pl[aá]tano|pl[aá]tanos|naranja|naranjas|pepino|pepinos)\b/i.test(name)) grams = amount * 160;
-      else if (/\b(lim[oó]n|limones|tomate|tomates)\b/i.test(name)) grams = amount * 100;
-      else if (/\b(cebolla|cebollas)\b/i.test(name)) grams = amount * 120;
-      else if (/\b(pechuga|pechugas|filete|filetes|lomo|lomos)\b/i.test(name)) grams = amount * 180;
-      else grams = amount * 80;
+      // Unidades estándar ('ud', piezas enteras)
+      if (isOilOrFat) {
+        // En aceite, "1 ud" o sin unidad equivale a 1 cucharada culinaria (~10g), nunca 80g o 100g
+        grams = Math.min(25, amount * 10);
+      } else if (/\b(dorada|lubina|trucha|lenguado|rodaballo|corvina|rape)\b/i.test(name)) {
+        // Pescado entero: ración limpia media ~250g
+        grams = amount * 250;
+      } else if (/\b(pechuga|pechugas|filete|filetes|lomo|lomos|rodaja|rodajas|merluza|bacalao|pescadilla|gallo)\b/i.test(name)) {
+        grams = amount * 180;
+      } else if (/\b(gamba|gambas|langostino|langostinos)\b/i.test(name)) {
+        grams = amount * 25;
+      } else if (/\b(huevo|huevos)\b/i.test(name)) {
+        grams = amount * 60;
+      } else if (/\b(aguacate)\b/i.test(name)) {
+        grams = amount * 150;
+      } else if (/\b(patata|patatas|papas?|manzana|manzanas|pera|peras|pl[aá]tano|pl[aá]tanos|naranja|naranjas|pepino|pepinos)\b/i.test(name)) {
+        grams = amount * 160;
+      } else if (/\b(lim[oó]n|limones|tomate|tomates)\b/i.test(name)) {
+        grams = amount * 100;
+      } else if (/\b(cebolla|cebollas)\b/i.test(name)) {
+        grams = amount * 120;
+      } else {
+        grams = amount * 80;
+      }
     }
 
-    // Densidad nutricional por 100g
-    let c100 = 100, p100 = 3, cb100 = 15, f100 = 2;
+    // 2. Densidad nutricional por 100g (kcal, proteína, carbohidratos, grasa)
+    let c100 = 80, p100 = 2, cb100 = 10, f100 = 1;
 
-    if (/\b(pollo|pechuga|pavo)\b/i.test(name)) {
-      c100 = 150; p100 = 31; cb100 = 0; f100 = 3;
-    } else if (/\b(ternera|solomillo|buey|cerdo|carne)\b/i.test(name)) {
-      c100 = 220; p100 = 26; cb100 = 0; f100 = 13;
-    } else if (/\b(salm[oó]n)\b/i.test(name)) {
-      c100 = 208; p100 = 22; cb100 = 0; f100 = 13;
-    } else if (/\b(at[uú]n|merluza|bacalao|pescado|gambas?|langostinos?)\b/i.test(name)) {
-      c100 = 110; p100 = 22; cb100 = 0; f100 = 2;
-    } else if (/\b(huevo|huevos|claras?)\b/i.test(name)) {
+    if (/\b(pollo|pechuga|pavo|conejo)\b/i.test(name)) {
+      c100 = 145; p100 = 31; cb100 = 0; f100 = 3;
+    } else if (/\b(ternera|solomillo|buey|cerdo|carne|lomo|cordero)\b/i.test(name)) {
+      c100 = 215; p100 = 26; cb100 = 0; f100 = 12;
+    } else if (/\b(salm[oó]n|at[uú]n|bonito|emperador|pez\s+espada|sardinas?|boquer[oó]n|boquerones|caballa|arenque)\b/i.test(name)) {
+      c100 = 190; p100 = 22; cb100 = 0; f100 = 11;
+    } else if (/\b(dorada|lubina|trucha|merluza|bacalao|lenguado|rodaballo|corvina|rape|pescadilla|gallo|pescado\s+blanco|pescado)\b/i.test(name)) {
+      // Pescado blanco magro (dorada, merluza, lubina, etc.): rico en proteína y 0g hidratos
+      c100 = 105; p100 = 20; cb100 = 0; f100 = 2.5;
+    } else if (/\b(gambas?|langostinos?|calamare?s?|chipir[oó]n|chipirones|sepia|pulpo|mejill[oó]n|mejillones|almejas?|berberechos?|chirlas?|marisco)\b/i.test(name)) {
+      c100 = 90; p100 = 18; cb100 = 1; f100 = 1;
+    } else if (/\b(claras?)\b/i.test(name)) {
+      c100 = 50; p100 = 11; cb100 = 0.7; f100 = 0.2;
+    } else if (/\b(huevo|huevos)\b/i.test(name)) {
       c100 = 145; p100 = 13; cb100 = 1; f100 = 10;
+    } else if (/\b(prote[ií]na|whey|polvo\s+de\s+prote[ií]na|case[ií]na)\b/i.test(name)) {
+      c100 = 380; p100 = 75; cb100 = 6; f100 = 4;
     } else if (/\b(tofu|tempeh|soja)\b/i.test(name)) {
       c100 = 120; p100 = 14; cb100 = 3; f100 = 6;
     } else if (/\b(pasta|espaguetis?|macarrones?|tallarines?|fideos?|lasa[ñn]a)\b/i.test(name)) {
@@ -292,12 +323,12 @@ function estimateRecipeNutrition(recipe) {
       c100 = 260; p100 = 9; cb100 = 50; f100 = 3;
     } else if (/\b(garbanzos?|lentejas?|alubias?|frijoles?|hummus)\b/i.test(name)) {
       c100 = 140; p100 = 9; cb100 = 20; f100 = 3;
-    } else if (/\b(aceite|oliva|mantequilla|ghee)\b/i.test(name)) {
+    } else if (isOilOrFat) {
       c100 = 884; p100 = 0; cb100 = 0; f100 = 100;
     } else if (/\b(aguacate)\b/i.test(name)) {
       c100 = 160; p100 = 2; cb100 = 8; f100 = 15;
-    } else if (/\b(queso|parmesano|feta|mozzarella|cheddar)\b/i.test(name)) {
-      c100 = 320; p100 = 22; cb100 = 2; f100 = 25;
+    } else if (/\b(queso|parmesano|feta|mozzarella|cheddar|cottage)\b/i.test(name)) {
+      c100 = 280; p100 = 20; cb100 = 3; f100 = 20;
     } else if (/\b(yogur|leche|bebida vegetal)\b/i.test(name)) {
       c100 = 80; p100 = 7; cb100 = 5; f100 = 4;
     } else if (/\b(nueces|almendras?|pi[ñn]ones|ch[ií]a|semillas|cacahuetes?|frutos secos)\b/i.test(name)) {
@@ -308,7 +339,7 @@ function estimateRecipeNutrition(recipe) {
       c100 = 50; p100 = 1; cb100 = 12; f100 = 0;
     } else if (/\b(patatas?|papas?)\b/i.test(name)) {
       c100 = 85; p100 = 2; cb100 = 19; f100 = 0;
-    } else if (/\b(tomates?|cherry|pepino|cebolla|ajo|esp[aá]rragos?|albahaca|romero|espinacas?|calabac[ií]n)\b/i.test(name)) {
+    } else if (/\b(tomates?|cherry|pepino|cebolla|ajo|esp[aá]rragos?|espinacas?|calabac[ií]n|lechuga|br[oó]coli|jud[ií]as)\b/i.test(name)) {
       c100 = 25; p100 = 1.5; cb100 = 4; f100 = 0.2;
     }
 
@@ -319,10 +350,10 @@ function estimateRecipeNutrition(recipe) {
     totalFat += f100 * factor;
   });
 
-  const perServingCalories = Math.max(50, Math.round(totalCal / servings));
-  const perServingProtein = Math.max(1, Math.round((totalProt / servings) * 10) / 10);
-  const perServingCarbs = Math.max(1, Math.round((totalCarbs / servings) * 10) / 10);
-  const perServingFat = Math.max(1, Math.round((totalFat / servings) * 10) / 10);
+  const perServingCalories = Math.max(20, Math.round(totalCal / servings));
+  const perServingProtein = Math.max(0, Math.round((totalProt / servings) * 10) / 10);
+  const perServingCarbs = Math.max(0, Math.round((totalCarbs / servings) * 10) / 10);
+  const perServingFat = Math.max(0, Math.round((totalFat / servings) * 10) / 10);
 
   return {
     calories: perServingCalories,
@@ -2500,7 +2531,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.73';
+  window.APP_VERSION = 'v0.74';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2532,7 +2563,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.73';
+    this.appVersion = 'v0.74';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -7645,25 +7676,27 @@ class FoodAssistantApp {
       ? `\nAVISO DE COBERTURA DEL CATÁLOGO: El usuario no tiene recetas guardadas para [${slotGaps.map(g => g.label).join(', ')}] que cumplan estrictamente con [${prefs}]. Al planificar la semana con "set_weekly_plan", rellena esos huecos con las mejores opciones actuales de su catálogo (sin dejar huecos vacíos) y SUGIÉRELE expresamente en tu mensaje crear recetas nuevas de ${slotGaps.map(g => g.label).join(' y ')} adaptadas a (${prefs}) para esos huecos.`
       : '';
 
-    return `Eres el Agente Gastronómico Inteligente de Food Assistant.
+    return `Eres el Asistente Culinario Personal de Franky en Food Assistant.
 Fecha actual: ${todayKey}.
 Raciones por defecto en casa: ${state.settings?.defaultServings || 2}.
-Preferencias dietéticas del usuario (RESPETAR SIEMPRE): ${prefs}.
-Objetivos nutricionales diarios del usuario: ${goals}.
+Preferencias dietéticas de Franky (RESPETAR SIEMPRE): ${prefs}.
+Objetivos nutricionales diarios de Franky: ${goals}.
 Lista de la compra pendiente: ${pendingShop}.${gapNotice}
 
-CATÁLOGO DE RECETAS DEL USUARIO:
+CATÁLOGO DE RECETAS DE FRANKY:
 ${recipesCatalog || '(Sin recetas guardadas)'}
 
 PLAN SEMANAL ACTUAL (Semana visible):
 ${currentPlanSummary}
 
-INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
-1. Cuando el usuario pida crear, planificar, completar o modificar su menú semanal (o indique que faltan comidas o que hay huecos vacíos), DEBES invocar SIEMPRE la herramienta "set_weekly_plan" con los 7 días de la semana (${weekDays.map(w => `${w.dayName}=${w.dateKey}`).join(', ')}) y las 4 comidas de cada día ("breakfast", "lunch", "snack" y "dinner") usando los IDs reales del catálogo. NUNCA dejes desayunos, almuerzos, meriendas ni cenas vacíos.
-2. Si para Desayuno ("breakfast") o Merienda ("snack") no hay suficientes recetas con una etiqueta nutricional como "Alta en Proteínas", elige igualmente las mejores recetas de Desayuno y Merienda del catálogo del usuario para que las 4 comidas de los 7 días queden siempre completas, y pregúntale al usuario si quiere que le crees recetas nuevas específicas para esos huecos.
-3. Si faltan recetas adecuadas o el usuario pide crear/inventar recetas nuevas para esos huecos, usa "create_and_save_recipe" para guardarlas en el catálogo y asígnalas al plan con "set_weekly_plan".
-4. Si el usuario pide añadir, tachar o eliminar cosas de la lista de la compra, usa "manage_shopping_list".
-5. PROHIBIDO mostrar identificadores internos (como "rec-...") en tu respuesta de texto al usuario. En el texto visible escribe únicamente los nombres de los platos. Responde siempre en español de forma cercana, minimalista, clara y directa.`;
+INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
+1. Dirígete siempre a Franky de forma natural, cálida, concisa y directa (sin introducciones robóticas, sin disculpas innecesarias).
+2. Si Franky pide planificar un solo día ("hoy", "día de hoy", "mañana", "el lunes", etc.), invoca la herramienta "set_day_plan" con el dateKey correspondiente y recetas equilibradas de su catálogo, sin alterar el resto de la semana.
+3. Si Franky pide crear, planificar, completar o modificar su menú semanal (o indica que faltan comidas, que hay huecos o que pongas los platos en el plan), DEBES invocar SIEMPRE la herramienta "set_weekly_plan" con los 7 días (${weekDays.map(w => `${w.dayName}=${w.dateKey}`).join(', ')}) y las 4 comidas completas ("breakfast", "lunch", "snack" y "dinner") usando los IDs reales de su catálogo. NUNCA dejes huecos vacíos ni te limites a responder con texto plano.
+4. Si Franky pide "Batch Cooking" o modo sobras, organiza las cenas para que se cocinen dobles y se reutilicen inteligentemente como tupper de almuerzo al día siguiente (ej. Lunes cena para Martes almuerzo).
+5. REGLA ESTRICTA PARA LA LISTA DE LA COMPRA: Si Franky pide añadir artículos concretos (ej. "añade leche y plátanos", "apunta 3 huevos"), usa SIEMPRE la herramienta "manage_shopping_list" con action: "add" y la lista de artículos pedidos en "items". NUNCA uses action: "add_from_current_plan" a menos que Franky diga explícitamente "añade los ingredientes del plan", "vuelca el menú semanal" o "añade todo lo de la semana".
+6. Si faltan recetas adecuadas para cubrir huecos nutricionales o Franky pide inventar recetas, usa "create_and_save_recipe" para crearlas y guardarlas en el catálogo.
+7. PROHIBIDO mostrar IDs internos tipo "rec-..." en el texto visible para Franky. Escribe los nombres de los platos de forma limpia y atractiva.`;
   }
 
   async callGeminiAgent(prompt, systemInstruction = "", enableTools = true) {
@@ -7672,14 +7705,14 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
       return this.simulateGeminiAgentResponse(prompt);
     }
 
-    const rawModel = state.settings.geminiModel || 'gemini-3.8-flash';
-    const primaryModel = (rawModel === 'gemini-2.5-flash' || rawModel === 'gemini-1.5-flash') ? 'gemini-3.8-flash' : rawModel;
-    // Cascada automática anti-saturación (High Demand / 503 / 429) entre modelos activos de la familia 3.x
+    const rawModel = state.settings.geminiModel || 'gemini-3.5-flash-lite';
+    const primaryModel = (rawModel === 'gemini-2.5-flash' || rawModel === 'gemini-1.5-flash') ? 'gemini-3.5-flash-lite' : rawModel;
+    // Cascada automática anti-saturación (High Demand / 503 / 429) priorizando modelos de baja latencia
     const candidateModels = [...new Set([
       primaryModel,
+      'gemini-3.5-flash-lite',
       'gemini-3.8-flash',
       'gemini-3.6-flash',
-      'gemini-3.5-flash-lite',
       'gemini-3.1-flash-lite'
     ])];
 
@@ -7721,14 +7754,26 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
       // US-39: La clave nunca va en la URL (?key=), se envía en la cabecera x-goog-api-key
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey
-        },
-        body: JSON.stringify(payload)
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      let response;
+
+      try {
+        response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+      } catch (fetchErr) {
+        clearTimeout(timeoutId);
+        lastErrMsg = fetchErr.name === 'AbortError' ? `Tiempo de espera agotado en modelo ${model}` : fetchErr.message;
+        continue;
+      }
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         data = await response.json();
@@ -7786,7 +7831,7 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
     return res.text || "";
   }
 
-  buildSimulatedWeeklyPlanArgs(mode = 'replace') {
+  buildSimulatedWeeklyPlanArgs(mode = 'replace', isBatchCooking = false) {
     const activePrefs = Array.isArray(state.dietaryPreferences) ? state.dietaryPreferences : [];
     const allRecipes = Array.isArray(state.recipes) ? state.recipes : [];
     const compliantRecipes = activePrefs.length > 0
@@ -7834,40 +7879,98 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
     const dinnerList = filterByTag('Cena', true);
 
     const weekDays = this.getPlannerWeekDates();
+    let prevDinnerId = null;
     const days = weekDays.map((wDay, idx) => {
       const pick = (list, offset = 0) => list.length > 0 ? list[(idx + offset) % list.length].id : null;
+      let lunchId = pick(lunchList, 0);
+      let dinnerId = pick(dinnerList, 1);
+      let isLeftoverLunch = false;
+
+      // US-65: Batch Cooking inteligente / Sobras en tupper:
+      // En vez de duplicar exactamente todo el día, se cocina ración doble de cena y se lleva de tupper para el almuerzo del día siguiente
+      if (isBatchCooking) {
+        if (idx === 1 && prevDinnerId) { // Martes almuerzo = tupper de la cena del Lunes
+          lunchId = prevDinnerId;
+          isLeftoverLunch = true;
+        } else if (idx === 3 && prevDinnerId) { // Jueves almuerzo = tupper de la cena del Miércoles
+          lunchId = prevDinnerId;
+          isLeftoverLunch = true;
+        }
+      }
+
+      prevDinnerId = dinnerId;
       return {
         dateKey: wDay.dateKey,
         dayName: wDay.dayName,
         breakfast: pick(breakfastList, 0),
-        lunch: pick(lunchList, 0),
+        lunch: lunchId,
         snack: pick(snackList, 0),
-        dinner: pick(dinnerList, 1)
+        dinner: dinnerId,
+        isLeftoverLunch
       };
     });
 
-    return { mode, days };
+    return { mode, days, isBatchCooking };
   }
 
   simulateGeminiAgentResponse(prompt) {
     const lower = (prompt || '').toLowerCase();
 
-    // 1. Planificación semanal estructurada respetando preferencias dietéticas (BUG-15 + US-17)
-    if (this.isWeeklyPlanPrompt(prompt)) {
+    // 0. Planificación de un solo día concreto (ej. "Planifica mi día de hoy")
+    const isSingleDay = /\b(hoy|dia\s+de\s+hoy|d[ií]a\s+de\s+hoy|ma[ñn]ana|solo\s+hoy|este\s+d[ií]a)\b/i.test(prompt);
+    if (isSingleDay) {
+      const todayKey = toLocalDateKey(new Date());
       const planArgs = this.buildSimulatedWeeklyPlanArgs('replace');
+      const todayPlan = planArgs.days[0] || {};
+      const findTitle = (id) => state.recipes.find(r => r.id === id)?.title || 'Comida equilibrada';
+      const dayName = new Date().toLocaleDateString('es-ES', { weekday: 'long' });
+      const capDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+
+      return {
+        text: `¡Listo, Franky! He planificado las comidas para tu **día de hoy (${capDay})** en tu Planificador:\n\n` +
+              `• **Desayuno**: ${findTitle(todayPlan.breakfast)}\n` +
+              `• **Almuerzo**: ${findTitle(todayPlan.lunch)}\n` +
+              `• **Merienda**: ${findTitle(todayPlan.snack)}\n` +
+              `• **Cena**: ${findTitle(todayPlan.dinner)}`,
+        toolCalls: [
+          {
+            name: 'set_day_plan',
+            args: {
+              dateKey: todayKey,
+              dayName: capDay,
+              breakfast: todayPlan.breakfast,
+              lunch: todayPlan.lunch,
+              snack: todayPlan.snack,
+              dinner: todayPlan.dinner
+            }
+          }
+        ]
+      };
+    }
+
+    // 1. Planificación semanal estructurada respetando preferencias dietéticas o modo Batch Cooking (BUG-15 + US-17 + US-65)
+    if (this.isWeeklyPlanPrompt(prompt)) {
+      const isBatch = lower.includes('batch cooking') || lower.includes('sobras') || lower.includes('tupper');
+      const planArgs = this.buildSimulatedWeeklyPlanArgs('replace', isBatch);
       planArgs.completeWeek = true;
       this.lastAiProposedPlan = planArgs;
       const findTitle = (id) => state.recipes.find(r => r.id === id)?.title || 'Comida libre';
-      const summaryLines = planArgs.days.map(d =>
-        `- **${d.dayName}**: Desayuno: ${findTitle(d.breakfast)} | Almuerzo: ${findTitle(d.lunch)} | Merienda: ${findTitle(d.snack)} | Cena: ${findTitle(d.dinner)}`
-      ).join('\n');
+
+      const summaryLines = planArgs.days.map(d => {
+        const lunchLabel = d.isLeftoverLunch ? `🥡 Tupper de sobras (${findTitle(d.lunch)})` : findTitle(d.lunch);
+        const dinnerLabel = (isBatch && (d.dayName === 'Lunes' || d.dayName === 'Miércoles'))
+          ? `${findTitle(d.dinner)} (cocinas doble para tupper)`
+          : findTitle(d.dinner);
+        return `- **${d.dayName}**: Desayuno: ${findTitle(d.breakfast)} | Almuerzo: ${lunchLabel} | Merienda: ${findTitle(d.snack)} | Cena: ${dinnerLabel}`;
+      }).join('\n');
 
       const prefNote = (state.dietaryPreferences && state.dietaryPreferences.length > 0)
         ? ` respetando tus preferencias (**${state.dietaryPreferences.join(', ')}**)`
         : '';
+      const modeNote = isBatch ? ' en modo **Batch Cooking Inteligente** (ahorras tiempo con tuppers de sobras martes y jueves)' : '';
 
       return {
-        text: `¡He analizado tus recetas guardadas${prefNote} y he completado las 4 comidas de lunes a domingo en tu Planificador Semanal!\n\n${summaryLines}`,
+        text: `¡Listo, Franky! He analizado tu catálogo de recetas${prefNote} y he organizado tu menú semanal completo${modeNote}:\n\n${summaryLines}`,
         toolCalls: [
           {
             name: 'set_weekly_plan',
@@ -7924,7 +8027,7 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
       };
 
       return {
-        text: `He creado y guardado en tu recetario la receta **${newRecipeArgs.title}** (${newRecipeArgs.prepTimeMinutes + newRecipeArgs.cookTimeMinutes} min | ${newRecipeArgs.nutrition.protein}g de proteína por ración).`,
+        text: `¡Listo, Franky! He creado y guardado en tu recetario la receta **${newRecipeArgs.title}** (${newRecipeArgs.prepTimeMinutes + newRecipeArgs.cookTimeMinutes} min | ${newRecipeArgs.nutrition.protein}g de proteína por ración).`,
         toolCalls: [
           {
             name: 'create_and_save_recipe',
@@ -7935,14 +8038,27 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
     }
 
     // 3. Gestión de lista de la compra por voz / chat (US-17)
-    if (lower.includes('compra') || lower.includes('añade') || lower.includes('anade') || lower.includes('apunta')) {
+    if (lower.includes('compra') || lower.includes('añade') || lower.includes('anade') || lower.includes('apunta') || lower.includes('agrega')) {
+      const isPlanDump = /ingredientes\s+del\s+plan|vuelca|todo\s+el\s+plan|del\s+men[uú]\s+semanal|plan\s+a\s+la\s+compra|completo\s+a\s+la\s+compra/i.test(prompt);
+      if (isPlanDump) {
+        return {
+          text: `¡Hecho, Franky! He añadido todos los ingredientes de tu plan semanal a la Lista de la Compra.`,
+          toolCalls: [
+            {
+              name: 'manage_shopping_list',
+              args: { action: 'add_from_current_plan' }
+            }
+          ]
+        };
+      }
+
       const cleaned = prompt
         .replace(/^(?:por favor\s+)?(?:a[ñn]ade|apunta|mete|pon|agrega)\s+/i, '')
         .replace(/\s+(?:a|en)\s+la\s+(?:lista\s+de\s+la\s+)?compra.*$/i, '')
         .trim();
       const rawParts = cleaned
         ? cleaned.split(/\s*,\s*|\s+y\s+/i).map(s => s.trim()).filter(Boolean)
-        : ['Leche', 'Aguacates'];
+        : ['Leche'];
 
       const items = rawParts.map(part => {
         const parsed = RecipeParser.parseIngredientLine(part);
@@ -7955,7 +8071,7 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
       });
 
       return {
-        text: `¡Hecho! He añadido **${items.map(i => i.name).join(', ')}** a tu Lista de la Compra clasificados por pasillo.`,
+        text: `¡Hecho, Franky! He añadido **${items.map(i => i.name).join(', ')}** a tu Lista de la Compra clasificados por pasillo.`,
         toolCalls: [
           {
             name: 'manage_shopping_list',
@@ -7969,7 +8085,7 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
     }
 
     return {
-      text: `He tomado nota de tu consulta. Puedes pedirme que **planifique tu menú semanal**, que **cree recetas nuevas** o que **añada ingredientes a tu lista de la compra** (y configurar tu clave de API de Gemini en Ajustes cuando quieras).`,
+      text: `¡Hola Franky! Puedes pedirme que **planifique tu día de hoy**, que **organice tu menú semanal** (incluyendo modo Batch Cooking / sobras), que **cree recetas nuevas** o que **añada artículos a tu lista de la compra**.`,
       toolCalls: []
     };
   }
@@ -8139,6 +8255,24 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
       };
     }
 
+    if (name === 'set_day_plan') {
+      const targetDateKey = args.dateKey || toLocalDateKey(new Date());
+      const dayData = state.getDayPlan(targetDateKey, args.dayName);
+      if (args.breakfast !== undefined) dayData.breakfast = this.resolveRecipeIdForAgent(args.breakfast);
+      if (args.lunch !== undefined) dayData.lunch = this.resolveRecipeIdForAgent(args.lunch);
+      if (args.snack !== undefined) dayData.snack = this.resolveRecipeIdForAgent(args.snack);
+      if (args.dinner !== undefined) dayData.dinner = this.resolveRecipeIdForAgent(args.dinner);
+      dayData.updatedAt = new Date().toISOString();
+      state.save('fa_mealplan', state.mealPlan);
+      this.scheduleSyncWithCloud();
+      this.render();
+      return {
+        tool: 'set_day_plan',
+        dateKey: targetDateKey,
+        dayName: args.dayName || dayData.dayName
+      };
+    }
+
     if (name === 'set_weekly_plan') {
       const mode = args.mode === 'merge' ? 'merge' : 'replace';
       const daysInput = Array.isArray(args.days) ? args.days : [];
@@ -8191,6 +8325,11 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
             dayData[slotKey] = fallbackDay[slotKey];
           }
         });
+
+        if (dayEntry.isLeftoverLunch) {
+          if (!dayData.leftoverSlots) dayData.leftoverSlots = {};
+          dayData.leftoverSlots.lunch = true;
+        }
 
         dayData.updatedAt = new Date().toISOString();
         updatedDateKeys.add(targetDateKey);
@@ -8377,6 +8516,7 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
         const summaries = executedResults.map(r => {
           if (r.tool === 'create_and_save_recipe') return `He creado la receta **${r.title}**.`;
           if (r.tool === 'set_weekly_plan') return this.buildWeeklyPlanSummaryText();
+          if (r.tool === 'set_day_plan') return `He planificado las comidas de tu día (${r.dayName || r.dateKey}) en el Planificador.`;
           if (r.tool === 'manage_shopping_list') return `He actualizado tu **Lista de la Compra** (${r.count} artículos).`;
           return '';
         }).filter(Boolean);
@@ -8401,7 +8541,7 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
         actionsContainer.style = 'display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;';
 
         executedResults.forEach(res => {
-          if (res.tool === 'set_weekly_plan') {
+          if (res.tool === 'set_weekly_plan' || res.tool === 'set_day_plan') {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'btn btn-primary btn-sm';
@@ -8489,38 +8629,51 @@ INSTRUCCIONES DE CONTROL OBLIGATORIAS (FUNCTION CALLING):
   async compressImageToBase64(file, maxWidth = 1024, maxHeight = 1024, quality = 0.8) {
     if (!file) return null;
     return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => reject(new Error("Tiempo de procesamiento de imagen agotado")), 8000);
       const reader = new FileReader();
       reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
-          let width = img.width;
-          let height = img.height;
-          if (width > maxWidth || height > maxHeight) {
-            if (width > height) {
-              height = Math.round((height * maxWidth) / width);
-              width = maxWidth;
-            } else {
-              width = Math.round((width * maxHeight) / height);
-              height = maxHeight;
+          clearTimeout(timeoutId);
+          try {
+            let width = img.width || 800;
+            let height = img.height || 600;
+            if (width > maxWidth || height > maxHeight) {
+              if (width > height) {
+                height = Math.round((height * maxWidth) / width);
+                width = maxWidth;
+              } else {
+                width = Math.round((width * maxHeight) / height);
+                height = maxHeight;
+              }
             }
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, width);
+            canvas.height = Math.max(1, height);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            // Convertir siempre a image/jpeg estándar y compatible con Gemini
+            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+            const base64Data = (dataUrl.split(',')[1] || '').trim();
+            resolve({
+              dataUrl,
+              base64Data,
+              mimeType: 'image/jpeg'
+            });
+          } catch (canvasErr) {
+            reject(canvasErr);
           }
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL(file.type || 'image/jpeg', quality);
-          const base64Data = dataUrl.split(',')[1];
-          resolve({
-            dataUrl,
-            base64Data,
-            mimeType: file.type || 'image/jpeg'
-          });
         };
-        img.onerror = reject;
+        img.onerror = () => {
+          clearTimeout(timeoutId);
+          reject(new Error("El archivo seleccionado no es una imagen compatible o legible."));
+        };
         img.src = e.target.result;
       };
-      reader.onerror = reject;
+      reader.onerror = () => {
+        clearTimeout(timeoutId);
+        reject(new Error("No se pudo leer el archivo de imagen."));
+      };
       reader.readAsDataURL(file);
     });
   }
@@ -8674,13 +8827,13 @@ REGLAS CRÍTICAS:
 }`;
     parts.push({ text: promptText });
 
-    const rawModel = state.settings.geminiModel || 'gemini-3.8-flash';
-    const primaryModel = (rawModel === 'gemini-2.5-flash' || rawModel === 'gemini-1.5-flash') ? 'gemini-3.8-flash' : rawModel;
+    const rawModel = state.settings.geminiModel || 'gemini-3.5-flash-lite';
+    const primaryModel = (rawModel === 'gemini-2.5-flash' || rawModel === 'gemini-1.5-flash') ? 'gemini-3.5-flash-lite' : rawModel;
     const candidateModels = [...new Set([
       primaryModel,
+      'gemini-3.5-flash-lite',
       'gemini-3.8-flash',
       'gemini-3.6-flash',
-      'gemini-3.5-flash-lite',
       'gemini-3.1-flash-lite'
     ])];
 
@@ -8688,6 +8841,8 @@ REGLAS CRÍTICAS:
     let data = null;
 
     for (const model of candidateModels) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
       try {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
         const resp = await fetch(endpoint, {
@@ -8698,8 +8853,10 @@ REGLAS CRÍTICAS:
           },
           body: JSON.stringify({
             contents: [{ parts }]
-          })
+          }),
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
         if (resp.ok) {
           data = await resp.json();
@@ -8708,7 +8865,8 @@ REGLAS CRÍTICAS:
         const errJson = await resp.json().catch(() => ({}));
         lastError = new Error(errJson.error?.message || `HTTP ${resp.status}`);
       } catch (e) {
-        lastError = e;
+        clearTimeout(timeoutId);
+        lastError = e.name === 'AbortError' ? new Error(`Tiempo de espera agotado en modelo ${model}`) : e;
       }
     }
 
@@ -8717,13 +8875,13 @@ REGLAS CRÍTICAS:
     }
 
     const rawResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const cleanJsonText = rawResponseText
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/i, '')
-      .replace(/\s*```$/i, '')
-      .trim();
+    // Extracción limpia y tolerante a bloques markdown o introducciones de texto
+    const jsonMatch = rawResponseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("No se detectó un formato JSON válido en la receta analizada.");
+    }
 
-    const parsedJson = JSON.parse(cleanJsonText);
+    const parsedJson = JSON.parse(jsonMatch[0]);
     return this.normalizeAiExtractedRecipe(parsedJson, sourceUrl);
   }
 
@@ -9483,6 +9641,22 @@ const AI_TOOLS_DECLARATIONS = [
         }
       },
       required: ["title", "ingredients", "instructions"]
+    }
+  },
+  {
+    name: "set_day_plan",
+    description: "Asigna o actualiza las comidas de un día concreto en el Planificador (ej. hoy, mañana o una fecha específica) usando IDs reales de recetas.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        dateKey: { type: "STRING", description: "Fecha ISO local YYYY-MM-DD del día a planificar (ej. 2026-10-29)" },
+        dayName: { type: "STRING", description: "Nombre del día (ej. Lunes, Martes...)" },
+        breakfast: { type: "STRING", description: "ID de la receta para desayuno (opcional)" },
+        lunch: { type: "STRING", description: "ID de la receta para almuerzo (opcional)" },
+        snack: { type: "STRING", description: "ID de la receta para merienda (opcional)" },
+        dinner: { type: "STRING", description: "ID de la receta para cena (opcional)" }
+      },
+      required: ["dateKey"]
     }
   },
   {

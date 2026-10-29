@@ -581,4 +581,38 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     expect(appInstance.isWeeklyPlanPrompt('Planifica mi dia de hoy')).toBe(false);
     expect(appInstance.isWeeklyPlanPrompt('Dime qué comer hoy')).toBe(false);
   });
+
+  it('v0.74 Refinamiento: "Planifica mi dia de hoy" invoca set_day_plan y personaliza la respuesta para Franky', () => {
+    const res = appInstance.simulateGeminiAgentResponse('Planifica mi dia de hoy');
+    expect(res.text).toContain('Franky');
+    expect(res.toolCalls.length).toBe(1);
+    expect(res.toolCalls[0].name).toBe('set_day_plan');
+    expect(res.toolCalls[0].args.breakfast).toBeTruthy();
+    expect(res.toolCalls[0].args.lunch).toBeTruthy();
+    expect(res.toolCalls[0].args.snack).toBeTruthy();
+    expect(res.toolCalls[0].args.dinner).toBeTruthy();
+  });
+
+  it('v0.74 Refinamiento: "Añade plátanos y leche a la compra" añade solo los artículos solicitados sin volcar el plan', () => {
+    const res = appInstance.simulateGeminiAgentResponse('Añade 3 plátanos y 1 leche a la compra');
+    expect(res.toolCalls.length).toBe(1);
+    expect(res.toolCalls[0].name).toBe('manage_shopping_list');
+    expect(res.toolCalls[0].args.action).toBe('add');
+    const items = res.toolCalls[0].args.items;
+    expect(items.length).toBe(2);
+    expect(items.some(i => /pl[aá]tano/i.test(i.name))).toBe(true);
+    expect(items.some(i => /leche/i.test(i.name))).toBe(true);
+  });
+
+  it('v0.74 Refinamiento: Batch Cooking organiza tuppers de sobras para martes y jueves', () => {
+    const res = appInstance.simulateGeminiAgentResponse('Planifica mi semana en modo Batch Cooking');
+    expect(res.text).toContain('Batch Cooking');
+    expect(res.text).toContain('🥡 Tupper de sobras');
+    expect(res.toolCalls.length).toBe(1);
+    expect(res.toolCalls[0].name).toBe('set_weekly_plan');
+    const days = res.toolCalls[0].args.days;
+    // Martes almuerzo debe ser sobras de la cena del Lunes
+    expect(days[1].lunch).toBe(days[0].dinner);
+    expect(days[1].isLeftoverLunch).toBe(true);
+  });
 });

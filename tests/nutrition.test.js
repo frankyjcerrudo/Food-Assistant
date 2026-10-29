@@ -65,6 +65,26 @@ describe('US-01: Contador de Calorías y Macronutrientes por plato y resumen dia
       expect(estimated.fat).toBeGreaterThan(5);
     });
 
+    it('estimateRecipeNutrition calcula con precisión pescados magros (dorada al horno con un pelín de aceite y sal) con alta proteína y 0 hidratos', () => {
+      const doradaRecipe = {
+        title: 'Dorada al horno',
+        servings: 1,
+        ingredients: [
+          { name: 'Dorada', amount: 1, unit: 'ud' },
+          { name: 'Aceite de oliva', amount: 1, unit: 'pelín' },
+          { name: 'Sal', amount: 1, unit: 'pizca' },
+          { name: 'Pimienta negra', amount: 1, unit: 'pizca' }
+        ]
+      };
+      const nut = estimateRecipeNutrition(doradaRecipe);
+      // 1 dorada entera limpia (~250g) aporta ~50g de proteína y ~0g de carbohidratos
+      expect(nut.protein).toBeGreaterThanOrEqual(40);
+      expect(nut.carbs).toBe(0);
+      expect(nut.fat).toBeLessThanOrEqual(15);
+      expect(nut.calories).toBeGreaterThan(250);
+      expect(nut.calories).toBeLessThan(350);
+    });
+
     it('RecipeParser.parseNutrition extrae valores numéricos de cadenas con unidades', () => {
       const rawNutrition = {
         calories: '450 kcal',
