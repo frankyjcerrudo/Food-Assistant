@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#ffffff">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.87">
+  <link rel="stylesheet" href="styles.css?v=0.88">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%231a73e8'/><path d='M30 30h40v40H30z' fill='%23ffffff'/></svg>">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -25,7 +25,7 @@
         <span class="material-symbols-outlined">restaurant_menu</span>
       </div>
       <h1 class="brand-name">Food Assistant</h1>
-      <span class="app-version-badge" id="app-version-badge" title="Versión de Food Assistant">v0.87</span>
+      <span class="app-version-badge" id="app-version-badge" title="Versión de Food Assistant">v0.88</span>
     </div>
     <div class="header-actions">
       <!-- Theme quick toggle -->
@@ -267,6 +267,14 @@
       <span class="material-symbols-outlined" style="font-size: 16px; animation: pulse 1s infinite; color: var(--m3-error, #ba1a1a);">mic</span>
       <span>Escuchando... habla ahora (se enviará automáticamente al terminar)</span>
     </div>
+    <div id="ai-chat-speaking-indicator" style="display: none; align-items: center; justify-content: space-between; margin-top: 8px; padding: 6px 12px; background: rgba(59, 130, 246, 0.08); border-radius: var(--radius-full); font-size: 12px; color: var(--color-brand); font-weight: 500;">
+      <span style="display: flex; align-items: center; gap: 6px;">
+        <span class="material-symbols-outlined icon-sm" style="animation: pulse 1.5s infinite;">volume_up</span> Asistente hablando...
+      </span>
+      <button type="button" class="btn btn-sm" id="btn-chat-stop-tts" style="color: var(--m3-error); background: transparent; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 11px; padding: 2px 8px; font-weight: 600; border-radius: 9999px;">
+        ⏹️ Detener voz
+      </button>
+    </div>
   </section>
 
   <!-- VIEW 6: SETTINGS -->
@@ -355,6 +363,16 @@
           <option value="gemini-2.5-pro">Gemini 2.5 Pro (Cuentas con facturación / Pro)</option>
           <option value="gemini-2.5-flash">Gemini 2.5 Flash (Proyectos antiguos autorizados)</option>
         </select>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding: 6px 0; border-top: 1px solid var(--m3-outline-variant, rgba(0,0,0,0.08));">
+        <div>
+          <label for="switch-tts-voice" style="font-size: 13px; font-weight: 500; display: block; color: var(--m3-on-surface);">Voz del Asistente (TTS)</label>
+          <span style="font-size: 11px; color: var(--m3-on-surface-variant);">Leer respuestas en voz alta de forma ágil y concisa</span>
+        </div>
+        <label class="switch" style="position: relative; display: inline-block; width: 44px; height: 24px; margin: 0;">
+          <input type="checkbox" id="switch-tts-voice" checked>
+          <span class="slider round"></span>
+        </label>
       </div>
       <div style="display: flex; gap: 8px; margin-bottom: 6px;">
         <input type="password" class="form-input" id="input-gemini-key" placeholder="AIzaSy... o sk-...">
@@ -553,7 +571,7 @@
         <span class="material-symbols-outlined" style="color: var(--m3-primary);">system_update</span> Versión y Actualizaciones
       </h3>
       <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px;">
-        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.87</strong>
+        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.88</strong>
       </p>
       <div style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
         Si acabas de desplegar o notas que algún cambio no aparece, pulsa el botón para limpiar la caché del Service Worker y cargar el código más reciente.
@@ -631,9 +649,14 @@
         <h3 id="gemini-invoke-title" style="margin: 0; font-size: 17px; font-weight: 600;">Asistente de Cocina</h3>
         <p id="gemini-invoke-subtitle" class="gemini-subtitle">Dime qué necesitas, pregúntame dudas o planifiquemos juntos</p>
       </div>
-      <button class="btn btn-ghost btn-icon" id="btn-close-gemini-invoke" aria-label="Cerrar Asistente">
-        <span class="material-symbols-outlined">close</span>
-      </button>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <button type="button" class="btn btn-sm btn-stop-tts" id="btn-header-stop-tts" style="display: none; align-items: center; gap: 4px; color: var(--m3-error); background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 9999px; padding: 4px 10px; font-size: 12px; font-weight: 500;" title="Detener locución de voz">
+          <span class="material-symbols-outlined" style="font-size: 16px;">stop_circle</span> Parar voz
+        </button>
+        <button class="btn btn-ghost btn-icon" id="btn-close-gemini-invoke" aria-label="Cerrar Asistente">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
     </div>
 
     <!-- Live transcription / Status badge -->
@@ -673,8 +696,16 @@
     </div>
 
     <!-- Result / Conversational Response card -->
-    <div class="gemini-result-card" id="gemini-invoke-result" style="display: none;">
-      <div class="gemini-response-body" id="gemini-invoke-result-text" style="font-size: 13px; line-height: 1.5; color: var(--m3-on-surface);">
+    <div class="gemini-result-card" id="gemini-invoke-result" style="display: none; flex-direction: column; gap: 8px;">
+      <div class="gemini-tts-bar" id="gemini-invoke-tts-bar" style="display: none; align-items: center; justify-content: space-between; background: rgba(59, 130, 246, 0.08); border-radius: 8px; padding: 6px 12px;">
+        <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-brand); font-weight: 500;">
+          <span class="material-symbols-outlined icon-sm" style="animation: pulse 1.5s infinite;">volume_up</span> Asistente hablando...
+        </span>
+        <button type="button" class="btn btn-sm" id="btn-result-stop-tts" style="color: var(--m3-error); background: transparent; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 11px; padding: 2px 8px; font-weight: 600; border-radius: 9999px;">
+          ⏹️ Detener
+        </button>
+      </div>
+      <div class="gemini-response-body" id="gemini-invoke-result-text" style="font-size: 13px; line-height: 1.5; color: var(--m3-on-surface);" title="Pulsa para detener voz si está hablando">
         <!-- Conversational text from Assistant -->
       </div>
       <div class="gemini-result-actions" id="gemini-invoke-result-actions">
@@ -1536,7 +1567,7 @@
   </div>
 </div>
 
-<script src="config.js?v=0.87"></script>
-<script src="app.js?v=0.87"></script>
+<script src="config.js?v=0.88"></script>
+<script src="app.js?v=0.88"></script>
 </body>
 </html>

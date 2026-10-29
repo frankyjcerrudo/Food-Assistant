@@ -127,6 +127,63 @@ describe('Camino B (US-17 & BUG-26): Asistente de Voz Integrado, Plurales y Fin 
       expect(cancelMock).toHaveBeenCalled();
       expect(speakMock).toHaveBeenCalled();
     });
+
+    it('v0.88: stopSpeech cancela SpeechSynthesis y actualiza indicadores visuales', () => {
+      const cancelMock = vi.fn();
+      window.speechSynthesis = { speak: vi.fn(), cancel: cancelMock };
+
+      const headerBtn = document.getElementById('btn-header-stop-tts');
+      const ttsBar = document.getElementById('gemini-invoke-tts-bar');
+
+      app.updateTtsPlayingUI(true);
+      expect(headerBtn.style.display).toBe('inline-flex');
+      expect(ttsBar.style.display).toBe('flex');
+
+      app.stopSpeech();
+      expect(cancelMock).toHaveBeenCalled();
+      expect(headerBtn.style.display).toBe('none');
+      expect(ttsBar.style.display).toBe('none');
+    });
+
+    it('v0.88: speakAiResponse locuta de forma concisa y breve (1-2 frases) ante respuestas largas', () => {
+      let spokenUtterance = null;
+      window.speechSynthesis = {
+        speak: vi.fn().mockImplementation((u) => { spokenUtterance = u; }),
+        cancel: vi.fn()
+      };
+      window.SpeechSynthesisUtterance = class {
+        constructor(text) {
+          this.text = text;
+        }
+      };
+
+      const longResponse = '¡Hola Franky! He añadido los tomates a tu lista de la compra. Además, he verificado que tienes 3 recetas compatibles en tu despensa. También he preparado un plan con pollo y ensalada para cenar hoy si te apetece.';
+      app.speakAiResponse(longResponse);
+
+      expect(spokenUtterance).not.toBeNull();
+      // Máximo 2 frases en la locución
+      const sentences = spokenUtterance.text.match(/[^.!?]+[.!?]+/g) || [];
+      expect(sentences.length).toBeLessThanOrEqual(2);
+      expect(spokenUtterance.text).not.toContain('pollo y ensalada');
+    });
+
+    it('v0.88: closeGeminiInvokeModal detiene la voz inmediatamente', () => {
+      const cancelMock = vi.fn();
+      window.speechSynthesis = { speak: vi.fn(), cancel: cancelMock };
+      app.closeGeminiInvokeModal();
+      expect(cancelMock).toHaveBeenCalled();
+    });
+
+    it('v0.88: si state.settings.ttsEnabled === false, speakAiResponse no emite voz', () => {
+      const speakMock = vi.fn();
+      window.speechSynthesis = { speak: speakMock, cancel: vi.fn() };
+      window.state.settings.ttsEnabled = false;
+
+      app.speakAiResponse('¡Hola Franky!');
+      expect(speakMock).not.toHaveBeenCalled();
+
+      window.state.settings.ttsEnabled = true;
+    });
   });
 
   describe('PWA Manifest Shortcuts', () => {

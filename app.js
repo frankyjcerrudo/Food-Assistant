@@ -1320,6 +1320,7 @@ class StateStore {
       geminiApiKey: '',
       defaultServings: 2,
       geminiModel: 'gemini-3.5-flash-lite',
+      ttsEnabled: true,
       nutritionGoals: {
         enabled: false,
         calories: 2000,
@@ -2539,7 +2540,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.87';
+  window.APP_VERSION = 'v0.88';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2571,7 +2572,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v0.87';
+    this.appVersion = window.APP_VERSION || 'v0.88';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -4266,6 +4267,10 @@ class FoodAssistantApp {
 
     // Gemini Quick Invoke Sheet Events
     document.getElementById('btn-close-gemini-invoke')?.addEventListener('click', () => this.closeGeminiInvokeModal());
+    document.getElementById('btn-header-stop-tts')?.addEventListener('click', () => this.stopSpeech());
+    document.getElementById('btn-result-stop-tts')?.addEventListener('click', () => this.stopSpeech());
+    document.getElementById('btn-chat-stop-tts')?.addEventListener('click', () => this.stopSpeech());
+    document.getElementById('gemini-invoke-result-text')?.addEventListener('click', () => this.stopSpeech());
     document.getElementById('btn-gemini-invoke-send')?.addEventListener('click', () => this.handleGeminiInvokeSubmit());
     document.getElementById('btn-gemini-invoke-mic')?.addEventListener('click', () => this.toggleVoiceRecognition(true));
     document.getElementById('gemini-invoke-input')?.addEventListener('keydown', (e) => {
@@ -4302,6 +4307,7 @@ class FoodAssistantApp {
   }
 
   switchView(viewId) {
+    this.stopSpeech();
     this.activeView = viewId;
     this.viewPanels.forEach(panel => {
       panel.classList.toggle('active', panel.id === viewId);
@@ -7785,14 +7791,15 @@ PLAN SEMANAL ACTUAL (Semana visible):
 ${currentPlanSummary}
 
 INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
-1. Dirígete siempre a Franky de forma natural, cálida, concisa y directa (sin introducciones robóticas, sin disculpas innecesarias).
+1. Dirígete siempre a Franky de forma natural, cálida, concisa y directa (sin introducciones robóticas, sin disculpas innecesarias y yendo siempre al grano).
 2. Si Franky pide planificar un solo día ("hoy", "día de hoy", "mañana", "el lunes", etc.), invoca ÚNICAMENTE la herramienta "set_day_plan" con el dateKey correspondiente y recetas equilibradas de su catálogo. NUNCA invoques "set_weekly_plan" para un solo día ni toques el resto de la semana.
 3. Si Franky pide crear, planificar, completar o modificar su menú semanal (o indica que faltan comidas, que hay huecos o que pongas los platos en el plan), DEBES invocar SIEMPRE la herramienta "set_weekly_plan" con los 7 días (${weekDays.map(w => `${w.dayName}=${w.dateKey}`).join(', ')}) y las 4 comidas completas ("breakfast", "lunch", "snack" y "dinner") usando los IDs reales de su catálogo. NUNCA dejes huecos vacíos ni te limites a responder con texto plano.
 4. Si Franky pide "Batch Cooking" o modo sobras: planifica cocinar ración doble en la cena de 2 días (ej. Lunes cena y Miércoles cena) para reutilizar como tupper en el almuerzo del día siguiente (Martes almuerzo y Jueves almuerzo) con isLeftoverLunch: true. Todas las demás comidas (desayunos, meriendas y demás cenas/almuerzos) DEBEN ser diferentes, frescas y variadas; NUNCA repitas todo el día idéntico.
 5. REGLA ESTRICTA PARA LA LISTA DE LA COMPRA: Si Franky pide añadir artículos concretos (ej. "añade leche y plátanos", "apunta 3 huevos"), usa SIEMPRE la herramienta "manage_shopping_list" con action: "add" y la lista de artículos pedidos en "items". NUNCA uses action: "add_from_current_plan" a menos que Franky diga explícitamente "añade los ingredientes del plan", "vuelca el menú semanal" o "añade todo lo de la semana".
 6. Si faltan recetas adecuadas para cubrir huecos nutricionales o Franky pide inventar recetas, usa "create_and_save_recipe" para crearlas y guardarlas en el catálogo.
 7. PROHIBIDO terminantemente mostrar IDs internos tipo "rec-..." en el texto visible para Franky. Escribe los nombres legibles de los platos de forma limpia y atractiva.
-8. CAPACIDAD DE RAZONAMIENTO Y ASESORAMIENTO CULINARIO: Si Franky hace preguntas abiertas, pide sugerencias o dudas sobre cocina, sustitutos de ingredientes, macros, técnicas o ideas para comer, razona con empatía e inteligencia como un chef y nutricionista experto, ofreciendo explicaciones claras y detalladas. Solo invoca herramientas cuando haya una acción concreta que ejecutar en la app (como apuntar a la compra, planificar comidas o guardar recetas).`;
+8. CAPACIDAD DE RAZONAMIENTO Y ASESORAMIENTO CULINARIO: Si Franky hace preguntas abiertas, pide sugerencias o dudas sobre cocina, sustitutos de ingredientes, macros, técnicas o ideas para comer, razona con empatía e inteligencia como un chef y nutricionista experto, ofreciendo explicaciones claras y prácticas. Solo invoca herramientas cuando haya una acción concreta que ejecutar en la app (como apuntar a la compra, planificar comidas o guardar recetas).
+9. CONCISIÓN OBLIGATORIA PARA VOZ HABLADA: Franky escucha tus respuestas mediante sintetizador de voz. Responde SIEMPRE de forma directa y sintética (máximo 1 a 3 frases claras y conversacionales). NUNCA recites monólogos largos ni enumeres listas eternas de ingredientes en el mensaje hablado si no se te pide expresamente. Confirma las acciones realizadas con agilidad y brevedad.`;
   }
 
   async callGeminiAgent(prompt, systemInstruction = "", enableTools = true) {
@@ -8804,6 +8811,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
   }
 
   async handleAiChatSubmit(fromVoice = false) {
+    this.stopSpeech();
     const input = document.getElementById('ai-chat-input');
     const text = input?.value.trim() || '';
     if (!text) return;
@@ -9176,6 +9184,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
   }
 
   openGeminiInvokeModal(startVoice = false) {
+    this.stopSpeech();
     const modal = document.getElementById('modal-gemini-invoke');
     if (!modal) return;
     this.openDialogModal(modal);
@@ -9201,6 +9210,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
   }
 
   closeGeminiInvokeModal() {
+    this.stopSpeech();
     const modal = document.getElementById('modal-gemini-invoke');
     if (this.isListeningVoice) {
       try { this.recognition.stop(); } catch (e) {}
@@ -9211,6 +9221,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
   }
 
   async handleGeminiInvokeSubmit(isVoice = false) {
+    this.stopSpeech();
     const input = document.getElementById('gemini-invoke-input');
     const prompt = input?.value?.trim();
     if (!prompt) return;
@@ -9307,20 +9318,75 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
   speakAiResponse(text) {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    if (state.settings?.ttsEnabled === false) return;
     try {
-      window.speechSynthesis.cancel();
-      const clean = text
+      this.stopSpeech();
+      const clean = String(text || '')
         .replace(/[*#_`]/g, '')
         .replace(/https?:\/\/\S+/g, '')
         .replace(/\n+/g, '. ')
+        .replace(/\s+/g, ' ')
         .trim();
       if (!clean) return;
-      const utterance = new SpeechSynthesisUtterance(clean);
+
+      // Locución ágil y concisa (máximo 2 oraciones o ~240 caracteres)
+      // para evitar que el sintetizador recite párrafos interminables.
+      const sentences = clean.match(/[^.!?]+[.!?]+/g);
+      let spokenText = clean;
+      if (sentences && sentences.length > 2) {
+        spokenText = sentences.slice(0, 2).join(' ').trim();
+      }
+      if (spokenText.length > 240) {
+        const truncated = spokenText.slice(0, 240);
+        const lastSpace = truncated.lastIndexOf(' ');
+        spokenText = (lastSpace > 80 ? truncated.slice(0, lastSpace) : truncated) + '.';
+      }
+
+      const utterance = new SpeechSynthesisUtterance(spokenText);
       utterance.lang = 'es-ES';
       utterance.rate = 1.05;
+      utterance.onstart = () => this.updateTtsPlayingUI(true);
+      utterance.onend = () => this.updateTtsPlayingUI(false);
+      utterance.onerror = () => this.updateTtsPlayingUI(false);
+
+      this.currentUtterance = utterance;
       window.speechSynthesis.speak(utterance);
+      this.updateTtsPlayingUI(true);
     } catch (e) {
       console.warn("SpeechSynthesis error:", e);
+      this.updateTtsPlayingUI(false);
+    }
+  }
+
+  stopSpeech() {
+    this.currentUtterance = null;
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch (e) {}
+    }
+    this.updateTtsPlayingUI(false);
+  }
+
+  updateTtsPlayingUI(isPlaying) {
+    const headerBtn = document.getElementById('btn-header-stop-tts');
+    if (headerBtn) headerBtn.style.display = isPlaying ? 'inline-flex' : 'none';
+
+    const ttsBar = document.getElementById('gemini-invoke-tts-bar');
+    if (ttsBar) ttsBar.style.display = isPlaying ? 'flex' : 'none';
+
+    const chatTtsBar = document.getElementById('ai-chat-speaking-indicator');
+    if (chatTtsBar) chatTtsBar.style.display = isPlaying ? 'flex' : 'none';
+
+    const resultText = document.getElementById('gemini-invoke-result-text');
+    if (resultText) {
+      if (isPlaying) {
+        resultText.style.cursor = 'pointer';
+        resultText.title = 'Haz clic para detener la voz del Asistente';
+      } else {
+        resultText.style.cursor = 'default';
+        resultText.removeAttribute('title');
+      }
     }
   }
 
@@ -10186,6 +10252,18 @@ REGLAS CRÍTICAS:
         state.settings.geminiModel = e.target.value;
         state.save && state.save('fa_settings', state.settings);
         this.renderSettings();
+      };
+    }
+
+    const switchTts = document.getElementById('switch-tts-voice');
+    if (switchTts) {
+      switchTts.checked = state.settings.ttsEnabled !== false;
+      switchTts.onchange = (e) => {
+        state.settings.ttsEnabled = e.target.checked;
+        state.save && state.save('fa_settings', state.settings);
+        if (!e.target.checked) {
+          this.stopSpeech();
+        }
       };
     }
 
