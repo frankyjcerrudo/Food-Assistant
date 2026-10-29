@@ -260,5 +260,62 @@ describe('Camino B (US-17 & BUG-26): Asistente de Voz Integrado, Plurales y Fin 
         globalThis.fetch = origFetch;
       }
     });
+
+    it('v0.89: flujo multi-turno de recomendación y guardado de receta nueva con botón de acción directa', async () => {
+      state.settings.geminiApiKey = 'AIzaSyTestCreateRecipeFlow';
+      const origFetch = globalThis.fetch;
+      const initialRecipesCount = state.recipes.length;
+
+      // Turno 1: el usuario pide recomendaciones y el asistente responde con recetas en texto
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          candidates: [{
+            content: {
+              parts: [{
+                functionCall: {
+                  name: 'create_and_save_recipe',
+                  args: {
+                    title: 'Pollo al Limón con Romero y Quinoa',
+                    description: 'Receta recomendada saludable y muy sabrosa.',
+                    prepTimeMinutes: 10,
+                    cookTimeMinutes: 15,
+                    servings: 2,
+                    tags: ['Cena', 'Saludable', 'Alta en Proteínas'],
+                    ingredients: [
+                      { name: 'Pechuga de pollo', amount: 300, unit: 'g' },
+                      { name: 'Quinoa cocida', amount: 150, unit: 'g' },
+                      { name: 'Zumo de limón', amount: 30, unit: 'ml' }
+                    ],
+                    instructions: [
+                      { step: 1, text: 'Saltea el pollo con el zumo de limón y romero.' },
+                      { step: 2, text: 'Sirve caliente sobre la cama de quinoa.' }
+                    ],
+                    nutrition: { calories: 380, protein: 44, carbs: 28, fat: 10 }
+                  }
+                }
+              }]
+            }
+          }]
+        })
+      });
+      globalThis.fetch = fetchSpy;
+
+      try {
+        const input = document.getElementById('gemini-invoke-input');
+        input.value = 'Guarda la receta recomendada en mi catálogo';
+        await app.handleGeminiInvokeSubmit(false);
+
+        expect(state.recipes.length).toBe(initialRecipesCount + 1);
+        const created = state.recipes[0];
+        expect(created.title).toBe('Pollo al Limón con Romero y Quinoa');
+
+        const resultActions = document.getElementById('gemini-invoke-result-actions');
+        expect(resultActions.innerHTML).toContain('Pollo al Limón con Romero');
+        expect(app.aiChatHistory.length).toBeGreaterThan(0);
+      } finally {
+        globalThis.fetch = origFetch;
+      }
+    });
   });
 });

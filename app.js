@@ -2540,7 +2540,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.88';
+  window.APP_VERSION = 'v0.89';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2572,7 +2572,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v0.88';
+    this.appVersion = window.APP_VERSION || 'v0.89';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -7796,7 +7796,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 3. Si Franky pide crear, planificar, completar o modificar su menú semanal (o indica que faltan comidas, que hay huecos o que pongas los platos en el plan), DEBES invocar SIEMPRE la herramienta "set_weekly_plan" con los 7 días (${weekDays.map(w => `${w.dayName}=${w.dateKey}`).join(', ')}) y las 4 comidas completas ("breakfast", "lunch", "snack" y "dinner") usando los IDs reales de su catálogo. NUNCA dejes huecos vacíos ni te limites a responder con texto plano.
 4. Si Franky pide "Batch Cooking" o modo sobras: planifica cocinar ración doble en la cena de 2 días (ej. Lunes cena y Miércoles cena) para reutilizar como tupper en el almuerzo del día siguiente (Martes almuerzo y Jueves almuerzo) con isLeftoverLunch: true. Todas las demás comidas (desayunos, meriendas y demás cenas/almuerzos) DEBEN ser diferentes, frescas y variadas; NUNCA repitas todo el día idéntico.
 5. REGLA ESTRICTA PARA LA LISTA DE LA COMPRA: Si Franky pide añadir artículos concretos (ej. "añade leche y plátanos", "apunta 3 huevos"), usa SIEMPRE la herramienta "manage_shopping_list" con action: "add" y la lista de artículos pedidos en "items". NUNCA uses action: "add_from_current_plan" a menos que Franky diga explícitamente "añade los ingredientes del plan", "vuelca el menú semanal" o "añade todo lo de la semana".
-6. Si faltan recetas adecuadas para cubrir huecos nutricionales o Franky pide inventar recetas, usa "create_and_save_recipe" para crearlas y guardarlas en el catálogo.
+6. GUARDAR Y CREAR RECETAS EN EL CATÁLOGO: Si Franky te pide recomendaciones de recetas y a continuación te pide guardarlas (ej: "guárdalas", "guarda las recetas", "guarda esa receta", "añádelas a mis recetas", "guárdame la primera", "créala"), o si te pide directamente inventar o crear una o varias recetas nuevas: DEBES invocar OBLIGATORIAMENTE la herramienta "create_and_save_recipe" (una llamada por cada receta que Franky quiera guardar) con todos los datos estructurados: title, description, prepTimeMinutes, cookTimeMinutes, servings, tags, ingredients (name, amount, unit) e instructions (step, text, timerMinutes) y nutrition (calories, protein, carbs, fat). NUNCA respondas diciendo que has guardado una receta sin haber ejecutado la llamada a "create_and_save_recipe".
 7. PROHIBIDO terminantemente mostrar IDs internos tipo "rec-..." en el texto visible para Franky. Escribe los nombres legibles de los platos de forma limpia y atractiva.
 8. CAPACIDAD DE RAZONAMIENTO Y ASESORAMIENTO CULINARIO: Si Franky hace preguntas abiertas, pide sugerencias o dudas sobre cocina, sustitutos de ingredientes, macros, técnicas o ideas para comer, razona con empatía e inteligencia como un chef y nutricionista experto, ofreciendo explicaciones claras y prácticas. Solo invoca herramientas cuando haya una acción concreta que ejecutar en la app (como apuntar a la compra, planificar comidas o guardar recetas).
 9. CONCISIÓN OBLIGATORIA PARA VOZ HABLADA: Franky escucha tus respuestas mediante sintetizador de voz. Responde SIEMPRE de forma directa y sintética (máximo 1 a 3 frases claras y conversacionales). NUNCA recites monólogos largos ni enumeres listas eternas de ingredientes en el mensaje hablado si no se te pide expresamente. Confirma las acciones realizadas con agilidad y brevedad.`;
@@ -8312,8 +8312,8 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       };
     }
 
-    // 2. Creación de receta nueva o aprovechamiento de nevera (US-17)
-    if (lower.includes('crea') || lower.includes('inventa') || lower.includes('receta') || lower.includes('pollo') || lower.includes('nevera') || lower.includes('tengo') || lower.includes('15 min')) {
+    // 2. Creación de receta nueva, guardado o aprovechamiento de nevera (US-17)
+    if (lower.includes('guarda') || lower.includes('guardar') || lower.includes('guárdala') || lower.includes('guárdalas') || lower.includes('crea') || lower.includes('inventa') || lower.includes('receta') || lower.includes('pollo') || lower.includes('nevera') || lower.includes('tengo') || lower.includes('15 min')) {
       const isQuickDinner = lower.includes('15 min') || lower.includes('proteína') || lower.includes('proteina');
       const newRecipeArgs = isQuickDinner ? {
         id: generateId('rec-'),
@@ -8582,6 +8582,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
       return {
         tool: 'create_and_save_recipe',
+        success: true,
         recipeId: newRecipe.id,
         title: newRecipe.title,
         recipe: newRecipe
@@ -8601,6 +8602,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       this.render();
       return {
         tool: 'set_day_plan',
+        success: true,
         dateKey: targetDateKey,
         dayName: args.dayName || dayData.dayName
       };
@@ -8708,6 +8710,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
       return {
         tool: 'set_weekly_plan',
+        success: true,
         mode,
         daysUpdated
       };
@@ -8792,6 +8795,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
       return {
         tool: 'manage_shopping_list',
+        success: true,
         action,
         count: affectedCount
       };
@@ -9250,31 +9254,34 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       const response = await this.callGeminiAgent(prompt, "", true);
       let executedToolsCount = 0;
       let primaryActionTarget = null; // 'view-shopping' | 'view-planner' | 'view-recipes'
+      const createdRecipes = [];
 
       if (Array.isArray(response.toolCalls) && response.toolCalls.length > 0) {
         response.toolCalls.forEach(call => {
           const res = this.executeAiToolCall(call);
-          if (res && res.success) {
+          if (res) {
             executedToolsCount++;
-            if (call.name === 'add_shopping_items') primaryActionTarget = 'view-shopping';
+            if (call.name === 'manage_shopping_list' || call.name === 'add_shopping_items') primaryActionTarget = 'view-shopping';
             else if (call.name === 'set_weekly_plan' || call.name === 'set_day_plan') primaryActionTarget = 'view-planner';
-            else if (call.name === 'create_and_save_recipe') primaryActionTarget = 'view-recipes';
+            else if (call.name === 'create_and_save_recipe') {
+              primaryActionTarget = 'view-recipes';
+              if (res.recipeId) createdRecipes.push(res);
+            }
           }
         });
       }
 
       this.render();
-      if (primaryActionTarget === 'view-shopping') {
-        this.renderShoppingView();
-      } else if (primaryActionTarget === 'view-planner') {
-        this.renderPlannerView();
-        this.renderTodayView();
-      }
 
       const cleanText = response.text || 'Acción completada con éxito.';
       if (transcription) {
         transcription.textContent = `"${prompt}"`;
       }
+
+      // Mantener memoria multi-turno en el Asistente para permitir diálogos continuos ("recomiéndame..." -> "guárdalas")
+      if (!Array.isArray(this.aiChatHistory)) this.aiChatHistory = [];
+      this.aiChatHistory.push({ role: 'user', text: prompt });
+      this.aiChatHistory.push({ role: 'model', text: cleanText });
 
       if (resultBox && resultText) {
         resultBox.style.display = 'flex';
@@ -9282,7 +9289,23 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
         if (resultActions) {
           resultActions.innerHTML = '';
-          if (primaryActionTarget) {
+
+          // Si se crearon recetas nuevas, añadir botón directo para abrir cada una
+          if (createdRecipes.length > 0) {
+            createdRecipes.forEach(cr => {
+              const btnRecipe = document.createElement('button');
+              btnRecipe.type = 'button';
+              btnRecipe.className = 'btn btn-primary btn-sm';
+              btnRecipe.innerHTML = `<span class="material-symbols-outlined icon-sm">restaurant_menu</span> Ver "${cr.title}"`;
+              btnRecipe.addEventListener('click', () => {
+                this.closeGeminiInvokeModal();
+                this.switchView('view-recipes');
+                this.openRecipeDetail(cr.recipeId);
+              });
+              resultActions.appendChild(btnRecipe);
+            });
+            this.showToast(`✓ ${createdRecipes.length === 1 ? `Receta "${createdRecipes[0].title}" guardada en tu catálogo.` : `${createdRecipes.length} recetas guardadas en tu catálogo.`}`, 'success');
+          } else if (primaryActionTarget) {
             const btnTarget = document.createElement('button');
             btnTarget.className = 'btn btn-primary btn-sm';
             btnTarget.textContent = primaryActionTarget === 'view-shopping'
@@ -9293,7 +9316,22 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
               this.switchView(primaryActionTarget);
             });
             resultActions.appendChild(btnTarget);
+          } else if (/receta|plato|ingrediente|1\.|2\./i.test(cleanText)) {
+            // Si el Asistente propuso recetas en texto pero aún no se guardaron, ofrecer botón directo de 1 toque para guardarlas
+            const btnSaveRecipes = document.createElement('button');
+            btnSaveRecipes.type = 'button';
+            btnSaveRecipes.className = 'btn btn-tonal btn-sm';
+            btnSaveRecipes.innerHTML = `<span class="material-symbols-outlined icon-sm">bookmark_add</span> Guardar en mis recetas`;
+            btnSaveRecipes.addEventListener('click', () => {
+              const input = document.getElementById('gemini-invoke-input');
+              if (input) {
+                input.value = 'Guarda las recetas recomendadas en mi catálogo';
+                this.handleGeminiInvokeSubmit(isVoice);
+              }
+            });
+            resultActions.appendChild(btnSaveRecipes);
           }
+
           const btnClose = document.createElement('button');
           btnClose.className = 'btn btn-secondary btn-sm';
           btnClose.textContent = 'Listo';
