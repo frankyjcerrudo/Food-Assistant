@@ -769,4 +769,86 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
       globalThis.fetch = origFetch;
     }
   });
+
+  it('v0.84: callGeminiAgent recupera automáticamente ante error 429 (Quota exceeded limit 20) activando fallback sin romper la UI', async () => {
+    state.settings.geminiApiKey = 'AIzaSyQuotaTestKey';
+    state.settings.aiProvider = 'gemini';
+    const origFetch = globalThis.fetch;
+    const quotaErrorMsg = 'Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_requests, limit: 20, model: gemini-3.8-flash, description: Generate content requests per day limit exceeded on Free Tier. Please retry in 14h3m40s.';
+
+    globalThis.fetch = vi.fn().mockImplementation(async () => {
+      return {
+        ok: false,
+        status: 429,
+        json: async () => ({
+          error: { message: quotaErrorMsg }
+        })
+      };
+    });
+
+    try {
+      const res = await appInstance.callGeminiAgent('dime recetas interesantes para Hall');
+      expect(res).toBeDefined();
+      expect(res.isSimulatedFallback).toBe(true);
+      expect(res.text.toLowerCase()).toContain('halloween');
+      expect(res.text.toLowerCase()).toContain('calabaza');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it('v0.84: simulateGeminiAgentResponse resuelve con éxito consultas de recetas temáticas de Halloween', () => {
+    const res = appInstance.simulateGeminiAgentResponse('dime recetas interesantes para Hall');
+    expect(res).toBeDefined();
+    expect(res.text).toContain('Franky');
+    expect(res.text.toLowerCase()).toContain('halloween');
+    expect(res.text.toLowerCase()).toContain('pimientos');
+    expect(res.text.toLowerCase()).toContain('calabaza');
+  });
+
+  it('v0.84: Selector Multi-Proveedor (BYOK) permite configurar OpenAI y Claude en Ajustes', () => {
+    state.settings.aiProvider = 'openai';
+    state.settings.geminiApiKey = 'sk-proj-test1234';
+
+    const card = document.createElement('div');
+    card.id = 'card-ai-settings';
+    const select = document.createElement('select');
+    select.id = 'select-ai-provider';
+    const optGemini = document.createElement('option');
+    optGemini.value = 'gemini';
+    const optOpenAi = document.createElement('option');
+    optOpenAi.value = 'openai';
+    const optClaude = document.createElement('option');
+    optClaude.value = 'claude';
+    select.appendChild(optGemini);
+    select.appendChild(optOpenAi);
+    select.appendChild(optClaude);
+
+    const input = document.createElement('input');
+    input.id = 'input-gemini-key';
+    const status = document.createElement('div');
+    status.id = 'gemini-key-status';
+
+    document.body.appendChild(card);
+    document.body.appendChild(select);
+    document.body.appendChild(input);
+    document.body.appendChild(status);
+
+    appInstance.renderSettings();
+
+    expect(select.value).toBe('openai');
+    expect(input.placeholder).toContain('OpenAI');
+    expect(status.textContent).toContain('OpenAI ChatGPT');
+
+    // Cambiar a Claude
+    select.value = 'claude';
+    select.dispatchEvent(new Event('change'));
+    expect(state.settings.aiProvider).toBe('claude');
+    expect(input.placeholder).toContain('Claude');
+
+    document.body.removeChild(card);
+    document.body.removeChild(select);
+    document.body.removeChild(input);
+    document.body.removeChild(status);
+  });
 });

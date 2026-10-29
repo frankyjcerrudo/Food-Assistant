@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#ffffff">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.83">
+  <link rel="stylesheet" href="styles.css?v=0.84">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%231a73e8'/><path d='M30 30h40v40H30z' fill='%23ffffff'/></svg>">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -25,7 +25,7 @@
         <span class="material-symbols-outlined">restaurant_menu</span>
       </div>
       <h1 class="brand-name">Food Assistant</h1>
-      <span class="app-version-badge" id="app-version-badge" title="Versión de Food Assistant">v0.83</span>
+      <span class="app-version-badge" id="app-version-badge" title="Versión de Food Assistant">v0.84</span>
     </div>
     <div class="header-actions">
       <!-- Theme quick toggle -->
@@ -331,16 +331,24 @@
       </div>
     </div>
 
-    <!-- 3: AI KEY -->
-    <div class="card">
+    <!-- 3: AI MOTOR & BYOK SETTINGS -->
+    <div class="card" id="card-ai-settings">
       <h3 style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-        <span class="material-symbols-outlined" style="color: var(--m3-primary);">key</span> Clave de Google Gemini API (Opcional)
+        <span class="material-symbols-outlined" style="color: var(--m3-primary);">smart_toy</span> Motor de Inteligencia Artificial (BYOK Opcional)
       </h3>
       <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 10px;">
-        Obtén una clave gratis en <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--m3-primary);">Google AI Studio</a>.
+        El Asistente incluye un motor inteligente integrado sin coste. Si lo deseas, puedes vincular tu propia clave (Bring Your Own Key) para conectar con Google Gemini, OpenAI o Claude y consumir de tu plan personal.
       </p>
+      <div style="margin-bottom: 8px;">
+        <label for="select-ai-provider" style="font-size: 12px; font-weight: 500; display: block; margin-bottom: 4px; color: var(--m3-on-surface-variant);">Proveedor de Inteligencia Artificial:</label>
+        <select class="form-input" id="select-ai-provider" style="padding: 6px 10px; font-size: 13px; margin-bottom: 6px;">
+          <option value="gemini">Google Gemini (Recomendado - Gratuito hasta 1.500 req/día)</option>
+          <option value="openai">OpenAI ChatGPT (GPT-4o mini / GPT-4o)</option>
+          <option value="claude">Anthropic Claude (Claude 3.5 Sonnet / Haiku)</option>
+        </select>
+      </div>
       <div style="display: flex; gap: 8px; margin-bottom: 6px;">
-        <input type="password" class="form-input" id="input-gemini-key" placeholder="AIzaSy...">
+        <input type="password" class="form-input" id="input-gemini-key" placeholder="AIzaSy... o sk-...">
         <button class="btn btn-primary btn-sm" id="btn-save-gemini-key">Guardar</button>
       </div>
       <div id="gemini-key-status" style="font-size: 11px;"></div>
@@ -536,7 +544,7 @@
         <span class="material-symbols-outlined" style="color: var(--m3-primary);">system_update</span> Versión y Actualizaciones
       </h3>
       <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px;">
-        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.83</strong>
+        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.84</strong>
       </p>
       <div style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
         Si acabas de desplegar o notas que algún cambio no aparece, pulsa el botón para limpiar la caché del Service Worker y cargar el código más reciente.
@@ -1519,7 +1527,7 @@
   </div>
 </div>
 
-<script src="config.js?v=0.83"></script>
-<script src="app.js?v=0.83"></script>
+<script src="config.js?v=0.84"></script>
+<script src="app.js?v=0.84"></script>
 </body>
 </html>

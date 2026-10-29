@@ -2539,7 +2539,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.83';
+  window.APP_VERSION = 'v0.84';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2571,7 +2571,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v0.83';
+    this.appVersion = window.APP_VERSION || 'v0.84';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -7796,6 +7796,14 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
   }
 
   async callGeminiAgent(prompt, systemInstruction = "", enableTools = true) {
+    const provider = state.settings?.aiProvider || 'gemini';
+    if (provider === 'openai') {
+      return this.callOpenAiAgent(prompt, systemInstruction, enableTools);
+    }
+    if (provider === 'claude') {
+      return this.callClaudeAgent(prompt, systemInstruction, enableTools);
+    }
+
     const apiKey = state.settings.geminiApiKey?.trim();
     if (!apiKey) {
       return this.simulateGeminiAgentResponse(prompt);
@@ -7882,7 +7890,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
         response.status === 503 ||
         response.status === 429 ||
         response.status === 404 ||
-        /high demand|overloaded|try again later|no longer available|not found|quota|rate limit/i.test(errMsg);
+        /high demand|overloaded|try again later|no longer available|not found|quota|rate limit|resource exhausted|exceeded/i.test(errMsg);
 
       // Si es un error de clave inválida (400/401/403 API key not valid), no reintentar con otros modelos
       if (!isTransientOrModelIssue || /api key not valid|invalid api key/i.test(errMsg)) {
@@ -7894,9 +7902,9 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     }
 
     if (!data) {
-      const isDemandOrTimeout = /high demand|overloaded|try again later|503|tiempo de espera|timeout|abort|network|fetch/i.test(lastErrMsg);
-      if (isDemandOrTimeout) {
-        console.warn(`[FoodAssistant] Gemini saturado o lento (${lastErrMsg}). Activando motor inteligente local.`);
+      const isDemandOrTimeoutOrQuota = /quota|exceeded|rate limit|429|resource exhausted|high demand|overloaded|try again later|503|tiempo de espera|timeout|abort|network|fetch/i.test(lastErrMsg);
+      if (isDemandOrTimeoutOrQuota) {
+        console.warn(`[FoodAssistant] Gemini saturado o cuota superada (${lastErrMsg}). Activando motor inteligente local.`);
         const sim = this.simulateGeminiAgentResponse(prompt);
         return {
           ...sim,
@@ -8017,8 +8025,127 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     return { mode, days, isBatchCooking };
   }
 
+  async callOpenAiAgent(prompt, systemInstruction = "", enableTools = true) {
+    const apiKey = state.settings.geminiApiKey?.trim();
+    if (!apiKey) return this.simulateGeminiAgentResponse(prompt);
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const messages = [];
+      const effectiveSystemInstruction = systemInstruction || this.buildAiSystemInstruction();
+      if (effectiveSystemInstruction) {
+        messages.push({ role: 'system', content: effectiveSystemInstruction });
+      }
+      if (Array.isArray(this.aiChatHistory)) {
+        this.aiChatHistory.slice(-6).forEach(m => {
+          messages.push({ role: m.role === 'model' ? 'assistant' : 'user', content: String(m.text || '') });
+        });
+      }
+      messages.push({ role: 'user', content: prompt });
+
+      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (resp.ok) {
+        const data = await resp.json();
+        const content = data.choices?.[0]?.message?.content || '';
+        return { text: content, toolCalls: [] };
+      }
+      const err = await resp.json().catch(() => ({}));
+      const msg = err.error?.message || `Error HTTP ${resp.status}`;
+      console.warn('[FoodAssistant] Fallback OpenAI:', msg);
+      return { ...this.simulateGeminiAgentResponse(prompt), isSimulatedFallback: true, originalError: msg };
+    } catch (e) {
+      console.warn('[FoodAssistant] Error conexión OpenAI, fallback local:', e.message);
+      return { ...this.simulateGeminiAgentResponse(prompt), isSimulatedFallback: true, originalError: e.message };
+    }
+  }
+
+  async callClaudeAgent(prompt, systemInstruction = "", enableTools = true) {
+    const apiKey = state.settings.geminiApiKey?.trim();
+    if (!apiKey) return this.simulateGeminiAgentResponse(prompt);
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const messages = [];
+      if (Array.isArray(this.aiChatHistory)) {
+        this.aiChatHistory.slice(-6).forEach(m => {
+          messages.push({ role: m.role === 'model' ? 'assistant' : 'user', content: String(m.text || '') });
+        });
+      }
+      messages.push({ role: 'user', content: prompt });
+
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-5-haiku-20241022',
+          max_tokens: 1024,
+          system: systemInstruction || this.buildAiSystemInstruction(),
+          messages
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (resp.ok) {
+        const data = await resp.json();
+        const text = data.content?.[0]?.text || '';
+        return { text, toolCalls: [] };
+      }
+      const err = await resp.json().catch(() => ({}));
+      const msg = err.error?.message || `Error HTTP ${resp.status}`;
+      console.warn('[FoodAssistant] Fallback Claude:', msg);
+      return { ...this.simulateGeminiAgentResponse(prompt), isSimulatedFallback: true, originalError: msg };
+    } catch (e) {
+      console.warn('[FoodAssistant] Error conexión Claude, fallback local:', e.message);
+      return { ...this.simulateGeminiAgentResponse(prompt), isSimulatedFallback: true, originalError: e.message };
+    }
+  }
+
   simulateGeminiAgentResponse(prompt) {
     const lower = (prompt || '').toLowerCase();
+
+    // 0. Recetas temáticas, Halloween, celebraciones o preguntas culinarias abiertas
+    if (/hall|halloween|calabaza|tem[aá]tic|oto[ñn]o|fiesta/i.test(prompt)) {
+      return {
+        text: `¡Por supuesto, Franky! Aquí tienes 3 ideas temáticas espectaculares, divertidas y saludables para **Halloween**:\n\n` +
+              `🎃 **1. Pimientos Monstruosos Rellenos de Arroz y Pavo**:\n` +
+              `Pimientos naranjas y amarillos vaciados, a los que les tallas ojos y sonrisa terrorífica. Los rellenas con carne picada de pavo, arroz integral salteado y tomate natural, gratinados con queso mozzarella fundido imitando telarañas.\n\n` +
+              `👻 **2. Momias de Hojaldre con Pechuga de Pollo y Espárragos**:\n` +
+              `Tiras jugosas de pollo marinadas con especias, envueltas en tiras finas de masa de hojaldre dejando huecos como vendas de momia, doradas al horno con dos gotas de salsa o granos de pimienta como ojos.\n\n` +
+              `🦇 **3. Crema Tenebrosa de Calabaza con Arañas de Champiñón y Sésamo Negro**:\n` +
+              `Crema suave de calabaza asada y puerro. Decora la superficie con un hilo de yogur griego en círculos concéntricos para formar una telaraña y pequeños champiñones salteados colocados con patitas de romero simulando arañas.\n\n` +
+              `¿Te apetece que guardemos alguna de estas recetas en tu recetario o que añadamos los ingredientes directamente a tu lista de la compra?`,
+        toolCalls: []
+      };
+    }
+
+    // 0.0 Consultas y dudas culinarias, sustitutos o técnicas
+    if (/sustitu|cambiar|puedo usar|qu[eé] pongo en vez|consejo|truco|c[oó]mo cocino|c[oó]mo preparar/i.test(prompt)) {
+      return {
+        text: `¡Claro, Franky! En la cocina casi todo tiene alternativa saludable:\n\n` +
+              `• Si buscas sustituir **harinas refinadas**, la harina de avena integral o almendra molida funcionan de maravilla.\n` +
+              `• Para reemplazar la **nata o crema**, el queso batido 0%, yogur griego natural o bebida de soja sin azúcar aportan cremosidad sin grasas saturadas.\n` +
+              `• Si necesitas un sustituto del **huevo**, 1 cucharada de semillas de chía o lino molido hidratadas en 3 cucharadas de agua crean una textura ideal para repostería.\n\n` +
+              `Dime qué ingrediente concreto quieres cambiar o para qué plato lo necesitas y te doy la mejor proporción exacta.`,
+        toolCalls: []
+      };
+    }
 
     // 0. Planificación de un solo día concreto (ej. "Planifica mi día de hoy")
     const isSingleDay = /\b(hoy|dia\s+de\s+hoy|d[ií]a\s+de\s+hoy|ma[ñn]ana|solo\s+hoy|este\s+d[ií]a)\b/i.test(prompt);
@@ -9948,15 +10075,37 @@ REGLAS CRÍTICAS:
 
   // SETTINGS
   renderSettings() {
+    const selectProvider = document.getElementById('select-ai-provider');
     const inputKey = document.getElementById('input-gemini-key');
-    if (inputKey) inputKey.value = state.settings.geminiApiKey || '';
-
     const status = document.getElementById('gemini-key-status');
+
+    if (selectProvider) {
+      selectProvider.value = state.settings.aiProvider || 'gemini';
+      selectProvider.onchange = (e) => {
+        state.settings.aiProvider = e.target.value;
+        state.save && state.save('fa_settings', state.settings);
+        this.renderSettings();
+      };
+    }
+
+    const currentProvider = state.settings.aiProvider || 'gemini';
+    if (inputKey) {
+      inputKey.value = state.settings.geminiApiKey || '';
+      if (currentProvider === 'openai') {
+        inputKey.placeholder = 'sk-proj-... (Clave de OpenAI)';
+      } else if (currentProvider === 'claude') {
+        inputKey.placeholder = 'sk-ant-... (Clave de Anthropic Claude)';
+      } else {
+        inputKey.placeholder = 'AIzaSy... (Clave de Google Gemini)';
+      }
+    }
+
     if (status) {
       if (state.settings.geminiApiKey) {
-        status.innerHTML = '<span style="color: var(--color-brand); font-weight: 500;">✓ Clave configurada (Gemini 3.8 Flash activo)</span>';
+        const provName = currentProvider === 'openai' ? 'OpenAI ChatGPT' : (currentProvider === 'claude' ? 'Anthropic Claude' : 'Google Gemini');
+        status.innerHTML = `<span style="color: var(--color-brand); font-weight: 500;">✓ Clave configurada (${provName} activo)</span>`;
       } else {
-        status.innerHTML = '<span style="color: var(--m3-on-surface-variant);">Modo Asistente Simulado activo (sin coste ni clave)</span>';
+        status.innerHTML = '<span style="color: var(--m3-on-surface-variant);">Modo Asistente Integrado activo (sin coste ni clave requerida)</span>';
       }
     }
 
@@ -10267,10 +10416,12 @@ Autenticación: API Key → Bearer → ${tk}`;
   saveGeminiKey() {
     const key = document.getElementById('input-gemini-key').value.trim();
     state.settings.geminiApiKey = key;
+    const provider = document.getElementById('select-ai-provider')?.value || 'gemini';
+    state.settings.aiProvider = provider;
     state.save('fa_settings', state.settings);
     this.renderSettings();
     this.scheduleSyncWithCloud();
-    this.showToast("Clave de Gemini guardada y sincronizada en tu cuenta.", 'success');
+    this.showToast("Configuración de Inteligencia Artificial guardada.", 'success');
   }
 
   exportBackup() {
