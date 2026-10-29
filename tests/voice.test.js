@@ -140,4 +140,45 @@ describe('Camino B (US-17 & BUG-26): Asistente de Voz Integrado, Plurales y Fin 
       expect(voiceShortcut.name).toContain('Hablar al Asistente');
     });
   });
+
+  describe('Botón Central Flotante e Invocador Directo Gemini (✦)', () => {
+    it('el botón central de Gemini existe en la barra de navegación con icono SVG y label', () => {
+      const centralBtn = document.getElementById('btn-central-gemini-invoke');
+      expect(centralBtn).not.toBeNull();
+      const svg = centralBtn.querySelector('.gemini-sparkle-icon');
+      expect(svg).not.toBeNull();
+      const label = centralBtn.querySelector('.nav-gemini-label');
+      expect(label.textContent).toBe('Gemini');
+    });
+
+    it('el modal de invocación rápida #modal-gemini-invoke contiene los controles necesarios', () => {
+      const modal = document.getElementById('modal-gemini-invoke');
+      expect(modal).not.toBeNull();
+      expect(document.getElementById('gemini-invoke-input')).not.toBeNull();
+      expect(document.getElementById('btn-gemini-invoke-mic')).not.toBeNull();
+      expect(document.getElementById('btn-gemini-invoke-send')).not.toBeNull();
+      expect(document.getElementById('gemini-invoke-result')).not.toBeNull();
+    });
+
+    it('openGeminiInvokeModal abre el modal y prepara el campo de entrada', () => {
+      app.openGeminiInvokeModal(false);
+      const modal = document.getElementById('modal-gemini-invoke');
+      expect(modal.classList.contains('active')).toBe(true);
+      app.closeGeminiInvokeModal();
+      expect(modal.classList.contains('active')).toBe(false);
+    });
+
+    it('handleGeminiInvokeSubmit ejecuta acción de añadir a la lista de compra y muestra resultado', async () => {
+      const input = document.getElementById('gemini-invoke-input');
+      input.value = 'Apunta 1kg de arroz a la compra';
+      const initialCount = state.shoppingList.length;
+
+      await app.handleGeminiInvokeSubmit(false);
+
+      expect(state.shoppingList.length).toBeGreaterThan(initialCount);
+      const resultCard = document.getElementById('gemini-invoke-result');
+      expect(resultCard.style.display).toBe('flex');
+      expect(resultCard.textContent.toLowerCase()).toContain('arroz');
+    });
+  });
 });

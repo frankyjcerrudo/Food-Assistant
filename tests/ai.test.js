@@ -275,34 +275,27 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
     expect(state.settings.geminiApiKey).toBe('AIzaSyFromCloudDevice777');
   });
 
-  it('US-17: callGeminiAgent hace fallback automático a gemini-3.6-flash / 3.5-flash-lite cuando 3.8-flash tiene High Demand (503)', async () => {
+  it('US-17: callGeminiAgent conecta únicamente con gemini-3.8-flash y activa fallback inteligente inmediato ante timeout o demanda alta', async () => {
     state.settings.geminiApiKey = 'AIzaSyTestFallbackKey';
     let callCount = 0;
     const origFetch = globalThis.fetch;
     globalThis.fetch = vi.fn().mockImplementation(async (url) => {
       callCount++;
-      if (url.includes('gemini-3.8-flash')) {
-        return {
-          ok: false,
-          status: 503,
-          json: async () => ({
-            error: { message: 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.' }
-          })
-        };
-      }
+      expect(url).toContain('models/gemini-3.8-flash:generateContent');
       return {
-        ok: true,
-        status: 200,
+        ok: false,
+        status: 503,
         json: async () => ({
-          candidates: [{ content: { parts: [{ text: 'Respuesta desde modelo de respaldo.' }] } }]
+          error: { message: 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.' }
         })
       };
     });
 
     try {
       const res = await appInstance.callGeminiAgent('Planifica mi semana');
-      expect(res.text).toBe('Respuesta desde modelo de respaldo.');
-      expect(callCount).toBe(2);
+      expect(res.isSimulatedFallback).toBe(true);
+      expect(callCount).toBe(1);
+      expect(res.toolCalls.length).toBeGreaterThan(0);
     } finally {
       globalThis.fetch = origFetch;
     }

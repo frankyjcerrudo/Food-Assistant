@@ -2539,7 +2539,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.81';
+  window.APP_VERSION = 'v0.82';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2571,7 +2571,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v0.81';
+    this.appVersion = window.APP_VERSION || 'v0.82';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -2675,6 +2675,7 @@ class FoodAssistantApp {
     this.modalShoppingPreview = document.getElementById('modal-shopping-preview');
     this.modalCopyWeek = document.getElementById('modal-copy-week');
     this.modalConfirmDialog = document.getElementById('modal-confirm-dialog');
+    this.modalGeminiInvoke = document.getElementById('modal-gemini-invoke');
     this.cookModeOverlay = document.getElementById('cook-mode-overlay');
     this._confirmDialogResolver = null;
     this._confirmDialogMode = 'confirm';
@@ -4009,14 +4010,21 @@ class FoodAssistantApp {
     this.navItems.forEach(item => {
       item.addEventListener('click', () => {
         const viewId = item.dataset.view;
-        this.switchView(viewId);
+        if (viewId) {
+          this.switchView(viewId);
+        }
       });
+    });
+
+    // Central Floating Gemini Invocation Button (✦)
+    document.getElementById('btn-central-gemini-invoke')?.addEventListener('click', () => {
+      this.openGeminiInvokeModal(true);
     });
 
     // Quick links
     document.getElementById('btn-goto-planner')?.addEventListener('click', () => this.switchView('view-planner'));
     document.getElementById('btn-quick-shopping')?.addEventListener('click', () => this.switchView('view-shopping'));
-    document.getElementById('btn-quick-ai-plan')?.addEventListener('click', () => this.switchView('view-ai'));
+    document.getElementById('btn-quick-ai-plan')?.addEventListener('click', () => this.openGeminiInvokeModal(true));
     document.getElementById('btn-header-settings')?.addEventListener('click', () => this.switchView('view-settings'));
 
     // Theme controls
@@ -4247,13 +4255,30 @@ class FoodAssistantApp {
       }
     });
 
-    // Gemini Chat & Voice Assistant (Camino B: US-17)
+    // Gemini Chat & Voice Assistant (Camino B: US-17 & Central Button)
     this.initVoiceAssistant();
     document.getElementById('btn-send-ai-chat')?.addEventListener('click', () => this.handleAiChatSubmit());
     document.getElementById('btn-mic-ai-chat')?.addEventListener('click', () => this.toggleVoiceRecognition());
-    document.getElementById('btn-header-voice')?.addEventListener('click', () => this.toggleVoiceRecognition());
+    document.getElementById('btn-header-voice')?.addEventListener('click', () => this.openGeminiInvokeModal(true));
     document.getElementById('ai-chat-input')?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.handleAiChatSubmit();
+    });
+
+    // Gemini Quick Invoke Sheet Events
+    document.getElementById('btn-close-gemini-invoke')?.addEventListener('click', () => this.closeGeminiInvokeModal());
+    document.getElementById('btn-gemini-invoke-send')?.addEventListener('click', () => this.handleGeminiInvokeSubmit());
+    document.getElementById('btn-gemini-invoke-mic')?.addEventListener('click', () => this.toggleVoiceRecognition(true));
+    document.getElementById('gemini-invoke-input')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') this.handleGeminiInvokeSubmit();
+    });
+    document.querySelectorAll('#gemini-invoke-chips .gemini-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const input = document.getElementById('gemini-invoke-input');
+        if (input && chip.dataset.prompt) {
+          input.value = chip.dataset.prompt;
+          this.handleGeminiInvokeSubmit();
+        }
+      });
     });
 
     // PWA Shortcut trigger: ?action=voice
@@ -4261,8 +4286,7 @@ class FoodAssistantApp {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('action') === 'voice') {
         setTimeout(() => {
-          this.switchView('view-ai');
-          this.toggleVoiceRecognition();
+          this.openGeminiInvokeModal(true);
         }, 400);
       }
     }
@@ -7782,7 +7806,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       state.settings.geminiModel = 'gemini-3.8-flash';
       state.save && state.save('fa_settings', state.settings);
     }
-    const candidateModels = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
+    const candidateModels = ['gemini-3.8-flash'];
 
     const historyTurns = Array.isArray(this.aiChatHistory)
       ? this.aiChatHistory.slice(-6).map(m => ({
@@ -7837,7 +7861,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 28000);
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
       let response;
 
       try {
@@ -7885,9 +7909,9 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     }
 
     if (!data) {
-      const isDemandSpike = /high demand|overloaded|try again later|503/i.test(lastErrMsg);
-      if (isDemandSpike) {
-        console.warn(`[FoodAssistant] Gemini saturado por alta demanda (${lastErrMsg}). Activando motor inteligente local.`);
+      const isDemandOrTimeout = /high demand|overloaded|try again later|503|tiempo de espera|timeout|abort|network|fetch/i.test(lastErrMsg);
+      if (isDemandOrTimeout) {
+        console.warn(`[FoodAssistant] Gemini saturado o lento (${lastErrMsg}). Activando motor inteligente local.`);
         const sim = this.simulateGeminiAgentResponse(prompt);
         return {
           ...sim,
@@ -8829,7 +8853,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
   }
 
   // ==========================================================================
-  // US-17 / CAMINO B: ASISTENTE DE VOZ INTEGRADO (WEB SPEECH RECOGNITION & TTS)
+  // US-17 / CAMINO B: ASISTENTE DE VOZ INTEGRADO & INVOCADOR CENTRAL GEMINI (✦)
   // ==========================================================================
   initVoiceAssistant() {
     const SpeechRec = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
@@ -8858,9 +8882,18 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
               interim += event.results[i][0].transcript;
             }
           }
+          const recognizedText = final || interim;
           const chatInput = document.getElementById('ai-chat-input');
           if (chatInput) {
-            chatInput.value = final || interim;
+            chatInput.value = recognizedText;
+          }
+          const invokeInput = document.getElementById('gemini-invoke-input');
+          if (invokeInput) {
+            invokeInput.value = recognizedText;
+          }
+          const invokeTranscription = document.getElementById('gemini-invoke-transcription');
+          if (invokeTranscription && recognizedText) {
+            invokeTranscription.textContent = `"${recognizedText}"`;
           }
         };
 
@@ -8876,10 +8909,19 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
         this.recognition.onend = () => {
           this.isListeningVoice = false;
           this.updateVoiceUI(false);
-          const chatInput = document.getElementById('ai-chat-input');
-          const text = chatInput?.value?.trim();
-          if (text) {
-            this.handleAiChatSubmit(true);
+          const invokeModal = document.getElementById('modal-gemini-invoke');
+          if (invokeModal && (invokeModal.classList.contains('active') || invokeModal.open)) {
+            const invokeInput = document.getElementById('gemini-invoke-input');
+            const text = invokeInput?.value?.trim();
+            if (text) {
+              this.handleGeminiInvokeSubmit(true);
+            }
+          } else {
+            const chatInput = document.getElementById('ai-chat-input');
+            const text = chatInput?.value?.trim();
+            if (text) {
+              this.handleAiChatSubmit(true);
+            }
           }
         };
       } catch (e) {
@@ -8888,7 +8930,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     }
   }
 
-  toggleVoiceRecognition() {
+  toggleVoiceRecognition(isInvokeModal = false) {
     if (!this.speechRecognitionSupported) {
       this.showToast("Tu navegador no soporta reconocimiento de voz nativo.", "info");
       return;
@@ -8898,9 +8940,16 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       this.isListeningVoice = false;
       this.updateVoiceUI(false);
     } else {
-      this.switchView('view-ai');
-      const chatInput = document.getElementById('ai-chat-input');
-      if (chatInput) chatInput.value = '';
+      if (!isInvokeModal) {
+        this.switchView('view-ai');
+        const chatInput = document.getElementById('ai-chat-input');
+        if (chatInput) chatInput.value = '';
+      } else {
+        const invokeInput = document.getElementById('gemini-invoke-input');
+        if (invokeInput) invokeInput.value = '';
+        const invokeTranscription = document.getElementById('gemini-invoke-transcription');
+        if (invokeTranscription) invokeTranscription.textContent = 'Escuchando a Franky...';
+      }
       try {
         this.recognition.start();
       } catch (e) {
@@ -8913,6 +8962,9 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     const micBtn = document.getElementById('btn-mic-ai-chat');
     const headerVoiceBtn = document.getElementById('btn-header-voice');
     const badge = document.getElementById('voice-listening-indicator');
+    const centralGeminiBtn = document.getElementById('btn-central-gemini-invoke');
+    const invokeMicBtn = document.getElementById('btn-gemini-invoke-mic');
+    const invokePulse = document.getElementById('gemini-invoke-pulse');
 
     if (micBtn) {
       micBtn.classList.toggle('listening', isListening);
@@ -8929,8 +8981,147 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
         icon.style.animation = isListening ? 'pulse 1s infinite' : '';
       }
     }
+    if (centralGeminiBtn) {
+      centralGeminiBtn.classList.toggle('listening', isListening);
+    }
+    if (invokeMicBtn) {
+      invokeMicBtn.classList.toggle('listening', isListening);
+    }
+    if (invokePulse) {
+      invokePulse.style.display = isListening ? 'flex' : 'none';
+    }
     if (badge) {
       badge.style.display = isListening ? 'flex' : 'none';
+    }
+  }
+
+  openGeminiInvokeModal(startVoice = false) {
+    const modal = document.getElementById('modal-gemini-invoke');
+    if (!modal) return;
+    this.openDialogModal(modal);
+
+    const input = document.getElementById('gemini-invoke-input');
+    const resultBox = document.getElementById('gemini-invoke-result');
+    const transcription = document.getElementById('gemini-invoke-transcription');
+    if (input) input.value = '';
+    if (resultBox) {
+      resultBox.style.display = 'none';
+      const actions = document.getElementById('gemini-invoke-result-actions');
+      if (actions) actions.innerHTML = '';
+    }
+    if (transcription) {
+      transcription.innerHTML = '<em>Pulsa el micro o escribe tu petición</em>';
+    }
+
+    if (startVoice && this.speechRecognitionSupported) {
+      this.toggleVoiceRecognition(true);
+    } else if (input) {
+      setTimeout(() => input.focus(), 150);
+    }
+  }
+
+  closeGeminiInvokeModal() {
+    const modal = document.getElementById('modal-gemini-invoke');
+    if (this.isListeningVoice) {
+      try { this.recognition.stop(); } catch (e) {}
+      this.isListeningVoice = false;
+      this.updateVoiceUI(false);
+    }
+    if (modal) this.closeDialogModal(modal);
+  }
+
+  async handleGeminiInvokeSubmit(isVoice = false) {
+    const input = document.getElementById('gemini-invoke-input');
+    const prompt = input?.value?.trim();
+    if (!prompt) return;
+
+    if (this.isListeningVoice) {
+      try { this.recognition.stop(); } catch (e) {}
+      this.isListeningVoice = false;
+      this.updateVoiceUI(false);
+    }
+
+    const transcription = document.getElementById('gemini-invoke-transcription');
+    const resultBox = document.getElementById('gemini-invoke-result');
+    const resultText = document.getElementById('gemini-invoke-result-text');
+    const resultActions = document.getElementById('gemini-invoke-result-actions');
+    const sendBtn = document.getElementById('btn-gemini-invoke-send');
+
+    if (transcription) {
+      transcription.innerHTML = `<span style="display:inline-flex; align-items:center; gap:6px; color:var(--m3-primary); font-weight:500;">
+        <span class="material-symbols-outlined icon-sm" style="animation: spin 1s linear infinite;">sync</span>
+        Procesando con Gemini 3.8 Flash...
+      </span>`;
+    }
+    if (sendBtn) sendBtn.disabled = true;
+
+    try {
+      const response = await this.callGeminiAgent(prompt, "", true);
+      let executedToolsCount = 0;
+      let primaryActionTarget = null; // 'view-shopping' | 'view-planner' | 'view-recipes'
+
+      if (Array.isArray(response.toolCalls) && response.toolCalls.length > 0) {
+        response.toolCalls.forEach(call => {
+          const res = this.executeAiToolCall(call);
+          if (res && res.success) {
+            executedToolsCount++;
+            if (call.name === 'add_shopping_items') primaryActionTarget = 'view-shopping';
+            else if (call.name === 'set_weekly_plan' || call.name === 'set_day_plan') primaryActionTarget = 'view-planner';
+            else if (call.name === 'create_and_save_recipe') primaryActionTarget = 'view-recipes';
+          }
+        });
+      }
+
+      this.render();
+      if (primaryActionTarget === 'view-shopping') {
+        this.renderShoppingView();
+      } else if (primaryActionTarget === 'view-planner') {
+        this.renderPlannerView();
+        this.renderTodayView();
+      }
+
+      const cleanText = response.text || 'Acción completada con éxito.';
+      if (transcription) {
+        transcription.textContent = `"${prompt}"`;
+      }
+
+      if (resultBox && resultText) {
+        resultBox.style.display = 'flex';
+        resultText.textContent = cleanText.split('\n')[0].replace(/[*#]/g, '');
+
+        if (resultActions) {
+          resultActions.innerHTML = '';
+          if (primaryActionTarget) {
+            const btnTarget = document.createElement('button');
+            btnTarget.className = 'btn btn-primary btn-sm';
+            btnTarget.textContent = primaryActionTarget === 'view-shopping'
+              ? 'Ver Lista de la Compra'
+              : (primaryActionTarget === 'view-planner' ? 'Ver Planificador' : 'Ver Recetas');
+            btnTarget.addEventListener('click', () => {
+              this.closeGeminiInvokeModal();
+              this.switchView(primaryActionTarget);
+            });
+            resultActions.appendChild(btnTarget);
+          }
+          const btnClose = document.createElement('button');
+          btnClose.className = 'btn btn-secondary btn-sm';
+          btnClose.textContent = 'Listo';
+          btnClose.addEventListener('click', () => this.closeGeminiInvokeModal());
+          resultActions.appendChild(btnClose);
+        }
+      }
+
+      if (isVoice) {
+        this.speakAiResponse(cleanText);
+      }
+      this.showToast('✓ Gemini completó la acción.', 'success');
+    } catch (err) {
+      if (transcription) {
+        transcription.innerHTML = `<span style="color:var(--m3-error); font-weight:500;">Error: ${err.message}</span>`;
+      }
+      this.showToast(`Error de Gemini: ${err.message}`, 'error');
+    } finally {
+      if (sendBtn) sendBtn.disabled = false;
     }
   }
 
@@ -9330,14 +9521,14 @@ REGLAS CRÍTICAS:
       state.settings.geminiModel = 'gemini-3.8-flash';
       state.save && state.save('fa_settings', state.settings);
     }
-    const candidateModels = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
+    const candidateModels = ['gemini-3.8-flash'];
 
     let lastError = null;
     let data = null;
 
     for (const model of candidateModels) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 35000);
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
       try {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
         const resp = await fetch(endpoint, {
