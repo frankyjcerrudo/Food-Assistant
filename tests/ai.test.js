@@ -536,6 +536,18 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     expect(res.instructions.length).toBeGreaterThan(0);
   });
 
+  it('US-30: compressImageToBase64 se recupera con fallback si la lectura directa de FileReader falla', async () => {
+    const fakeFile = {
+      name: 'receta.jpg',
+      type: 'image/jpeg',
+      arrayBuffer: async () => new Uint8Array([255, 216, 255, 224, 0, 16, 74, 70, 73, 70]).buffer
+    };
+    const res = await appInstance.compressImageToBase64(fakeFile);
+    expect(res).toBeTruthy();
+    expect(res.mimeType).toBe('image/jpeg');
+    expect(res.base64Data).toBeTruthy();
+  });
+
   it('US-34: Fridge Reverse Search añade ingredientes, filtra recetas y ordena por mayor coincidencia', () => {
     // Añadimos pechuga de pollo y patata
     appInstance.addFridgeIngredient('pollo');
@@ -614,5 +626,124 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     // Martes almuerzo debe ser sobras de la cena del Lunes
     expect(days[1].lunch).toBe(days[0].dinner);
     expect(days[1].isLeftoverLunch).toBe(true);
+  });
+
+  it('v0.77: stripRecipeIdsFromText elimina IDs técnicos internos del texto visible para Franky', () => {
+    const raw = 'Desayuno: *Porridge Cremoso* (*rec-porridge-bowl*) | Almuerzo: Salmón (`rec-salmon-bowl`) | rec-1792772627564';
+    const cleaned = appInstance.stripRecipeIdsFromText(raw);
+    expect(cleaned).not.toContain('rec-porridge-bowl');
+    expect(cleaned).not.toContain('rec-salmon-bowl');
+    expect(cleaned).not.toContain('rec-1792772627564');
+    expect(cleaned).toContain('Porridge Cremoso');
+    expect(cleaned).toContain('Salmón');
+  });
+
+  it('v0.77: callGeminiAgent activa fallback local automático si Gemini devuelve error de alta demanda (503)', async () => {
+    state.settings.geminiApiKey = 'AIzaSyTestHighDemand';
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: async () => ({
+        error: {
+          code: 503,
+          message: 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.'
+        }
+      })
+    });
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = fetchSpy;
+
+    try {
+      const res = await appInstance.callGeminiAgent('Planifica mi semana');
+      expect(res.isSimulatedFallback).toBe(true);
+      expect(res.toolCalls.length).toBeGreaterThan(0);
+      expect(res.toolCalls[0].name).toBe('set_weekly_plan');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it('v0.77: handleAiChatSubmit con "Planifica mi dia de hoy" actualiza únicamente hoy sin alterar los demás días', async () => {
+    const weekDays = appInstance.getPlannerWeekDates();
+    const mondayKey = weekDays[0].dateKey;
+    const tuesdayKey = weekDays[1].dateKey;
+
+    // Configurar el martes con una cena fija previa
+    state.mealPlan[tuesdayKey] = {
+      dayName: 'Martes',
+      dateKey: tuesdayKey,
+      breakfast: null,
+      lunch: null,
+      snack: null,
+      dinner: 'rec-pesto-pasta'
+    };
+
+    const chatInput = document.getElementById('ai-chat-input');
+    chatInput.value = 'Planifica mi dia de hoy';
+
+    // Mock callGeminiAgent que erróneamente devuelve set_weekly_plan
+    const origCall = appInstance.callGeminiAgent.bind(appInstance);
+    appInstance.callGeminiAgent = vi.fn().mockResolvedValue({
+      text: 'He actualizado tu día.',
+      toolCalls: [
+        {
+          name: 'set_weekly_plan',
+          args: {
+            days: weekDays.map(w => ({
+              dateKey: w.dateKey,
+              dayName: w.dayName,
+              breakfast: 'rec-porridge-bowl',
+              lunch: 'rec-lemon-chicken',
+              snack: 'rec-healthy-snack',
+              dinner: 'rec-salmon-bowl'
+            }))
+          }
+        }
+      ]
+    });
+
+    try {
+      await appInstance.handleAiChatSubmit();
+
+      const todayKey = window.toLocalDateKey(new Date());
+      const todayData = state.getDayPlan(todayKey);
+      expect(todayData.lunch).toBe('rec-lemon-chicken');
+
+      // Si hoy no es martes, el martes debe haber conservado su cena original y no ser sobreescrito
+      if (todayKey !== tuesdayKey) {
+        expect(state.mealPlan[tuesdayKey].dinner).toBe('rec-pesto-pasta');
+      }
+    } finally {
+      appInstance.callGeminiAgent = origCall;
+    }
+  });
+
+  it('v0.77: set_weekly_plan garantiza que todos los 7 días tienen sus 4 comidas sin huecos vacíos', () => {
+    const weekDays = appInstance.getPlannerWeekDates();
+    // Simular que el modelo solo envía almuerzo y cena para el primer día
+    const toolRes = appInstance.executeAiToolCall({
+      name: 'set_weekly_plan',
+      args: {
+        mode: 'replace',
+        completeWeek: true,
+        days: [
+          {
+            dateKey: weekDays[0].dateKey,
+            dayName: weekDays[0].dayName,
+            lunch: 'rec-lemon-chicken',
+            dinner: 'rec-salmon-bowl'
+          }
+        ]
+      }
+    });
+
+    expect(toolRes.tool).toBe('set_weekly_plan');
+    weekDays.forEach(w => {
+      const dayPlan = state.getDayPlan(w.dateKey, w.dayName);
+      expect(dayPlan.breakfast).toBeTruthy();
+      expect(dayPlan.lunch).toBeTruthy();
+      expect(dayPlan.snack).toBeTruthy();
+      expect(dayPlan.dinner).toBeTruthy();
+    });
   });
 });

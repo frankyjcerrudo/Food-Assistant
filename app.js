@@ -2531,7 +2531,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.75';
+  window.APP_VERSION = 'v0.77';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2563,7 +2563,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.75';
+    this.appVersion = window.APP_VERSION || 'v0.77';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -4036,18 +4036,24 @@ class FoodAssistantApp {
     // Image file preview in AI import tab (US-30)
     document.getElementById('import-image-input')?.addEventListener('change', (e) => {
       const file = e.target.files?.[0];
+      this.selectedImportImageFile = file || null;
       const previewWrap = document.getElementById('import-image-preview-wrap');
       const previewImg = document.getElementById('import-image-preview');
       if (file && previewWrap && previewImg) {
-        const url = URL.createObjectURL(file);
-        previewImg.src = url;
-        previewWrap.style.display = 'flex';
+        try {
+          const url = URL.createObjectURL(file);
+          previewImg.src = url;
+          previewWrap.style.display = 'flex';
+        } catch (err) {
+          console.warn("[FoodAssistant] createObjectURL para preview falló:", err);
+        }
       }
     });
     document.getElementById('btn-clear-import-image')?.addEventListener('click', () => {
       const input = document.getElementById('import-image-input');
       const previewWrap = document.getElementById('import-image-preview-wrap');
       const previewImg = document.getElementById('import-image-preview');
+      this.selectedImportImageFile = null;
       if (input) input.value = '';
       if (previewImg) previewImg.src = '';
       if (previewWrap) previewWrap.style.display = 'none';
@@ -7638,18 +7644,30 @@ class FoodAssistantApp {
     return slotDefs.filter(def => compliantRecipes.filter(r => hasTagCI(r, def.tag)).length < 3);
   }
 
+  isSingleDayPrompt(prompt) {
+    if (!prompt || typeof prompt !== 'string') return false;
+    return /\b(hoy|dia\s+de\s+hoy|d[ií]a\s+de\s+hoy|ma[ñn]ana|solo\s+hoy|este\s+d[ií]a|para\s+hoy|de\s+hoy|qu[eé]\s+como\s+hoy)\b/i.test(prompt);
+  }
+
   isWeeklyPlanPrompt(prompt) {
     if (!prompt || typeof prompt !== 'string') return false;
     // Si el usuario pide un solo día específico ("día de hoy", "hoy", "mañana", "lunes", etc.), NO forzar semana completa
-    const isSingleDay = /\b(hoy|dia\s+de\s+hoy|d[ií]a\s+de\s+hoy|ma[ñn]ana|solo\s+hoy|este\s+d[ií]a)\b/i.test(prompt);
-    if (isSingleDay) return false;
-    return /planifica\s+(?:mi\s+)?(?:semana|men[uú]\s+semanal)|semana|men[uú]\s+semanal|hueco|vac[ií]|rellena\s+la\s+semana|completa\s+la\s+semana|platos\s+en\s+el\s+plan|plan\s+semanal|aparecer\s+muchas\s+comidas|dejado\s+vac|desayunos\s+y\s+meriendas|batch\s+cooking/i.test(prompt);
+    if (this.isSingleDayPrompt(prompt)) return false;
+    return /\b(planifica|completa|rellena|organiza|pon|asigna)\b.*?\b(semana|men[uú]|plan)\b|\b(men[uú]\s+semanal|plan\s+semanal|semana\s+completa|dejad[oa]s?\s+vac[ií][ao]s?|huecos?\s+libres?|huecos?\s+vac[ií][ao]s?|faltan\s+comidas|sin\s+aparecer\s+muchas\s+comidas|platos\s+en\s+el\s+plan|desayunos\s+y\s+meriendas|batch\s+cooking|sobras|tuppers?)\b/i.test(prompt);
   }
 
   isAiActionPrompt(prompt) {
     if (!prompt || typeof prompt !== 'string') return false;
-    if (this.isWeeklyPlanPrompt(prompt)) return true;
-    return /asigna|pon\s+en\s+el|cambia\s+el|actualiza\s+el\s+plan|crea\s+una\s+receta|crea\s+recetas|inventa|nueva\s+receta|compra|a[ñn]ade|apunta|agrega|quita|borra|elimina|tacha/i.test(prompt);
+    if (this.isSingleDayPrompt(prompt) || this.isWeeklyPlanPrompt(prompt)) return true;
+    return /\b(asigna|pon\s+en\s+el|cambia\s+el|actualiza\s+el\s+plan|crea\s+una\s+receta|crea\s+recetas|inventa|nueva\s+receta|compra|a[ñn]ade|apunta|agrega|quita|borra|elimina|tacha|planifica|organiza)\b/i.test(prompt);
+  }
+
+  stripRecipeIdsFromText(text) {
+    if (!text || typeof text !== 'string') return '';
+    return text
+      .replace(/\s*\([\s*`'"]*rec-[a-zA-Z0-9_-]+[\s*`'"]*\)/gi, '')
+      .replace(/\s*[`*]rec-[a-zA-Z0-9_-]+[`*]/gi, '')
+      .replace(/\s*rec-[a-zA-Z0-9_-]+/gi, '');
   }
 
   buildAiSystemInstruction() {
@@ -7691,12 +7709,12 @@ ${currentPlanSummary}
 
 INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 1. Dirígete siempre a Franky de forma natural, cálida, concisa y directa (sin introducciones robóticas, sin disculpas innecesarias).
-2. Si Franky pide planificar un solo día ("hoy", "día de hoy", "mañana", "el lunes", etc.), invoca la herramienta "set_day_plan" con el dateKey correspondiente y recetas equilibradas de su catálogo, sin alterar el resto de la semana.
+2. Si Franky pide planificar un solo día ("hoy", "día de hoy", "mañana", "el lunes", etc.), invoca ÚNICAMENTE la herramienta "set_day_plan" con el dateKey correspondiente y recetas equilibradas de su catálogo. NUNCA invoques "set_weekly_plan" para un solo día ni toques el resto de la semana.
 3. Si Franky pide crear, planificar, completar o modificar su menú semanal (o indica que faltan comidas, que hay huecos o que pongas los platos en el plan), DEBES invocar SIEMPRE la herramienta "set_weekly_plan" con los 7 días (${weekDays.map(w => `${w.dayName}=${w.dateKey}`).join(', ')}) y las 4 comidas completas ("breakfast", "lunch", "snack" y "dinner") usando los IDs reales de su catálogo. NUNCA dejes huecos vacíos ni te limites a responder con texto plano.
-4. Si Franky pide "Batch Cooking" o modo sobras, organiza las cenas para que se cocinen dobles y se reutilicen inteligentemente como tupper de almuerzo al día siguiente (ej. Lunes cena para Martes almuerzo).
+4. Si Franky pide "Batch Cooking" o modo sobras: planifica cocinar ración doble en la cena de 2 días (ej. Lunes cena y Miércoles cena) para reutilizar como tupper en el almuerzo del día siguiente (Martes almuerzo y Jueves almuerzo) con isLeftoverLunch: true. Todas las demás comidas (desayunos, meriendas y demás cenas/almuerzos) DEBEN ser diferentes, frescas y variadas; NUNCA repitas todo el día idéntico.
 5. REGLA ESTRICTA PARA LA LISTA DE LA COMPRA: Si Franky pide añadir artículos concretos (ej. "añade leche y plátanos", "apunta 3 huevos"), usa SIEMPRE la herramienta "manage_shopping_list" con action: "add" y la lista de artículos pedidos en "items". NUNCA uses action: "add_from_current_plan" a menos que Franky diga explícitamente "añade los ingredientes del plan", "vuelca el menú semanal" o "añade todo lo de la semana".
 6. Si faltan recetas adecuadas para cubrir huecos nutricionales o Franky pide inventar recetas, usa "create_and_save_recipe" para crearlas y guardarlas en el catálogo.
-7. PROHIBIDO mostrar IDs internos tipo "rec-..." en el texto visible para Franky. Escribe los nombres de los platos de forma limpia y atractiva.`;
+7. PROHIBIDO terminantemente mostrar IDs internos tipo "rec-..." en el texto visible para Franky. Escribe los nombres legibles de los platos de forma limpia y atractiva.`;
   }
 
   async callGeminiAgent(prompt, systemInstruction = "", enableTools = true) {
@@ -7712,8 +7730,8 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       primaryModel,
       'gemini-3.5-flash-lite',
       'gemini-3.8-flash',
-      'gemini-3.6-flash',
-      'gemini-3.1-flash-lite'
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash'
     ])];
 
     const historyTurns = Array.isArray(this.aiChatHistory)
@@ -7737,7 +7755,21 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
     if (enableTools) {
       payload.tools = [{ functionDeclarations: AI_TOOLS_DECLARATIONS }];
-      if (this.isAiActionPrompt(prompt)) {
+      if (this.isSingleDayPrompt(prompt)) {
+        payload.toolConfig = {
+          functionCallingConfig: {
+            mode: "ANY",
+            allowedFunctionNames: ["set_day_plan", "create_and_save_recipe"]
+          }
+        };
+      } else if (this.isWeeklyPlanPrompt(prompt)) {
+        payload.toolConfig = {
+          functionCallingConfig: {
+            mode: "ANY",
+            allowedFunctionNames: ["set_weekly_plan", "create_and_save_recipe"]
+          }
+        };
+      } else if (this.isAiActionPrompt(prompt)) {
         payload.toolConfig = {
           functionCallingConfig: {
             mode: "ANY"
@@ -7755,7 +7787,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const timeoutId = setTimeout(() => controller.abort(), 28000);
       let response;
 
       try {
@@ -7797,9 +7829,22 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       if (!isTransientOrModelIssue || /api key not valid|invalid api key/i.test(errMsg)) {
         break;
       }
+
+      // Pequeña pausa de alivio ante picos de demanda
+      await new Promise(res => setTimeout(res, 500));
     }
 
     if (!data) {
+      const isDemandSpike = /high demand|overloaded|try again later|503/i.test(lastErrMsg);
+      if (isDemandSpike) {
+        console.warn(`[FoodAssistant] Gemini saturado por alta demanda (${lastErrMsg}). Activando motor inteligente local.`);
+        const sim = this.simulateGeminiAgentResponse(prompt);
+        return {
+          ...sim,
+          isSimulatedFallback: true,
+          originalError: lastErrMsg
+        };
+      }
       throw new Error(lastErrMsg);
     }
 
@@ -8169,7 +8214,8 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     const findTitle = (id) => state.recipes.find(r => r.id === id)?.title || 'Plato asignado';
     const lines = weekDays.map(w => {
       const dp = state.getDayPlan(w.dateKey, w.dayName);
-      return `- **${w.dayName}**: Desayuno: ${findTitle(dp.breakfast)} | Almuerzo: ${findTitle(dp.lunch)} | Merienda: ${findTitle(dp.snack)} | Cena: ${findTitle(dp.dinner)}`;
+      const leftoverBadge = dp.leftoverSlots?.lunch ? ' 🥡(Tupper de sobras)' : '';
+      return `- **${w.dayName}**: Desayuno: ${findTitle(dp.breakfast)} | Almuerzo: ${findTitle(dp.lunch)}${leftoverBadge} | Merienda: ${findTitle(dp.snack)} | Cena: ${findTitle(dp.dinner)}`;
     }).join('\n');
     return `He actualizado tu **Planificador Semanal** completo (7 días, 4 comidas diarias):\n\n${lines}`;
   }
@@ -8324,6 +8370,11 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
           if (!dayData[slotKey] && fallbackDay && fallbackDay[slotKey]) {
             dayData[slotKey] = fallbackDay[slotKey];
           }
+          if (!dayData[slotKey]) {
+            const allAvailable = (state.recipes && state.recipes.length > 0) ? state.recipes : DEFAULT_RECIPES;
+            const picked = allAvailable[(idx + slotKey.length) % allAvailable.length];
+            if (picked) dayData[slotKey] = picked.id;
+          }
         });
 
         if (dayEntry.isLeftoverLunch) {
@@ -8345,6 +8396,14 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
             if (!dayData[slotKey] && fallbackDay && fallbackDay[slotKey]) {
               dayData[slotKey] = fallbackDay[slotKey];
               modified = true;
+            }
+            if (!dayData[slotKey]) {
+              const allAvailable = (state.recipes && state.recipes.length > 0) ? state.recipes : DEFAULT_RECIPES;
+              const picked = allAvailable[(idx + slotKey.length) % allAvailable.length];
+              if (picked) {
+                dayData[slotKey] = picked.id;
+                modified = true;
+              }
             }
           });
           if (modified || !updatedDateKeys.has(wDay.dateKey)) {
@@ -8488,10 +8547,51 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     try {
       const systemPrompt = this.buildAiSystemInstruction();
       const agentResult = await this.callGeminiAgent(text, systemPrompt, true);
-      const isWeeklyIntent = this.isWeeklyPlanPrompt(text);
+      const isSingleDay = this.isSingleDayPrompt(text);
+      const isWeeklyIntent = !isSingleDay && this.isWeeklyPlanPrompt(text);
 
-      const rawToolCalls = Array.isArray(agentResult.toolCalls) ? [...agentResult.toolCalls] : [];
-      if (isWeeklyIntent) {
+      let rawToolCalls = Array.isArray(agentResult.toolCalls) ? [...agentResult.toolCalls] : [];
+
+      if (isSingleDay) {
+        const todayKey = toLocalDateKey(new Date());
+        const dayName = new Date().toLocaleDateString('es-ES', { weekday: 'long' });
+        const capDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+
+        rawToolCalls = rawToolCalls.map(tc => {
+          if (tc.name === 'set_weekly_plan') {
+            const days = Array.isArray(tc.args?.days) ? tc.args.days : [];
+            const dayEntry = days.find(d => d.dateKey === todayKey) || days[0] || {};
+            return {
+              name: 'set_day_plan',
+              args: {
+                dateKey: todayKey,
+                dayName: capDay,
+                breakfast: dayEntry.breakfast,
+                lunch: dayEntry.lunch,
+                snack: dayEntry.snack,
+                dinner: dayEntry.dinner
+              }
+            };
+          }
+          return tc;
+        });
+
+        if (!rawToolCalls.some(tc => tc.name === 'set_day_plan')) {
+          const planArgs = this.buildSimulatedWeeklyPlanArgs('replace');
+          const todayPlan = planArgs.days[0] || {};
+          rawToolCalls.push({
+            name: 'set_day_plan',
+            args: {
+              dateKey: todayKey,
+              dayName: capDay,
+              breakfast: todayPlan.breakfast,
+              lunch: todayPlan.lunch,
+              snack: todayPlan.snack,
+              dinner: todayPlan.dinner
+            }
+          });
+        }
+      } else if (isWeeklyIntent) {
         rawToolCalls.forEach(tc => {
           if (tc.name === 'set_weekly_plan') {
             tc.args = { ...(tc.args || {}), completeWeek: true };
@@ -8507,11 +8607,29 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
         }
       }
 
+      // Proteger lista de la compra si el usuario solo pidió añadir artículos sueltos
+      const isExplicitPlanShopRequest = /ingredientes\s+del\s+plan|men[uú]\s+semanal|toda\s+la\s+semana|plan\s+a\s+la\s+compra|vuelca.*compra/i.test(text);
+      if (!isExplicitPlanShopRequest) {
+        rawToolCalls.forEach(tc => {
+          if (tc.name === 'manage_shopping_list' && tc.args?.action === 'add_from_current_plan') {
+            tc.args.action = 'add';
+            const cleanItemName = text.replace(/a[ñn]ade|apunta|agrega|a\s+la\s+lista|a\s+la\s+compra/gi, '').trim() || 'Artículo nuevo';
+            tc.args.items = (Array.isArray(tc.args.items) && tc.args.items.length > 0)
+              ? tc.args.items
+              : [{ name: cleanItemName }];
+          }
+        });
+      }
+
       const executedResults = this.executeAiToolCalls(rawToolCalls);
       const hasWeeklyPlanExecuted = executedResults.some(r => r.tool === 'set_weekly_plan');
       const slotGaps = hasWeeklyPlanExecuted ? this.getDietarySlotGaps() : [];
 
       let displayMessage = agentResult.text;
+      if (agentResult.isSimulatedFallback) {
+        const fallbackPrefix = `⚠️ *Servidores de Gemini con saturación temporal. Petición completada con el motor inteligente local de Food Assistant:*\n\n`;
+        displayMessage = displayMessage ? `${fallbackPrefix}${displayMessage}` : fallbackPrefix;
+      }
       if (!displayMessage && executedResults.length > 0) {
         const summaries = executedResults.map(r => {
           if (r.tool === 'create_and_save_recipe') return `He creado la receta **${r.title}**.`;
@@ -8522,6 +8640,9 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
         }).filter(Boolean);
         displayMessage = summaries.join('\n\n');
       }
+
+      // Eliminar IDs internos tipo (*rec-...*) o rec-... del mensaje visible
+      displayMessage = this.stripRecipeIdsFromText(displayMessage);
 
       if (slotGaps.length > 0 && !/crear|inventar|nuevas recetas/i.test(displayMessage || '')) {
         const gapLabels = slotGaps.map(g => g.label.toLowerCase()).join(' y ');
@@ -8628,16 +8749,157 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
   // ==========================================================================
   async compressImageToBase64(file, maxWidth = 1024, maxHeight = 1024, quality = 0.8) {
     if (!file) return null;
+
+    // Capa 1: createImageBitmap (Moderno, nativo, decodifica JPEG/PNG/WebP/HEIC/AVIF sin fallos de FileReader)
+    if (typeof createImageBitmap === 'function') {
+      try {
+        const bitmap = await createImageBitmap(file);
+        let width = bitmap.width || 800;
+        let height = bitmap.height || 600;
+        if (width > maxWidth || height > maxHeight) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, width);
+        canvas.height = Math.max(1, height);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        if (typeof bitmap.close === 'function') bitmap.close();
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        const base64Data = (dataUrl.split(',')[1] || '').trim();
+        if (base64Data && base64Data.length > 50) {
+          return { dataUrl, base64Data, mimeType: 'image/jpeg' };
+        }
+      } catch (bmErr) {
+        console.warn("[FoodAssistant] createImageBitmap no disponible o falló:", bmErr);
+      }
+    }
+
+    // Capa 2: Si el preview del modal ya cargó la imagen en el DOM, extraer directamente desde el elemento <img>
+    const previewImg = document.getElementById('import-image-preview');
+    if (previewImg && (previewImg.naturalWidth > 0 || previewImg.width > 0)) {
+      try {
+        let width = previewImg.naturalWidth || previewImg.width || 800;
+        let height = previewImg.naturalHeight || previewImg.height || 600;
+        if (width > maxWidth || height > maxHeight) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, width);
+        canvas.height = Math.max(1, height);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(previewImg, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        const base64Data = (dataUrl.split(',')[1] || '').trim();
+        if (base64Data && base64Data.length > 50) {
+          return { dataUrl, base64Data, mimeType: 'image/jpeg' };
+        }
+      } catch (prevErr) {
+        console.warn("[FoodAssistant] Render desde previewImg falló:", prevErr);
+      }
+    }
+
+    // Capa 3: Lectura binaria directa con file.arrayBuffer() (instantáneo, sin dependencias de DOM ni timers)
+    if (typeof file.arrayBuffer === 'function') {
+      try {
+        const buffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        const len = bytes.byteLength;
+        const chunkSize = 8192;
+        for (let i = 0; i < len; i += chunkSize) {
+          binary += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + chunkSize, len)));
+        }
+        const base64Data = (typeof btoa === 'function' ? btoa(binary) : Buffer.from(binary, 'binary').toString('base64')).trim();
+        if (base64Data && base64Data.length > 0) {
+          const mimeType = (file.type && file.type.startsWith('image/')) ? file.type : 'image/jpeg';
+          return {
+            dataUrl: `data:${mimeType};base64,${base64Data}`,
+            base64Data,
+            mimeType
+          };
+        }
+      } catch (bufErr) {
+        console.warn("[FoodAssistant] file.arrayBuffer falló:", bufErr);
+      }
+    }
+
+    // Capa 4: URL.createObjectURL + HTMLImageElement (evita bloqueos de permisos en FileReader de móviles)
+    if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function' && typeof file === 'object') {
+      try {
+        const objectUrl = URL.createObjectURL(file);
+        const res = await new Promise((resolve, reject) => {
+          const img = new Image();
+          const tId = setTimeout(() => {
+            try { URL.revokeObjectURL(objectUrl); } catch (e) {}
+            reject(new Error("Timeout cargando imagen"));
+          }, 2500);
+          img.onload = () => {
+            clearTimeout(tId);
+            try {
+              let width = img.naturalWidth || img.width || 800;
+              let height = img.naturalHeight || img.height || 600;
+              if (width > maxWidth || height > maxHeight) {
+                if (width > height) {
+                  height = Math.round((height * maxWidth) / width);
+                  width = maxWidth;
+                } else {
+                  width = Math.round((width * maxHeight) / height);
+                  height = maxHeight;
+                }
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = Math.max(1, width);
+              canvas.height = Math.max(1, height);
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              try { URL.revokeObjectURL(objectUrl); } catch (e) {}
+              const dataUrl = canvas.toDataURL('image/jpeg', quality);
+              const base64Data = (dataUrl.split(',')[1] || '').trim();
+              resolve({ dataUrl, base64Data, mimeType: 'image/jpeg' });
+            } catch (err) {
+              try { URL.revokeObjectURL(objectUrl); } catch (e) {}
+              reject(err);
+            }
+          };
+          img.onerror = (err) => {
+            clearTimeout(tId);
+            try { URL.revokeObjectURL(objectUrl); } catch (e) {}
+            reject(err);
+          };
+          img.src = objectUrl;
+        });
+        if (res && res.base64Data && res.base64Data.length > 0) {
+          return res;
+        }
+      } catch (objErr) {
+        console.warn("[FoodAssistant] URL.createObjectURL falló:", objErr);
+      }
+    }
+
+    // Capa 5: FileReader clásico
     return new Promise((resolve, reject) => {
-      const timeoutId = setTimeout(() => reject(new Error("Tiempo de procesamiento de imagen agotado")), 8000);
       const reader = new FileReader();
+      const timeoutId = setTimeout(() => reject(new Error("Tiempo de procesamiento de imagen agotado")), 8000);
       reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
           clearTimeout(timeoutId);
           try {
-            let width = img.width || 800;
-            let height = img.height || 600;
+            let width = img.naturalWidth || img.width || 800;
+            let height = img.naturalHeight || img.height || 600;
             if (width > maxWidth || height > maxHeight) {
               if (width > height) {
                 height = Math.round((height * maxWidth) / width);
@@ -8652,21 +8914,16 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
             canvas.height = Math.max(1, height);
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            // Convertir siempre a image/jpeg estándar y compatible con Gemini
             const dataUrl = canvas.toDataURL('image/jpeg', quality);
             const base64Data = (dataUrl.split(',')[1] || '').trim();
-            resolve({
-              dataUrl,
-              base64Data,
-              mimeType: 'image/jpeg'
-            });
-          } catch (canvasErr) {
-            reject(canvasErr);
+            resolve({ dataUrl, base64Data, mimeType: 'image/jpeg' });
+          } catch (cErr) {
+            reject(cErr);
           }
         };
         img.onerror = () => {
           clearTimeout(timeoutId);
-          reject(new Error("El archivo seleccionado no es una imagen compatible o legible."));
+          reject(new Error("El archivo no es una imagen compatible o legible."));
         };
         img.src = e.target.result;
       };
@@ -8833,8 +9090,7 @@ REGLAS CRÍTICAS:
       primaryModel,
       'gemini-3.5-flash-lite',
       'gemini-3.8-flash',
-      'gemini-3.6-flash',
-      'gemini-3.1-flash-lite'
+      'gemini-2.5-flash-lite'
     ])];
 
     let lastError = null;
@@ -8842,7 +9098,7 @@ REGLAS CRÍTICAS:
 
     for (const model of candidateModels) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const timeoutId = setTimeout(() => controller.abort(), 35000);
       try {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
         const resp = await fetch(endpoint, {
@@ -8864,9 +9120,12 @@ REGLAS CRÍTICAS:
         }
         const errJson = await resp.json().catch(() => ({}));
         lastError = new Error(errJson.error?.message || `HTTP ${resp.status}`);
+        if (resp.status === 503 || resp.status === 429) {
+          await new Promise(r => setTimeout(r, 600));
+        }
       } catch (e) {
         clearTimeout(timeoutId);
-        lastError = e.name === 'AbortError' ? new Error(`Tiempo de espera agotado en modelo ${model}`) : e;
+        lastError = e.name === 'AbortError' ? new Error(`Tiempo de espera agotado al analizar con Gemini (${model})`) : e;
       }
     }
 
@@ -9012,7 +9271,7 @@ REGLAS CRÍTICAS:
     const text = document.getElementById('import-text-input')?.value.trim() || '';
     const aiPrompt = document.getElementById('import-ai-prompt-input')?.value.trim() || '';
     const imageInput = document.getElementById('import-image-input');
-    const imageFile = imageInput?.files?.[0] || null;
+    const imageFile = imageInput?.files?.[0] || this.selectedImportImageFile || null;
 
     const status = document.getElementById('import-status-indicator');
     const previewBox = document.getElementById('import-preview-box');
@@ -9676,7 +9935,8 @@ const AI_TOOLS_DECLARATIONS = [
               breakfast: { type: "STRING", description: "ID de la receta de Desayuno (obligatorio)" },
               lunch: { type: "STRING", description: "ID de la receta de Almuerzo (obligatorio)" },
               snack: { type: "STRING", description: "ID de la receta de Merienda (obligatorio)" },
-              dinner: { type: "STRING", description: "ID de la receta de Cena (obligatorio)" }
+              dinner: { type: "STRING", description: "ID de la receta de Cena (obligatorio)" },
+              isLeftoverLunch: { type: "BOOLEAN", description: "true si este almuerzo es tupper de la cena anterior (Batch Cooking)" }
             },
             required: ["dateKey", "breakfast", "lunch", "snack", "dinner"]
           }
@@ -9687,19 +9947,19 @@ const AI_TOOLS_DECLARATIONS = [
   },
   {
     name: "manage_shopping_list",
-    description: "Añade, marca como comprados o elimina artículos de la lista de la compra, o vuelca los ingredientes del plan semanal actual.",
+    description: "Gestiona la lista de la compra. Para añadir artículos sueltos que pida el usuario usa SIEMPRE action: 'add' y la lista en 'items'. NUNCA uses 'add_from_current_plan' para artículos individuales.",
     parameters: {
       type: "OBJECT",
       properties: {
-        action: { type: "STRING", description: "'add' | 'check' | 'remove' | 'add_from_current_plan'" },
+        action: { type: "STRING", description: "'add' (artículos sueltos pedidos por Franky) | 'check' (marcar comprados) | 'remove' (borrar) | 'add_from_current_plan' (SOLO si Franky pide explícitamente volcar todo el menú semanal a la lista)" },
         items: {
           type: "ARRAY",
           items: {
             type: "OBJECT",
             properties: {
-              name: { type: "STRING" },
-              amount: { type: "NUMBER" },
-              unit: { type: "STRING" }
+              name: { type: "STRING", description: "Nombre del producto" },
+              amount: { type: "NUMBER", description: "Cantidad numérica" },
+              unit: { type: "STRING", description: "Unidad (ej. g, ml, ud, l, kg)" }
             },
             required: ["name"]
           }
