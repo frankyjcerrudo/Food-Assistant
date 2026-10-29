@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#ffffff">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.84">
+  <link rel="stylesheet" href="styles.css?v=0.85">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%231a73e8'/><path d='M30 30h40v40H30z' fill='%23ffffff'/></svg>">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -25,7 +25,7 @@
         <span class="material-symbols-outlined">restaurant_menu</span>
       </div>
       <h1 class="brand-name">Food Assistant</h1>
-      <span class="app-version-badge" id="app-version-badge" title="Versión de Food Assistant">v0.84</span>
+      <span class="app-version-badge" id="app-version-badge" title="Versión de Food Assistant">v0.85</span>
     </div>
     <div class="header-actions">
       <!-- Theme quick toggle -->
@@ -342,9 +342,17 @@
       <div style="margin-bottom: 8px;">
         <label for="select-ai-provider" style="font-size: 12px; font-weight: 500; display: block; margin-bottom: 4px; color: var(--m3-on-surface-variant);">Proveedor de Inteligencia Artificial:</label>
         <select class="form-input" id="select-ai-provider" style="padding: 6px 10px; font-size: 13px; margin-bottom: 6px;">
-          <option value="gemini">Google Gemini (Recomendado - Gratuito hasta 1.500 req/día)</option>
+          <option value="gemini">Google Gemini (Gratuito hasta 1.500 req/día)</option>
           <option value="openai">OpenAI ChatGPT (GPT-4o mini / GPT-4o)</option>
           <option value="claude">Anthropic Claude (Claude 3.5 Sonnet / Haiku)</option>
+        </select>
+      </div>
+      <div id="wrapper-gemini-model" style="margin-bottom: 8px;">
+        <label for="select-gemini-model" style="font-size: 12px; font-weight: 500; display: block; margin-bottom: 4px; color: var(--m3-on-surface-variant);">Modelo de Google Gemini:</label>
+        <select class="form-input" id="select-gemini-model" style="padding: 6px 10px; font-size: 13px; margin-bottom: 6px;">
+          <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recomendado - 1.500 peticiones gratis/día)</option>
+          <option value="gemini-2.0-flash">Gemini 2.0 Flash (Estándar - 1.500 peticiones gratis/día)</option>
+          <option value="gemini-3.8-flash">Gemini 3.8 Flash (Experimental - Límite estricto de 20 peticiones/día)</option>
         </select>
       </div>
       <div style="display: flex; gap: 8px; margin-bottom: 6px;">
@@ -544,7 +552,7 @@
         <span class="material-symbols-outlined" style="color: var(--m3-primary);">system_update</span> Versión y Actualizaciones
       </h3>
       <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px;">
-        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.84</strong>
+        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.85</strong>
       </p>
       <div style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
         Si acabas de desplegar o notas que algún cambio no aparece, pulsa el botón para limpiar la caché del Service Worker y cargar el código más reciente.
@@ -1527,7 +1535,7 @@
   </div>
 </div>
 
-<script src="config.js?v=0.84"></script>
-<script src="app.js?v=0.84"></script>
+<script src="config.js?v=0.85"></script>
+<script src="app.js?v=0.85"></script>
 </body>
 </html>

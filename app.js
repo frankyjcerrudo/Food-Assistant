@@ -1319,7 +1319,7 @@ class StateStore {
     this.settings = this.load('fa_settings', {
       geminiApiKey: '',
       defaultServings: 2,
-      geminiModel: 'gemini-3.8-flash',
+      geminiModel: 'gemini-2.5-flash',
       nutritionGoals: {
         enabled: false,
         calories: 2000,
@@ -1328,8 +1328,8 @@ class StateStore {
         fat: 65
       }
     });
-    if (!this.settings.geminiModel || String(this.settings.geminiModel).includes('2.5') || String(this.settings.geminiModel).includes('1.5') || String(this.settings.geminiModel).includes('2.0')) {
-      this.settings.geminiModel = 'gemini-3.8-flash';
+    if (!this.settings.geminiModel || this.settings.geminiModel === 'gemini-2.5-flash-lite' || this.settings.geminiModel === 'gemini-1.5-flash') {
+      this.settings.geminiModel = 'gemini-2.5-flash';
       this.save('fa_settings', this.settings);
     }
     if (!this.settings.nutritionGoals) {
@@ -2539,7 +2539,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.84';
+  window.APP_VERSION = 'v0.85';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2571,7 +2571,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v0.84';
+    this.appVersion = window.APP_VERSION || 'v0.85';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -7810,12 +7810,12 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     }
 
     let rawModel = state.settings.geminiModel || 'gemini-3.8-flash';
-    if (String(rawModel).includes('2.5') || String(rawModel).includes('1.5') || String(rawModel).includes('2.0')) {
+    if (rawModel === 'gemini-2.5-flash-lite' || rawModel === 'gemini-1.5-flash') {
       rawModel = 'gemini-3.8-flash';
       state.settings.geminiModel = 'gemini-3.8-flash';
       state.save && state.save('fa_settings', state.settings);
     }
-    const candidateModels = ['gemini-3.8-flash'];
+    const candidateModels = [rawModel];
 
     const historyTurns = Array.isArray(this.aiChatHistory)
       ? this.aiChatHistory.slice(-6).map(m => ({
@@ -7891,6 +7891,29 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
         response.status === 429 ||
         response.status === 404 ||
         /high demand|overloaded|try again later|no longer available|not found|quota|rate limit|resource exhausted|exceeded/i.test(errMsg);
+
+      // Si es límite de cuota (429) en gemini-3.8-flash (límite de 20/día), intentar gemini-2.5-flash (1.500 req/día)
+      if ((response.status === 429 || /quota|limit: 20/i.test(errMsg)) && model === 'gemini-3.8-flash') {
+        try {
+          const fallbackEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
+          const fbController = new AbortController();
+          const fbTimeout = setTimeout(() => fbController.abort(), 6000);
+          const fbResponse = await fetch(fallbackEndpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey
+            },
+            body: JSON.stringify(payload),
+            signal: fbController.signal
+          });
+          clearTimeout(fbTimeout);
+          if (fbResponse.ok) {
+            data = await fbResponse.json();
+            break;
+          }
+        } catch (fbErr) {}
+      }
 
       // Si es un error de clave inválida (400/401/403 API key not valid), no reintentar con otros modelos
       if (!isTransientOrModelIssue || /api key not valid|invalid api key/i.test(errMsg)) {
@@ -9628,12 +9651,12 @@ REGLAS CRÍTICAS:
     parts.push({ text: promptText });
 
     let rawModel = state.settings.geminiModel || 'gemini-3.8-flash';
-    if (String(rawModel).includes('2.5') || String(rawModel).includes('1.5') || String(rawModel).includes('2.0')) {
+    if (rawModel === 'gemini-2.5-flash-lite' || rawModel === 'gemini-1.5-flash') {
       rawModel = 'gemini-3.8-flash';
       state.settings.geminiModel = 'gemini-3.8-flash';
       state.save && state.save('fa_settings', state.settings);
     }
-    const candidateModels = ['gemini-3.8-flash'];
+    const candidateModels = [rawModel];
 
     let lastError = null;
     let data = null;
@@ -10089,6 +10112,20 @@ REGLAS CRÍTICAS:
     }
 
     const currentProvider = state.settings.aiProvider || 'gemini';
+    const modelWrapper = document.getElementById('wrapper-gemini-model');
+    const selectModel = document.getElementById('select-gemini-model');
+    if (modelWrapper) {
+      modelWrapper.style.display = (currentProvider === 'gemini') ? 'block' : 'none';
+    }
+    if (selectModel) {
+      selectModel.value = state.settings.geminiModel || 'gemini-2.5-flash';
+      selectModel.onchange = (e) => {
+        state.settings.geminiModel = e.target.value;
+        state.save && state.save('fa_settings', state.settings);
+        this.renderSettings();
+      };
+    }
+
     if (inputKey) {
       inputKey.value = state.settings.geminiApiKey || '';
       if (currentProvider === 'openai') {
@@ -10418,6 +10455,8 @@ Autenticación: API Key → Bearer → ${tk}`;
     state.settings.geminiApiKey = key;
     const provider = document.getElementById('select-ai-provider')?.value || 'gemini';
     state.settings.aiProvider = provider;
+    const model = document.getElementById('select-gemini-model')?.value || 'gemini-2.5-flash';
+    state.settings.geminiModel = model;
     state.save('fa_settings', state.settings);
     this.renderSettings();
     this.scheduleSyncWithCloud();

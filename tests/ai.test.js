@@ -851,4 +851,67 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     document.body.removeChild(input);
     document.body.removeChild(status);
   });
+
+  it('v0.85: callGeminiAgent usa gemini-2.5-flash con 1.500 peticiones/día cuando está configurado', async () => {
+    state.settings.geminiApiKey = 'AIzaSyTestKey25';
+    state.settings.geminiModel = 'gemini-2.5-flash';
+    state.settings.aiProvider = 'gemini';
+
+    const origFetch = globalThis.fetch;
+    let calledUrl = null;
+    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
+      calledUrl = url;
+      return {
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: '¡Hola Franky! Respuesta con 1.500 peticiones diarias.' }] } }]
+        })
+      };
+    });
+
+    try {
+      const res = await appInstance.callGeminiAgent('Hola');
+      expect(calledUrl).toContain('models/gemini-2.5-flash:generateContent');
+      expect(res.text).toContain('Respuesta con 1.500 peticiones diarias');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it('v0.85: callGeminiAgent en gemini-3.8-flash conmuta a gemini-2.5-flash (1.500 req/día) ante error 429 de cuota', async () => {
+    state.settings.geminiApiKey = 'AIzaSyTestKeyFailover';
+    state.settings.geminiModel = 'gemini-3.8-flash';
+    state.settings.aiProvider = 'gemini';
+
+    const calledUrls = [];
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
+      calledUrls.push(url);
+      if (url.includes('gemini-3.8-flash')) {
+        return {
+          ok: false,
+          status: 429,
+          json: async () => ({
+            error: { message: 'Quota exceeded for metric: limit: 20, model: gemini-3.8-flash' }
+          })
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: 'Recuperado con éxito en gemini-2.5-flash.' }] } }]
+        })
+      };
+    });
+
+    try {
+      const res = await appInstance.callGeminiAgent('Recetas');
+      expect(calledUrls.length).toBe(2);
+      expect(calledUrls[0]).toContain('gemini-3.8-flash');
+      expect(calledUrls[1]).toContain('gemini-2.5-flash');
+      expect(res.text).toContain('Recuperado con éxito en gemini-2.5-flash');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
 });
