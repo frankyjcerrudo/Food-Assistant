@@ -139,3 +139,9 @@ create policy "Users own settings update" on public.user_settings for update usi
 drop policy if exists "Users own settings delete" on public.user_settings;
 create policy "Users own settings delete" on public.user_settings for delete using (auth.uid() = user_id);
 
+
+-- 5. CONTROL EXTERNO POR IA / VOZ / MCP (US-69, Fase 3)
+alter table public.user_settings add column if not exists agent_token_hash text default null;
+alter table public.user_settings add column if not exists agent_enabled boolean not null default false;
+alter table public.user_settings add column if not exists default_servings integer not null default 2;
+create index if not exists user_settings_agent_token_hash_idx on public.user_settings (agent_token_hash) where agent_token_hash is not null;

@@ -2531,7 +2531,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.79';
+  window.APP_VERSION = 'v0.80';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2563,7 +2563,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v0.79';
+    this.appVersion = window.APP_VERSION || 'v0.80';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -3057,7 +3057,12 @@ class FoodAssistantApp {
           this.sanitizeRecipeProteinTags();
           this.render();
           if (this.supabaseClient && state.cloudUser?.id) {
-            this.syncDataWithCloud(true);
+            // US-69: refresco reactivo al volver a la app (debounce 15 s)
+            const nowMs = Date.now();
+            if (!this._lastVisibilitySyncAt || nowMs - this._lastVisibilitySyncAt > 15000) {
+              this._lastVisibilitySyncAt = nowMs;
+              this.syncDataWithCloud(true);
+            }
           }
         }
       });
@@ -3582,6 +3587,14 @@ class FoodAssistantApp {
             if (sRow.nutrition_goals && typeof sRow.nutrition_goals === 'object') remoteGoals = sRow.nutrition_goals;
             if (typeof sRow.gemini_api_key === 'string' && sRow.gemini_api_key.trim()) remoteGeminiKey = sRow.gemini_api_key.trim();
             if (sRow.updated_at) remoteDietaryUpdatedAt = sRow.updated_at;
+            // US-69: adoptar el acceso externo configurado desde otro dispositivo
+            if (typeof sRow.agent_token_hash === 'string' && sRow.agent_token_hash && !state.settings?.agentTokenHash) {
+              if (!state.settings) state.settings = {};
+              state.settings.agentTokenHash = sRow.agent_token_hash;
+              state.settings.agentEnabled = !!sRow.agent_enabled;
+              state.save('fa_settings', state.settings);
+              stateChanged = true;
+            }
           }
         }
       } catch (e) {
@@ -3925,13 +3938,20 @@ class FoodAssistantApp {
       // Opcional: Persistir en tabla user_settings si existe en el backend
       try {
         if (typeof this.upsertWithSchemaFallback === 'function') {
-          await this.upsertWithSchemaFallback('user_settings', [{
+          const settingsRow = {
             user_id: state.cloudUser.id,
             dietary_preferences: state.dietaryPreferences || [],
             custom_tags: state.customTags || [],
             nutrition_goals: state.settings?.nutritionGoals || null,
+            default_servings: state.settings?.defaultServings || 2,
             updated_at: state.dietaryUpdatedAt || new Date().toISOString()
-          }]);
+          };
+          // US-69: solo se envía si este dispositivo conoce el token (evita pisarlo con null)
+          if (state.settings?.agentTokenHash !== undefined) {
+            settingsRow.agent_token_hash = state.settings.agentTokenHash || null;
+            settingsRow.agent_enabled = !!state.settings.agentEnabled;
+          }
+          await this.upsertWithSchemaFallback('user_settings', [settingsRow]);
         }
       } catch (tableErr) {
         // user_settings es opcional, user_metadata garantiza la persistencia multi-dispositivo
@@ -4162,6 +4182,10 @@ class FoodAssistantApp {
 
     // Settings
     document.getElementById('btn-save-gemini-key')?.addEventListener('click', () => this.saveGeminiKey());
+    document.getElementById('btn-generate-agent-token')?.addEventListener('click', () => this.generateExternalAgentToken());
+    document.getElementById('btn-revoke-agent-token')?.addEventListener('click', () => this.revokeExternalAgentToken());
+    document.getElementById('btn-copy-agent-token')?.addEventListener('click', () => this.copyExternalAgentText(document.getElementById('external-agent-token')?.value || ''));
+    document.getElementById('btn-copy-agent-guide')?.addEventListener('click', () => this.copyExternalAgentText(document.getElementById('external-agent-guide')?.textContent || ''));
     document.getElementById('btn-save-nutrition-goals')?.addEventListener('click', () => this.saveNutritionGoalsFromSettings());
     document.getElementById('btn-export-backup')?.addEventListener('click', () => this.exportBackup());
     document.getElementById('input-import-backup')?.addEventListener('change', (e) => this.importBackup(e));
@@ -9552,6 +9576,111 @@ REGLAS CRÍTICAS:
 
     this.renderDietaryPreferencesSettings();
     this.renderNutritionGoalsSettings();
+    this.renderExternalAgentSettings();
+  }
+
+  // ==========================================================================
+  // US-69 (Fase 3): Control externo por voz / IA / MCP sin abrir la app
+  // ==========================================================================
+  getExternalAgentEndpoint() {
+    const base = (window.APP_CONFIG?.supabaseUrl || localStorage.getItem('fa_sb_url') || '').replace(/\/+$/, '');
+    return base ? `${base}/functions/v1/food-assistant-agent` : '';
+  }
+
+  async hashAgentToken(token) {
+    const bytes = new TextEncoder().encode(String(token));
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async generateExternalAgentToken() {
+    if (!state.cloudUser?.id) {
+      this.showToast('Inicia sesión en tu cuenta para activar el control externo.', 'warning');
+      return null;
+    }
+    const uuid = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}${Math.random()}`).replace(/-/g, '');
+    const token = `fa_live_${uuid}`;
+    state.settings.agentTokenHash = await this.hashAgentToken(token);
+    state.settings.agentTokenHint = token.slice(-4);
+    state.settings.agentEnabled = true;
+    state.save('fa_settings', state.settings);
+    this.renderExternalAgentSettings(token);
+    this.scheduleSyncWithCloud();
+    return token;
+  }
+
+  revokeExternalAgentToken() {
+    state.settings.agentTokenHash = '';
+    state.settings.agentTokenHint = '';
+    state.settings.agentEnabled = false;
+    state.save('fa_settings', state.settings);
+    this.renderExternalAgentSettings();
+    this.scheduleSyncWithCloud();
+    this.showToast('Token revocado. Los asistentes externos ya no tienen acceso.', 'success');
+  }
+
+  toggleExternalAgentEnabled(enabled) {
+    if (!state.settings.agentTokenHash) return;
+    state.settings.agentEnabled = !!enabled;
+    state.save('fa_settings', state.settings);
+    this.renderExternalAgentSettings();
+    this.scheduleSyncWithCloud();
+  }
+
+  async copyExternalAgentText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      this.showToast('Copiado al portapapeles.', 'success');
+    } catch (e) {
+      this.showToast('No se pudo copiar automáticamente.', 'warning');
+    }
+  }
+
+  // `freshToken` solo existe justo tras generarlo: es la única vez que se muestra completo.
+  renderExternalAgentSettings(freshToken = null) {
+    const statusEl = document.getElementById('external-agent-status');
+    if (!statusEl) return;
+    const hasToken = !!state.settings?.agentTokenHash;
+    const enabled = hasToken && !!state.settings.agentEnabled;
+
+    const toggle = document.getElementById('toggle-external-agent');
+    if (toggle) {
+      toggle.checked = enabled;
+      toggle.disabled = !hasToken;
+      toggle.onchange = (e) => this.toggleExternalAgentEnabled(e.target.checked);
+    }
+
+    const endpoint = this.getExternalAgentEndpoint();
+    statusEl.innerHTML = hasToken
+      ? `<span style="color: ${enabled ? 'var(--color-brand)' : 'var(--m3-on-surface-variant)'}; font-weight: 500;">${enabled ? '✓ Acceso externo activo' : 'Acceso externo en pausa'} · token fa_live_••••${state.settings.agentTokenHint || ''}</span>`
+      : '<span style="color: var(--m3-on-surface-variant);">Sin token. Genera uno para conectar asistentes externos.</span>';
+
+    const reveal = document.getElementById('external-agent-token-reveal');
+    const tokenInput = document.getElementById('external-agent-token');
+    if (reveal && tokenInput) {
+      reveal.style.display = freshToken ? 'block' : 'none';
+      tokenInput.value = freshToken || '';
+    }
+
+    const guide = document.getElementById('external-agent-guide');
+    if (guide) {
+      const tk = freshToken || 'fa_live_TU_TOKEN';
+      guide.textContent =
+`# 1) Comando en lenguaje natural (Atajos de voz / HTTP Shortcuts / Telegram)
+POST ${endpoint}/command
+Authorization: Bearer ${tk}
+Content-Type: application/json
+{"command": "Añade leche y aguacates a la compra"}
+→ responde {"ok":true,"speech":"..."}  (lee "speech" en voz alta)
+
+# 2) Claude / clientes MCP  (servidor MCP remoto)
+URL:  ${endpoint}/mcp
+Header: Authorization: Bearer ${tk}
+
+# 3) ChatGPT (Custom GPT → Actions)
+Importar esquema desde: ${endpoint}/openapi.json
+Autenticación: API Key → Bearer → ${tk}`;
+    }
   }
 
   // US-02: Preferencias dietéticas activas en Ajustes
