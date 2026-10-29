@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "Food Assistant - Planificador de Comidas & IA",
   "short_name": "FoodAssistant",
   "description": "Tu asistente de cocina inteligente: organiza tus recetas, planifica tu menú semanal con Gemini y compra por pasillos sin esfuerzo.",
@@ -12,6 +12,32 @@
       "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%23c2410c'/><text y='.9em' font-size='70' x='15'>🍳</text></svg>",
       "sizes": "192x192 512x512",
       "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "🎙️ Hablar al Asistente",
+      "short_name": "Asistente Voz",
+      "description": "Dicta comidas, recetas o artículos de la compra",
+      "url": "./index.html?action=voice",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%23c2410c'/><text y='.75em' font-size='50' x='25'>🎙️</text></svg>",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "🛒 Lista de la Compra",
+      "short_name": "Compra",
+      "description": "Ver artículos pendientes de la compra",
+      "url": "./index.html#view-shopping",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%23c2410c'/><text y='.75em' font-size='50' x='25'>🛒</text></svg>",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }

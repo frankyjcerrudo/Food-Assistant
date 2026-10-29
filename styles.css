@@ -3034,4 +3034,22 @@ dialog.modal-overlay::backdrop {
   border-top: 1px solid var(--m3-outline-variant);
 }
 
+/* Camino B (US-17): Micrófono y Asistente de Voz */
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.18); opacity: 0.75; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+#btn-mic-ai-chat.listening {
+  background-color: var(--m3-error-container, #ffdad6) !important;
+  color: var(--m3-error, #ba1a1a) !important;
+  border-color: var(--m3-error, #ba1a1a) !important;
+}
+
+#btn-header-voice.listening {
+  background-color: var(--m3-error-container, #ffdad6) !important;
+  color: var(--m3-error, #ba1a1a) !important;
+}
+
 

@@ -1058,11 +1058,19 @@ function getIngredientSuggestions(query, max = 6, extraItems = []) {
   const prefixMatches = [];
   const containsMatches = [];
 
+  // Lematización básica de plurales en español (ej. doradas -> dorada, patatas -> patata)
+  const stem = (s) => s.replace(/(?:es|s)$/i, '').trim();
+  const qStem = stem(qNorm);
+
   for (const item of all) {
     const itemNorm = normalizeIngredientText(item.name);
-    if (itemNorm.startsWith(qNorm)) {
+    const itemStem = stem(itemNorm);
+    const startsMatch = itemNorm.startsWith(qNorm) || (qStem.length >= 3 && itemNorm.startsWith(qStem)) || (qStem.length >= 3 && itemStem.startsWith(qStem));
+    const containsMatch = itemNorm.includes(qNorm) || (qStem.length >= 3 && itemNorm.includes(qStem)) || (qStem.length >= 3 && itemStem.includes(qStem));
+
+    if (startsMatch) {
       prefixMatches.push(item);
-    } else if (itemNorm.includes(qNorm)) {
+    } else if (containsMatch) {
       containsMatches.push(item);
     }
   }
@@ -2531,7 +2539,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.80';
+  window.APP_VERSION = 'v0.81';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2563,7 +2571,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v0.80';
+    this.appVersion = window.APP_VERSION || 'v0.81';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -4239,11 +4247,25 @@ class FoodAssistantApp {
       }
     });
 
-    // Gemini Chat
+    // Gemini Chat & Voice Assistant (Camino B: US-17)
+    this.initVoiceAssistant();
     document.getElementById('btn-send-ai-chat')?.addEventListener('click', () => this.handleAiChatSubmit());
+    document.getElementById('btn-mic-ai-chat')?.addEventListener('click', () => this.toggleVoiceRecognition());
+    document.getElementById('btn-header-voice')?.addEventListener('click', () => this.toggleVoiceRecognition());
     document.getElementById('ai-chat-input')?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.handleAiChatSubmit();
     });
+
+    // PWA Shortcut trigger: ?action=voice
+    if (typeof window !== 'undefined' && window.location?.search) {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('action') === 'voice') {
+        setTimeout(() => {
+          this.switchView('view-ai');
+          this.toggleVoiceRecognition();
+        }, 400);
+      }
+    }
     document.querySelectorAll('.chips-scroll-container button[data-prompt]').forEach(chip => {
       chip.addEventListener('click', () => {
         const input = document.getElementById('ai-chat-input');
@@ -7670,13 +7692,20 @@ class FoodAssistantApp {
 
   isSingleDayPrompt(prompt) {
     if (!prompt || typeof prompt !== 'string') return false;
-    return /\b(hoy|dia\s+de\s+hoy|d[ií]a\s+de\s+hoy|ma[ñn]ana|solo\s+hoy|este\s+d[ií]a|para\s+hoy|de\s+hoy|qu[eé]\s+como\s+hoy)\b/i.test(prompt);
+    // Días de la semana específicos o referencias temporales directas
+    return /\b(hoy|dia\s+de\s+hoy|d[ií]a\s+de\s+hoy|ma[ñn]ana|solo\s+hoy|este\s+d[ií]a|para\s+hoy|de\s+hoy|qu[eé]\s+como\s+hoy|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)\b/i.test(prompt) &&
+      !/\b(fin\s+de\s+semana|finde|semana\s+completa|toda\s+la\s+semana|men[uú]\s+semanal)\b/i.test(prompt);
+  }
+
+  isWeekendPrompt(prompt) {
+    if (!prompt || typeof prompt !== 'string') return false;
+    return /\b(fin\s+de\s+semana|finde|s[aá]bado\s+y\s+domingo|sabado\s+y\s+domingo)\b/i.test(prompt);
   }
 
   isWeeklyPlanPrompt(prompt) {
     if (!prompt || typeof prompt !== 'string') return false;
-    // Si el usuario pide un solo día específico ("día de hoy", "hoy", "mañana", "lunes", etc.), NO forzar semana completa
-    if (this.isSingleDayPrompt(prompt)) return false;
+    // Si el usuario pide un solo día específico o el fin de semana, NO forzar semana completa
+    if (this.isSingleDayPrompt(prompt) || this.isWeekendPrompt(prompt)) return false;
     return /\b(planifica|completa|rellena|organiza|pon|asigna)\b.*?\b(semana|men[uú]|plan)\b|\b(men[uú]\s+semanal|plan\s+semanal|semana\s+completa|dejad[oa]s?\s+vac[ií][ao]s?|huecos?\s+libres?|huecos?\s+vac[ií][ao]s?|faltan\s+comidas|sin\s+aparecer\s+muchas\s+comidas|platos\s+en\s+el\s+plan|desayunos\s+y\s+meriendas|batch\s+cooking|sobras|tuppers?)\b/i.test(prompt);
   }
 
@@ -8008,6 +8037,32 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
               lunch: todayPlan.lunch,
               snack: todayPlan.snack,
               dinner: todayPlan.dinner
+            }
+          }
+        ]
+      };
+    }
+
+    // 0.1 Planificación específica de fin de semana (Sábado y Domingo únicamente)
+    if (this.isWeekendPrompt(prompt)) {
+      const planArgs = this.buildSimulatedWeeklyPlanArgs('replace');
+      const weekendDays = planArgs.days.filter(d => {
+        const dName = String(d.dayName || '').toLowerCase();
+        return dName.includes('sáb') || dName.includes('sab') || dName.includes('dom');
+      });
+      const findTitle = (id) => state.recipes.find(r => r.id === id)?.title || 'Comida equilibrada';
+      const summaryLines = weekendDays.map(d =>
+        `- **${d.dayName}**: Desayuno: ${findTitle(d.breakfast)} | Almuerzo: ${findTitle(d.lunch)} | Merienda: ${findTitle(d.snack)} | Cena: ${findTitle(d.dinner)}`
+      ).join('\n');
+
+      return {
+        text: `¡Listo, Franky! He planificado únicamente tu **fin de semana** (Sábado y Domingo), manteniendo intactos los menús del resto de la semana:\n\n${summaryLines}`,
+        toolCalls: [
+          {
+            name: 'set_weekly_plan',
+            args: {
+              mode: 'replace',
+              days: weekendDays
             }
           }
         ]
@@ -8544,7 +8599,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     return results;
   }
 
-  async handleAiChatSubmit() {
+  async handleAiChatSubmit(fromVoice = false) {
     const input = document.getElementById('ai-chat-input');
     const text = input?.value.trim() || '';
     if (!text) return;
@@ -8569,11 +8624,45 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       const systemPrompt = this.buildAiSystemInstruction();
       const agentResult = await this.callGeminiAgent(text, systemPrompt, true);
       const isSingleDay = this.isSingleDayPrompt(text);
-      const isWeeklyIntent = !isSingleDay && this.isWeeklyPlanPrompt(text);
+      const isWeekend = this.isWeekendPrompt(text);
+      const isWeeklyIntent = !isSingleDay && !isWeekend && this.isWeeklyPlanPrompt(text);
 
       let rawToolCalls = Array.isArray(agentResult.toolCalls) ? [...agentResult.toolCalls] : [];
 
-      if (isSingleDay) {
+      if (isWeekend) {
+        rawToolCalls = rawToolCalls.map(tc => {
+          if (tc.name === 'set_weekly_plan') {
+            const days = Array.isArray(tc.args?.days) ? tc.args.days : [];
+            const weekendEntries = days.filter(d => {
+              const dName = String(d.dayName || '').toLowerCase();
+              return dName.includes('sáb') || dName.includes('sab') || dName.includes('dom');
+            });
+            return {
+              name: 'set_weekly_plan',
+              args: {
+                mode: 'replace',
+                days: weekendEntries.length > 0 ? weekendEntries : days.slice(-2)
+              }
+            };
+          }
+          return tc;
+        });
+
+        if (!rawToolCalls.some(tc => tc.name === 'set_weekly_plan')) {
+          const planArgs = this.buildSimulatedWeeklyPlanArgs('replace');
+          const weekendDays = planArgs.days.filter(d => {
+            const dName = String(d.dayName || '').toLowerCase();
+            return dName.includes('sáb') || dName.includes('sab') || dName.includes('dom');
+          });
+          rawToolCalls.push({
+            name: 'set_weekly_plan',
+            args: {
+              mode: 'replace',
+              days: weekendDays
+            }
+          });
+        }
+      } else if (isSingleDay) {
         const todayKey = toLocalDateKey(new Date());
         const dayName = new Date().toLocaleDateString('es-ES', { weekday: 'long' });
         const capDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
@@ -8722,6 +8811,11 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
         aiBubble.appendChild(actionsContainer);
       }
+
+      // Camino B (US-17): Si la orden se dictó por voz, responder también con voz natural hablada
+      if (fromVoice && displayMessage) {
+        this.speakAiResponse(displayMessage);
+      }
     } catch (err) {
       // US-37: Mostrar mensajes de error con textContent para impedir XSS
       aiBubble.innerHTML = '';
@@ -8732,6 +8826,131 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     }
 
     history.scrollTop = history.scrollHeight;
+  }
+
+  // ==========================================================================
+  // US-17 / CAMINO B: ASISTENTE DE VOZ INTEGRADO (WEB SPEECH RECOGNITION & TTS)
+  // ==========================================================================
+  initVoiceAssistant() {
+    const SpeechRec = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
+    this.speechRecognitionSupported = !!SpeechRec;
+    this.isListeningVoice = false;
+
+    if (this.speechRecognitionSupported) {
+      try {
+        this.recognition = new SpeechRec();
+        this.recognition.lang = 'es-ES';
+        this.recognition.continuous = false;
+        this.recognition.interimResults = true;
+
+        this.recognition.onstart = () => {
+          this.isListeningVoice = true;
+          this.updateVoiceUI(true);
+        };
+
+        this.recognition.onresult = (event) => {
+          let interim = '';
+          let final = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              final += event.results[i][0].transcript;
+            } else {
+              interim += event.results[i][0].transcript;
+            }
+          }
+          const chatInput = document.getElementById('ai-chat-input');
+          if (chatInput) {
+            chatInput.value = final || interim;
+          }
+        };
+
+        this.recognition.onerror = (event) => {
+          console.warn("[Voice] Error en reconocimiento de voz:", event.error);
+          this.isListeningVoice = false;
+          this.updateVoiceUI(false);
+          if (event.error === 'not-allowed') {
+            this.showToast("Permiso de micrófono no concedido en el navegador.", "warning");
+          }
+        };
+
+        this.recognition.onend = () => {
+          this.isListeningVoice = false;
+          this.updateVoiceUI(false);
+          const chatInput = document.getElementById('ai-chat-input');
+          const text = chatInput?.value?.trim();
+          if (text) {
+            this.handleAiChatSubmit(true);
+          }
+        };
+      } catch (e) {
+        console.warn("Could not init SpeechRecognition:", e);
+      }
+    }
+  }
+
+  toggleVoiceRecognition() {
+    if (!this.speechRecognitionSupported) {
+      this.showToast("Tu navegador no soporta reconocimiento de voz nativo.", "info");
+      return;
+    }
+    if (this.isListeningVoice) {
+      try { this.recognition.stop(); } catch (e) {}
+      this.isListeningVoice = false;
+      this.updateVoiceUI(false);
+    } else {
+      this.switchView('view-ai');
+      const chatInput = document.getElementById('ai-chat-input');
+      if (chatInput) chatInput.value = '';
+      try {
+        this.recognition.start();
+      } catch (e) {
+        console.warn("Recognition start error:", e);
+      }
+    }
+  }
+
+  updateVoiceUI(isListening) {
+    const micBtn = document.getElementById('btn-mic-ai-chat');
+    const headerVoiceBtn = document.getElementById('btn-header-voice');
+    const badge = document.getElementById('voice-listening-indicator');
+
+    if (micBtn) {
+      micBtn.classList.toggle('listening', isListening);
+      micBtn.innerHTML = isListening
+        ? '<span class="material-symbols-outlined icon-sm" style="animation: pulse 1s infinite; color: var(--m3-error, #ba1a1a);">mic</span>'
+        : '<span class="material-symbols-outlined icon-sm">mic</span>';
+      micBtn.title = isListening ? 'Escuchando... pulsa para parar' : 'Hablar por micrófono';
+    }
+    if (headerVoiceBtn) {
+      headerVoiceBtn.classList.toggle('listening', isListening);
+      const icon = headerVoiceBtn.querySelector('.material-symbols-outlined');
+      if (icon) {
+        icon.style.color = isListening ? 'var(--m3-error, #ba1a1a)' : '';
+        icon.style.animation = isListening ? 'pulse 1s infinite' : '';
+      }
+    }
+    if (badge) {
+      badge.style.display = isListening ? 'flex' : 'none';
+    }
+  }
+
+  speakAiResponse(text) {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    try {
+      window.speechSynthesis.cancel();
+      const clean = text
+        .replace(/[*#_`]/g, '')
+        .replace(/https?:\/\/\S+/g, '')
+        .replace(/\n+/g, '. ')
+        .trim();
+      if (!clean) return;
+      const utterance = new SpeechSynthesisUtterance(clean);
+      utterance.lang = 'es-ES';
+      utterance.rate = 1.05;
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.warn("SpeechSynthesis error:", e);
+    }
   }
 
   applySampleAiPlan(planOverride = null) {
