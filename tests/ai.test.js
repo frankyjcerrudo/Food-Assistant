@@ -914,4 +914,30 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
       globalThis.fetch = origFetch;
     }
   });
+
+  it('v0.86: callGeminiAgent conecta con gemini-2.5-pro para cuentas Pro o con facturación', async () => {
+    state.settings.geminiApiKey = 'AIzaSyProKey';
+    state.settings.geminiModel = 'gemini-2.5-pro';
+    state.settings.aiProvider = 'gemini';
+
+    const origFetch = globalThis.fetch;
+    let calledUrl = null;
+    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
+      calledUrl = url;
+      return {
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: '¡Hola Franky! Respuesta generada por Gemini 2.5 Pro.' }] } }]
+        })
+      };
+    });
+
+    try {
+      const res = await appInstance.callGeminiAgent('Asesoramiento nutricional');
+      expect(calledUrl).toContain('models/gemini-2.5-pro:generateContent');
+      expect(res.text).toContain('Gemini 2.5 Pro');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
 });
