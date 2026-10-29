@@ -269,22 +269,22 @@ function estimateRecipeNutrition(recipe) {
       if (isOilOrFat) {
         // En aceite, "1 ud" o sin unidad equivale a 1 cucharada culinaria (~10g), nunca 80g o 100g
         grams = Math.min(25, amount * 10);
-      } else if (/\b(dorada|lubina|trucha|lenguado|rodaballo|corvina|rape)\b/i.test(name)) {
-        // Pescado entero: ración limpia media ~250g
+      } else if (/\b(doradas?|lubinas?|truchas?|lenguados?|rodaballos?|corvinas?|rapes?)\b/i.test(name)) {
+        // Pescado entero (dorada, doradas, lubinas...): ración limpia media ~250g
         grams = amount * 250;
-      } else if (/\b(pechuga|pechugas|filete|filetes|lomo|lomos|rodaja|rodajas|merluza|bacalao|pescadilla|gallo)\b/i.test(name)) {
+      } else if (/\b(pechugas?|filetes?|lomos?|rodajas?|merluzas?|bacalaos?|pescadillas?|gallos?)\b/i.test(name)) {
         grams = amount * 180;
-      } else if (/\b(gamba|gambas|langostino|langostinos)\b/i.test(name)) {
+      } else if (/\b(gambas?|langostinos?|camarones?)\b/i.test(name)) {
         grams = amount * 25;
-      } else if (/\b(huevo|huevos)\b/i.test(name)) {
+      } else if (/\b(huevos?)\b/i.test(name)) {
         grams = amount * 60;
-      } else if (/\b(aguacate)\b/i.test(name)) {
+      } else if (/\b(aguacates?)\b/i.test(name)) {
         grams = amount * 150;
-      } else if (/\b(patata|patatas|papas?|manzana|manzanas|pera|peras|pl[aá]tano|pl[aá]tanos|naranja|naranjas|pepino|pepinos)\b/i.test(name)) {
+      } else if (/\b(patatas?|papas?|manzanas?|peras?|pl[aá]tanos?|bananas?|naranjas?|pepinos?)\b/i.test(name)) {
         grams = amount * 160;
-      } else if (/\b(lim[oó]n|limones|tomate|tomates)\b/i.test(name)) {
+      } else if (/\b(lim[oó]n|limones|tomates?)\b/i.test(name)) {
         grams = amount * 100;
-      } else if (/\b(cebolla|cebollas)\b/i.test(name)) {
+      } else if (/\b(cebollas?)\b/i.test(name)) {
         grams = amount * 120;
       } else {
         grams = amount * 80;
@@ -294,52 +294,52 @@ function estimateRecipeNutrition(recipe) {
     // 2. Densidad nutricional por 100g (kcal, proteína, carbohidratos, grasa)
     let c100 = 80, p100 = 2, cb100 = 10, f100 = 1;
 
-    if (/\b(pollo|pechuga|pavo|conejo)\b/i.test(name)) {
+    if (/\b(pollos?|pechugas?|pavos?|conejos?)\b/i.test(name)) {
       c100 = 145; p100 = 31; cb100 = 0; f100 = 3;
-    } else if (/\b(ternera|solomillo|buey|cerdo|carne|lomo|cordero)\b/i.test(name)) {
+    } else if (/\b(terneras?|solomillos?|buey|bueyes|cerdos?|carnes?|lomos?|corderos?)\b/i.test(name)) {
       c100 = 215; p100 = 26; cb100 = 0; f100 = 12;
-    } else if (/\b(salm[oó]n|at[uú]n|bonito|emperador|pez\s+espada|sardinas?|boquer[oó]n|boquerones|caballa|arenque)\b/i.test(name)) {
+    } else if (/\b(salm[oó]n|salmones|at[uú]n|atunes|bonitos?|emperadores?|pez\s+espada|peces\s+espada|sardinas?|boquer[oó]n|boquerones|caballas?|arenques?)\b/i.test(name)) {
       c100 = 190; p100 = 22; cb100 = 0; f100 = 11;
-    } else if (/\b(dorada|lubina|trucha|merluza|bacalao|lenguado|rodaballo|corvina|rape|pescadilla|gallo|pescado\s+blanco|pescado)\b/i.test(name)) {
-      // Pescado blanco magro (dorada, merluza, lubina, etc.): rico en proteína y 0g hidratos
+    } else if (/\b(doradas?|lubinas?|truchas?|merluzas?|bacalaos?|lenguados?|rodaballos?|corvinas?|rapes?|pescadillas?|gallos?|pescados?\s+blancos?|pescados?)\b/i.test(name)) {
+      // Pescado blanco magro (dorada, doradas, merluza, merluzas, lubina...): rico en proteína y 0g hidratos
       c100 = 105; p100 = 20; cb100 = 0; f100 = 2.5;
-    } else if (/\b(gambas?|langostinos?|calamare?s?|chipir[oó]n|chipirones|sepia|pulpo|mejill[oó]n|mejillones|almejas?|berberechos?|chirlas?|marisco)\b/i.test(name)) {
+    } else if (/\b(gambas?|langostinos?|camarones?|calamare?s?|chipir[oó]n|chipirones|sepias?|pulpos?|mejill[oó]n|mejillones|almejas?|berberechos?|chirlas?|mariscos?)\b/i.test(name)) {
       c100 = 90; p100 = 18; cb100 = 1; f100 = 1;
     } else if (/\b(claras?)\b/i.test(name)) {
       c100 = 50; p100 = 11; cb100 = 0.7; f100 = 0.2;
-    } else if (/\b(huevo|huevos)\b/i.test(name)) {
+    } else if (/\b(huevos?)\b/i.test(name)) {
       c100 = 145; p100 = 13; cb100 = 1; f100 = 10;
-    } else if (/\b(prote[ií]na|whey|polvo\s+de\s+prote[ií]na|case[ií]na)\b/i.test(name)) {
+    } else if (/\b(prote[ií]nas?|whey|polvos?\s+de\s+prote[ií]na|case[ií]nas?)\b/i.test(name)) {
       c100 = 380; p100 = 75; cb100 = 6; f100 = 4;
-    } else if (/\b(tofu|tempeh|soja)\b/i.test(name)) {
+    } else if (/\b(tofus?|tempeh|sojas?)\b/i.test(name)) {
       c100 = 120; p100 = 14; cb100 = 3; f100 = 6;
-    } else if (/\b(pasta|espaguetis?|macarrones?|tallarines?|fideos?|lasa[ñn]a)\b/i.test(name)) {
+    } else if (/\b(pastas?|espaguetis?|macarrones?|tallarines?|fideos?|lasa[ñn]as?)\b/i.test(name)) {
       c100 = 350; p100 = 12; cb100 = 72; f100 = 2;
-    } else if (/\b(arroz|basmati|quinoa|cusc[uú]s)\b/i.test(name)) {
+    } else if (/\b(arroz|arroces|basmati|quinoa|cusc[uú]s)\b/i.test(name)) {
       c100 = 360; p100 = 8; cb100 = 78; f100 = 1;
-    } else if (/\b(avena|copos de avena|harina)\b/i.test(name)) {
+    } else if (/\b(avena|copos\s+de\s+avena|harinas?)\b/i.test(name)) {
       c100 = 370; p100 = 13; cb100 = 60; f100 = 7;
-    } else if (/\b(pan|tostadas?|panecillo|masa)\b/i.test(name)) {
+    } else if (/\b(pan|panes|tostadas?|panecillos?|masas?)\b/i.test(name)) {
       c100 = 260; p100 = 9; cb100 = 50; f100 = 3;
     } else if (/\b(garbanzos?|lentejas?|alubias?|frijoles?|hummus)\b/i.test(name)) {
       c100 = 140; p100 = 9; cb100 = 20; f100 = 3;
     } else if (isOilOrFat) {
       c100 = 884; p100 = 0; cb100 = 0; f100 = 100;
-    } else if (/\b(aguacate)\b/i.test(name)) {
+    } else if (/\b(aguacates?)\b/i.test(name)) {
       c100 = 160; p100 = 2; cb100 = 8; f100 = 15;
-    } else if (/\b(queso|parmesano|feta|mozzarella|cheddar|cottage)\b/i.test(name)) {
+    } else if (/\b(quesos?|parmesanos?|fetas?|mozzarellas?|cheddars?|cottage)\b/i.test(name)) {
       c100 = 280; p100 = 20; cb100 = 3; f100 = 20;
-    } else if (/\b(yogur|leche|bebida vegetal)\b/i.test(name)) {
+    } else if (/\b(yogures?|yogurs?|leches?|bebidas?\s+vegetales?)\b/i.test(name)) {
       c100 = 80; p100 = 7; cb100 = 5; f100 = 4;
-    } else if (/\b(nueces|almendras?|pi[ñn]ones|ch[ií]a|semillas|cacahuetes?|frutos secos)\b/i.test(name)) {
+    } else if (/\b(nueces|almendras?|pi[ñn]ones?|ch[ií]a|semillas?|cacahuetes?|frutos?\s+secos?)\b/i.test(name)) {
       c100 = 590; p100 = 18; cb100 = 15; f100 = 52;
-    } else if (/\b(pl[aá]tano|banana|miel|az[uú]car|sirope)\b/i.test(name)) {
+    } else if (/\b(pl[aá]tanos?|bananas?|miel|mieles|az[uú]car|azucares|siropes?)\b/i.test(name)) {
       c100 = 120; p100 = 1; cb100 = 30; f100 = 0;
-    } else if (/\b(fresas?|ar[aá]ndanos?|frutos rojos|kiwi|manzana|pera|naranja|lim[oó]n)\b/i.test(name)) {
+    } else if (/\b(fresas?|ar[aá]ndanos?|frutos?\s+rojos?|kiwis?|manzanas?|peras?|naranjas?|lim[oó]n|limones)\b/i.test(name)) {
       c100 = 50; p100 = 1; cb100 = 12; f100 = 0;
     } else if (/\b(patatas?|papas?)\b/i.test(name)) {
       c100 = 85; p100 = 2; cb100 = 19; f100 = 0;
-    } else if (/\b(tomates?|cherry|pepino|cebolla|ajo|esp[aá]rragos?|espinacas?|calabac[ií]n|lechuga|br[oó]coli|jud[ií]as)\b/i.test(name)) {
+    } else if (/\b(tomates?|cherrys?|pepinos?|cebollas?|cebolletas?|ajos?|esp[aá]rragos?|espinacas?|calabac[ií]n|calabacines|lechugas?|br[oó]colis?|jud[ií]as?)\b/i.test(name)) {
       c100 = 25; p100 = 1.5; cb100 = 4; f100 = 0.2;
     }
 
@@ -493,7 +493,7 @@ function analyzeAndInferRecipeTags(recipe) {
     const hasFish = ingredients.some(ing => {
       const name = (typeof ing === 'string' ? ing : (ing.name || '')).toLowerCase();
       const aisle = (typeof ing === 'object' && ing.aisle) || '';
-      return aisle === 'fish' || /\b(pescado|salm[oó]n|at[uú]n|merluza|bacalao|gambas?|langostinos?|camarones?|mejillones?|calamar|pulpo|anchoas?|sardinas?|dorada|lubina|almejas?)\b/i.test(name);
+      return aisle === 'fish' || /\b(pescados?|salm[oó]n|salmones|at[uú]n|atunes|merluzas?|bacalaos?|gambas?|langostinos?|camarones?|mejillones?|calamares?|pulpos?|anchoas?|sardinas?|doradas?|lubinas?|truchas?|almejas?)\b/i.test(name);
     });
 
     const hasDairy = ingredients.some(ing => {
@@ -674,7 +674,7 @@ function categorizeIngredientAisle(ingredientName) {
   }
 
   // 2. Carnes, Aves, Pescados, Mariscos y Embutidos (meat)
-  if (/\b(pollo|pollos|pechuga|pechugas|muslo|muslos|alita|alitas|pavo|pavos|ternera|terneras|vaca|buey|cerdo|cerdos|cochinillo|cordero|conejo|pato|carne|carnes|picada|filete|filetes|solomillo|solomillos|lomo|lomos|costilla|costillas|chuleta|chuletas|entrecot|hamburguesa|hamburguesas|salchicha|salchichas|chorizo|chorizos|morcilla|morcillas|jamon|jamones|panceta|bacon|beicon|lacon|cecina|embutido|embutidos|pescado|pescados|salmon|salmones|merluza|merluzas|atun|atunes|bonito|bacalao|dorada|lubina|trucha|truchas|sardina|sardinas|boqueron|boquerones|anchoa|anchoas|pez\s+espada|emperador|gamba|gambas|langostino|langostinos|calamar|calamares|sepia|chipiron|chipirones|pulpo|pulpos|mejillon|mejillones|almeja|almejas|navaja|navajas|ostra|ostras|cangrejo|bogavante)\b/.test(text)) {
+  if (/\b(pollo|pollos|pechuga|pechugas|muslo|muslos|alita|alitas|pavo|pavos|ternera|terneras|vaca|buey|cerdo|cerdos|cochinillo|cordero|conejo|pato|carne|carnes|picada|filete|filetes|solomillo|solomillos|lomo|lomos|costilla|costillas|chuleta|chuletas|entrecot|hamburguesa|hamburguesas|salchicha|salchichas|chorizo|chorizos|morcilla|morcillas|jamon|jamones|panceta|bacon|beicon|lacon|cecina|embutido|embutidos|pescado|pescados|salmon|salmones|merluza|merluzas|atun|atunes|bonito|bacalao|dorada|doradas|lubina|lubinas|trucha|truchas|sardina|sardinas|boqueron|boquerones|anchoa|anchoas|pez\s+espada|emperador|gamba|gambas|langostino|langostinos|calamar|calamares|sepia|chipiron|chipirones|pulpo|pulpos|mejillon|mejillones|almeja|almejas|navaja|navajas|ostra|ostras|cangrejo|bogavante)\b/.test(text)) {
     return 'meat';
   }
 
@@ -829,7 +829,7 @@ function getIngredientIcon(name, aisle) {
   if (/\b(ternera|vaca|buey|cerdo|hamburguesa|hamburguesas|filete|filetes|solomillo|lomo|costilla|costillas|chuleta|chuletas|carne|carnes|bacon|panceta|jamon)\b/.test(norm)) {
     return 'dinner_dining';
   }
-  if (/\b(pescado|pescados|salmon|merluza|atun|bonito|bacalao|dorada|lubina|trucha|sardina|sardinas|boqueron|boquerones|gamba|gambas|langostino|langostinos|calamar|calamares|pulpo|mejillon|mejillones|almeja|almejas)\b/.test(norm)) {
+  if (/\b(pescado|pescados|salmon|merluza|atun|bonito|bacalao|dorada|doradas|lubina|lubinas|trucha|truchas|sardina|sardinas|boqueron|boquerones|gamba|gambas|langostino|langostinos|calamar|calamares|pulpo|pulpos|mejillon|mejillones|almeja|almejas)\b/.test(norm)) {
     return 'set_meal';
   }
   if (/\b(huevo|huevos|clara|claras|yema|yemas)\b/.test(norm)) {
@@ -2531,7 +2531,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.74';
+  window.APP_VERSION = 'v0.75';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2563,7 +2563,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = 'v0.74';
+    this.appVersion = 'v0.75';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;

@@ -85,6 +85,26 @@ describe('US-01: Contador de Calorías y Macronutrientes por plato y resumen dia
       expect(nut.calories).toBeLessThan(350);
     });
 
+    it('estimateRecipeNutrition reconoce plurales (ej. Doradas, Lubinas) y calcula los macros con precisión', () => {
+      const doradasRecipe = {
+        title: 'Doradas al horno para dos',
+        servings: 2,
+        ingredients: [
+          { name: 'Doradas', amount: 2, unit: 'ud' },
+          { name: 'Aceite de oliva virgen extra', amount: 1, unit: 'chorrito' },
+          { name: 'Sal', amount: 1, unit: 'pizca' },
+          { name: 'Pimienta', amount: 1, unit: 'pizca' }
+        ]
+      };
+      const nut = estimateRecipeNutrition(doradasRecipe);
+      // 2 doradas (~500g) entre 2 raciones = ~250g de dorada limpia por ración -> ~50g proteína, 0g carbohidratos
+      expect(nut.protein).toBeGreaterThanOrEqual(40);
+      expect(nut.carbs).toBe(0);
+      expect(nut.fat).toBeLessThanOrEqual(15);
+      expect(nut.calories).toBeGreaterThan(250);
+      expect(nut.calories).toBeLessThan(350);
+    });
+
     it('RecipeParser.parseNutrition extrae valores numéricos de cadenas con unidades', () => {
       const rawNutrition = {
         calories: '450 kcal',
