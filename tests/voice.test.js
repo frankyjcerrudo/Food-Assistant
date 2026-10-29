@@ -85,13 +85,13 @@ describe('Camino B (US-17 & BUG-26): Asistente de Voz Integrado, Plurales y Fin 
   });
 
   describe('Asistente de Voz (Web Speech Recognition & Synthesis)', () => {
-    it('inicializa los elementos de interfaz del micrófono en la vista de IA y cabecera', () => {
+    it('inicializa los elementos de interfaz del micrófono en la vista de IA y botón central', () => {
       const micBtn = document.getElementById('btn-mic-ai-chat');
-      const headerVoiceBtn = document.getElementById('btn-header-voice');
+      const centralBtn = document.getElementById('btn-central-gemini-invoke');
       const voiceBadge = document.getElementById('voice-listening-indicator');
 
       expect(micBtn).not.toBeNull();
-      expect(headerVoiceBtn).not.toBeNull();
+      expect(centralBtn).not.toBeNull();
       expect(voiceBadge).not.toBeNull();
     });
 
@@ -141,14 +141,14 @@ describe('Camino B (US-17 & BUG-26): Asistente de Voz Integrado, Plurales y Fin 
     });
   });
 
-  describe('Botón Central Flotante e Invocador Directo Gemini (✦)', () => {
-    it('el botón central de Gemini existe en la barra de navegación con icono SVG y label', () => {
+  describe('Botón Central Flotante e Invocador Directo del Asistente (✦)', () => {
+    it('el botón central del Asistente existe en la barra de navegación con icono SVG y label', () => {
       const centralBtn = document.getElementById('btn-central-gemini-invoke');
       expect(centralBtn).not.toBeNull();
       const svg = centralBtn.querySelector('.gemini-sparkle-icon');
       expect(svg).not.toBeNull();
       const label = centralBtn.querySelector('.nav-gemini-label');
-      expect(label.textContent).toBe('Gemini');
+      expect(label.textContent).toBe('Asistente');
     });
 
     it('el modal de invocación rápida #modal-gemini-invoke contiene los controles necesarios', () => {
@@ -168,7 +168,7 @@ describe('Camino B (US-17 & BUG-26): Asistente de Voz Integrado, Plurales y Fin 
       expect(modal.classList.contains('active')).toBe(false);
     });
 
-    it('handleGeminiInvokeSubmit ejecuta acción de añadir a la lista de compra y muestra resultado', async () => {
+    it('handleGeminiInvokeSubmit ejecuta acción de añadir a la lista de compra y muestra resultado completo', async () => {
       const input = document.getElementById('gemini-invoke-input');
       input.value = 'Apunta 1kg de arroz a la compra';
       const initialCount = state.shoppingList.length;
@@ -179,6 +179,29 @@ describe('Camino B (US-17 & BUG-26): Asistente de Voz Integrado, Plurales y Fin 
       const resultCard = document.getElementById('gemini-invoke-result');
       expect(resultCard.style.display).toBe('flex');
       expect(resultCard.textContent.toLowerCase()).toContain('arroz');
+    });
+
+    it('callGeminiAgent utiliza mode: AUTO para permitir razonamiento conversacional fluido', async () => {
+      state.settings.geminiApiKey = 'AIzaSyTestAutoMode';
+      const origFetch = globalThis.fetch;
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          candidates: [{
+            content: { parts: [{ text: 'Para una cena ligera te sugiero salmón a la plancha con verduras.' }] }
+          }]
+        })
+      });
+      globalThis.fetch = fetchSpy;
+      try {
+        const res = await app.callGeminiAgent('¿Qué me sugieres para cenar ligero?');
+        expect(res.text).toContain('salmón');
+        const [url, opts] = fetchSpy.mock.calls[0];
+        const body = JSON.parse(opts.body);
+        expect(body.toolConfig.functionCallingConfig.mode).toBe('AUTO');
+      } finally {
+        globalThis.fetch = origFetch;
+      }
     });
   });
 });

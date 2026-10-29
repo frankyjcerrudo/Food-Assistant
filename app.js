@@ -2539,7 +2539,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.82';
+  window.APP_VERSION = 'v0.83';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2571,7 +2571,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v0.82';
+    this.appVersion = window.APP_VERSION || 'v0.83';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -7791,7 +7791,8 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 4. Si Franky pide "Batch Cooking" o modo sobras: planifica cocinar ración doble en la cena de 2 días (ej. Lunes cena y Miércoles cena) para reutilizar como tupper en el almuerzo del día siguiente (Martes almuerzo y Jueves almuerzo) con isLeftoverLunch: true. Todas las demás comidas (desayunos, meriendas y demás cenas/almuerzos) DEBEN ser diferentes, frescas y variadas; NUNCA repitas todo el día idéntico.
 5. REGLA ESTRICTA PARA LA LISTA DE LA COMPRA: Si Franky pide añadir artículos concretos (ej. "añade leche y plátanos", "apunta 3 huevos"), usa SIEMPRE la herramienta "manage_shopping_list" con action: "add" y la lista de artículos pedidos en "items". NUNCA uses action: "add_from_current_plan" a menos que Franky diga explícitamente "añade los ingredientes del plan", "vuelca el menú semanal" o "añade todo lo de la semana".
 6. Si faltan recetas adecuadas para cubrir huecos nutricionales o Franky pide inventar recetas, usa "create_and_save_recipe" para crearlas y guardarlas en el catálogo.
-7. PROHIBIDO terminantemente mostrar IDs internos tipo "rec-..." en el texto visible para Franky. Escribe los nombres legibles de los platos de forma limpia y atractiva.`;
+7. PROHIBIDO terminantemente mostrar IDs internos tipo "rec-..." en el texto visible para Franky. Escribe los nombres legibles de los platos de forma limpia y atractiva.
+8. CAPACIDAD DE RAZONAMIENTO Y ASESORAMIENTO CULINARIO: Si Franky hace preguntas abiertas, pide sugerencias o dudas sobre cocina, sustitutos de ingredientes, macros, técnicas o ideas para comer, razona con empatía e inteligencia como un chef y nutricionista experto, ofreciendo explicaciones claras y detalladas. Solo invoca herramientas cuando haya una acción concreta que ejecutar en la app (como apuntar a la compra, planificar comidas o guardar recetas).`;
   }
 
   async callGeminiAgent(prompt, systemInstruction = "", enableTools = true) {
@@ -7829,27 +7830,11 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
     if (enableTools) {
       payload.tools = [{ functionDeclarations: AI_TOOLS_DECLARATIONS }];
-      if (this.isSingleDayPrompt(prompt)) {
-        payload.toolConfig = {
-          functionCallingConfig: {
-            mode: "ANY",
-            allowedFunctionNames: ["set_day_plan", "create_and_save_recipe"]
-          }
-        };
-      } else if (this.isWeeklyPlanPrompt(prompt)) {
-        payload.toolConfig = {
-          functionCallingConfig: {
-            mode: "ANY",
-            allowedFunctionNames: ["set_weekly_plan", "create_and_save_recipe"]
-          }
-        };
-      } else if (this.isAiActionPrompt(prompt)) {
-        payload.toolConfig = {
-          functionCallingConfig: {
-            mode: "ANY"
-          }
-        };
-      }
+      payload.toolConfig = {
+        functionCallingConfig: {
+          mode: "AUTO"
+        }
+      };
     }
 
     let lastErrMsg = "Error al conectar con Gemini API";
@@ -9050,7 +9035,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     if (transcription) {
       transcription.innerHTML = `<span style="display:inline-flex; align-items:center; gap:6px; color:var(--m3-primary); font-weight:500;">
         <span class="material-symbols-outlined icon-sm" style="animation: spin 1s linear infinite;">sync</span>
-        Procesando con Gemini 3.8 Flash...
+        El Asistente está pensando...
       </span>`;
     }
     if (sendBtn) sendBtn.disabled = true;
@@ -9087,7 +9072,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
       if (resultBox && resultText) {
         resultBox.style.display = 'flex';
-        resultText.textContent = cleanText.split('\n')[0].replace(/[*#]/g, '');
+        resultText.innerHTML = formatSafeAiMarkdown(cleanText);
 
         if (resultActions) {
           resultActions.innerHTML = '';
@@ -9114,12 +9099,12 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       if (isVoice) {
         this.speakAiResponse(cleanText);
       }
-      this.showToast('✓ Gemini completó la acción.', 'success');
+      this.showToast('✓ Tu Asistente respondió.', 'success');
     } catch (err) {
       if (transcription) {
         transcription.innerHTML = `<span style="color:var(--m3-error); font-weight:500;">Error: ${err.message}</span>`;
       }
-      this.showToast(`Error de Gemini: ${err.message}`, 'error');
+      this.showToast(`Error del Asistente: ${err.message}`, 'error');
     } finally {
       if (sendBtn) sendBtn.disabled = false;
     }

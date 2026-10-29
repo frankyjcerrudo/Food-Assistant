@@ -343,7 +343,7 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
     });
   });
 
-  it('US-17 & BUG-15: handleAiChatSubmit fuerza functionCallingConfig ANY y aplica el plan automáticamente aunque el modelo solo responda en texto', async () => {
+  it('US-17 & BUG-15: handleAiChatSubmit utiliza functionCallingConfig AUTO y aplica el plan automáticamente si el modelo propone comidas', async () => {
     state.settings.geminiApiKey = 'AIzaSyTestForcePlan';
     const origFetch = globalThis.fetch;
     const fetchSpy = vi.fn().mockResolvedValue({
@@ -373,7 +373,7 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
 
       const [, calledOpts] = fetchSpy.mock.calls[0];
       const payloadSent = JSON.parse(calledOpts.body);
-      expect(payloadSent.toolConfig?.functionCallingConfig?.mode).toBe('ANY');
+      expect(payloadSent.toolConfig?.functionCallingConfig?.mode).toBe('AUTO');
 
       const weekDays = appInstance.getPlannerWeekDates();
       weekDays.forEach(w => {
