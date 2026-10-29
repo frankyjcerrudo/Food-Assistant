@@ -122,3 +122,4 @@ Deno.serve(async (req: Request) => {
     return json({ ok: false, speech: 'Ha ocurrido un error al ejecutar la orden.', error: String((err as Error)?.message || err) }, 500);
   }
 });
+

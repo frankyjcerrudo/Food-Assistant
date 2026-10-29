@@ -226,3 +226,4 @@ describe('US-69 Servidor MCP, OpenAPI y modo comando', () => {
     await expect(runNaturalLanguageCommand({ command: 'x', db, userId: USER, geminiApiKey: 'k', now: NOW, fetchImpl })).rejects.toThrow('Gemini 503');
   });
 });
+

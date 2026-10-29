@@ -577,3 +577,4 @@ export async function runNaturalLanguageCommand({ command, db, userId, geminiApi
 
   return { ok: actions.every(a => a.ok), speech: finalText || buildSpeech(actions), actionsExecuted: actions.map(a => ({ tool: a.tool, ok: a.ok, ...(a.ok ? a.result : { error: a.error }) })) };
 }
+
