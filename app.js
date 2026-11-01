@@ -1319,7 +1319,7 @@ class StateStore {
     this.settings = this.load('fa_settings', {
       geminiApiKey: '',
       defaultServings: 2,
-      geminiModel: 'gemini-3.5-flash-lite',
+      geminiModel: 'gemini-3.8-flash',
       ttsEnabled: true,
       nutritionGoals: {
         enabled: false,
@@ -1330,7 +1330,7 @@ class StateStore {
       }
     });
     if (!this.settings.geminiModel || this.settings.geminiModel === 'gemini-2.5-flash-lite' || this.settings.geminiModel === 'gemini-1.5-flash') {
-      this.settings.geminiModel = 'gemini-3.5-flash-lite';
+      this.settings.geminiModel = 'gemini-3.8-flash';
       this.save('fa_settings', this.settings);
     }
     if (!this.settings.nutritionGoals) {
@@ -2540,7 +2540,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.89';
+  window.APP_VERSION = 'v0.90';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2572,7 +2572,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v0.89';
+    this.appVersion = window.APP_VERSION || 'v0.90';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -4267,6 +4267,46 @@ class FoodAssistantApp {
 
     // Gemini Quick Invoke Sheet Events
     document.getElementById('btn-close-gemini-invoke')?.addEventListener('click', () => this.closeGeminiInvokeModal());
+    document.getElementById('btn-gemini-invoke-new-chat')?.addEventListener('click', () => {
+      this.stopSpeech();
+      this.aiChatHistory = [];
+      const threadBox = document.getElementById('gemini-invoke-thread');
+      if (threadBox) {
+        threadBox.style.display = 'none';
+        threadBox.innerHTML = '';
+      }
+      const resultBox = document.getElementById('gemini-invoke-result');
+      if (resultBox) resultBox.style.display = 'none';
+      const input = document.getElementById('gemini-invoke-input');
+      if (input) {
+        input.value = '';
+        input.focus();
+      }
+      const transcription = document.getElementById('gemini-invoke-transcription');
+      if (transcription) transcription.innerHTML = '<em>Nueva consulta iniciada. Pregunta algo o pulsa el micro...</em>';
+      const newChatBtn = document.getElementById('btn-gemini-invoke-new-chat');
+      if (newChatBtn) newChatBtn.style.display = 'none';
+    });
+    document.getElementById('btn-gemini-invoke-new-chat')?.addEventListener('click', () => {
+      this.stopSpeech();
+      this.aiChatHistory = [];
+      const threadBox = document.getElementById('gemini-invoke-thread');
+      if (threadBox) {
+        threadBox.style.display = 'none';
+        threadBox.innerHTML = '';
+      }
+      const resultBox = document.getElementById('gemini-invoke-result');
+      if (resultBox) resultBox.style.display = 'none';
+      const input = document.getElementById('gemini-invoke-input');
+      if (input) {
+        input.value = '';
+        input.focus();
+      }
+      const transcription = document.getElementById('gemini-invoke-transcription');
+      if (transcription) transcription.innerHTML = '<em>Nueva consulta iniciada. Pregunta algo o pulsa el micro...</em>';
+      const newChatBtn = document.getElementById('btn-gemini-invoke-new-chat');
+      if (newChatBtn) newChatBtn.style.display = 'none';
+    });
     document.getElementById('btn-header-stop-tts')?.addEventListener('click', () => this.stopSpeech());
     document.getElementById('btn-result-stop-tts')?.addEventListener('click', () => this.stopSpeech());
     document.getElementById('btn-chat-stop-tts')?.addEventListener('click', () => this.stopSpeech());
@@ -7722,6 +7762,11 @@ class FoodAssistantApp {
 
   isSingleDayPrompt(prompt) {
     if (!prompt || typeof prompt !== 'string') return false;
+    // Si el usuario pide ideas, sugerencias o se refiere a un momento concreto (ej: "dame ideas para cenar hoy"), NO es plan de día completo
+    const isSlotOrSuggestion = /\b(ideas?|sugiere|sugerencias?|qu[eé]\s+(hago|preparo|cocino|puedo|como|ceno|desayuno|meriendo)|recomienda|recomendaci[oó]n|opciones?)\b/i.test(prompt) ||
+      (/\b(cena|cenar|almuerzo|comida|comer|desayuno|desayunar|merienda|merendar)\b/i.test(prompt) && !/\b(planifica|organiza|men[uú]\s+del\s+d[ií]a|todo\s+el\s+d[ií]a)\b/i.test(prompt));
+    if (isSlotOrSuggestion) return false;
+
     // Días de la semana específicos o referencias temporales directas
     return /\b(hoy|dia\s+de\s+hoy|d[ií]a\s+de\s+hoy|ma[ñn]ana|solo\s+hoy|este\s+d[ií]a|para\s+hoy|de\s+hoy|qu[eé]\s+como\s+hoy|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)\b/i.test(prompt) &&
       !/\b(fin\s+de\s+semana|finde|semana\s+completa|toda\s+la\s+semana|men[uú]\s+semanal)\b/i.test(prompt);
@@ -7792,7 +7837,10 @@ ${currentPlanSummary}
 
 INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 1. Dirígete siempre a Franky de forma natural, cálida, concisa y directa (sin introducciones robóticas, sin disculpas innecesarias y yendo siempre al grano).
-2. Si Franky pide planificar un solo día ("hoy", "día de hoy", "mañana", "el lunes", etc.), invoca ÚNICAMENTE la herramienta "set_day_plan" con el dateKey correspondiente y recetas equilibradas de su catálogo. NUNCA invoques "set_weekly_plan" para un solo día ni toques el resto de la semana.
+2. PRECISIÓN DE MOMENTO Y ALCANCE (EVITAR SOBRE-PLANIFICACIÓN):
+- Si Franky pide ideas, dudas o sugerencias para un momento concreto (ej. "dame ideas para cenar hoy", "¿qué puedo cenar?", "ideas para el almuerzo"): NUNCA planifiques ni reemplaces el día entero. Ofrece 2 o 3 opciones apetecibles y saludables para ese momento específico (cena, almuerzo, etc.) de forma conversacional.
+- Si Franky pide asignar un plato a una comida concreta (ej. "pon salmón para cenar hoy"), usa "set_day_plan" manteniendo intactos el desayuno, almuerzo y merienda existentes del día.
+- Solo invoca "set_day_plan" con las 4 comidas completas cuando Franky pida explícitamente planificar u organizar todo el día ("planifica mi día de hoy", "organiza todas las comidas de hoy"). NUNCA invoques "set_weekly_plan" para un solo día ni toques el resto de la semana.
 3. Si Franky pide crear, planificar, completar o modificar su menú semanal (o indica que faltan comidas, que hay huecos o que pongas los platos en el plan), DEBES invocar SIEMPRE la herramienta "set_weekly_plan" con los 7 días (${weekDays.map(w => `${w.dayName}=${w.dateKey}`).join(', ')}) y las 4 comidas completas ("breakfast", "lunch", "snack" y "dinner") usando los IDs reales de su catálogo. NUNCA dejes huecos vacíos ni te limites a responder con texto plano.
 4. Si Franky pide "Batch Cooking" o modo sobras: planifica cocinar ración doble en la cena de 2 días (ej. Lunes cena y Miércoles cena) para reutilizar como tupper en el almuerzo del día siguiente (Martes almuerzo y Jueves almuerzo) con isLeftoverLunch: true. Todas las demás comidas (desayunos, meriendas y demás cenas/almuerzos) DEBEN ser diferentes, frescas y variadas; NUNCA repitas todo el día idéntico.
 5. REGLA ESTRICTA PARA LA LISTA DE LA COMPRA: Si Franky pide añadir artículos concretos (ej. "añade leche y plátanos", "apunta 3 huevos"), usa SIEMPRE la herramienta "manage_shopping_list" con action: "add" y la lista de artículos pedidos en "items". NUNCA uses action: "add_from_current_plan" a menos que Franky diga explícitamente "añade los ingredientes del plan", "vuelca el menú semanal" o "añade todo lo de la semana".
@@ -7816,10 +7864,10 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       return this.simulateGeminiAgentResponse(prompt);
     }
 
-    let rawModel = state.settings.geminiModel || 'gemini-3.5-flash-lite';
+    let rawModel = state.settings.geminiModel || 'gemini-3.8-flash';
     if (rawModel === 'gemini-2.5-flash-lite' || rawModel === 'gemini-1.5-flash') {
-      rawModel = 'gemini-3.5-flash-lite';
-      state.settings.geminiModel = 'gemini-3.5-flash-lite';
+      rawModel = 'gemini-3.8-flash';
+      state.settings.geminiModel = 'gemini-3.8-flash';
       state.save && state.save('fa_settings', state.settings);
     }
     const candidateModels = [rawModel];
@@ -7928,7 +7976,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       // Si es límite de cuota (429) en gemini-3.8-flash (límite de 20/día), intentar gemini-2.5-flash o gemini-3.5-flash-lite
       if ((response.status === 429 || /quota|limit: 20/i.test(errMsg)) && model === 'gemini-3.8-flash') {
         try {
-          const fallbackEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
+          const fallbackEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`;
           const fbController = new AbortController();
           const fbTimeout = setTimeout(() => fbController.abort(), 6000);
           const fbResponse = await fetch(fallbackEndpoint, {
@@ -8222,8 +8270,57 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       };
     }
 
+    // 0.05 Sugerencias o ideas para un momento concreto (Cena, Almuerzo, Desayuno, Merienda) - NO sobre-planificar todo el día
+    const isAskingSuggestions = /\b(ideas?|sugiere|sugerencias?|qu[eé]\s+(hago|preparo|cocino|puedo\s+(hacer|cenar|comer|preparar)|como|ceno|desayuno|meriendo)|opciones?|recomienda|recomendaci[oó]n|recomendaciones)\b/i.test(prompt);
+    const isDinnerSlot = /\b(cena|cenar)\b/i.test(prompt);
+    const isLunchSlot = /\b(almuerzo|comida|comer)\b/i.test(prompt);
+    const isBreakfastSlot = /\b(desayuno|desayunar)\b/i.test(prompt);
+    const isSnackSlot = /\b(merienda|merendar)\b/i.test(prompt);
+    const isSlotQuery = isDinnerSlot || isLunchSlot || isBreakfastSlot || isSnackSlot;
+
+    if (isAskingSuggestions || (isSlotQuery && !/\b(planifica\s+(todo\s+el\s+)?d[ií]a|organiza\s+(todo\s+el\s+)?d[ií]a|men[uú]\s+completo)\b/i.test(prompt))) {
+      const hasTagCI = (recipe, tag) => Array.isArray(recipe?.tags) && recipe.tags.some(t => String(t).toLowerCase() === tag.toLowerCase());
+      let targetTag = 'Cena';
+      let slotLabel = 'cenar hoy';
+      if (isLunchSlot) { targetTag = 'Almuerzo'; slotLabel = 'comer hoy'; }
+      else if (isBreakfastSlot) { targetTag = 'Desayuno'; slotLabel = 'desayunar'; }
+      else if (isSnackSlot) { targetTag = 'Merienda'; slotLabel = 'merendar'; }
+
+      const matchingRecipes = (state.recipes || []).filter(r => hasTagCI(r, targetTag));
+      const candidates = matchingRecipes.length >= 2 ? matchingRecipes.slice(0, 3) : [
+        {
+          title: "Salmón a la Plancha con Espárragos y Arroz",
+          time: "20 min",
+          protein: "38g"
+        },
+        {
+          title: "Tortilla de Espinacas, Champiñones y Queso Feta",
+          time: "12 min",
+          protein: "26g"
+        },
+        {
+          title: "Bowl Templado de Pollo a la Plancha, Quinoa y Aguacate",
+          time: "15 min",
+          protein: "42g"
+        }
+      ];
+
+      const optionsText = candidates.map((c, i) => {
+        const title = c.title || 'Plato saludable';
+        const nut = c.nutrition || (c.protein ? { protein: c.protein } : { protein: 30 });
+        const time = c.time || `${(c.prepTimeMinutes || 10) + (c.cookTimeMinutes || 10)} min`;
+        const protText = nut.protein ? ` | ${nut.protein}${typeof nut.protein === 'number' ? 'g' : ''} proteína` : '';
+        return `${i + 1}. **${title}** (${time}${protText})`;
+      }).join('\n');
+
+      return {
+        text: `¡Hola Franky! Para **${slotLabel}** te propongo estas deliciosas opciones ligeras y saludables:\n\n${optionsText}\n\n¿Te apetece alguna de ellas? Puedes pedirme que te la guarde en tu recetario, o que te detalle sus ingredientes.`,
+        toolCalls: []
+      };
+    }
+
     // 0. Planificación de un solo día concreto (ej. "Planifica mi día de hoy")
-    const isSingleDay = /\b(hoy|dia\s+de\s+hoy|d[ií]a\s+de\s+hoy|ma[ñn]ana|solo\s+hoy|este\s+d[ií]a)\b/i.test(prompt);
+    const isSingleDay = !isSlotQuery && /\b(planifica|organiza|prepara|haz|asigna|men[uú]|plan)\b.*\b(hoy|dia\s+de\s+hoy|d[ií]a\s+de\s+hoy|ma[ñn]ana|solo\s+hoy|este\s+d[ií]a)\b/i.test(prompt);
     if (isSingleDay) {
       const todayKey = toLocalDateKey(new Date());
       const planArgs = this.buildSimulatedWeeklyPlanArgs('replace');
@@ -9221,6 +9318,15 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       this.isListeningVoice = false;
       this.updateVoiceUI(false);
     }
+    // Franky: limpiar memoria conversacional al cerrar la ventana para comenzar limpio en la siguiente apertura
+    this.aiChatHistory = [];
+    const threadBox = document.getElementById('gemini-invoke-thread');
+    if (threadBox) {
+      threadBox.style.display = 'none';
+      threadBox.innerHTML = '';
+    }
+    const newChatBtn = document.getElementById('btn-gemini-invoke-new-chat');
+    if (newChatBtn) newChatBtn.style.display = 'none';
     if (modal) this.closeDialogModal(modal);
   }
 
@@ -9229,6 +9335,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     const input = document.getElementById('gemini-invoke-input');
     const prompt = input?.value?.trim();
     if (!prompt) return;
+    if (input) input.value = '';
 
     if (this.isListeningVoice) {
       try { this.recognition.stop(); } catch (e) {}
@@ -9282,6 +9389,31 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       if (!Array.isArray(this.aiChatHistory)) this.aiChatHistory = [];
       this.aiChatHistory.push({ role: 'user', text: prompt });
       this.aiChatHistory.push({ role: 'model', text: cleanText });
+
+      // Botón "Nuevo tema" visible si hay conversación activa
+      const newChatBtn = document.getElementById('btn-gemini-invoke-new-chat');
+      if (newChatBtn) newChatBtn.style.display = 'inline-flex';
+
+      // Mostrar hilo anterior mientras la ventana está abierta para memoria conversacional visual
+      const threadBox = document.getElementById('gemini-invoke-thread');
+      if (threadBox) {
+        const previousTurns = this.aiChatHistory.slice(0, -2);
+        if (previousTurns.length > 0) {
+          threadBox.style.display = 'flex';
+          threadBox.innerHTML = previousTurns.map(t => {
+            const isU = t.role === 'user';
+            const bg = isU ? 'var(--m3-surface-container-high, #f1f3f4)' : 'var(--m3-surface, #fff)';
+            const border = isU ? 'transparent' : 'var(--m3-outline-variant, rgba(0,0,0,0.08))';
+            const escaped = typeof escapeHtml === 'function' ? escapeHtml(t.text) : String(t.text).replace(/</g, '&lt;');
+            return `<div style="background: ${bg}; border: 1px solid ${border}; border-radius: 8px; padding: 6px 10px; font-size: 12px; line-height: 1.4;">
+              <strong style="color: ${isU ? 'var(--m3-primary)' : 'var(--color-brand)'};">${isU ? 'Tú' : 'Asistente'}:</strong> ${escaped.slice(0, 160)}${escaped.length > 160 ? '...' : ''}
+            </div>`;
+          }).join('');
+        } else {
+          threadBox.style.display = 'none';
+          threadBox.innerHTML = '';
+        }
+      }
 
       if (resultBox && resultText) {
         resultBox.style.display = 'flex';
@@ -10282,7 +10414,7 @@ REGLAS CRÍTICAS:
     const modelWrapper = document.getElementById('wrapper-gemini-model');
     const selectModel = document.getElementById('select-gemini-model');
     if (modelWrapper) {
-      modelWrapper.style.display = (currentProvider === 'gemini') ? 'block' : 'none';
+      modelWrapper.style.display = 'none';
     }
     if (selectModel) {
       selectModel.value = state.settings.geminiModel || 'gemini-3.5-flash-lite';
@@ -10634,7 +10766,7 @@ Autenticación: API Key → Bearer → ${tk}`;
     state.settings.geminiApiKey = key;
     const provider = document.getElementById('select-ai-provider')?.value || 'gemini';
     state.settings.aiProvider = provider;
-    const model = document.getElementById('select-gemini-model')?.value || 'gemini-3.5-flash-lite';
+    const model = 'gemini-3.8-flash';
     state.settings.geminiModel = model;
     state.save('fa_settings', state.settings);
     this.renderSettings();

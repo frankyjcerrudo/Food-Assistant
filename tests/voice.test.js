@@ -317,5 +317,22 @@ describe('Camino B (US-17 & BUG-26): Asistente de Voz Integrado, Plurales y Fin 
         globalThis.fetch = origFetch;
       }
     });
+    it('v0.90: handleGeminiInvokeSubmit limpia automáticamente el campo de texto y preserva memoria multi-turno en modal', async () => {
+      state.settings.geminiApiKey = '';
+      const input = document.getElementById('gemini-invoke-input');
+      input.value = '¿Qué me sugieres para cenar?';
+      
+      await app.handleGeminiInvokeSubmit(false);
+      
+      // Campo de texto debe limpiarse automáticamente
+      expect(input.value).toBe('');
+      // Memoria conversacional multi-turno debe acumular la interacción
+      expect(app.aiChatHistory.length).toBeGreaterThanOrEqual(2);
+      expect(app.aiChatHistory[app.aiChatHistory.length - 2].text).toBe('¿Qué me sugieres para cenar?');
+      
+      // El modal muestra el resultado
+      const resultCard = document.getElementById('gemini-invoke-result');
+      expect(resultCard.style.display).toBe('flex');
+    });
   });
 });

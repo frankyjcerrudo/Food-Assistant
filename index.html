@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#ffffff">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.89">
+  <link rel="stylesheet" href="styles.css?v=0.90">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%231a73e8'/><path d='M30 30h40v40H30z' fill='%23ffffff'/></svg>">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -25,7 +25,7 @@
         <span class="material-symbols-outlined">restaurant_menu</span>
       </div>
       <h1 class="brand-name">Food Assistant</h1>
-      <span class="app-version-badge" id="app-version-badge" title="Versión de Food Assistant">v0.89</span>
+      <span class="app-version-badge" id="app-version-badge" title="Versión de Food Assistant">v0.90</span>
     </div>
     <div class="header-actions">
       <!-- Theme quick toggle -->
@@ -355,7 +355,7 @@
           <option value="claude">Anthropic Claude (Claude 3.5 Sonnet / Haiku)</option>
         </select>
       </div>
-      <div id="wrapper-gemini-model" style="margin-bottom: 8px;">
+      <div id="wrapper-gemini-model" style="display: none;">
         <label for="select-gemini-model" style="font-size: 12px; font-weight: 500; display: block; margin-bottom: 4px; color: var(--m3-on-surface-variant);">Modelo de Google Gemini:</label>
         <select class="form-input" id="select-gemini-model" style="padding: 6px 10px; font-size: 13px; margin-bottom: 6px;">
           <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite (Recomendado Google - Nuevos y existentes)</option>
@@ -571,7 +571,7 @@
         <span class="material-symbols-outlined" style="color: var(--m3-primary);">system_update</span> Versión y Actualizaciones
       </h3>
       <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px;">
-        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.89</strong>
+        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.90</strong>
       </p>
       <div style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
         Si acabas de desplegar o notas que algún cambio no aparece, pulsa el botón para limpiar la caché del Service Worker y cargar el código más reciente.
@@ -653,6 +653,9 @@
         <button type="button" class="btn btn-sm btn-stop-tts" id="btn-header-stop-tts" style="display: none; align-items: center; gap: 4px; color: var(--m3-error); background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 9999px; padding: 4px 10px; font-size: 12px; font-weight: 500;" title="Detener locución de voz">
           <span class="material-symbols-outlined" style="font-size: 16px;">stop_circle</span> Parar voz
         </button>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-gemini-invoke-new-chat" style="display: none; font-size: 11px; padding: 3px 8px; border-radius: 9999px; border: 1px solid var(--m3-outline-variant); color: var(--m3-on-surface-variant);" title="Comenzar nueva consulta">
+          <span class="material-symbols-outlined" style="font-size: 14px; vertical-align: middle;">restart_alt</span> Nuevo tema
+        </button>
         <button class="btn btn-ghost btn-icon" id="btn-close-gemini-invoke" aria-label="Cerrar Asistente">
           <span class="material-symbols-outlined">close</span>
         </button>
@@ -705,6 +708,7 @@
           ⏹️ Detener
         </button>
       </div>
+      <div class="gemini-invoke-thread" id="gemini-invoke-thread" style="display: none; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; padding-right: 4px; border-bottom: 1px solid var(--m3-outline-variant, rgba(0,0,0,0.08)); padding-bottom: 8px;"></div>
       <div class="gemini-response-body" id="gemini-invoke-result-text" style="font-size: 13px; line-height: 1.5; color: var(--m3-on-surface);" title="Pulsa para detener voz si está hablando">
         <!-- Conversational text from Assistant -->
       </div>
@@ -1567,7 +1571,7 @@
   </div>
 </div>
 
-<script src="config.js?v=0.89"></script>
-<script src="app.js?v=0.89"></script>
+<script src="config.js?v=0.90"></script>
+<script src="app.js?v=0.90"></script>
 </body>
 </html>

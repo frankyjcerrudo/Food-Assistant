@@ -878,7 +878,7 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     }
   });
 
-  it('v0.85: callGeminiAgent en gemini-3.8-flash conmuta a gemini-2.5-flash (1.500 req/día) ante error 429 de cuota', async () => {
+  it('v0.90: callGeminiAgent en gemini-3.8-flash conmuta a gemini-3.5-flash-lite ante error 429 de cuota (20 req/día)', async () => {
     state.settings.geminiApiKey = 'AIzaSyTestKeyFailover';
     state.settings.geminiModel = 'gemini-3.8-flash';
     state.settings.aiProvider = 'gemini';
@@ -899,7 +899,7 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
       return {
         ok: true,
         json: async () => ({
-          candidates: [{ content: { parts: [{ text: 'Recuperado con éxito en gemini-2.5-flash.' }] } }]
+          candidates: [{ content: { parts: [{ text: 'Recuperado con éxito en gemini-3.5-flash-lite.' }] } }]
         })
       };
     });
@@ -908,8 +908,8 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
       const res = await appInstance.callGeminiAgent('Recetas');
       expect(calledUrls.length).toBe(2);
       expect(calledUrls[0]).toContain('gemini-3.8-flash');
-      expect(calledUrls[1]).toContain('gemini-2.5-flash');
-      expect(res.text).toContain('Recuperado con éxito en gemini-2.5-flash');
+      expect(calledUrls[1]).toContain('gemini-3.5-flash-lite');
+      expect(res.text).toContain('Recuperado con éxito en gemini-3.5-flash-lite');
     } finally {
       globalThis.fetch = origFetch;
     }
@@ -941,7 +941,7 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     }
   });
 
-  it('v0.87: callGeminiAgent usa gemini-3.5-flash-lite por defecto cuando no hay modelo explícito configurado', async () => {
+  it('v0.90: callGeminiAgent usa gemini-3.8-flash por defecto cuando no hay modelo explícito configurado', async () => {
     state.settings.geminiApiKey = 'AIzaSyLiteDefault';
     delete state.settings.geminiModel;
     state.settings.aiProvider = 'gemini';
@@ -953,15 +953,15 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
       return {
         ok: true,
         json: async () => ({
-          candidates: [{ content: { parts: [{ text: '¡Hola Franky! Respuesta desde Gemini 3.5 Flash-Lite.' }] } }]
+          candidates: [{ content: { parts: [{ text: '¡Hola Franky! Respuesta desde Gemini 3.8 Flash.' }] } }]
         })
       };
     });
 
     try {
       const res = await appInstance.callGeminiAgent('Hola');
-      expect(calledUrl).toContain('models/gemini-3.5-flash-lite:generateContent');
-      expect(res.text).toContain('Gemini 3.5 Flash-Lite');
+      expect(calledUrl).toContain('models/gemini-3.8-flash:generateContent');
+      expect(res.text).toContain('Gemini 3.8 Flash');
     } finally {
       globalThis.fetch = origFetch;
     }
@@ -1009,4 +1009,16 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
       globalThis.fetch = origFetch;
     }
   });
+  it('v0.90: consultas de ideas para cenar ("dame ideas para cenar hoy") no sobre-planifican el día completo ni tocan desayuno/almuerzo/merienda', async () => {
+    state.settings.geminiApiKey = ''; // activar simulador inteligente local
+    const todayBefore = state.getDayPlan('2026-11-01', 'Domingo');
+    
+    const res = await appInstance.callGeminiAgent('dame ideas para cenar hoy');
+    expect(res.toolCalls.length).toBe(0); // No debe ejecutar set_day_plan para las 4 comidas
+    expect(res.text.toLowerCase()).toContain('cenar');
+    expect(res.text).not.toContain('Desayuno:');
+    expect(res.text).not.toContain('Merienda:');
+  });
+
+
 });
