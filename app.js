@@ -2535,12 +2535,418 @@ const RecipeParser = {
     };
     this.detectRobotFeatures(recipe);
     return recipe;
+  },
+
+  // US-67: Importador Masivo de Colecciones y Migración de Recetas (Samsung Food / Whisk / JSON Backup)
+  parseBulkCollection(input) {
+    if (!input) return { candidates: [], extraData: {} };
+    let data = input;
+    if (typeof input === 'string') {
+      try {
+        data = JSON.parse(input);
+      } catch (err) {
+        throw new Error('El archivo no contiene un formato JSON válido.');
+      }
+    }
+
+    const rawList = [];
+    const extraData = {};
+
+    // 1. Array at root: [ { ... }, { ... } ]
+    if (Array.isArray(data)) {
+      data.forEach(item => {
+        if (!item || typeof item !== 'object') return;
+        if (item.recipe && typeof item.recipe === 'object') {
+          rawList.push({ ...item.recipe, _collection: item.collection || item.collectionName || '' });
+        } else {
+          rawList.push(item);
+        }
+      });
+    }
+    // 2. Object with "recipes" array: Food Assistant backup or Whisk export
+    else if (data && typeof data === 'object') {
+      if (Array.isArray(data.recipes)) {
+        data.recipes.forEach(r => {
+          if (r && typeof r === 'object') {
+            rawList.push(r.recipe ? { ...r.recipe, _collection: r.collection || '' } : r);
+          }
+        });
+      }
+      // 3. Object with "collections" array (Samsung Food / Whisk multi-collection export)
+      if (Array.isArray(data.collections)) {
+        data.collections.forEach(col => {
+          const colName = col.name || col.title || '';
+          if (Array.isArray(col.recipes)) {
+            col.recipes.forEach(r => {
+              if (r && typeof r === 'object') {
+                rawList.push({ ...(r.recipe || r), _collection: colName });
+              }
+            });
+          }
+        });
+      }
+      // 4. Object with "items" or "data" array
+      if (Array.isArray(data.items)) {
+        data.items.forEach(it => {
+          if (it && typeof it === 'object') {
+            rawList.push(it.recipe || it);
+          }
+        });
+      } else if (Array.isArray(data.data)) {
+        data.data.forEach(it => {
+          if (it && typeof it === 'object') {
+            rawList.push(it.recipe || it);
+          }
+        });
+      }
+      // 5. Schema.org @graph
+      if (Array.isArray(data['@graph'])) {
+        data['@graph'].forEach(node => {
+          if (node && (node['@type'] === 'Recipe' || (Array.isArray(node['@type']) && node['@type'].includes('Recipe')))) {
+            rawList.push(node);
+          }
+        });
+      }
+      // 6. Single Schema.org or Whisk recipe object at root
+      if (rawList.length === 0) {
+        if (data['@type'] === 'Recipe' || (Array.isArray(data['@type']) && data['@type'].includes('Recipe'))) {
+          rawList.push(data);
+        } else if (data.recipe && typeof data.recipe === 'object') {
+          rawList.push(data.recipe);
+        } else if ((data.title || data.name) && (data.ingredients || data.recipeIngredient || data.instructions || data.recipeInstructions)) {
+          rawList.push(data);
+        }
+      }
+
+      // Check for extra backup data (Food Assistant full backup)
+      if (data.mealPlan && typeof data.mealPlan === 'object') {
+        extraData.hasMealPlan = true;
+        extraData.mealPlan = data.mealPlan;
+      }
+      if (Array.isArray(data.shoppingList)) {
+        extraData.hasShoppingList = true;
+        extraData.shoppingList = data.shoppingList;
+      }
+    }
+
+    const candidates = [];
+    rawList.forEach((cand, idx) => {
+      if (!cand || typeof cand !== 'object') return;
+
+      // Check if it's Schema.org Recipe format
+      if (cand['@type'] === 'Recipe' || cand.recipeIngredient) {
+        const parsedSchema = this.parseSchemaRecipe(cand, cand.url || cand['@id'] || '');
+        if (parsedSchema) {
+          if (cand._collection && !parsedSchema.tags.includes(cand._collection)) {
+            parsedSchema.tags.push(cand._collection);
+          }
+          candidates.push(parsedSchema);
+          return;
+        }
+      }
+
+      // Standardize title
+      const title = String(cand.title || cand.name || cand.recipeName || `Receta importada ${idx + 1}`).trim();
+
+      // Description
+      const description = String(cand.description || cand.summary || '').trim();
+
+      // Remote image extraction
+      let imageUrl = '';
+      if (cand.imageUrl) {
+        imageUrl = cand.imageUrl;
+      } else if (cand.image) {
+        if (typeof cand.image === 'string') imageUrl = cand.image;
+        else if (Array.isArray(cand.image) && cand.image.length > 0) {
+          imageUrl = typeof cand.image[0] === 'string' ? cand.image[0] : (cand.image[0]?.url || '');
+        } else if (cand.image.url) {
+          imageUrl = cand.image.url;
+        }
+      } else if (Array.isArray(cand.images) && cand.images.length > 0) {
+        imageUrl = typeof cand.images[0] === 'string' ? cand.images[0] : (cand.images[0]?.url || '');
+      }
+
+      // Servings
+      let servings = 2;
+      const rawServings = cand.servings || cand.servings_scaled || cand.yield || cand.recipeYield;
+      if (rawServings) {
+        servings = this.parseServings(rawServings);
+      }
+
+      // Prep & cook times (handles seconds from Whisk or minutes or ISO)
+      const parseAnyDuration = (val) => {
+        if (!val) return null;
+        if (typeof val === 'number') {
+          return val > 120 ? Math.round(val / 60) : val;
+        }
+        if (typeof val === 'string') {
+          if (/^P/i.test(val)) return this.parseIsoDuration(val);
+          const num = parseInt(val, 10);
+          if (!isNaN(num)) return num > 120 ? Math.round(num / 60) : num;
+        }
+        return null;
+      };
+
+      const prepTimeMinutes = parseAnyDuration(cand.prepTimeMinutes || cand.prep_time || cand.prepTime) || 15;
+      const cookTimeMinutes = parseAnyDuration(cand.cookTimeMinutes || cand.cook_time || cand.cookTime) || 20;
+
+      // Source URL & Domain preservation
+      let sourceUrl = cand.sourceUrl || cand.source_url || cand.source?.url || cand.url || '';
+      let sourceDomain = cand.sourceDomain || cand.source_domain || '';
+      if (sourceUrl && !sourceDomain) {
+        sourceDomain = this.getDomain(sourceUrl) || cand.source?.name || '';
+      }
+
+      // Ingredients normalization
+      const ingredients = [];
+      const rawIngs = cand.ingredients || cand.recipeIngredient || [];
+      const ingLines = Array.isArray(rawIngs) ? rawIngs : (typeof rawIngs === 'string' ? rawIngs.split(/\r?\n/) : []);
+
+      ingLines.forEach(ingItem => {
+        if (!ingItem) return;
+        if (typeof ingItem === 'string') {
+          const parsed = this.parseIngredientLine(ingItem);
+          if (parsed) {
+            if (Array.isArray(parsed)) ingredients.push(...parsed);
+            else ingredients.push(parsed);
+          }
+        } else if (typeof ingItem === 'object') {
+          if (!ingItem.name && (ingItem.text || ingItem.displayText || ingItem.raw)) {
+            const rawText = ingItem.text || ingItem.displayText || ingItem.raw;
+            const parsed = this.parseIngredientLine(rawText);
+            if (parsed) {
+              if (Array.isArray(parsed)) ingredients.push(...parsed);
+              else ingredients.push(parsed);
+              return;
+            }
+          }
+          let name = String(ingItem.name || ingItem.ingredient || ingItem.displayText || ingItem.text || '').trim();
+          if (name) {
+            name = name.replace(/^[\u2022\-\*]\s*/, '').trim();
+            const rawAmount = ingItem.amount !== undefined ? ingItem.amount : (ingItem.quantity !== undefined ? ingItem.quantity : null);
+            const amount = typeof rawAmount === 'number' ? rawAmount : (rawAmount ? parseFloat(rawAmount) : null);
+            const unit = this.normalizeUnit(ingItem.unit || ingItem.measurement || '');
+            const aisle = ingItem.aisle || (typeof categorizeIngredientAisle === 'function' ? categorizeIngredientAisle(name) : 'other');
+            ingredients.push({
+              id: ingItem.id || generateId('i-'),
+              name: name.charAt(0).toUpperCase() + name.slice(1),
+              amount: amount !== null && !isNaN(amount) ? amount : null,
+              unit: unit,
+              aisle: aisle
+            });
+          }
+        }
+      });
+
+      // Instructions normalization
+      const instructions = [];
+      let rawSteps = cand.instructions || cand.recipeInstructions || cand.steps || [];
+      if (rawSteps && typeof rawSteps === 'object' && !Array.isArray(rawSteps) && Array.isArray(rawSteps.steps)) {
+        rawSteps = rawSteps.steps;
+      }
+      if (typeof rawSteps === 'string') {
+        rawSteps = rawSteps.split(/\r?\n/).filter(s => s.trim().length > 0);
+      }
+      if (Array.isArray(rawSteps)) {
+        rawSteps.forEach(stepItem => {
+          if (!stepItem) return;
+          let text = '';
+          let timerMin = 0;
+          if (typeof stepItem === 'string') {
+            text = stepItem;
+          } else if (typeof stepItem === 'object') {
+            text = stepItem.text || stepItem.description || stepItem.step || '';
+            if (stepItem.timerMinutes) timerMin = stepItem.timerMinutes;
+          }
+          text = String(text)
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+          if (text && text.length > 3) {
+            if (!timerMin) timerMin = this.extractTimerMinutes(text);
+            instructions.push({
+              step: instructions.length + 1,
+              text: text,
+              timerMinutes: timerMin
+            });
+          }
+        });
+      }
+
+      // Tags
+      const tags = [];
+      if (Array.isArray(cand.tags)) tags.push(...cand.tags);
+      if (Array.isArray(cand.categories)) tags.push(...cand.categories);
+      if (cand._collection && !tags.includes(cand._collection)) {
+        tags.push(cand._collection);
+      }
+
+      // Nutrition
+      let nutrition = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+      if (cand.nutrition && typeof cand.nutrition === 'object') {
+        nutrition = {
+          calories: parseInt(cand.nutrition.calories, 10) || 0,
+          protein: parseInt(cand.nutrition.protein, 10) || 0,
+          carbs: parseInt(cand.nutrition.carbs, 10) || 0,
+          fat: parseInt(cand.nutrition.fat, 10) || 0
+        };
+      }
+      if (nutrition.calories === 0 && ingredients.length > 0 && typeof estimateRecipeNutrition === 'function') {
+        nutrition = estimateRecipeNutrition({ title, ingredients, servings });
+      }
+
+      const recipe = {
+        id: cand.id || generateId('rec-'),
+        title: title,
+        description: description,
+        imageUrl: imageUrl,
+        prepTimeMinutes: prepTimeMinutes,
+        cookTimeMinutes: cookTimeMinutes,
+        servings: servings,
+        nutrition: nutrition,
+        tags: tags,
+        ingredients: ingredients,
+        instructions: instructions,
+        sourceUrl: sourceUrl,
+        sourceDomain: sourceDomain,
+        createdAt: cand.createdAt || new Date().toISOString(),
+        updatedAt: cand.updatedAt || new Date().toISOString()
+      };
+
+      this.detectRobotFeatures(recipe);
+      candidates.push(recipe);
+    });
+
+    return { candidates, extraData };
+  },
+
+  detectDuplicatesAndWarnings(candidates, existingRecipes = []) {
+    if (!Array.isArray(candidates)) return;
+    const existing = Array.isArray(existingRecipes) ? existingRecipes : [];
+
+    const norm = (str) => {
+      if (!str) return '';
+      return String(str)
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '');
+    };
+
+    const cleanUrl = (url) => {
+      if (!url) return '';
+      return String(url)
+        .trim()
+        .toLowerCase()
+        .replace(/^https?:\/\/(?:www\.)?/, '')
+        .replace(/\/+$/, '');
+    };
+
+    candidates.forEach(cand => {
+      cand.warnings = [];
+      const candTitleNorm = norm(cand.title);
+      const candUrlNorm = cleanUrl(cand.sourceUrl);
+
+      // Warning checks
+      if (!cand.instructions || cand.instructions.length === 0) {
+        cand.warnings.push('Sin pasos de preparación');
+      }
+      if (!cand.ingredients || cand.ingredients.length < 2) {
+        cand.warnings.push(`Pocos ingredientes (${cand.ingredients ? cand.ingredients.length : 0})`);
+      }
+      if (!cand.imageUrl) {
+        cand.warnings.push('Sin foto');
+      }
+
+      // Duplicate detection
+      let dupMatch = null;
+      let dupReason = '';
+
+      if (candUrlNorm) {
+        dupMatch = existing.find(ex => cleanUrl(ex.sourceUrl) === candUrlNorm);
+        if (dupMatch) dupReason = 'Misma URL original';
+      }
+
+      if (!dupMatch && candTitleNorm) {
+        dupMatch = existing.find(ex => norm(ex.title) === candTitleNorm);
+        if (dupMatch) dupReason = 'Mismo título';
+      }
+
+      if (dupMatch) {
+        cand.isDuplicate = true;
+        cand.duplicateOf = dupMatch;
+        cand.duplicateReason = dupReason;
+        cand.selected = false; // Duplicates unselected by default
+      } else {
+        cand.isDuplicate = false;
+        cand.duplicateOf = null;
+        cand.duplicateReason = '';
+        cand.selected = true; // New recipes selected by default
+      }
+    });
+  },
+
+  finalizeImportRecipe(cand) {
+    if (!cand) return null;
+    const finalRecipe = { ...cand };
+    delete finalRecipe.warnings;
+    delete finalRecipe.isDuplicate;
+    delete finalRecipe.duplicateOf;
+    delete finalRecipe.duplicateReason;
+    delete finalRecipe.selected;
+    delete finalRecipe._collection;
+
+    // Normalization of ingredients with aisle categorization
+    if (Array.isArray(finalRecipe.ingredients)) {
+      finalRecipe.ingredients = finalRecipe.ingredients.map(ing => {
+        const itemAisle = ing.aisle && ing.aisle !== 'other' 
+          ? ing.aisle 
+          : (typeof categorizeIngredientAisle === 'function' ? categorizeIngredientAisle(ing.name) : 'other');
+        return {
+          id: ing.id || generateId('i-'),
+          name: ing.name,
+          amount: ing.amount !== undefined ? ing.amount : null,
+          unit: ing.unit || '',
+          aisle: itemAisle
+        };
+      });
+    } else {
+      finalRecipe.ingredients = [];
+    }
+
+    // Auto-infer tags if available
+    if (typeof analyzeAndInferRecipeTags === 'function') {
+      const inferred = analyzeAndInferRecipeTags(finalRecipe);
+      if (!Array.isArray(finalRecipe.tags)) finalRecipe.tags = [];
+      const set = new Set(finalRecipe.tags.map(t => String(t).toLowerCase().trim()));
+      inferred.forEach(t => {
+        if (!set.has(String(t).toLowerCase().trim())) {
+          finalRecipe.tags.push(t);
+          set.add(String(t).toLowerCase().trim());
+          if (typeof state !== 'undefined' && state.addCustomTag) {
+            state.addCustomTag(t);
+          }
+        }
+      });
+    }
+
+    if ((!finalRecipe.nutrition || finalRecipe.nutrition.calories === 0) && typeof estimateRecipeNutrition === 'function') {
+      finalRecipe.nutrition = estimateRecipeNutrition({
+        title: finalRecipe.title,
+        ingredients: finalRecipe.ingredients,
+        servings: finalRecipe.servings
+      });
+    }
+
+    return finalRecipe;
   }
 };
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.90';
+  window.APP_VERSION = 'v0.91';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2572,7 +2978,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v0.90';
+    this.appVersion = window.APP_VERSION || 'v0.91';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -2675,6 +3081,7 @@ class FoodAssistantApp {
     this.modalAuth = document.getElementById('modal-auth');
     this.modalShoppingPreview = document.getElementById('modal-shopping-preview');
     this.modalCopyWeek = document.getElementById('modal-copy-week');
+    this.modalBulkImport = document.getElementById('modal-bulk-import');
     this.modalConfirmDialog = document.getElementById('modal-confirm-dialog');
     this.modalGeminiInvoke = document.getElementById('modal-gemini-invoke');
     this.cookModeOverlay = document.getElementById('cook-mode-overlay');
@@ -4115,6 +4522,11 @@ class FoodAssistantApp {
       this.closeAddRecipeChoiceModal();
       this.openImportModal('ai');
     });
+    document.getElementById('btn-choice-bulk-json')?.addEventListener('click', () => {
+      this.closeAddRecipeChoiceModal();
+      document.getElementById('input-bulk-import-file')?.click();
+    });
+    document.getElementById('input-bulk-import-file')?.addEventListener('change', (e) => this.handleFileInputForBulkImport(e));
 
     // Recipe CRUD
     document.getElementById('btn-edit-switch-to-import')?.addEventListener('click', () => {
@@ -4216,6 +4628,24 @@ class FoodAssistantApp {
     document.getElementById('btn-exit-cook-mode')?.addEventListener('click', () => this.exitCookMode());
     document.getElementById('btn-cook-next-step')?.addEventListener('click', () => this.nextCookStep());
     document.getElementById('btn-cook-prev-step')?.addEventListener('click', () => this.prevCookStep());
+
+    // Bulk Import Modal Events (US-67)
+    document.getElementById('btn-close-bulk-import')?.addEventListener('click', () => this.closeBulkImportModal());
+    document.getElementById('btn-cancel-bulk-import')?.addEventListener('click', () => this.closeBulkImportModal());
+    document.getElementById('btn-confirm-bulk-import')?.addEventListener('click', () => this.executeBulkImport());
+    document.getElementById('btn-bulk-select-all')?.addEventListener('click', () => this.setBulkImportSelection('all'));
+    document.getElementById('btn-bulk-select-new')?.addEventListener('click', () => this.setBulkImportSelection('new'));
+    document.getElementById('btn-bulk-select-none')?.addEventListener('click', () => this.setBulkImportSelection('none'));
+
+    ['all', 'new', 'duplicates', 'warnings'].forEach(filterKey => {
+      const chipEl = document.querySelector(`.bulk-filter-chips .chip[data-filter="${filterKey}"]`);
+      chipEl?.addEventListener('click', () => {
+        document.querySelectorAll('.bulk-filter-chips .chip').forEach(c => c.classList.remove('active'));
+        chipEl.classList.add('active');
+        this.bulkImportFilter = filterKey;
+        this.renderBulkImportList();
+      });
+    });
 
     // Bind Confirm Dialog if present in DOM
     if (this.modalConfirmDialog) {
@@ -5231,6 +5661,9 @@ class FoodAssistantApp {
         break;
       case 'modal-copy-week':
         this.closeCopyWeekModal();
+        break;
+      case 'modal-bulk-import':
+        this.closeBulkImportModal();
         break;
       case 'modal-confirm-dialog':
         this.closeConfirmDialog(false);
@@ -10792,30 +11225,345 @@ Autenticación: API Key → Bearer → ${tk}`;
     URL.revokeObjectURL(url);
   }
 
-  importBackup(e) {
-    const file = e.target.files?.[0];
+  handleFileInputForBulkImport(e) {
+    const file = e.target?.files?.[0];
     if (!file) return;
 
+    const inputEl = e.target;
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
-        const imported = JSON.parse(event.target.result);
-        if (imported.recipes) state.recipes = imported.recipes;
-        if (imported.mealPlan) state.mealPlan = imported.mealPlan;
-        if (imported.shoppingList) state.shoppingList = imported.shoppingList;
-
-        state.save('fa_recipes', state.recipes);
-        state.save('fa_mealplan', state.mealPlan);
-        state.save('fa_shopping', state.shoppingList);
-
-        this.syncDataWithCloud(true);
-        this.render();
-        this.showToast("¡Copia de seguridad restaurada con éxito!", 'success');
+        const rawContent = event.target.result;
+        this.openBulkImportModal(rawContent);
       } catch (err) {
-        this.showToast("Error al importar el archivo JSON.", 'error');
+        this.showToast('Error al leer el archivo JSON: ' + (err.message || 'formato inválido'), 'error');
+      } finally {
+        if (inputEl) inputEl.value = '';
       }
     };
+    reader.onerror = () => {
+      this.showToast('Error de lectura del archivo.', 'error');
+      if (inputEl) inputEl.value = '';
+    };
     reader.readAsText(file);
+  }
+
+  importBackup(e) {
+    this.handleFileInputForBulkImport(e);
+  }
+
+  // ==========================================================================
+  // US-67: BULK RECIPES & COLLECTIONS IMPORTER (Samsung Food / Whisk / Backup)
+  // ==========================================================================
+
+  openBulkImportModal(dataOrJsonString) {
+    let parsed = null;
+    try {
+      parsed = RecipeParser.parseBulkCollection(dataOrJsonString);
+    } catch (err) {
+      this.showToast(err.message || 'Error al procesar el archivo JSON.', 'error');
+      return;
+    }
+
+    const { candidates, extraData } = parsed;
+    if (!candidates || candidates.length === 0) {
+      this.showToast('No se encontraron recetas válidas en el archivo seleccionado.', 'warning');
+      return;
+    }
+
+    RecipeParser.detectDuplicatesAndWarnings(candidates, state.recipes);
+
+    this.pendingBulkImport = {
+      candidates,
+      extraData
+    };
+    this.bulkImportFilter = 'all';
+
+    // Show extra backup notice if mealPlan / shoppingList is present
+    const extraNotice = document.getElementById('bulk-import-extra-notice');
+    if (extraNotice) {
+      if (extraData && (extraData.hasMealPlan || extraData.hasShoppingList)) {
+        extraNotice.style.display = 'block';
+        const parts = [];
+        if (extraData.hasMealPlan) parts.push('Plan Semanal');
+        if (extraData.hasShoppingList) parts.push('Lista de la Compra');
+        extraNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size: 16px; vertical-align: text-bottom; color: var(--m3-primary);">inventory_2</span> Esta copia también incluye datos de <strong>${parts.join(' y ')}</strong> que se sincronizarán al importar.`;
+      } else {
+        extraNotice.style.display = 'none';
+      }
+    }
+
+    // Reset progress UI and unlock buttons
+    const progressSec = document.getElementById('bulk-progress-section');
+    if (progressSec) progressSec.style.display = 'none';
+    const btnConfirm = document.getElementById('btn-confirm-bulk-import');
+    if (btnConfirm) btnConfirm.disabled = false;
+    const btnCancel = document.getElementById('btn-cancel-bulk-import');
+    if (btnCancel) btnCancel.disabled = false;
+
+    // Reset active chip
+    document.querySelectorAll('.bulk-filter-chips .chip').forEach(c => {
+      c.classList.toggle('active', c.getAttribute('data-filter') === 'all');
+    });
+
+    this.renderBulkImportStats();
+    this.renderBulkImportList();
+    this.updateBulkImportFooterAction();
+
+    this.openDialogModal(this.modalBulkImport);
+  }
+
+  closeBulkImportModal() {
+    this.closeDialogModal(this.modalBulkImport);
+    this.pendingBulkImport = null;
+  }
+
+  renderBulkImportStats() {
+    if (!this.pendingBulkImport) return;
+    const { candidates } = this.pendingBulkImport;
+
+    const total = candidates.length;
+    const newCount = candidates.filter(c => !c.isDuplicate).length;
+    const dupCount = candidates.filter(c => c.isDuplicate).length;
+    const warnCount = candidates.filter(c => c.warnings && c.warnings.length > 0).length;
+
+    // Update stats header container
+    const statsContainer = document.getElementById('bulk-import-stats');
+    if (statsContainer) {
+      statsContainer.innerHTML = `
+        <div class="bulk-stat-card">
+          <span class="bulk-stat-number">${total}</span>
+          <span class="bulk-stat-label">Encontradas</span>
+        </div>
+        <div class="bulk-stat-card bulk-stat-new">
+          <span class="bulk-stat-number">${newCount}</span>
+          <span class="bulk-stat-label">Nuevas</span>
+        </div>
+        <div class="bulk-stat-card bulk-stat-dup">
+          <span class="bulk-stat-number">${dupCount}</span>
+          <span class="bulk-stat-label">Duplicadas</span>
+        </div>
+        <div class="bulk-stat-card bulk-stat-warn">
+          <span class="bulk-stat-number">${warnCount}</span>
+          <span class="bulk-stat-label">Con avisos</span>
+        </div>
+      `;
+    }
+
+    // Update filter counts
+    const countAll = document.getElementById('count-filter-all');
+    const countNew = document.getElementById('count-filter-new');
+    const countDup = document.getElementById('count-filter-dup');
+    const countWarn = document.getElementById('count-filter-warn');
+    if (countAll) countAll.textContent = total;
+    if (countNew) countNew.textContent = newCount;
+    if (countDup) countDup.textContent = dupCount;
+    if (countWarn) countWarn.textContent = warnCount;
+
+    // Toggle duplicate overwrite option
+    const dupOptionCard = document.getElementById('bulk-duplicate-option-card');
+    if (dupOptionCard) {
+      dupOptionCard.style.display = dupCount > 0 ? 'block' : 'none';
+    }
+  }
+
+  renderBulkImportList() {
+    if (!this.pendingBulkImport) return;
+    const { candidates } = this.pendingBulkImport;
+    const listContainer = document.getElementById('bulk-import-list');
+    if (!listContainer) return;
+
+    let filtered = candidates;
+    if (this.bulkImportFilter === 'new') {
+      filtered = candidates.filter(c => !c.isDuplicate);
+    } else if (this.bulkImportFilter === 'duplicates') {
+      filtered = candidates.filter(c => c.isDuplicate);
+    } else if (this.bulkImportFilter === 'warnings') {
+      filtered = candidates.filter(c => c.warnings && c.warnings.length > 0);
+    }
+
+    if (filtered.length === 0) {
+      listContainer.innerHTML = `
+        <div style="text-align: center; padding: 24px; color: var(--m3-on-surface-variant); font-size: 13px;">
+          No hay recetas en esta categoría.
+        </div>
+      `;
+      return;
+    }
+
+    listContainer.innerHTML = filtered.map((c) => {
+      const originalIdx = candidates.indexOf(c);
+      const thumbHtml = c.imageUrl
+        ? `<div class="bulk-item-thumb"><img src="${c.imageUrl}" alt="" onerror="this.parentElement.innerHTML='<span class=\\'material-symbols-outlined\\'>restaurant</span>'"></div>`
+        : `<div class="bulk-item-thumb"><span class="material-symbols-outlined">restaurant</span></div>`;
+
+      const dupBadge = c.isDuplicate
+        ? `<span class="bulk-badge bulk-badge-dup"><span class="material-symbols-outlined" style="font-size: 12px;">sync_problem</span> ${c.duplicateReason || 'Ya existe'}</span>`
+        : `<span class="bulk-badge bulk-badge-new"><span class="material-symbols-outlined" style="font-size: 12px;">sparkles</span> Nueva</span>`;
+
+      const domainBadge = c.sourceDomain
+        ? `<span class="bulk-badge bulk-badge-domain"><span class="material-symbols-outlined" style="font-size: 12px;">public</span> ${c.sourceDomain}</span>`
+        : '';
+
+      const warningsBadges = (c.warnings || []).map(w => 
+        `<span class="bulk-badge bulk-badge-warn"><span class="material-symbols-outlined" style="font-size: 12px;">warning</span> ${w}</span>`
+      ).join('');
+
+      const totalTime = (c.prepTimeMinutes || 0) + (c.cookTimeMinutes || 0);
+      const timeStr = totalTime > 0 ? `<span>• ${totalTime} min</span>` : '';
+
+      return `
+        <div class="bulk-import-item ${c.selected ? '' : 'is-excluded'}" data-cand-idx="${originalIdx}">
+          <input type="checkbox" class="bulk-item-check" data-idx="${originalIdx}" ${c.selected ? 'checked' : ''} aria-label="Seleccionar receta ${c.title}">
+          ${thumbHtml}
+          <div class="bulk-item-info">
+            <div class="bulk-item-title-row">
+              <span class="bulk-item-title" title="${c.title}">${c.title}</span>
+              ${dupBadge}
+              ${domainBadge}
+              ${warningsBadges}
+            </div>
+            <div class="bulk-item-meta">
+              <span>${c.ingredients?.length || 0} ingredientes</span>
+              <span>• ${c.instructions?.length || 0} pasos</span>
+              <span>• ${c.servings || 2} raciones</span>
+              ${timeStr}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Attach click events on items and checkboxes
+    listContainer.querySelectorAll('.bulk-import-item').forEach(itemEl => {
+      const idx = parseInt(itemEl.getAttribute('data-cand-idx'), 10);
+      const checkEl = itemEl.querySelector('.bulk-item-check');
+
+      checkEl.addEventListener('change', (e) => {
+        candidates[idx].selected = e.target.checked;
+        itemEl.classList.toggle('is-excluded', !e.target.checked);
+        this.updateBulkImportFooterAction();
+      });
+
+      itemEl.addEventListener('click', (e) => {
+        if (e.target === checkEl || e.target.tagName === 'INPUT') return;
+        checkEl.checked = !checkEl.checked;
+        candidates[idx].selected = checkEl.checked;
+        itemEl.classList.toggle('is-excluded', !checkEl.checked);
+        this.updateBulkImportFooterAction();
+      });
+    });
+  }
+
+  setBulkImportSelection(mode) {
+    if (!this.pendingBulkImport) return;
+    const { candidates } = this.pendingBulkImport;
+
+    candidates.forEach(c => {
+      if (mode === 'all') c.selected = true;
+      else if (mode === 'new') c.selected = !c.isDuplicate;
+      else if (mode === 'none') c.selected = false;
+    });
+
+    this.renderBulkImportList();
+    this.updateBulkImportFooterAction();
+  }
+
+  updateBulkImportFooterAction() {
+    if (!this.pendingBulkImport) return;
+    const { candidates } = this.pendingBulkImport;
+    const selectedCount = candidates.filter(c => c.selected).length;
+    const totalCount = candidates.length;
+
+    const btnText = document.getElementById('btn-confirm-bulk-import-text');
+    const btnConfirm = document.getElementById('btn-confirm-bulk-import');
+    if (btnText) {
+      btnText.textContent = selectedCount > 0 
+        ? `Importar ${selectedCount} de ${totalCount} recetas`
+        : 'Selecciona al menos 1 receta';
+    }
+    if (btnConfirm) {
+      btnConfirm.disabled = (selectedCount === 0);
+    }
+  }
+
+  async executeBulkImport() {
+    if (!this.pendingBulkImport) return;
+    const { candidates, extraData } = this.pendingBulkImport;
+    const selected = candidates.filter(c => c.selected);
+    if (selected.length === 0) {
+      this.showToast('Selecciona al menos una receta para importar.', 'warning');
+      return;
+    }
+
+    const overwrite = document.getElementById('check-bulk-overwrite-duplicates')?.checked || false;
+
+    // Show progress UI and lock buttons
+    const progressSec = document.getElementById('bulk-progress-section');
+    const fillEl = document.getElementById('bulk-progress-fill');
+    const titleEl = document.getElementById('bulk-progress-title');
+    const percentEl = document.getElementById('bulk-progress-percent');
+    const detailEl = document.getElementById('bulk-progress-detail');
+    const btnConfirm = document.getElementById('btn-confirm-bulk-import');
+    const btnCancel = document.getElementById('btn-cancel-bulk-import');
+
+    if (progressSec) progressSec.style.display = 'flex';
+    if (btnConfirm) btnConfirm.disabled = true;
+    if (btnCancel) btnCancel.disabled = true;
+
+    let processedCount = 0;
+    const total = selected.length;
+
+    for (let i = 0; i < total; i++) {
+      const cand = selected[i];
+      const percent = Math.round(((i + 1) / total) * 100);
+
+      if (fillEl) fillEl.style.width = `${percent}%`;
+      if (percentEl) percentEl.textContent = `${percent}%`;
+      if (titleEl) titleEl.textContent = `Procesando receta ${i + 1} de ${total}`;
+      if (detailEl) detailEl.textContent = `Normalizando ingredientes y pasillos: ${cand.title}...`;
+
+      // Smooth unblocked tick
+      await new Promise(resolve => setTimeout(resolve, 15));
+
+      const finalRecipe = RecipeParser.finalizeImportRecipe(cand);
+
+      if (cand.isDuplicate && overwrite && cand.duplicateOf) {
+        const idx = state.recipes.findIndex(r => r.id === cand.duplicateOf.id);
+        if (idx >= 0) {
+          finalRecipe.id = cand.duplicateOf.id;
+          finalRecipe.createdAt = cand.duplicateOf.createdAt || finalRecipe.createdAt;
+          finalRecipe.updatedAt = new Date().toISOString();
+          state.recipes[idx] = finalRecipe;
+        } else {
+          state.recipes.unshift(finalRecipe);
+        }
+      } else {
+        finalRecipe.id = generateId('rec-');
+        state.recipes.unshift(finalRecipe);
+      }
+
+      processedCount++;
+    }
+
+    // Extra data restoration if present in backup
+    if (extraData && extraData.mealPlan) {
+      state.mealPlan = extraData.mealPlan;
+      state.save('fa_mealplan', state.mealPlan);
+    }
+    if (extraData && extraData.shoppingList) {
+      state.shoppingList = extraData.shoppingList;
+      state.save('fa_shopping', state.shoppingList);
+    }
+
+    state.save('fa_recipes', state.recipes);
+    this.scheduleSyncWithCloud();
+
+    this.closeBulkImportModal();
+    this.render();
+    this.switchView('view-recipes');
+
+    this.showToast(`¡${processedCount} recetas importadas con éxito!`, 'success');
   }
 
   async resetDemoData(skipConfirm = false) {

@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#ffffff">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.90">
+  <link rel="stylesheet" href="styles.css?v=0.91">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%231a73e8'/><path d='M30 30h40v40H30z' fill='%23ffffff'/></svg>">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -25,7 +25,7 @@
         <span class="material-symbols-outlined">restaurant_menu</span>
       </div>
       <h1 class="brand-name">Food Assistant</h1>
-      <span class="app-version-badge" id="app-version-badge" title="Versión de Food Assistant">v0.90</span>
+      <span class="app-version-badge" id="app-version-badge" title="Versión de Food Assistant">v0.91</span>
     </div>
     <div class="header-actions">
       <!-- Theme quick toggle -->
@@ -571,7 +571,7 @@
         <span class="material-symbols-outlined" style="color: var(--m3-primary);">system_update</span> Versión y Actualizaciones
       </h3>
       <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px;">
-        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.90</strong>
+        Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v0.91</strong>
       </p>
       <div style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
         Si acabas de desplegar o notas que algún cambio no aparece, pulsa el botón para limpiar la caché del Service Worker y cargar el código más reciente.
@@ -903,6 +903,19 @@
         </div>
         <span class="material-symbols-outlined choice-arrow">chevron_right</span>
       </button>
+
+      <!-- Option 5: Bulk JSON / Samsung Food / Whisk migration (US-67) -->
+      <button type="button" class="recipe-choice-card" id="btn-choice-bulk-json">
+        <div class="choice-icon-wrap" style="background: var(--m3-tertiary-container, #e8def8); color: var(--m3-on-tertiary-container, #1d192b);">
+          <span class="material-symbols-outlined">folder_zip</span>
+        </div>
+        <div class="choice-text-wrap">
+          <div class="choice-title">Importar archivo JSON o copia</div>
+          <div class="choice-desc">Migración masiva de Samsung Food, Whisk o copias de seguridad</div>
+        </div>
+        <span class="material-symbols-outlined choice-arrow">chevron_right</span>
+      </button>
+      <input type="file" id="input-bulk-import-file" accept=".json" style="display: none;">
     </div>
   </div>
 </dialog>
@@ -1512,6 +1525,78 @@
   </div>
 </dialog>
 
+<!-- MODAL: BULK RECIPES & COLLECTIONS IMPORTER (US-67) -->
+<dialog class="modal-overlay" id="modal-bulk-import" closedby="any" aria-labelledby="bulk-import-modal-title">
+  <div class="modal-content bulk-import-modal-content">
+    <!-- Header -->
+    <div class="modal-header-bar" style="padding: 16px 20px; border-bottom: 1px solid var(--m3-outline-variant); flex-shrink: 0; background: var(--m3-surface); display: flex; justify-content: space-between; align-items: center;">
+      <h3 id="bulk-import-modal-title" style="font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin: 0;">
+        <span class="material-symbols-outlined" style="color: var(--m3-primary);">folder_zip</span>
+        <span>Importar Colección de Recetas</span>
+      </h3>
+      <button class="btn btn-ghost btn-icon" id="btn-close-bulk-import" title="Cerrar">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="bulk-import-body" style="padding: 16px 20px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 14px;">
+      <!-- Stats summary cards -->
+      <div class="bulk-import-stats" id="bulk-import-stats"></div>
+
+      <!-- Backup notice if mealPlan / shoppingList detected -->
+      <div id="bulk-import-extra-notice" class="bulk-import-notice" style="display: none;"></div>
+
+      <!-- Controls & Filter Toolbar -->
+      <div class="bulk-import-toolbar">
+        <div class="bulk-filter-chips" id="bulk-filter-chips">
+          <button type="button" class="chip active" data-filter="all" id="chip-filter-all">Todas (<span id="count-filter-all">0</span>)</button>
+          <button type="button" class="chip" data-filter="new" id="chip-filter-new">Nuevas (<span id="count-filter-new">0</span>)</button>
+          <button type="button" class="chip" data-filter="duplicates" id="chip-filter-dup">Duplicadas (<span id="count-filter-dup">0</span>)</button>
+          <button type="button" class="chip" data-filter="warnings" id="chip-filter-warn">Avisos (<span id="count-filter-warn">0</span>)</button>
+        </div>
+        <div class="bulk-select-actions">
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-bulk-select-all" title="Seleccionar todas">Todas</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-bulk-select-new" title="Seleccionar solo recetas nuevas">Solo nuevas</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-bulk-select-none" title="Deseleccionar todas">Ninguna</button>
+        </div>
+      </div>
+
+      <!-- Overwrite toggle for duplicates -->
+      <div class="bulk-duplicate-option-card" id="bulk-duplicate-option-card" style="display: none;">
+        <label class="bulk-checkbox-label">
+          <input type="checkbox" id="check-bulk-overwrite-duplicates">
+          <span>Actualizar / sobrescribir recetas existentes si están marcadas</span>
+        </label>
+      </div>
+
+      <!-- Recipe items list -->
+      <div class="bulk-import-list" id="bulk-import-list"></div>
+
+      <!-- Progress Section (hidden initially) -->
+      <div class="bulk-progress-section" id="bulk-progress-section" style="display: none;">
+        <div class="bulk-progress-header">
+          <span class="bulk-progress-title" id="bulk-progress-title">Procesando recetas...</span>
+          <span class="bulk-progress-percent" id="bulk-progress-percent">0%</span>
+        </div>
+        <div class="bulk-progress-track">
+          <div class="bulk-progress-fill" id="bulk-progress-fill" style="width: 0%;"></div>
+        </div>
+        <p class="bulk-progress-detail" id="bulk-progress-detail">Normalizando ingredientes y asignando pasillos...</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="modal-footer-bar" style="padding: 12px 20px; border-top: 1px solid var(--m3-outline-variant); flex-shrink: 0; background: var(--m3-surface); display: flex; justify-content: space-between; align-items: center;">
+      <button type="button" class="btn btn-ghost btn-sm" id="btn-cancel-bulk-import">Cancelar</button>
+      <button type="button" class="btn btn-primary btn-sm" id="btn-confirm-bulk-import">
+        <span class="material-symbols-outlined icon-sm">cloud_download</span>
+        <span id="btn-confirm-bulk-import-text">Importar recetas</span>
+      </button>
+    </div>
+  </div>
+</dialog>
+
 <!-- MODAL: MATERIAL 3 CONFIRMATION DIALOG (US-18 / US-55) -->
 <dialog class="modal-overlay" id="modal-confirm-dialog" closedby="any" aria-labelledby="confirm-dialog-title">
   <div class="modal-content confirm-dialog-content">
@@ -1571,7 +1656,7 @@
   </div>
 </div>
 
-<script src="config.js?v=0.90"></script>
-<script src="app.js?v=0.90"></script>
+<script src="config.js?v=0.91"></script>
+<script src="app.js?v=0.91"></script>
 </body>
 </html>

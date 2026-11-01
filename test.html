@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Food Assistant - Informe Detallado de Calidad y Tests</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.90">
+  <link rel="stylesheet" href="styles.css?v=0.91">
   <style>
     :root {
       --qa-pass: #059669;
@@ -4039,6 +4039,123 @@ Bocadillo De Atun Paso A Paso
           });
           expect(shopRes.count).toBe(1);
           expect(W.state.shoppingList.some(i => i.name === 'Aguacates')).toBe(true);
+        }
+      );
+    });
+
+    // =========================================================
+    // 13. US-67: IMPORTADOR MASIVO Y MIGRACIÓN (SAMSUNG FOOD / WHISK / BACKUP)
+    // =========================================================
+    describe('13. US-67: Importador Masivo de Colecciones y Migración de Recetas (Samsung Food / Whisk / JSON Backup)', () => {
+      it(
+        'parseBulkCollection procesa copias completas de Food Assistant y colecciones de Samsung Food / Whisk',
+        'Validar extracción de candidatos, raciones, tiempos en segundos/minutos, pasillos e imágenes remotas.',
+        'candidates contiene recetas normalizadas con pasillos categorizados y tiempos convertidos.',
+        () => {
+          const whiskData = {
+            collections: [
+              {
+                name: 'Otoño QA',
+                recipes: [
+                  {
+                    recipe: {
+                      name: 'Sopa de Calabaza Asada QA',
+                      servings: 4,
+                      prep_time: 600,
+                      cook_time: 1800,
+                      images: [{ url: 'https://example.com/sopa.jpg' }],
+                      source: { name: 'Instagram', url: 'https://instagram.com/p/123' },
+                      ingredients: [
+                        { name: 'Calabaza', quantity: 500, unit: 'g' },
+                        { text: '1 cebolla' }
+                      ],
+                      instructions: ['Hornear 25 minutos.', 'Triturar.']
+                    }
+                  }
+                ]
+              }
+            ]
+          };
+
+          const { candidates } = window.RecipeParser.parseBulkCollection(whiskData);
+          expect(candidates.length).toBe(1);
+          const r = candidates[0];
+          expect(r.title).toBe('Sopa de Calabaza Asada QA');
+          expect(r.prepTimeMinutes).toBe(10);
+          expect(r.cookTimeMinutes).toBe(30);
+          expect(r.imageUrl).toBe('https://example.com/sopa.jpg');
+          expect(r.sourceDomain).toBe('instagram.com');
+          expect(r.ingredients[0].aisle).toBe('produce');
+          expect(r.instructions[0].timerMinutes).toBe(25);
+        }
+      );
+
+      it(
+        'detectDuplicatesAndWarnings marca duplicadas por título o URL y detecta advertencias',
+        'Comprobar coincidencia sin importar mayúsculas/acentos y cálculo de avisos (sin foto, pocos ingredientes).',
+        'isDuplicate true, duplicateReason establecido, warnings contiene avisos correspondientes.',
+        () => {
+          const existing = [{ id: 'ex-1', title: 'Tortilla de Patatas', sourceUrl: 'https://web.com/tortilla' }];
+          const candidates = [
+            { title: 'tortilla de patatas', sourceUrl: 'https://web.com/tortilla/', ingredients: [{ name: 'Sal', amount: 1, unit: 'pizca' }], instructions: [] }
+          ];
+
+          window.RecipeParser.detectDuplicatesAndWarnings(candidates, existing);
+          expect(candidates[0].isDuplicate).toBe(true);
+          expect(candidates[0].selected).toBe(false);
+          expect(candidates[0].warnings).toContain('Sin pasos de preparación');
+          expect(candidates[0].warnings).toContain('Pocos ingredientes (1)');
+          expect(candidates[0].warnings).toContain('Sin foto');
+        }
+      );
+
+      it(
+        'finalizeImportRecipe clasifica pasillos e infiere etiquetas dietéticas automáticamente',
+        'Asegurar que cada ingrediente recibe su pasillo correspondiente y la receta recibe sus chips dietéticos.',
+        'ing.aisle produce/pantry/spices y tags contiene Vegano/Vegetariano.',
+        () => {
+          const cand = {
+            title: 'Salteado Vegano de Garbanzos y Espinacas QA',
+            servings: 2,
+            ingredients: [
+              { name: 'Garbanzos cocidos', amount: 400, unit: 'g', aisle: '' },
+              { name: 'Espinacas frescas', amount: 200, unit: 'g', aisle: 'other' }
+            ],
+            instructions: [{ step: 1, text: 'Saltear todo 5 minutos.', timerMinutes: 5 }],
+            tags: []
+          };
+
+          const finalized = window.RecipeParser.finalizeImportRecipe(cand);
+          expect(finalized.ingredients[0].aisle).toBe('pantry');
+          expect(finalized.ingredients[1].aisle).toBe('produce');
+          expect(finalized.tags).toContain('Vegano');
+          expect(finalized.tags).toContain('Vegetariano');
+        }
+      );
+
+      it(
+        'openBulkImportModal y setBulkImportSelection actualizan el DOM y la selección',
+        'Verificar renderizado de estadísticas (total, nuevas, duplicadas) y botones de selección rápida.',
+        'Métricas #count-filter-all, #count-filter-new reflejan el lote y botón de confirmación muestra cantidad.',
+        () => {
+          const app = new window.FoodAssistantApp();
+          const jsonStr = JSON.stringify({
+            recipes: [
+              { title: 'Receta QA 1', ingredients: ['1 tomate'], instructions: ['Paso 1'] },
+              { title: 'Receta QA 2', ingredients: ['2 tomates'], instructions: ['Paso 1'] }
+            ]
+          });
+
+          app.openBulkImportModal(jsonStr);
+          expect(document.getElementById('count-filter-all').textContent).toBe('2');
+          expect(document.getElementById('count-filter-new').textContent).toBe('2');
+
+          app.setBulkImportSelection('none');
+          expect(document.getElementById('btn-confirm-bulk-import').disabled).toBe(true);
+
+          app.setBulkImportSelection('all');
+          expect(document.getElementById('btn-confirm-bulk-import').disabled).toBe(false);
+          app.closeBulkImportModal();
         }
       );
     });
