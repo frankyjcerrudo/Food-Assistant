@@ -345,6 +345,39 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
     }
   });
 
+  it('v0.98: callGeminiAgent conmuta de inmediato a gemini-3.5-flash-lite si gemini-3.8-flash da timeout (AbortError)', async () => {
+    state.settings.geminiApiKey = 'AIzaSyTimeoutTestKey';
+    state.settings.geminiModel = 'gemini-3.8-flash';
+    const calledUrls = [];
+    const origFetch = globalThis.fetch;
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
+      calledUrls.push(url);
+      if (url.includes('gemini-3.8-flash')) {
+        const abortErr = new Error('The operation was aborted');
+        abortErr.name = 'AbortError';
+        throw abortErr;
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: '¡Listo Franky! Respuesta recuperada desde Gemini 3.5 Flash-Lite tras timeout de 3.8.' }] } }]
+        })
+      };
+    });
+
+    try {
+      const res = await appInstance.callGeminiAgent('Crea un plan semanal');
+      expect(calledUrls.length).toBe(2);
+      expect(calledUrls[0]).toContain('gemini-3.8-flash');
+      expect(calledUrls[1]).toContain('gemini-3.5-flash-lite');
+      expect(res.isSimulatedFallback).toBeFalsy();
+      expect(res.text).toContain('Gemini 3.5 Flash-Lite');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
   it('US-17 & BUG-15: formatSafeAiMarkdown limpia códigos internos (rec-...) y formatea cursivas (*plato*) sin dejar asteriscos crudos', () => {
     const raw = '• **Lunes (26 Oct)**: Desayuno: *Porridge cremoso de avena* (*rec-porridge-bowl*) | Merienda: Batido de proteínas (`rec-aafe6e6d-45e5-4328-b41c-b62ec9e3e69a`)';
     const html = formatSafeAiMarkdown(raw);

@@ -8415,7 +8415,7 @@ class FoodAssistantApp {
     if (!prompt || typeof prompt !== 'string') return false;
     // Si el usuario pide un solo día específico o el fin de semana, NO forzar semana completa
     if (this.isSingleDayPrompt(prompt) || this.isWeekendPrompt(prompt)) return false;
-    return /\b(planifica|planifiques|planificar|organiza|organices|organizar|completa|completes|rellena|rellenes|pon|pongas|asigna|asignes|prepara|prepares|haz|hazme)\b.*?\b(semana|men[uú]|plan)\b|\b(men[uú]\s+semanal|plan\s+semanal|semana\s+completa|dejad[oa]s?\s+vac[ií][ao]s?|huecos?\s+libres?|huecos?\s+vac[ií][ao]s?|faltan\s+comidas|sin\s+aparecer\s+muchas\s+comidas|platos\s+en\s+el\s+plan|desayunos\s+y\s+meriendas|batch\s+cooking|sobras|tuppers?)\b/i.test(prompt);
+    return /\b(planifica|planifiques|planificar|organiza|organices|organizar|completa|completes|rellena|rellenes|pon|pongas|asigna|asignes|prepara|prepares|haz|hazme|crea|crees|diseña|diseñes|arma|armes)\b.*?\b(semana|men[uú]|plan)\b|\b(men[uú]\s+semanal|plan\s+semanal|semana\s+completa|dejad[oa]s?\s+vac[ií][ao]s?|huecos?\s+libres?|huecos?\s+vac[ií][ao]s?|faltan\s+comidas|sin\s+aparecer\s+muchas\s+comidas|platos\s+en\s+el\s+plan|desayunos\s+y\s+meriendas|batch\s+cooking|sobras|tuppers?)\b/i.test(prompt);
   }
 
   isAiActionPrompt(prompt) {
@@ -8440,9 +8440,28 @@ class FoodAssistantApp {
       ? `${state.settings.nutritionGoals.calories} kcal, ${state.settings.nutritionGoals.protein}g Proteínas, ${state.settings.nutritionGoals.carbs}g Carbos, ${state.settings.nutritionGoals.fat}g Grasas`
       : 'Sin metas numéricas estrictas activas';
 
-    const recipesCatalog = (state.recipes || []).map(r => {
+    let catalogList = state.recipes || [];
+    if (catalogList.length > 70) {
+      // Si el catálogo es extenso, priorizar favoritos, platos en uso y variedad
+      // para evitar exceder el límite de tokens y prevenir timeouts en conexiones móviles
+      const activeIds = new Set();
+      weekDays.forEach(d => {
+        const dp = state.getDayPlan(d.dateKey, d.dayName);
+        if (dp.breakfast) activeIds.add(dp.breakfast);
+        if (dp.lunch) activeIds.add(dp.lunch);
+        if (dp.snack) activeIds.add(dp.snack);
+        if (dp.dinner) activeIds.add(dp.dinner);
+      });
+      const prioritized = catalogList.filter(r => r.isFavorite || activeIds.has(r.id));
+      const rest = catalogList.filter(r => !r.isFavorite && !activeIds.has(r.id));
+      catalogList = [...prioritized, ...rest].slice(0, 70);
+    }
+
+    const recipesCatalog = catalogList.map(r => {
       const nut = getRecipeNutrition(r);
-      return `- ID: "${r.id}" | Título: "${r.title}" | Tags: [${(r.tags || []).join(', ')}] | Tiempo: ${(r.prepTimeMinutes || 0) + (r.cookTimeMinutes || 0)} min | Macros/ración: ${nut.calories} kcal, P:${nut.protein}g, C:${nut.carbs}g, G:${nut.fat}g`;
+      const cleanTitle = String(r.title || '').replace(/[\r\n]+/g, ' ').slice(0, 70);
+      const cleanTags = (r.tags || []).slice(0, 4).join(', ');
+      return `- ID: "${r.id}" | "${cleanTitle}" | Tags: [${cleanTags}] | Macros: ${nut.calories}kcal, P:${nut.protein}g, C:${nut.carbs}g, G:${nut.fat}g`;
     }).join('\n');
 
     const currentPlanSummary = weekDays.map(d => {
@@ -8518,7 +8537,11 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       state.settings.geminiModel = 'gemini-3.8-flash';
       state.save && state.save('fa_settings', state.settings);
     }
-    const candidateModels = [rawModel];
+    // Secuencia multi-modelo: Probar el modelo configurado (o 3.8 Flash) y ante cualquier problema
+    // (timeout, cuota 429, o alta demanda 503) conmutar inmediatamente a 3.5 Flash-Lite en la misma llamada
+    const candidateModels = (rawModel === 'gemini-3.5-flash-lite')
+      ? ['gemini-3.5-flash-lite', 'gemini-3.8-flash']
+      : [rawModel, 'gemini-3.5-flash-lite'];
 
     const historyTurns = Array.isArray(this.aiChatHistory)
       ? this.aiChatHistory.slice(-6).map(m => ({
@@ -8557,7 +8580,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      const timeoutId = setTimeout(() => controller.abort(), 18000);
       let response;
 
       try {
@@ -8573,6 +8596,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       } catch (fetchErr) {
         clearTimeout(timeoutId);
         lastErrMsg = fetchErr.name === 'AbortError' ? `Tiempo de espera agotado en modelo ${model}` : fetchErr.message;
+        console.warn(`[FoodAssistant] Fallo de conexión o timeout con ${model}: ${lastErrMsg}. Conmutando a siguiente modelo...`);
         continue;
       }
       clearTimeout(timeoutId);
@@ -8589,87 +8613,22 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       } catch (e) {}
       lastErrMsg = errMsg;
 
-      const isTransientOrModelIssue =
-        response.status === 503 ||
-        response.status === 429 ||
-        response.status === 404 ||
-        /high demand|overloaded|try again later|no longer available|not found|quota|rate limit|resource exhausted|exceeded/i.test(errMsg);
+      console.warn(`[FoodAssistant] Error devuelto por ${model} (${response.status}): ${errMsg}. Conmutando a siguiente modelo...`);
 
-      // Si el modelo 2.5 flash no está disponible para nuevos usuarios o proyectos (política de Google restringiendo 2.5 a favor de 3.5), conmutar transparentemente a gemini-3.5-flash-lite
       if (model === 'gemini-2.5-flash' && (/not available.*(new users|new projects)|not supported for new|permission denied|deprecated|not found/i.test(errMsg) || response.status === 404)) {
-        try {
-          const fallbackEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`;
-          const fbController = new AbortController();
-          const fbTimeout = setTimeout(() => fbController.abort(), 25000);
-          const fbResponse = await fetch(fallbackEndpoint, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-goog-api-key": apiKey
-            },
-            body: JSON.stringify(payload),
-            signal: fbController.signal
-          });
-          clearTimeout(fbTimeout);
-          if (fbResponse.ok) {
-            data = await fbResponse.json();
-            // Actualizar permanentemente a gemini-3.5-flash-lite en ajustes del usuario
-            state.settings.geminiModel = 'gemini-3.5-flash-lite';
-            state.save && state.save('fa_settings', state.settings);
-            break;
-          }
-        } catch (fbErr) {}
-      }
-
-      // Si gemini-3.8-flash devuelve cuota (429), alta demanda (503), saturación o error transitorio, conmutar de inmediato a gemini-3.5-flash-lite
-      if ((response.status === 429 || response.status === 503 || /quota|limit: 20|high demand|overloaded|try again later|spikes in demand/i.test(errMsg)) && model === 'gemini-3.8-flash') {
-        try {
-          const fallbackEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`;
-          const fbController = new AbortController();
-          const fbTimeout = setTimeout(() => fbController.abort(), 25000);
-          const fbResponse = await fetch(fallbackEndpoint, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-goog-api-key": apiKey
-            },
-            body: JSON.stringify(payload),
-            signal: fbController.signal
-          });
-          clearTimeout(fbTimeout);
-          if (fbResponse.ok) {
-            data = await fbResponse.json();
-            break;
-          } else {
-            // Si 2.5-flash no está disponible para nuevos usuarios, probar gemini-3.5-flash-lite
-            const liteEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`;
-            const liteController = new AbortController();
-            const liteTimeout = setTimeout(() => liteController.abort(), 25000);
-            const liteResponse = await fetch(liteEndpoint, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "x-goog-api-key": apiKey
-              },
-              body: JSON.stringify(payload),
-              signal: liteController.signal
-            });
-            clearTimeout(liteTimeout);
-            if (liteResponse.ok) {
-              data = await liteResponse.json();
-              break;
-            }
-          }
-        } catch (fbErr) {}
+        state.settings.geminiModel = 'gemini-3.5-flash-lite';
+        state.save && state.save('fa_settings', state.settings);
       }
 
       // Si es un error de clave inválida (400/401/403 API key not valid), no reintentar con otros modelos
-      if (!isTransientOrModelIssue || /api key not valid|invalid api key/i.test(errMsg)) {
+      if (/api key not valid|invalid api key/i.test(errMsg)) {
         break;
       }
 
-      // Pequeña pausa de alivio ante picos de demanda
-      await new Promise(res => setTimeout(res, 500));
+      // Pequeña pausa de alivio ante 429/503
+      if (response.status === 429 || response.status === 503) {
+        await new Promise(res => setTimeout(res, 300));
+      }
     }
 
     if (!data) {
@@ -8750,6 +8709,11 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       if (tag.toLowerCase() === 'merienda') {
         const snackOrBreakfast = safePool.filter(r => hasTagCI(r, 'Desayuno') || /batido|yogur|hummus|tosta|fruta|avena|snack/i.test(r.title || ''));
         if (snackOrBreakfast.length > 0) return snackOrBreakfast;
+      }
+
+      if (tag.toLowerCase() === 'desayuno') {
+        const breakfastCandidates = safePool.filter(r => hasTagCI(r, 'Desayuno') || /pancake|torta|avena|tosta|huevo|tortilla|yogur|chia|cha|smoothie|batido|fruta|porridge|bowl/i.test(r.title || ''));
+        if (breakfastCandidates.length > 0) return breakfastCandidates;
       }
 
       if (allowNonBreakfastFallback) {
@@ -10650,19 +10614,21 @@ REGLAS CRÍTICAS:
     parts.push({ text: promptText });
 
     let rawModel = state.settings.geminiModel || 'gemini-3.8-flash';
-    if (rawModel === 'gemini-2.5-flash-lite' || rawModel === 'gemini-1.5-flash') {
+    if (rawModel === 'gemini-2.5-flash-lite' || rawModel === 'gemini-1.5-flash' || rawModel === 'gemini-2.5-flash') {
       rawModel = 'gemini-3.8-flash';
       state.settings.geminiModel = 'gemini-3.8-flash';
       state.save && state.save('fa_settings', state.settings);
     }
-    const candidateModels = [rawModel];
+    const candidateModels = (rawModel === 'gemini-3.5-flash-lite')
+      ? ['gemini-3.5-flash-lite', 'gemini-3.8-flash']
+      : ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
 
     let lastError = null;
     let data = null;
 
     for (const model of candidateModels) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
       try {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
         const resp = await fetch(endpoint, {
@@ -10686,24 +10652,12 @@ REGLAS CRÍTICAS:
         const errMsg = errJson.error?.message || `HTTP ${resp.status}`;
         lastError = new Error(errMsg);
 
-        if (model === 'gemini-2.5-flash' && (/not available.*(new users|new projects)|not supported for new|permission denied|deprecated|not found/i.test(errMsg) || resp.status === 404)) {
-          try {
-            const fbResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-              body: JSON.stringify({ contents: [{ parts }] })
-            });
-            if (fbResp.ok) {
-              data = await fbResp.json();
-              state.settings.geminiModel = 'gemini-3.5-flash-lite';
-              state.save && state.save('fa_settings', state.settings);
-              break;
-            }
-          } catch (fbE) {}
+        if (/api key not valid|invalid api key/i.test(errMsg)) {
+          break;
         }
 
         if (resp.status === 503 || resp.status === 429) {
-          await new Promise(r => setTimeout(r, 600));
+          await new Promise(r => setTimeout(r, 300));
         }
       } catch (e) {
         clearTimeout(timeoutId);
