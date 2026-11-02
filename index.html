@@ -811,6 +811,9 @@
     <div class="modal-header-bar">
       <!-- Normal Mode Actions (saved recipe) -->
       <div id="recipe-detail-normal-actions" style="display: flex; align-items: center; gap: 8px;">
+        <button class="btn btn-secondary btn-sm" id="btn-detail-plan-recipe" onclick="app.openPlanRecipeModal()" title="Planificar esta receta en el calendario">
+          <span class="material-symbols-outlined icon-sm">calendar_month</span> Planificar
+        </button>
         <button class="btn btn-secondary btn-sm" id="btn-detail-edit-recipe">
           <span class="material-symbols-outlined icon-sm">edit</span> Editar
         </button>
@@ -1218,6 +1221,14 @@
         <span class="material-symbols-outlined">close</span>
       </button>
     </div>
+    <!-- US-71: Buscador en tiempo real de recetas en selector del planificador -->
+    <div class="picker-search-bar-wrap" style="position: relative; margin-bottom: 8px;">
+      <span class="material-symbols-outlined icon-sm" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--m3-on-surface-variant); pointer-events: none;">search</span>
+      <input type="search" id="input-picker-search" class="form-input" placeholder="Buscar por título o ingrediente..." style="padding-left: 34px; padding-right: 32px; width: 100%; height: 38px; font-size: 13px; border-radius: var(--radius-md);" autocomplete="off">
+      <button type="button" id="btn-clear-picker-search" class="btn btn-ghost btn-icon" style="position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: none; width: 28px; height: 28px; padding: 0;" title="Limpiar búsqueda">
+        <span class="material-symbols-outlined icon-sm">close</span>
+      </button>
+    </div>
     <div id="picker-dietary-filter-bar" style="display: none; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--m3-outline-variant);">
       <button type="button" class="m3-filter-chip dietary-chip" id="btn-toggle-picker-dietary-only">
         <span class="material-symbols-outlined icon-sm">eco</span> Solo aptas para mis dietas
@@ -1232,6 +1243,58 @@
       <input type="checkbox" id="toggle-picker-cook-double" class="grocery-checkbox" style="margin: 0;">
     </div>
     <div style="max-height: 56vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;" id="picker-recipes-list"></div>
+  </div>
+</dialog>
+
+<!-- MODAL: US-72 PLAN RECIPE DIRECTLY FROM DETAIL -->
+<dialog class="modal-overlay" id="modal-plan-recipe" closedby="any" aria-labelledby="plan-recipe-modal-title">
+  <div class="modal-content" style="padding: 20px; max-width: 460px; width: 92%; border-radius: var(--radius-xl);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--m3-outline-variant); padding-bottom: 8px;">
+      <h3 style="font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin: 0;" id="plan-recipe-modal-title">
+        <span class="material-symbols-outlined" style="color: var(--m3-primary);">calendar_month</span> Añadir al Plan
+      </h3>
+      <button class="btn btn-ghost btn-icon" id="btn-close-plan-recipe-modal" onclick="app.closePlanRecipeModal()" title="Cerrar">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+
+    <!-- Recipe summary snippet -->
+    <div id="plan-recipe-summary-box" style="display: flex; align-items: center; gap: 10px; background: var(--m3-surface-container); padding: 8px 12px; border-radius: var(--radius-md); margin-bottom: 14px;">
+      <span class="material-symbols-outlined" style="color: var(--m3-primary); font-size: 22px;">restaurant</span>
+      <div style="min-width: 0; flex: 1;">
+        <div id="plan-recipe-target-title" style="font-size: 13px; font-weight: 600; color: var(--m3-on-surface); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
+        <div id="plan-recipe-target-meta" style="font-size: 11px; color: var(--m3-on-surface-variant);"></div>
+      </div>
+    </div>
+
+    <!-- 1. Date selection -->
+    <div style="margin-bottom: 14px;">
+      <label style="display: block; font-size: 12px; font-weight: 600; color: var(--m3-on-surface); margin-bottom: 6px;">Fecha:</label>
+      <div style="display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap;" id="plan-recipe-quick-dates">
+        <!-- Quick date pills injected dynamically -->
+      </div>
+      <input type="date" id="plan-recipe-date-input" class="form-input" style="width: 100%; height: 38px; font-size: 13px;">
+    </div>
+
+    <!-- 2. Meal slot selection -->
+    <div style="margin-bottom: 14px;">
+      <label style="display: block; font-size: 12px; font-weight: 600; color: var(--m3-on-surface); margin-bottom: 6px;">Momento del día:</label>
+      <div id="plan-recipe-slots-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+        <!-- Slot options injected dynamically -->
+      </div>
+    </div>
+
+    <!-- 3. Conflict warning banner -->
+    <div id="plan-recipe-conflict-warning" style="display: none; padding: 10px 12px; border-radius: var(--radius-md); font-size: 12px; margin-bottom: 16px; line-height: 1.4; border: 1px solid var(--m3-outline-variant);">
+    </div>
+
+    <!-- Actions -->
+    <div style="display: flex; gap: 8px; justify-content: flex-end;">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="app.closePlanRecipeModal()">Cancelar</button>
+      <button type="button" class="btn btn-primary btn-sm" id="btn-confirm-plan-recipe" onclick="app.confirmPlanRecipe()">
+        <span class="material-symbols-outlined icon-sm">check</span> Confirmar y Planificar
+      </button>
+    </div>
   </div>
 </dialog>
 

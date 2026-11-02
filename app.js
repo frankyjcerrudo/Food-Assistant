@@ -655,6 +655,16 @@ const AISLE_METADATA = {
 // ==========================================================================
 // UNIFIED INGREDIENT CLASSIFIER, ICONS & AUTOCOMPLETE CATALOG (US-20, BUG-14)
 // ==========================================================================
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function normalizeIngredientText(str) {
   if (!str) return '';
   return str.toString()
@@ -3042,6 +3052,7 @@ if (typeof window !== 'undefined') {
   window.getWeekDates = getWeekDates;
   window.formatWeekRange = formatWeekRange;
   window.DAYS_OF_WEEK_ES = DAYS_OF_WEEK_ES;
+  window.escapeHtml = escapeHtml;
   window.normalizeIngredientText = normalizeIngredientText;
   window.categorizeIngredientAisle = categorizeIngredientAisle;
   window.getIngredientIcon = getIngredientIcon;
@@ -3205,9 +3216,14 @@ class FoodAssistantApp {
     this.modalBulkImport = document.getElementById('modal-bulk-import');
     this.modalConfirmDialog = document.getElementById('modal-confirm-dialog');
     this.modalGeminiInvoke = document.getElementById('modal-gemini-invoke');
+    this.modalPlanRecipe = document.getElementById('modal-plan-recipe');
     this.cookModeOverlay = document.getElementById('cook-mode-overlay');
     this._confirmDialogResolver = null;
     this._confirmDialogMode = 'confirm';
+    this.planRecipeTarget = null;
+    this.planRecipeSelectedSlot = 'lunch';
+    this.planRecipeIsCustomSlot = false;
+    this.pickerSearchQuery = '';
   }
 
   // ==========================================================================
@@ -4821,6 +4837,28 @@ class FoodAssistantApp {
       this.renderPickerRecipesList();
     });
 
+    // US-71: Real-time search in recipe picker
+    const pickerSearchInput = document.getElementById('input-picker-search');
+    const pickerClearBtn = document.getElementById('btn-clear-picker-search');
+    if (pickerSearchInput) {
+      pickerSearchInput.addEventListener('input', () => {
+        this.pickerSearchQuery = pickerSearchInput.value.trim();
+        if (pickerClearBtn) {
+          pickerClearBtn.style.display = this.pickerSearchQuery ? 'inline-flex' : 'none';
+        }
+        this.renderPickerRecipesList();
+      });
+      pickerSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && this.pickerSearchQuery) {
+          e.stopPropagation();
+          this.clearPickerSearch();
+        }
+      });
+    }
+    pickerClearBtn?.addEventListener('click', () => {
+      this.clearPickerSearch();
+    });
+
     // Shopping List (US-20: Autocompletado inteligente de artículos)
     const quickGroceryInput = document.getElementById('input-quick-grocery');
     const quickGroceryDropdown = document.getElementById('quick-grocery-autocomplete');
@@ -5907,6 +5945,9 @@ class FoodAssistantApp {
       case 'modal-confirm-dialog':
         this.closeConfirmDialog(false);
         break;
+      case 'modal-plan-recipe':
+        this.closePlanRecipeModal();
+        break;
       default:
         this.closeDialogModal(overlay);
         break;
@@ -6074,9 +6115,14 @@ class FoodAssistantApp {
             </div>
           </div>
         ` : `
-          <button class="btn btn-primary" style="width: 100%; padding: 12px;" onclick="app.startCookMode()">
-            <span class="material-symbols-outlined">skillet</span> Empezar Modo Cocina Paso a Paso
-          </button>
+          <div style="display: flex; gap: 8px; margin-top: 16px;">
+            <button class="btn btn-secondary" id="btn-bottom-plan-recipe" style="flex: 1; padding: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="app.openPlanRecipeModal()">
+              <span class="material-symbols-outlined icon-sm">calendar_month</span> Añadir al Plan
+            </button>
+            <button class="btn btn-primary" id="btn-bottom-start-cook-mode" style="flex: 1.5; padding: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="app.startCookMode()">
+              <span class="material-symbols-outlined icon-sm">skillet</span> Modo Cocina
+            </button>
+          </div>
         `}
       </div>
     `;
@@ -7694,6 +7740,16 @@ class FoodAssistantApp {
     });
   }
 
+  clearPickerSearch() {
+    this.pickerSearchQuery = '';
+    const input = document.getElementById('input-picker-search');
+    const clearBtn = document.getElementById('btn-clear-picker-search');
+    if (input) input.value = '';
+    if (clearBtn) clearBtn.style.display = 'none';
+    this.renderPickerRecipesList();
+    if (input) input.focus();
+  }
+
   openPickerModal(dateStr, slotKey, isCustom = false) {
     this.pickerTarget = { dateStr, slotKey, isCustom };
     const filterBar = document.getElementById('picker-dietary-filter-bar');
@@ -7718,8 +7774,21 @@ class FoodAssistantApp {
       toggleBtn.classList.toggle('active', this.pickerOnlyDietary);
     }
 
+    // US-71: Reset search on modal open
+    this.pickerSearchQuery = '';
+    const searchInput = document.getElementById('input-picker-search');
+    const clearBtn = document.getElementById('btn-clear-picker-search');
+    if (searchInput) searchInput.value = '';
+    if (clearBtn) clearBtn.style.display = 'none';
+
     this.renderPickerRecipesList();
     this.openDialogModal(this.modalRecipePicker);
+
+    setTimeout(() => {
+      if (searchInput && this.modalRecipePicker && (this.modalRecipePicker.open || this.modalRecipePicker.classList.contains('active'))) {
+        searchInput.focus();
+      }
+    }, 60);
   }
 
   renderPickerRecipesList() {
@@ -7733,11 +7802,54 @@ class FoodAssistantApp {
       recipes = recipes.filter(r => checkDietaryCompliance(r, state.dietaryPreferences).compliant);
     }
 
+    // US-71: Filtrado reactivo en tiempo real por término de búsqueda (título e ingredientes)
+    const q = (this.pickerSearchQuery || '').trim();
+    const qNorm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(q) : q.toLowerCase();
+
+    if (qNorm) {
+      recipes = recipes.filter(r => {
+        const titleNorm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(r.title || '') : (r.title || '').toLowerCase();
+        if (titleNorm.includes(qNorm)) return true;
+        if (Array.isArray(r.ingredients)) {
+          return r.ingredients.some(ing => {
+            const ingNorm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(ing?.name || '') : (ing?.name || '').toLowerCase();
+            return ingNorm.includes(qNorm);
+          });
+        }
+        return false;
+      });
+    }
+
     if (recipes.length === 0) {
+      if (q) {
+        list.innerHTML = `
+          <div style="text-align: center; padding: 28px 16px; color: var(--m3-on-surface-variant); font-size: 13px;">
+            <span class="material-symbols-outlined" style="font-size: 32px; display: block; margin-bottom: 6px; color: var(--m3-primary);">search_off</span>
+            No se encontraron recetas para "<strong>${escapeHtml(q)}</strong>".
+            <div style="margin-top: 10px;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="app.clearPickerSearch()">
+                <span class="material-symbols-outlined icon-sm">backspace</span> Limpiar búsqueda
+              </button>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      if (this.pickerOnlyDietary && hasPreferences) {
+        list.innerHTML = `
+          <div style="text-align: center; padding: 28px 16px; color: var(--m3-on-surface-variant); font-size: 13px;">
+            <span class="material-symbols-outlined" style="font-size: 32px; display: block; margin-bottom: 6px; color: var(--m3-primary);">eco</span>
+            No hay recetas que cumplan con los filtros dietéticos seleccionados.
+          </div>
+        `;
+        return;
+      }
+
       list.innerHTML = `
         <div style="text-align: center; padding: 28px 16px; color: var(--m3-on-surface-variant); font-size: 13px;">
-          <span class="material-symbols-outlined" style="font-size: 32px; display: block; margin-bottom: 6px; color: var(--m3-primary);">eco</span>
-          No hay recetas que cumplan con los filtros dietéticos seleccionados.
+          <span class="material-symbols-outlined" style="font-size: 32px; display: block; margin-bottom: 6px; color: var(--m3-primary);">menu_book</span>
+          Aún no tienes recetas guardadas en tu recetario.
         </div>
       `;
       return;
@@ -7750,7 +7862,7 @@ class FoodAssistantApp {
              onclick="app.selectRecipeForSlot('${r.id}')">
           <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; padding-right: 8px;">
             ${r.imageUrl ? `
-              <img src="${r.imageUrl}" alt="" style="width: 42px; height: 42px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\\'http://www.w3.org/2000/svg\\\' viewBox=\\\'0 0 48 48\\\'><rect width=\\\'48\\\' height=\\\'48\\\' rx=\\\'8\\\' fill=\\\'%23f1f3f4\\\'/><text x=\\\'50%25\\\' y=\\\'55%25\\\' dominant-baseline=\\\'middle\\\' text-anchor=\\\'middle\\\' font-size=\\\'18\\\'>🍲</text></svg>'">
+              <img src="${r.imageUrl}" alt="" style="width: 42px; height: 42px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 48 48\\'><rect width=\\'48\\' height=\\'48\\' rx=\\'8\\' fill=\\'%23f1f3f4\\'/><text x=\\'50%25\\' y=\\'55%25\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' font-size=\\'18\\'>🍲</text></svg>'">
             ` : `
               <div style="width: 42px; height: 42px; border-radius: 6px; background: var(--m3-surface-container-high); color: var(--m3-primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                 <span class="material-symbols-outlined icon-sm">restaurant</span>
@@ -7768,14 +7880,251 @@ class FoodAssistantApp {
               ) : ''}
             </div>
           </div>
-          <button class="btn btn-primary btn-sm" style="flex-shrink: 0;">Elegir</button>
+          <button class="btn btn-secondary btn-sm" style="flex-shrink: 0;">Elegir</button>
         </div>
       `;
     }).join('');
   }
 
   closePickerModal() {
+    this.pickerSearchQuery = '';
+    const input = document.getElementById('input-picker-search');
+    const clearBtn = document.getElementById('btn-clear-picker-search');
+    if (input) input.value = '';
+    if (clearBtn) clearBtn.style.display = 'none';
     this.closeDialogModal(this.modalRecipePicker);
+  }
+
+  // ==========================================================================
+  // US-72: PLANIFICAR RECETA DIRECTAMENTE DESDE SU FICHA ("AÑADIR AL PLAN")
+  // ==========================================================================
+  openPlanRecipeModal(recipeOrId = null) {
+    let r = null;
+    if (recipeOrId && typeof recipeOrId === 'object') {
+      r = recipeOrId;
+    } else if (typeof recipeOrId === 'string') {
+      r = state.recipes.find(rec => rec.id === recipeOrId);
+    } else if (this.activeRecipe) {
+      r = this.activeRecipe;
+    }
+
+    if (!r) {
+      this.showToast('No se encontró la receta a planificar.', 'error');
+      return;
+    }
+
+    this.planRecipeTarget = r;
+
+    // Actualizar snippet resumen
+    const titleEl = document.getElementById('plan-recipe-target-title');
+    const metaEl = document.getElementById('plan-recipe-target-meta');
+    if (titleEl) titleEl.textContent = r.title;
+    if (metaEl) {
+      const totalTime = (r.prepTimeMinutes || 0) + (r.cookTimeMinutes || 0);
+      metaEl.textContent = `${totalTime > 0 ? `${totalTime} min • ` : ''}${r.servings || 2} personas`;
+    }
+
+    // Inicializar fecha (hoy por defecto)
+    const today = new Date();
+    const todayKey = toLocalDateKey(today);
+    const dateInput = document.getElementById('plan-recipe-date-input');
+    if (dateInput) {
+      dateInput.value = todayKey;
+      dateInput.onchange = () => {
+        this.renderPlanRecipeSlots();
+        this.updatePlanRecipeConflict();
+      };
+    }
+
+    // Quick date pills
+    const quickDatesContainer = document.getElementById('plan-recipe-quick-dates');
+    if (quickDatesContainer) {
+      const dates = [];
+      for (let i = 0; i < 4; i++) {
+        const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
+        const k = toLocalDateKey(d);
+        let label = '';
+        if (i === 0) label = 'Hoy';
+        else if (i === 1) label = 'Mañana';
+        else {
+          const dayIdx = d.getDay() === 0 ? 6 : d.getDay() - 1;
+          const dayName = DAYS_OF_WEEK_ES[dayIdx] || '';
+          label = `${dayName.slice(0, 3)} ${d.getDate()}`;
+        }
+        dates.push({ key: k, label });
+      }
+
+      quickDatesContainer.innerHTML = dates.map((item, idx) => `
+        <button type="button" class="m3-filter-chip plan-quick-date-chip ${idx === 0 ? 'active' : ''}" data-date="${item.key}" onclick="app.selectPlanRecipeQuickDate('${item.key}', this)" style="cursor: pointer;">
+          ${item.label}
+        </button>
+      `).join('');
+    }
+
+    // Render slots y verificar conflicto
+    this.planRecipeSelectedSlot = 'lunch';
+    this.planRecipeIsCustomSlot = false;
+    this.renderPlanRecipeSlots();
+    this.updatePlanRecipeConflict();
+
+    this.openDialogModal(this.modalPlanRecipe);
+  }
+
+  selectPlanRecipeQuickDate(dateKey, btnElem) {
+    const dateInput = document.getElementById('plan-recipe-date-input');
+    if (dateInput) {
+      dateInput.value = dateKey;
+    }
+    const container = document.getElementById('plan-recipe-quick-dates');
+    if (container) {
+      container.querySelectorAll('.plan-quick-date-chip').forEach(b => b.classList.remove('active'));
+      if (btnElem) btnElem.classList.add('active');
+    }
+    this.renderPlanRecipeSlots();
+    this.updatePlanRecipeConflict();
+  }
+
+  renderPlanRecipeSlots() {
+    const container = document.getElementById('plan-recipe-slots-container');
+    if (!container) return;
+
+    const dateInput = document.getElementById('plan-recipe-date-input');
+    const dateKey = dateInput?.value || toLocalDateKey(new Date());
+    const dayData = state.getDayPlan(dateKey);
+
+    const slots = [
+      ...STANDARD_SLOTS.map(s => ({ key: s.key, label: s.label, icon: s.icon, isCustom: false })),
+      ...(dayData.customSlots || []).map(cs => ({ key: cs.id, label: cs.name, icon: 'restaurant', isCustom: true }))
+    ];
+
+    if (!slots.some(s => s.key === this.planRecipeSelectedSlot)) {
+      this.planRecipeSelectedSlot = slots[0]?.key || 'lunch';
+      this.planRecipeIsCustomSlot = slots[0]?.isCustom || false;
+    }
+
+    container.innerHTML = slots.map(s => {
+      const isSelected = s.key === this.planRecipeSelectedSlot;
+      const currentRecipeId = s.isCustom
+        ? (dayData.customSlots.find(c => c.id === s.key)?.recipeId)
+        : dayData[s.key];
+      const hasCurrent = !!currentRecipeId;
+
+      return `
+        <button type="button" class="plan-slot-card-choice ${isSelected ? 'selected' : ''}" onclick="app.selectPlanRecipeSlot('${s.key}', ${s.isCustom})" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: ${isSelected ? 'var(--m3-primary-container)' : 'var(--m3-surface-container-low)'}; color: ${isSelected ? 'var(--m3-on-primary-container)' : 'var(--m3-on-surface)'}; border: 1.5px solid ${isSelected ? 'var(--m3-primary)' : 'var(--m3-outline-variant)'}; border-radius: var(--radius-md); cursor: pointer; text-align: left; font-size: 13px; font-weight: 500;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="material-symbols-outlined icon-sm" style="color: ${isSelected ? 'var(--m3-primary)' : 'var(--m3-on-surface-variant)'};">${s.icon}</span>
+            <span>${s.label}</span>
+          </div>
+          ${hasCurrent ? '<span class="material-symbols-outlined icon-sm" style="color: #f59e0b;" title="Ya tiene plato asignado">warning</span>' : ''}
+        </button>
+      `;
+    }).join('');
+  }
+
+  selectPlanRecipeSlot(slotKey, isCustom = false) {
+    this.planRecipeSelectedSlot = slotKey;
+    this.planRecipeIsCustomSlot = isCustom;
+    this.renderPlanRecipeSlots();
+    this.updatePlanRecipeConflict();
+  }
+
+  updatePlanRecipeConflict() {
+    const warningBox = document.getElementById('plan-recipe-conflict-warning');
+    if (!warningBox) return;
+
+    const dateInput = document.getElementById('plan-recipe-date-input');
+    const dateKey = dateInput?.value || toLocalDateKey(new Date());
+    const dayData = state.getDayPlan(dateKey);
+    const slotKey = this.planRecipeSelectedSlot || 'lunch';
+
+    let currentRecipeId = null;
+    let slotLabel = slotKey;
+
+    if (this.planRecipeIsCustomSlot) {
+      const cs = (dayData.customSlots || []).find(c => c.id === slotKey);
+      currentRecipeId = cs?.recipeId;
+      slotLabel = cs?.name || 'Momento extra';
+    } else {
+      currentRecipeId = dayData[slotKey];
+      const std = STANDARD_SLOTS.find(s => s.key === slotKey);
+      slotLabel = std ? std.label : slotKey;
+    }
+
+    if (currentRecipeId) {
+      const existing = (state.recipes || []).find(r => r.id === currentRecipeId);
+      const existingTitle = existing ? existing.title : 'Otro plato';
+      warningBox.style.display = 'block';
+      warningBox.style.background = 'var(--m3-surface-container-high)';
+      warningBox.style.borderColor = '#f59e0b';
+      warningBox.style.color = 'var(--m3-on-surface)';
+      warningBox.innerHTML = `
+        <div style="display: flex; gap: 8px; align-items: flex-start;">
+          <span class="material-symbols-outlined icon-sm" style="color: #f59e0b; flex-shrink: 0; margin-top: 1px;">warning</span>
+          <div>
+            <strong>Momento ocupado:</strong> Ya hay asignado "<em>${escapeHtml(existingTitle)}</em>" en ${slotLabel}.
+            <div style="font-size: 11px; margin-top: 3px; color: var(--m3-on-surface-variant);">
+              Al confirmar, se sustituirá por "${escapeHtml(this.planRecipeTarget?.title || '')}".
+            </div>
+          </div>
+        </div>
+      `;
+    } else {
+      warningBox.style.display = 'block';
+      warningBox.style.background = 'var(--m3-surface-container-low)';
+      warningBox.style.borderColor = 'var(--m3-outline-variant)';
+      warningBox.style.color = 'var(--m3-on-surface-variant)';
+      warningBox.innerHTML = `
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <span class="material-symbols-outlined icon-sm" style="color: var(--m3-primary);">check_circle</span>
+          <span>Hueco libre en <strong>${slotLabel}</strong>.</span>
+        </div>
+      `;
+    }
+  }
+
+  closePlanRecipeModal() {
+    this.closeDialogModal(this.modalPlanRecipe);
+    this.planRecipeTarget = null;
+  }
+
+  confirmPlanRecipe() {
+    const r = this.planRecipeTarget;
+    if (!r) {
+      this.closePlanRecipeModal();
+      return;
+    }
+
+    const dateInput = document.getElementById('plan-recipe-date-input');
+    const dateKey = dateInput?.value || toLocalDateKey(new Date());
+    if (!dateKey) {
+      this.showToast('Por favor selecciona una fecha válida.', 'error');
+      return;
+    }
+
+    const slotKey = this.planRecipeSelectedSlot || 'lunch';
+    const dayData = state.getDayPlan(dateKey);
+
+    if (this.planRecipeIsCustomSlot) {
+      const cs = (dayData.customSlots || []).find(c => c.id === slotKey);
+      if (cs) {
+        cs.recipeId = r.id;
+      }
+    } else {
+      dayData[slotKey] = r.id;
+    }
+    dayData.updatedAt = new Date().toISOString();
+
+    state.save('fa_mealplan', state.mealPlan);
+    this.scheduleSyncWithCloud();
+    this.closePlanRecipeModal();
+    this.render();
+
+    const std = STANDARD_SLOTS.find(s => s.key === slotKey);
+    const slotLabel = std ? std.label : slotKey;
+    const parts = dateKey.split('-');
+    const formattedDate = parts.length === 3 ? `${parts[2]}/${parts[1]}` : dateKey;
+
+    this.showToast(`¡"${r.title}" planificada para ${slotLabel} (${formattedDate})!`, 'success');
   }
 
   selectRecipeForSlot(recipeId, cookDoubleOverride = null) {
@@ -12366,6 +12715,7 @@ if (typeof module !== 'undefined' && module.exports) {
     STANDARD_SLOTS,
     AISLE_METADATA,
     COMMON_INGREDIENTS,
+    escapeHtml,
     normalizeIngredientText,
     categorizeIngredientAisle,
     resolveAisleOnline,

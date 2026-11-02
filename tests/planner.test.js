@@ -420,3 +420,246 @@ describe('US-04: Duplicar o copiar plan de cualquier semana (semana anterior, hi
     expect(modal.classList.contains('active')).toBe(false);
   });
 });
+
+describe('US-71: Buscador en tiempo real en el selector de recetas del planificador', () => {
+  let appInstance;
+
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = `
+      <dialog class="modal-overlay" id="modal-recipe-picker" closedby="any">
+        <h3 id="picker-modal-title">Elegir Plato</h3>
+        <button id="btn-close-picker-modal"></button>
+        <div class="picker-search-bar-wrap">
+          <input type="search" id="input-picker-search">
+          <button id="btn-clear-picker-search" style="display: none;"></button>
+        </div>
+        <div id="picker-dietary-filter-bar" style="display: none;">
+          <button id="btn-toggle-picker-dietary-only"></button>
+        </div>
+        <input type="checkbox" id="toggle-picker-cook-double">
+        <div id="picker-recipes-list"></div>
+      </dialog>
+    `;
+
+    window.state.recipes = [
+      {
+        id: 'rec-pasta-pesto',
+        title: 'Pasta al Pesto Genovés',
+        description: 'Deliciosa pasta fresca.',
+        prepTimeMinutes: 10,
+        cookTimeMinutes: 15,
+        servings: 2,
+        tags: ['Vegetariano'],
+        ingredients: [
+          { name: 'Albahaca fresca', amount: 50, unit: 'g' },
+          { name: 'Piñones', amount: 30, unit: 'g' }
+        ]
+      },
+      {
+        id: 'rec-pollo-limon',
+        title: 'Pollo al Limón con Patatas',
+        description: 'Pollo asado jugoso.',
+        prepTimeMinutes: 15,
+        cookTimeMinutes: 40,
+        servings: 4,
+        tags: ['Keto'],
+        ingredients: [
+          { name: 'Pechuga de pollo', amount: 500, unit: 'g' },
+          { name: 'Limón', amount: 2, unit: 'ud' }
+        ]
+      },
+      {
+        id: 'rec-ensalada-quinoa',
+        title: 'Ensalada de Quinoa y Aguacate',
+        description: 'Ensalada fresca y nutritiva.',
+        prepTimeMinutes: 10,
+        cookTimeMinutes: 10,
+        servings: 2,
+        tags: ['Vegano', 'Sin Gluten'],
+        ingredients: [
+          { name: 'Quinoa', amount: 150, unit: 'g' },
+          { name: 'Aguacate', amount: 1, unit: 'ud' }
+        ]
+      }
+    ];
+    window.state.dietaryPreferences = [];
+
+    appInstance = new FoodAssistantApp();
+  });
+
+  it('openPickerModal limpia el término de búsqueda y enfoca el buscador', () => {
+    appInstance.pickerSearchQuery = 'anterior';
+    const input = document.getElementById('input-picker-search');
+    input.value = 'anterior';
+
+    appInstance.openPickerModal('2026-11-02', 'lunch');
+
+    expect(appInstance.pickerSearchQuery).toBe('');
+    expect(input.value).toBe('');
+    const list = document.getElementById('picker-recipes-list');
+    expect(list.children.length).toBe(3);
+  });
+
+  it('filtra en tiempo real por título de receta insensible a mayúsculas y acentos', () => {
+    appInstance.openPickerModal('2026-11-02', 'lunch');
+    const input = document.getElementById('input-picker-search');
+    const clearBtn = document.getElementById('btn-clear-picker-search');
+
+    input.value = 'pesto';
+    input.dispatchEvent(new Event('input'));
+
+    expect(appInstance.pickerSearchQuery).toBe('pesto');
+    expect(clearBtn.style.display).toBe('inline-flex');
+
+    const list = document.getElementById('picker-recipes-list');
+    expect(list.children.length).toBe(1);
+    expect(list.textContent).toContain('Pasta al Pesto Genovés');
+  });
+
+  it('filtra en tiempo real por ingrediente de la receta', () => {
+    appInstance.openPickerModal('2026-11-02', 'lunch');
+    const input = document.getElementById('input-picker-search');
+
+    // "albahaca" está en los ingredientes de Pasta al Pesto
+    input.value = 'albahaca';
+    input.dispatchEvent(new Event('input'));
+
+    const list = document.getElementById('picker-recipes-list');
+    expect(list.children.length).toBe(1);
+    expect(list.textContent).toContain('Pasta al Pesto Genovés');
+  });
+
+  it('muestra estado vacío claro cuando no hay coincidencias y permite limpiar la búsqueda', () => {
+    appInstance.openPickerModal('2026-11-02', 'lunch');
+    const input = document.getElementById('input-picker-search');
+
+    input.value = 'TerminoInexistenteXYZ';
+    input.dispatchEvent(new Event('input'));
+
+    const list = document.getElementById('picker-recipes-list');
+    expect(list.textContent).toContain('No se encontraron recetas para "TerminoInexistenteXYZ"');
+
+    // Botón limpiar búsqueda
+    appInstance.clearPickerSearch();
+    expect(input.value).toBe('');
+    expect(appInstance.pickerSearchQuery).toBe('');
+    expect(list.children.length).toBe(3);
+  });
+});
+
+describe('US-72: Planificar receta directamente desde su ficha ("Añadir al plan")', () => {
+  let appInstance;
+
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = `
+      <dialog class="modal-overlay" id="modal-recipe-detail" closedby="any">
+        <div id="recipe-modal-body"></div>
+      </dialog>
+      <dialog class="modal-overlay" id="modal-plan-recipe" closedby="any">
+        <h3 id="plan-recipe-modal-title">Añadir al Plan</h3>
+        <button id="btn-close-plan-recipe-modal"></button>
+        <div id="plan-recipe-target-title"></div>
+        <div id="plan-recipe-target-meta"></div>
+        <div id="plan-recipe-quick-dates"></div>
+        <input type="date" id="plan-recipe-date-input">
+        <div id="plan-recipe-slots-container"></div>
+        <div id="plan-recipe-conflict-warning" style="display: none;"></div>
+        <button id="btn-confirm-plan-recipe"></button>
+      </dialog>
+    `;
+
+    window.state.recipes = [
+      {
+        id: 'rec-tacos',
+        title: 'Tacos de Carnitas',
+        prepTimeMinutes: 20,
+        cookTimeMinutes: 30,
+        servings: 4,
+        ingredients: []
+      },
+      {
+        id: 'rec-sopa',
+        title: 'Sopa de Verduras',
+        prepTimeMinutes: 10,
+        cookTimeMinutes: 20,
+        servings: 2,
+        ingredients: []
+      }
+    ];
+
+    window.state.mealPlan = {
+      '2026-11-02': {
+        dayName: 'Lunes',
+        breakfast: null,
+        lunch: 'rec-sopa',
+        snack: null,
+        dinner: null,
+        customSlots: []
+      }
+    };
+
+    appInstance = new FoodAssistantApp();
+  });
+
+  it('openPlanRecipeModal inicializa datos de receta, fecha de hoy y momento por defecto', () => {
+    const recipe = window.state.recipes[0];
+    appInstance.openPlanRecipeModal(recipe);
+
+    const modal = document.getElementById('modal-plan-recipe');
+    expect(modal.classList.contains('active')).toBe(true);
+
+    const titleEl = document.getElementById('plan-recipe-target-title');
+    expect(titleEl.textContent).toBe('Tacos de Carnitas');
+
+    const dateInput = document.getElementById('plan-recipe-date-input');
+    expect(dateInput.value).toBe(toLocalDateKey(new Date()));
+
+    const slots = document.getElementById('plan-recipe-slots-container');
+    expect(slots.children.length).toBeGreaterThanOrEqual(4); // Desayuno, Almuerzo, Merienda, Cena
+  });
+
+  it('detecta conflicto si el momento seleccionado ya tiene plato asignado y avisa de la sustitución', () => {
+    const recipe = window.state.recipes[0]; // Tacos
+    appInstance.openPlanRecipeModal(recipe);
+
+    const dateInput = document.getElementById('plan-recipe-date-input');
+    dateInput.value = '2026-11-02';
+
+    // Seleccionar slot Almuerzo (que ya tiene Sopa de Verduras)
+    appInstance.selectPlanRecipeSlot('lunch', false);
+
+    const warningBox = document.getElementById('plan-recipe-conflict-warning');
+    expect(warningBox.style.display).toBe('block');
+    expect(warningBox.textContent).toContain('Ya hay asignado');
+    expect(warningBox.textContent).toContain('Sopa de Verduras');
+    expect(warningBox.textContent).toContain('se sustituirá por "Tacos de Carnitas"');
+
+    // Cambiar a slot libre (Cena)
+    appInstance.selectPlanRecipeSlot('dinner', false);
+    expect(warningBox.textContent).toContain('Hueco libre en Cena');
+  });
+
+  it('confirmPlanRecipe asigna la receta al día y momento elegidos, persiste y notifica', () => {
+    const recipe = window.state.recipes[0];
+    appInstance.openPlanRecipeModal(recipe);
+
+    const dateInput = document.getElementById('plan-recipe-date-input');
+    dateInput.value = '2026-11-02';
+    appInstance.selectPlanRecipeSlot('dinner', false);
+
+    let toastMessage = '';
+    appInstance.showToast = (msg) => { toastMessage = msg; };
+
+    appInstance.confirmPlanRecipe();
+
+    // Verificamos asignación en state
+    expect(window.state.mealPlan['2026-11-02'].dinner).toBe('rec-tacos');
+    expect(toastMessage).toContain('Tacos de Carnitas');
+    expect(toastMessage).toContain('Cena');
+
+    const modal = document.getElementById('modal-plan-recipe');
+    expect(modal.classList.contains('active')).toBe(false);
+  });
+});

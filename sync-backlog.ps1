@@ -324,6 +324,9 @@ if ($UpdateExisting) {
                         body   = $item.Body
                         labels = $item.Labels
                     }
+                    if ($item.RawStatus -eq 'Done') {
+                        $patchPayload["state"] = "closed"
+                    }
                     $jsonBytes = [System.Text.Encoding]::UTF8.GetBytes(($patchPayload | ConvertTo-Json -Depth 5))
                     try {
                         $null = Invoke-RestMethod -Uri "https://api.github.com/repos/$Owner/$Repo/issues/$issueNum" `
