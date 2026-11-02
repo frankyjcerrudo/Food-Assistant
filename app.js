@@ -674,7 +674,7 @@ function categorizeIngredientAisle(ingredientName) {
   }
 
   // 2. Carnes, Aves, Pescados, Mariscos y Embutidos (meat)
-  if (/\b(pollo|pollos|pechuga|pechugas|muslo|muslos|alita|alitas|pavo|pavos|ternera|terneras|vaca|buey|cerdo|cerdos|cochinillo|cordero|conejo|pato|carne|carnes|picada|filete|filetes|solomillo|solomillos|lomo|lomos|costilla|costillas|chuleta|chuletas|entrecot|hamburguesa|hamburguesas|salchicha|salchichas|chorizo|chorizos|morcilla|morcillas|jamon|jamones|panceta|bacon|beicon|lacon|cecina|embutido|embutidos|pescado|pescados|salmon|salmones|merluza|merluzas|atun|atunes|bonito|bacalao|dorada|doradas|lubina|lubinas|trucha|truchas|sardina|sardinas|boqueron|boquerones|anchoa|anchoas|pez\s+espada|emperador|gamba|gambas|langostino|langostinos|calamar|calamares|sepia|chipiron|chipirones|pulpo|pulpos|mejillon|mejillones|almeja|almejas|navaja|navajas|ostra|ostras|cangrejo|bogavante)\b/.test(text)) {
+  if (/\b(pollo|pollos|pechuga|pechugas|muslo|muslos|alita|alitas|pavo|pavos|ternera|terneras|vaca|buey|cerdo|cerdos|cochinillo|cordero|conejo|pato|carne|carnes|carne\s+picada|picada\s+de\s+(?:ternera|cerdo|pollo|pavo|vaca|buey)|filete|filetes|solomillo|solomillos|lomo|lomos|costilla|costillas|chuleta|chuletas|entrecot|hamburguesa|hamburguesas|salchicha|salchichas|chorizo|chorizos|morcilla|morcillas|jamon|jamones|panceta|bacon|beicon|lacon|cecina|embutido|embutidos|pescado|pescados|salmon|salmones|merluza|merluzas|atun|atunes|bonito|bacalao|dorada|doradas|lubina|lubinas|trucha|truchas|sardina|sardinas|boqueron|boquerones|anchoa|anchoas|pez\s+espada|emperador|gamba|gambas|langostino|langostinos|calamar|calamares|sepia|chipiron|chipirones|pulpo|pulpos|mejillon|mejillones|almeja|almejas|navaja|navajas|ostra|ostras|cangrejo|bogavante)\b/.test(text)) {
     return 'meat';
   }
 
@@ -684,7 +684,7 @@ function categorizeIngredientAisle(ingredientName) {
   }
 
   // 4. Frutas, Verduras, Hortalizas y Hierbas Frescas (produce)
-  if (/\b(tomate|tomates|cherry|cebolla|cebollas|cebolleta|cebolletas|ajo|ajos|patata|patatas|papa|papas|aguacate|aguacates|espinaca|espinacas|lechuga|lechugas|zanahoria|zanahorias|limon|limones|lima|limas|manzana|manzanas|platano|platanos|banana|bananas|champinon|champinones|seta|setas|pimiento|pimientos|calabacin|calabacines|pepino|pepinos|fresa|fresas|fresones|arandano|arandanos|frambuesa|frambuesas|mora|moras|pera|peras|naranja|naranjas|mandarina|mandarinas|pomelo|uva|uvas|melon|sandia|melocoton|albaricoque|ciruela|ciruelas|mango|pina|kiwi|kiwis|brocoli|coliflor|col|repollo|lombarda|berenjena|berenjenas|judia|judias|guisante|guisantes|esparrago|esparragos|triguero|trigueros|apio|puerro|puerros|calabaza|calabazas|perejil|albahaca|cilantro|hierbabuena|menta|rucula|canonigos|alcachofa|alcachofas|remolacha|rabano|rabanos|nabo|brotes|endivia|endivias|castana|castanas)\b/.test(text)) {
+  if (/\b(tomate|tomates|cherry|cebolla|cebollas|cebolleta|cebolletas|ajo|ajos|patata|patatas|papa|papas|batata|batatas|boniato|boniatos|camote|camotes|aguacate|aguacates|espinaca|espinacas|lechuga|lechugas|zanahoria|zanahorias|limon|limones|lima|limas|manzana|manzanas|platano|platanos|banana|bananas|champinon|champinones|seta|setas|pimiento|pimientos|calabacin|calabacines|pepino|pepinos|fresa|fresas|fresones|arandano|arandanos|frambuesa|frambuesas|mora|moras|pera|peras|naranja|naranjas|mandarina|mandarinas|pomelo|uva|uvas|melon|sandia|melocoton|albaricoque|ciruela|ciruelas|mango|pina|kiwi|kiwis|brocoli|coliflor|col|repollo|lombarda|berenjena|berenjenas|judia|judias|guisante|guisantes|esparrago|esparragos|triguero|trigueros|apio|puerro|puerros|calabaza|calabazas|perejil|albahaca|cilantro|hierbabuena|menta|rucula|canonigos|alcachofa|alcachofas|remolacha|rabano|rabanos|nabo|brotes|endivia|endivias|castana|castanas)\b/.test(text)) {
     if (/\b(vinagre|vinagres|aceite|aceites)\b/.test(text)) {
       return 'spices';
     }
@@ -2700,29 +2700,58 @@ const RecipeParser = {
       // Ingredients normalization
       const ingredients = [];
       const rawIngs = cand.ingredients || cand.recipeIngredient || [];
-      const ingLines = Array.isArray(rawIngs) ? rawIngs : (typeof rawIngs === 'string' ? rawIngs.split(/\r?\n/) : []);
+      const ingItems = Array.isArray(rawIngs) ? rawIngs : (typeof rawIngs === 'string' ? rawIngs.split(/\r?\n/) : []);
 
-      ingLines.forEach(ingItem => {
+      const splitCompositeIngredientLine = (text) => {
+        if (!text || typeof text !== 'string') return [];
+        let clean = text.trim();
+        if (/^(?:#+\s*)?(?:ingredientes(?:\s+para\s+[^:\n]+)?:?|para\s+(?:el\s+)?[^:\n]+:?)$/i.test(clean)) return [];
+        if (clean.includes('\n')) {
+          return clean.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        }
+        if (/[🔸🔹•●■▪️]/.test(clean)) {
+          return clean.split(/[🔸🔹•●■▪️]/).map(s => s.trim()).filter(Boolean);
+        }
+        if (/\s+-\s+/.test(clean)) {
+          return clean.split(/\s+-\s+/).map(s => s.trim()).filter(Boolean);
+        }
+        if (clean.includes(',') && clean.length > 35) {
+          const parts = clean.split(',').map(s => s.trim()).filter(Boolean);
+          if (parts.length > 2) return parts;
+        }
+        return [clean];
+      };
+
+      ingItems.forEach(ingItem => {
         if (!ingItem) return;
-        if (typeof ingItem === 'string') {
-          const parsed = this.parseIngredientLine(ingItem);
-          if (parsed) {
-            if (Array.isArray(parsed)) ingredients.push(...parsed);
-            else ingredients.push(parsed);
-          }
-        } else if (typeof ingItem === 'object') {
-          if (!ingItem.name && (ingItem.text || ingItem.displayText || ingItem.raw)) {
-            const rawText = ingItem.text || ingItem.displayText || ingItem.raw;
-            const parsed = this.parseIngredientLine(rawText);
+        const rawString = typeof ingItem === 'string'
+          ? ingItem
+          : (ingItem.rawText || ingItem.text || ingItem.displayText || ingItem.raw || ingItem.ingredientText);
+
+        if (rawString) {
+          const subLines = splitCompositeIngredientLine(rawString);
+          subLines.forEach(line => {
+            if (/^(?:#+\s*)?(?:ingredientes(?:\s+para\s+[^:\n]+)?:?|para\s+(?:el\s+)?[^:\n]+:?)$/i.test(line)) return;
+            const parsed = this.parseIngredientLine(line);
             if (parsed) {
               if (Array.isArray(parsed)) ingredients.push(...parsed);
               else ingredients.push(parsed);
-              return;
+            } else {
+              const cleanLine = line.replace(/^[\u2022\-\*]\s*/, '').trim();
+              if (cleanLine.length > 1) {
+                ingredients.push({
+                  id: generateId('i-'),
+                  name: cleanLine.charAt(0).toUpperCase() + cleanLine.slice(1),
+                  amount: 1,
+                  unit: 'ud',
+                  aisle: (typeof categorizeIngredientAisle === 'function' ? categorizeIngredientAisle(cleanLine) : 'other')
+                });
+              }
             }
-          }
-          let name = String(ingItem.name || ingItem.ingredient || ingItem.displayText || ingItem.text || '').trim();
+          });
+        } else if (typeof ingItem === 'object' && (ingItem.name || ingItem.ingredient)) {
+          let name = String(ingItem.name || ingItem.ingredient).replace(/^[\u2022\-\*]\s*/, '').trim();
           if (name) {
-            name = name.replace(/^[\u2022\-\*]\s*/, '').trim();
             const rawAmount = ingItem.amount !== undefined ? ingItem.amount : (ingItem.quantity !== undefined ? ingItem.quantity : null);
             const amount = typeof rawAmount === 'number' ? rawAmount : (rawAmount ? parseFloat(rawAmount) : null);
             const unit = this.normalizeUnit(ingItem.unit || ingItem.measurement || '');
@@ -2745,32 +2774,47 @@ const RecipeParser = {
         rawSteps = rawSteps.steps;
       }
       if (typeof rawSteps === 'string') {
-        rawSteps = rawSteps.split(/\r?\n/).filter(s => s.trim().length > 0);
+        rawSteps = [rawSteps];
       }
+
+      const splitInstructionStep = (text) => {
+        if (!text || typeof text !== 'string') return [];
+        const clean = text.trim();
+        if (clean.includes('\n') || /(?<=[^\d\s])\s*(?=\d+[\.\)]\s*)/.test(clean)) {
+          return clean.split(/(?:\r?\n|(?<=[^\d\s])\s*(?=\d+[\.\)]\s*))/).map(s => s.trim()).filter(Boolean);
+        }
+        return [clean];
+      };
+
       if (Array.isArray(rawSteps)) {
         rawSteps.forEach(stepItem => {
           if (!stepItem) return;
-          let text = '';
+          let rawText = '';
           let timerMin = 0;
           if (typeof stepItem === 'string') {
-            text = stepItem;
+            rawText = stepItem;
           } else if (typeof stepItem === 'object') {
-            text = stepItem.text || stepItem.description || stepItem.step || '';
+            rawText = stepItem.text || stepItem.description || stepItem.step || '';
             if (stepItem.timerMinutes) timerMin = stepItem.timerMinutes;
           }
-          text = String(text)
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/&nbsp;/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-          if (text && text.length > 3) {
-            if (!timerMin) timerMin = this.extractTimerMinutes(text);
-            instructions.push({
-              step: instructions.length + 1,
-              text: text,
-              timerMinutes: timerMin
-            });
-          }
+
+          const subSteps = splitInstructionStep(rawText);
+          subSteps.forEach(sub => {
+            let text = String(sub)
+              .replace(/<[^>]+>/g, ' ')
+              .replace(/&nbsp;/g, ' ')
+              .replace(/^[\d\.\)\s\-]+/, '')
+              .replace(/\s+/g, ' ')
+              .trim();
+            if (text && text.length > 3) {
+              const detectedTimer = timerMin || this.extractTimerMinutes(text);
+              instructions.push({
+                step: instructions.length + 1,
+                text: text,
+                timerMinutes: detectedTimer
+              });
+            }
+          });
         });
       }
 
@@ -2946,7 +2990,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.91';
+  window.APP_VERSION = 'v0.92';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -2978,7 +3022,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v0.91';
+    this.appVersion = window.APP_VERSION || 'v0.92';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -11399,7 +11443,7 @@ Autenticación: API Key → Bearer → ${tk}`;
 
       const dupBadge = c.isDuplicate
         ? `<span class="bulk-badge bulk-badge-dup"><span class="material-symbols-outlined" style="font-size: 12px;">sync_problem</span> ${c.duplicateReason || 'Ya existe'}</span>`
-        : `<span class="bulk-badge bulk-badge-new"><span class="material-symbols-outlined" style="font-size: 12px;">sparkles</span> Nueva</span>`;
+        : `<span class="bulk-badge bulk-badge-new"><span class="material-symbols-outlined" style="font-size: 12px;">auto_awesome</span> Nueva</span>`;
 
       const domainBadge = c.sourceDomain
         ? `<span class="bulk-badge bulk-badge-domain"><span class="material-symbols-outlined" style="font-size: 12px;">public</span> ${c.sourceDomain}</span>`
@@ -11518,13 +11562,14 @@ Autenticación: API Key → Bearer → ${tk}`;
       const cand = selected[i];
       const percent = Math.round(((i + 1) / total) * 100);
 
-      if (fillEl) fillEl.style.width = `${percent}%`;
-      if (percentEl) percentEl.textContent = `${percent}%`;
-      if (titleEl) titleEl.textContent = `Procesando receta ${i + 1} de ${total}`;
-      if (detailEl) detailEl.textContent = `Normalizando ingredientes y pasillos: ${cand.title}...`;
-
-      // Smooth unblocked tick
-      await new Promise(resolve => setTimeout(resolve, 15));
+      // Smooth unblocked tick: yield every 5 items on large batches or every item on small batches
+      if (total <= 50 || i % 5 === 0 || i === total - 1) {
+        if (fillEl) fillEl.style.width = `${percent}%`;
+        if (percentEl) percentEl.textContent = `${percent}%`;
+        if (titleEl) titleEl.textContent = `Procesando receta ${i + 1} de ${total}`;
+        if (detailEl) detailEl.textContent = `Normalizando ingredientes y pasillos: ${cand.title}...`;
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
 
       const finalRecipe = RecipeParser.finalizeImportRecipe(cand);
 

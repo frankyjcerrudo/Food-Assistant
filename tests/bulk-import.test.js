@@ -132,6 +132,40 @@ describe('US-67: Importador Masivo de Colecciones y Migración de Recetas (Samsu
       expect(r.instructions[0].timerMinutes).toBe(25);
     });
 
+    it('parseBulkCollection extrae ingredientes en formato rawText de Samsung Food y divide pasos inline', () => {
+      const samsungFoodRawExport = [
+        {
+          id: 'sf_10701a1064037cd76cfa9a76cc5fee5c2a2',
+          title: 'Crema thai',
+          ingredients: [
+            { rawText: 'Zanahorias' },
+            { rawText: 'Batata' },
+            { rawText: 'Cebolla' },
+            { rawText: 'Jengibre' },
+            { rawText: 'Curry' },
+            { rawText: 'Cúrcuma' },
+            { rawText: 'Leche de coco' }
+          ],
+          instructions: [
+            '1.Cuece los vegetales con el caldo 2.Añade sal, pimienta y aove y tritura\n3.Emplata y decora'
+          ]
+        }
+      ];
+
+      const { candidates } = RecipeParser.parseBulkCollection(samsungFoodRawExport);
+      expect(candidates).toHaveLength(1);
+      const r = candidates[0];
+      expect(r.ingredients).toHaveLength(7);
+      expect(r.ingredients[0].name).toBe('Zanahorias');
+      expect(r.ingredients[0].aisle).toBe('produce');
+      expect(r.ingredients[1].name).toBe('Batata');
+      expect(r.ingredients[1].aisle).toBe('produce');
+      expect(r.instructions).toHaveLength(3);
+      expect(r.instructions[0].text).toBe('Cuece los vegetales con el caldo');
+      expect(r.instructions[1].text).toBe('Añade sal, pimienta y aove y tritura');
+      expect(r.instructions[2].text).toBe('Emplata y decora');
+    });
+
     it('parseBulkCollection parsea array directo de recetas en formato plano o Schema.org @graph', () => {
       const graphExport = {
         '@context': 'https://schema.org',

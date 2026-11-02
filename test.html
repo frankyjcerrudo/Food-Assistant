@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Food Assistant - Informe Detallado de Calidad y Tests</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=0.91">
+  <link rel="stylesheet" href="styles.css?v=0.92">
   <style>
     :root {
       --qa-pass: #059669;
@@ -4067,6 +4067,7 @@ Bocadillo De Atun Paso A Paso
                       source: { name: 'Instagram', url: 'https://instagram.com/p/123' },
                       ingredients: [
                         { name: 'Calabaza', quantity: 500, unit: 'g' },
+                        { rawText: 'Batata' },
                         { text: '1 cebolla' }
                       ],
                       instructions: ['Hornear 25 minutos.', 'Triturar.']
@@ -4086,6 +4087,8 @@ Bocadillo De Atun Paso A Paso
           expect(r.imageUrl).toBe('https://example.com/sopa.jpg');
           expect(r.sourceDomain).toBe('instagram.com');
           expect(r.ingredients[0].aisle).toBe('produce');
+          expect(r.ingredients[1].name).toBe('Batata');
+          expect(r.ingredients[1].aisle).toBe('produce');
           expect(r.instructions[0].timerMinutes).toBe(25);
         }
       );
