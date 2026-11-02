@@ -2992,7 +2992,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.95';
+  window.APP_VERSION = 'v0.96';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -3024,7 +3024,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v0.95';
+    this.appVersion = window.APP_VERSION || 'v0.96';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -8553,8 +8553,8 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
         } catch (fbErr) {}
       }
 
-      // Si es límite de cuota (429) en gemini-3.8-flash (límite de 20/día), intentar gemini-2.5-flash o gemini-3.5-flash-lite
-      if ((response.status === 429 || /quota|limit: 20/i.test(errMsg)) && model === 'gemini-3.8-flash') {
+      // Si gemini-3.8-flash devuelve cuota (429), alta demanda (503), saturación o error transitorio, conmutar de inmediato a gemini-3.5-flash-lite
+      if ((response.status === 429 || response.status === 503 || /quota|limit: 20|high demand|overloaded|try again later|spikes in demand/i.test(errMsg)) && model === 'gemini-3.8-flash') {
         try {
           const fallbackEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`;
           const fbController = new AbortController();
@@ -8984,17 +8984,37 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     // 1. Planificación semanal estructurada respetando preferencias dietéticas o modo Batch Cooking (BUG-15 + US-17 + US-65)
     if (this.isWeeklyPlanPrompt(prompt)) {
       const isBatch = lower.includes('batch cooking') || lower.includes('sobras') || lower.includes('tupper');
-      const planArgs = this.buildSimulatedWeeklyPlanArgs('replace', isBatch);
+      const planArgs = this.buildSimulatedWeeklyPlanArgs('replace', isBatch, prompt);
       planArgs.completeWeek = true;
       this.lastAiProposedPlan = planArgs;
-      const findTitle = (id) => state.recipes.find(r => r.id === id)?.title || 'Comida libre';
 
-      const summaryLines = planArgs.days.map(d => {
-        const lunchLabel = d.isLeftoverLunch ? `🥡 Tupper de sobras (${findTitle(d.lunch)})` : findTitle(d.lunch);
+      const noWeekend = /\b(no\s+(incluyas?|pongas?|metas?|cuentes?)|sin|excepto|quitar|fuera|nada\s+de)\b.*?\b(fin\s+de\s+semana|finde|s[aá]bado|domingo)\b/i.test(prompt || '');
+      const noSnacks = /\b(no\s+(incluyas?|pongas?|metas?|cuentes?)|sin|excepto|quitar|fuera|nada\s+de)\b.*?\b(merienda|meriendas)\b/i.test(prompt || '');
+      const noBreakfast = /\b(no\s+(incluyas?|pongas?|metas?|cuentes?)|sin|excepto|quitar|fuera|nada\s+de)\b.*?\b(desayuno|desayunos)\b/i.test(prompt || '');
+
+      const cleanTitle = (id) => {
+        const raw = state.recipes.find(r => r.id === id)?.title || 'Comida equilibrada';
+        return raw.split(/\r?\n|Ingredientes:/i)[0].trim() || raw;
+      };
+
+      const filteredDays = noWeekend
+        ? planArgs.days.filter(d => {
+            const dn = String(d.dayName || '').toLowerCase();
+            return !dn.includes('sáb') && !dn.includes('sab') && !dn.includes('dom');
+          })
+        : planArgs.days;
+
+      const summaryLines = filteredDays.map(d => {
+        const lunchLabel = d.isLeftoverLunch ? `🥡 Tupper de sobras (${cleanTitle(d.lunch)})` : cleanTitle(d.lunch);
         const dinnerLabel = (isBatch && (d.dayName === 'Lunes' || d.dayName === 'Miércoles'))
-          ? `${findTitle(d.dinner)} (cocinas doble para tupper)`
-          : findTitle(d.dinner);
-        return `- **${d.dayName}**: Desayuno: ${findTitle(d.breakfast)} | Almuerzo: ${lunchLabel} | Merienda: ${findTitle(d.snack)} | Cena: ${dinnerLabel}`;
+          ? `${cleanTitle(d.dinner)} (cocinas doble para tupper)`
+          : cleanTitle(d.dinner);
+        const parts = [];
+        if (!noBreakfast && d.breakfast) parts.push(`Desayuno: ${cleanTitle(d.breakfast)}`);
+        if (d.lunch) parts.push(`Almuerzo: ${lunchLabel}`);
+        if (!noSnacks && d.snack) parts.push(`Merienda: ${cleanTitle(d.snack)}`);
+        if (d.dinner) parts.push(`Cena: ${dinnerLabel}`);
+        return `- **${d.dayName}**: ${parts.join(' | ')}`;
       }).join('\n');
 
       const prefNote = (state.dietaryPreferences && state.dietaryPreferences.length > 0)

@@ -275,13 +275,14 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
     expect(state.settings.geminiApiKey).toBe('AIzaSyFromCloudDevice777');
   });
 
-  it('US-17: callGeminiAgent conecta únicamente con gemini-3.8-flash y activa fallback inteligente inmediato ante timeout o demanda alta', async () => {
+  it('US-17: callGeminiAgent conecta con gemini-3.8-flash, conmuta a gemini-3.5-flash-lite ante 503, y si ambos fallan activa fallback inteligente', async () => {
     state.settings.geminiApiKey = 'AIzaSyTestFallbackKey';
     let callCount = 0;
+    const calledModels = [];
     const origFetch = globalThis.fetch;
     globalThis.fetch = vi.fn().mockImplementation(async (url) => {
       callCount++;
-      expect(url).toContain('models/gemini-3.8-flash:generateContent');
+      calledModels.push(url);
       return {
         ok: false,
         status: 503,
@@ -294,8 +295,51 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
     try {
       const res = await appInstance.callGeminiAgent('Planifica mi semana');
       expect(res.isSimulatedFallback).toBe(true);
-      expect(callCount).toBe(1);
+      expect(callCount).toBeGreaterThanOrEqual(2);
+      expect(calledModels[0]).toContain('gemini-3.8-flash');
+      expect(calledModels[1]).toContain('gemini-3.5-flash-lite');
       expect(res.toolCalls.length).toBeGreaterThan(0);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it('v0.96: callGeminiAgent se recupera de forma transparente con gemini-3.5-flash-lite cuando gemini-3.8-flash devuelve 503 (alta demanda)', async () => {
+    state.settings.geminiApiKey = 'AIzaSyLiveHighDemandKey';
+    state.settings.geminiModel = 'gemini-3.8-flash';
+    const calledUrls = [];
+    const origFetch = globalThis.fetch;
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
+      calledUrls.push(url);
+      if (url.includes('gemini-3.8-flash')) {
+        return {
+          ok: false,
+          status: 503,
+          json: async () => ({
+            error: {
+              code: 503,
+              message: 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.',
+              status: 'UNAVAILABLE'
+            }
+          })
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: '¡Hola Franky! Respuesta real desde Gemini 3.5 Flash-Lite con razonamiento activo.' }] } }]
+        })
+      };
+    });
+
+    try {
+      const res = await appInstance.callGeminiAgent('Planifica mi semana');
+      expect(calledUrls.length).toBe(2);
+      expect(calledUrls[0]).toContain('gemini-3.8-flash');
+      expect(calledUrls[1]).toContain('gemini-3.5-flash-lite');
+      expect(res.isSimulatedFallback).toBeFalsy();
+      expect(res.text).toContain('Gemini 3.5 Flash-Lite');
     } finally {
       globalThis.fetch = origFetch;
     }
