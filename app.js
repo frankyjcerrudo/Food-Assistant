@@ -2992,7 +2992,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.00';
+  window.APP_VERSION = 'v1.01';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -3024,7 +3024,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.00';
+    this.appVersion = window.APP_VERSION || 'v1.01';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -8634,6 +8634,13 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 - RESPETO RIGUROSO A EXCLUSIONES DEL USUARIO:
   * Si Franky indica "no incluyas el fin de semana", "de lunes a viernes" o excluye ciertos días, DEBES dejar los días Sábado y Domingo con comidas en null o sin modificar.
   * Si Franky indica "sin meriendas", "sin desayunos" o excluye cualquier momento, DEBES dejar esos momentos en null. NUNCA fuerces comidas que el usuario haya pedido excluir explícitamente.
+- CUADRE FLEXIBLE DE OBJETIVOS NUTRICIONALES DIARIOS:
+  * Si Franky tiene objetivos nutricionales diarios activos (${goals}):
+    - Al crear o proponer un menú semanal, combina las comidas de cada día (desayuno, almuerzo, merienda y cena) buscando que la suma total diaria de calorías y macronutrientes se aproxime de forma equilibrada y realista a sus objetivos (tolerancia flexible de ±10-15%, sin obsesionarte con exactitudes milimétricas que perjudiquen la variedad o el disfrute de la comida casera).
+  * ADVERTENCIA TRANSPARENTE ANTE SOBREPASOS EXCESIVOS (SIN BLOQUEO):
+    - Si Franky pide asignar, poner o cambiar una receta (ej. poner un batido proteico en todas las meriendas, o un plato muy calórico) y eso causa que en uno o varios días se sobrepase de forma excesiva (+25% a +30% o más) el objetivo diario de calorías, proteínas, carbohidratos o grasas:
+      1. NUNCA bloquees ni te niegues: ejecuta SIEMPRE la acción solicitada en el planificador ("set_weekly_plan" o "set_day_plan"). La voluntad de Franky siempre manda.
+      2. Añade en tu mensaje de respuesta un aviso nutricional breve, cordial y transparente (ej. "💡 Nota: He asignado tu plato al planificador. Ten en cuenta que con esta merienda rondarás los ~Xg de proteína diaria, superando tu meta de Yg.").
 - REGLA ESTRICTA DE VARIEDAD Y ROTACIÓN DE PROTEÍNAS (ANTI-MONOTONÍA):
   * NUNCA repitas la misma receta en la misma semana (excepto si Franky solicita expresamente modo sobras o Batch Cooking).
   * NUNCA repitas la misma fuente de proteína principal (ej. pollo) en días seguidos ni dos veces en el mismo día. Alterna obligatoriamente fuentes proteicas: pescados (blanco o azul), legumbres, aves (pollo/pavo), huevos, ternera magra y opciones vegetales/tofu.
@@ -9170,8 +9177,24 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
           [targetSlot]: matchedRecipe.id
         }));
 
+        let notice = '';
+        const goals = state.settings?.nutritionGoals;
+        if (goals?.enabled) {
+          const nut = getRecipeNutrition(matchedRecipe);
+          const protGoal = Number(goals.protein) || 0;
+          const calGoal = Number(goals.calories) || 0;
+          const estDayProtein = (nut.protein || 0) + 80;
+          const estDayCalories = (nut.calories || 0) + 1400;
+
+          if (protGoal > 0 && (nut.protein > protGoal * 0.4 || estDayProtein > protGoal * 1.25)) {
+            notice = `\n\n💡 **Nota nutricional**: Con esta incorporación estarás rondando los ~${Math.round(estDayProtein)}g de proteína diaria (algo por encima de tu meta de ${protGoal}g), pero tus comidas han quedado planificadas tal como me pediste.`;
+          } else if (calGoal > 0 && estDayCalories > calGoal * 1.25) {
+            notice = `\n\n💡 **Nota nutricional**: Con este plato estarás rondando las ~${Math.round(estDayCalories)} kcal al día (por encima de tu meta de ${calGoal} kcal), pero tu menú ya está actualizado.`;
+          }
+        }
+
         return {
-          text: `¡Listo, Franky! He asignado tu receta **${matchedRecipe.title}** a ${slotLabel} de toda la semana en tu Planificador.`,
+          text: `¡Listo, Franky! He asignado tu receta **${matchedRecipe.title}** a ${slotLabel} de toda la semana en tu Planificador.${notice}`,
           toolCalls: [
             {
               name: 'set_weekly_plan',

@@ -1279,4 +1279,27 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     expect(createToolRes.alreadyExisted).toBe(true);
     expect(createToolRes.recipeId).toBe('rec-shake-myprotein');
   });
+
+  it('v1.01: Asignar receta que sobrepasa objetivos diarios incluye aviso nutricional cordial y no bloquea la acción', () => {
+    state.settings.nutritionGoals = { enabled: true, calories: 1800, protein: 100, carbs: 180, fat: 50 };
+    state.recipes = [
+      {
+        id: 'rec-shake-ultra',
+        title: 'Batido proteinas MyProtein',
+        nutrition: { calories: 350, protein: 55, carbs: 8, fat: 3 }
+      }
+    ];
+
+    const prompt = 'Pon Batido proteinas MyProtein a todas las meriendas de la semana';
+    const res = appInstance.simulateGeminiAgentResponse(prompt);
+
+    // Debe ejecutar la acción en el planificador (NUNCA bloquear al usuario)
+    expect(res.toolCalls.length).toBe(1);
+    expect(res.toolCalls[0].name).toBe('set_weekly_plan');
+    expect(res.toolCalls[0].args.days[0].snack).toBe('rec-shake-ultra');
+
+    // Debe incluir un aviso nutricional transparente sobre el exceso sin impedir la acción
+    expect(res.text).toContain('Nota nutricional');
+    expect(res.text).toContain('proteína');
+  });
 });
