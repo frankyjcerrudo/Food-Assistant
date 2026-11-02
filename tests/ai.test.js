@@ -1302,4 +1302,31 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     expect(res.text).toContain('Nota nutricional');
     expect(res.text).toContain('proteína');
   });
+
+  it('v1.02: callGeminiAgent desactiva thinking extendido (thinkingBudget: 0) para agilizar respuestas interactivas', async () => {
+    state.settings.geminiApiKey = 'AIzaSyThinkingBudgetTest';
+    state.settings.geminiModel = 'gemini-3.8-flash';
+    const origFetch = globalThis.fetch;
+    let sentBody = null;
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url, opts) => {
+      sentBody = JSON.parse(opts.body);
+      return {
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: 'Respuesta inmediata' }] } }]
+        })
+      };
+    });
+
+    try {
+      await appInstance.callGeminiAgent('Planifica mi dia de hoy');
+      expect(sentBody).not.toBeNull();
+      expect(sentBody.generationConfig).toBeDefined();
+      expect(sentBody.generationConfig.thinkingConfig).toBeDefined();
+      expect(sentBody.generationConfig.thinkingConfig.thinkingBudget).toBe(0);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
 });
