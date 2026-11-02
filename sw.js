@@ -1,11 +1,13 @@
-const CACHE_NAME = 'food-assistant-v1.05';
+const CACHE_NAME = 'food-assistant-v1.06';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './styles.css?v=1.05',
-  './config.js?v=1.05',
-  './app.js?v=1.05',
-  './manifest.json'
+  './styles.css?v=1.06',
+  './config.js?v=1.06',
+  './app.js?v=1.06',
+  './manifest.json',
+  'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200',
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
 ];
 
 self.addEventListener('install', (event) => {
@@ -31,19 +33,22 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only handle same-origin GET requests; completely bypass any external origins (proxies, APIs, images, CDNs)
-  if (
-    event.request.method !== 'GET' || 
-    !event.request.url.startsWith(self.location.origin)
-  ) {
+  const url = event.request.url;
+  const isSameOrigin = url.startsWith(self.location.origin);
+  const isPrecachedExternal = url.includes('fonts.googleapis.com') ||
+                              url.includes('fonts.gstatic.com') ||
+                              url.includes('cdn.jsdelivr.net');
+
+  // Only handle same-origin GET requests or precached external assets (fonts/icons, Supabase SDK)
+  if (event.request.method !== 'GET' || (!isSameOrigin && !isPrecachedExternal)) {
     return;
   }
 
-  // Network-First strategy: guarantees user always gets fresh code when online, with instant offline cache fallback
+  // Network-First strategy: guarantees fresh content online, seamless cache fallback offline
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+        if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
         }

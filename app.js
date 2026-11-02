@@ -1625,10 +1625,11 @@ const RecipeParser = {
     return false;
   },
 
-  parseIsoDuration(durationStr) {
-    if (!durationStr) return 15;
+  parseIsoDuration(durationStr, fallback = 0) {
+    if (!durationStr) return fallback;
     if (typeof durationStr === 'number') return durationStr;
     const str = String(durationStr).trim();
+    if (!str) return fallback;
 
     // Check Spanish fractions of hours: "1 hora y media", "media hora", "1 hora y cuarto"
     const halfHourMatch = str.match(/(?:(\d+)\s*(?:h|horas?)\s*y\s*media|media\s*hora)/i);
@@ -1669,10 +1670,10 @@ const RecipeParser = {
       const minutes = parseInt(match[2] || '0', 10);
       const seconds = parseInt(match[3] || '0', 10);
       const total = hours * 60 + minutes + (seconds > 30 ? 1 : 0);
-      return total > 0 ? total : 15;
+      return total > 0 ? total : fallback;
     }
     const anyNum = str.match(/\d+/);
-    return anyNum ? parseInt(anyNum[0], 10) : 15;
+    return anyNum ? parseInt(anyNum[0], 10) : fallback;
   },
 
   extractTimerMinutes(stepText) {
@@ -2217,13 +2218,22 @@ const RecipeParser = {
     const parsedNutrition = this.parseNutrition(schema.nutrition);
     const parsedServings = this.parseServings(schema.recipeYield);
 
+    const prepMinutes = schema.prepTime ? this.parseIsoDuration(schema.prepTime, 0) : 0;
+    let cookMinutes = 0;
+    if (schema.cookTime) {
+      cookMinutes = this.parseIsoDuration(schema.cookTime, 0);
+    } else if (schema.totalTime) {
+      const totalMinutes = this.parseIsoDuration(schema.totalTime, 0);
+      cookMinutes = Math.max(0, totalMinutes - prepMinutes);
+    }
+
     const recipe = {
       id: generateId('rec-'),
       title: schema.name ? String(schema.name).trim() : 'Receta Web',
       description: schema.description ? String(schema.description).trim() : '',
       imageUrl: imageUrl,
-      prepTimeMinutes: this.parseIsoDuration(schema.prepTime),
-      cookTimeMinutes: this.parseIsoDuration(schema.cookTime || schema.totalTime),
+      prepTimeMinutes: prepMinutes,
+      cookTimeMinutes: cookMinutes,
       servings: parsedServings,
       nutrition: parsedNutrition || estimateRecipeNutrition({
         title: schema.name,
@@ -2505,17 +2515,17 @@ const RecipeParser = {
 
         const prepMatch = line.match(/(?:prep|elaborac|tiempo\s*activo).*?(\d+)\s*(?:h|hora|horas|min|m|minuto)/i);
         if (prepMatch) {
-          prepTimeMinutes = this.parseIsoDuration(prepMatch[0]);
+          prepTimeMinutes = this.parseIsoDuration(prepMatch[0], 0);
         }
 
         const cookMatch = line.match(/(?:cocc|horno|cocinado|cook).*?(\d+)\s*(?:h|hora|horas|min|m|minuto)/i);
         if (cookMatch) {
-          cookTimeMinutes = this.parseIsoDuration(cookMatch[0]);
+          cookTimeMinutes = this.parseIsoDuration(cookMatch[0], 0);
         }
 
         const totalMatch = line.match(/(?:tiempo(?:\s*total)?|duraci[o\u00F3]n).*?(\d+)\s*(?:h|hora|horas|min|m|minuto)/i);
         if (totalMatch && (cookTimeMinutes === 20 || cookTimeMinutes === 0 || cookTimeMinutes === prepTimeMinutes)) {
-          cookTimeMinutes = this.parseIsoDuration(totalMatch[0]);
+          cookTimeMinutes = this.parseIsoDuration(totalMatch[0], 0);
         }
 
         if (servingsMatch || prepMatch || cookMatch || totalMatch) {
@@ -3044,7 +3054,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.05';
+  window.APP_VERSION = 'v1.06';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -3077,7 +3087,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.05';
+    this.appVersion = window.APP_VERSION || 'v1.06';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -3756,7 +3766,7 @@ class FoodAssistantApp {
   async handleAuthSubmit() {
     const isSignUp = document.querySelector('#auth-tab-buttons .auth-tab.active')?.dataset.tab === 'signup';
     const email = document.getElementById('auth-email').value.trim();
-    const password = document.getElementById('auth-password').value.trim();
+    const password = document.getElementById('auth-password').value;
     const name = document.getElementById('auth-name').value.trim();
     const errBox = document.getElementById('auth-error-msg');
 
@@ -3794,6 +3804,7 @@ class FoodAssistantApp {
               errBox.textContent = "Revisa tu correo para confirmar la cuenta antes de iniciar sesión.";
               errBox.style.display = 'block';
             }
+            this.showToast("Revisa tu correo para confirmar la cuenta antes de iniciar sesión.", 'info');
             return;
           }
           state.cloudUser = { email: data.user.email, name: name || email.split('@')[0], id: data.user.id };
@@ -5606,7 +5617,7 @@ class FoodAssistantApp {
                 <span class="material-symbols-outlined" style="font-size: 13px;">link</span> ${rec.sourceDomain}
               </span>
             ` : ''}
-            ${rec.tags.map(t => {
+            ${(rec.tags || []).map(t => {
               const isDiet = PREDEFINED_DIETARY_TAGS.includes(t);
               return `<span class="tag-chip" ${isDiet ? 'style="border: 1px solid var(--color-brand); color: var(--color-brand); font-weight: 600;"' : ''}>${isDiet ? getDietaryTagEmoji(t) + ' ' : ''}${t}</span>`;
             }).join('')}
@@ -5763,26 +5774,36 @@ class FoodAssistantApp {
     }
   }
 
-  applyRecipeFilters() {
+  applyRecipeFilters(overrideTerm) {
     const searchInput = document.getElementById('recipes-search-input');
-    const term = (searchInput?.value || '').toLowerCase().trim();
+    const term = (overrideTerm !== undefined ? overrideTerm : (searchInput?.value || '')).trim();
+    const termNorm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(term) : term.toLowerCase();
 
     const filtered = state.recipes.filter(r => {
       // 1. Tag multi-selection (AND logic: debe contener todas las etiquetas seleccionadas)
       if (this.selectedRecipeTags.size > 0) {
-        const rTagsLower = (r.tags || []).map(t => String(t).toLowerCase().trim());
+        const rTagsNorm = (r.tags || []).map(t => typeof normalizeIngredientText === 'function' ? normalizeIngredientText(String(t)) : String(t).toLowerCase().trim());
         for (const selTag of this.selectedRecipeTags) {
-          if (!rTagsLower.includes(selTag.toLowerCase().trim())) {
+          const selTagNorm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(selTag) : selTag.toLowerCase().trim();
+          if (!rTagsNorm.includes(selTagNorm)) {
             return false;
           }
         }
       }
 
-      // 2. Término de búsqueda (título, etiquetas o ingredientes)
-      if (term) {
-        const titleMatch = (r.title || '').toLowerCase().includes(term);
-        const tagsMatch = (r.tags || []).some(t => String(t).toLowerCase().includes(term));
-        const ingMatch = (r.ingredients || []).some(i => i && i.name && i.name.toLowerCase().includes(term));
+      // 2. Término de búsqueda (título, etiquetas o ingredientes) con normalización de acentos
+      if (termNorm) {
+        const titleNorm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(r.title || '') : (r.title || '').toLowerCase();
+        const titleMatch = titleNorm.includes(termNorm);
+        const tagsMatch = (r.tags || []).some(t => {
+          const tNorm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(String(t)) : String(t).toLowerCase();
+          return tNorm.includes(termNorm);
+        });
+        const ingMatch = (r.ingredients || []).some(i => {
+          if (!i || !i.name) return false;
+          const iNorm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(i.name) : i.name.toLowerCase();
+          return iNorm.includes(termNorm);
+        });
         if (!titleMatch && !tagsMatch && !ingMatch) return false;
       }
 
@@ -5811,14 +5832,14 @@ class FoodAssistantApp {
     const badge = document.getElementById('recipes-count-badge');
     const subtitle = document.getElementById('recipes-count-subtitle');
     if (badge) {
-      if (this.selectedRecipeTags.size > 0 || term || this.fridgeIngredients.length > 0) {
+      if (this.selectedRecipeTags.size > 0 || termNorm || this.fridgeIngredients.length > 0) {
         badge.textContent = `${filtered.length} de ${state.recipes.length}`;
       } else {
         badge.textContent = `${state.recipes.length}`;
       }
     }
     if (subtitle) {
-      if (this.selectedRecipeTags.size > 0 || term || this.fridgeIngredients.length > 0) {
+      if (this.selectedRecipeTags.size > 0 || termNorm || this.fridgeIngredients.length > 0) {
         const filtersDesc = [];
         if (this.fridgeIngredients.length > 0) filtersDesc.push(`Nevera: ${this.fridgeIngredients.join(', ')}`);
         if (this.selectedRecipeTags.size > 0) filtersDesc.push(`etiquetas: ${Array.from(this.selectedRecipeTags).join(', ')}`);
@@ -5831,7 +5852,11 @@ class FoodAssistantApp {
   }
 
   filterRecipes(searchTerm) {
-    this.applyRecipeFilters();
+    const searchInput = document.getElementById('recipes-search-input');
+    if (searchInput && searchTerm !== undefined) {
+      searchInput.value = searchTerm;
+    }
+    this.applyRecipeFilters(searchTerm);
   }
 
   filterRecipesByTag(tag) {
@@ -6067,7 +6092,7 @@ class FoodAssistantApp {
             ` : ''}
           </div>
           <ul style="list-style: none; display: flex; flex-direction: column; gap: 6px;">
-            ${r.ingredients.map(ing => {
+            ${(r.ingredients || []).map(ing => {
               const adjustedAmount = ing.amount ? Math.round((ing.amount * scale) * 10) / 10 : null;
               return `
                 <li style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--m3-surface-container-low); border: 1px solid var(--m3-outline-variant); border-radius: var(--radius-sm); font-size: 13px;">
@@ -6082,7 +6107,7 @@ class FoodAssistantApp {
         <div style="margin-bottom: 18px;">
           <h3 style="font-size: 15px; font-weight: 500; margin-bottom: 10px;">Instrucciones</h3>
           <div style="display: flex; flex-direction: column; gap: 10px;">
-            ${r.instructions.map(inst => `
+            ${(r.instructions || []).map(inst => `
               <div style="display: flex; gap: 10px;">
                 <div style="width: 24px; height: 24px; border-radius: var(--radius-full); background: var(--m3-primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; flex-shrink: 0;">
                   ${inst.step}
@@ -6928,6 +6953,10 @@ class FoodAssistantApp {
 
   // COOK MODE
   startCookMode() {
+    if (!this.activeRecipe || !Array.isArray(this.activeRecipe.instructions) || this.activeRecipe.instructions.length === 0) {
+      this.showToast("Esta receta no tiene pasos de preparación para el Modo Cocina.", 'warning');
+      return;
+    }
     this.closeRecipeModal();
     this.cookStepIndex = 0;
     this.cookModeOverlay.classList.add('active');
@@ -6936,6 +6965,7 @@ class FoodAssistantApp {
 
   exitCookMode() {
     clearInterval(this.timerInterval);
+    this.timerInterval = null;
     this.cookModeOverlay.classList.remove('active');
   }
 
@@ -6974,18 +7004,28 @@ class FoodAssistantApp {
 
     const timerBox = document.getElementById('cook-timer-box');
     clearInterval(this.timerInterval);
+    this.timerInterval = null;
+
+    const timerStartBtn = document.getElementById('btn-timer-start');
+    if (timerStartBtn) {
+      timerStartBtn.textContent = 'Iniciar';
+    }
 
     if (step.timerMinutes > 0) {
       timerBox.style.display = 'block';
       this.timerSecondsLeft = step.timerMinutes * 60;
       this.updateTimerDisplay();
 
-      document.getElementById('btn-timer-start').onclick = () => this.toggleCookTimer();
+      if (timerStartBtn) {
+        timerStartBtn.onclick = () => this.toggleCookTimer();
+      }
       document.getElementById('btn-timer-reset').onclick = () => {
         clearInterval(this.timerInterval);
+        this.timerInterval = null;
         this.timerSecondsLeft = step.timerMinutes * 60;
         this.updateTimerDisplay();
-        document.getElementById('btn-timer-start').textContent = 'Iniciar';
+        const startBtn = document.getElementById('btn-timer-start');
+        if (startBtn) startBtn.textContent = 'Iniciar';
       };
     } else {
       timerBox.style.display = 'none';
@@ -8644,9 +8684,10 @@ class FoodAssistantApp {
     if (servingsVal) servingsVal.textContent = newServings;
 
     this.shoppingPreviewState.groups.forEach(group => {
+      const gBase = group.baseServings || this.shoppingPreviewState.baseServings || 2;
       group.items.forEach(item => {
         if (item.baseAmount !== null && item.baseAmount !== undefined) {
-          item.amount = Math.round((item.baseAmount * (newServings / this.shoppingPreviewState.baseServings)) * 10) / 10;
+          item.amount = Math.round((item.baseAmount * (newServings / gBase)) * 10) / 10;
         }
       });
     });
@@ -8762,10 +8803,10 @@ class FoodAssistantApp {
     this.showToast(`\u00A1Se han a\u00F1adido ${addedCount} ingredientes a tu lista de la compra!`, 'success');
   }
 
-  copyShoppingList() {
+  async copyShoppingList() {
     if (!state.shoppingList || !state.shoppingList.length) {
       this.showToast("No hay artículos en la lista de la compra para copiar.", 'info');
-      return;
+      return false;
     }
 
     let text = "LISTA DE LA COMPRA - FOOD ASSISTANT\n\n";
@@ -8785,9 +8826,37 @@ class FoodAssistantApp {
       text += '\n';
     });
 
-    navigator.clipboard.writeText(text).then(() => {
-      this.showToast("¡Lista copiada al portapapeles!", 'success');
-    });
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        this.showToast("¡Lista copiada al portapapeles!", 'success');
+        return true;
+      }
+      throw new Error("Clipboard API no disponible");
+    } catch (err) {
+      let copied = false;
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        copied = document.execCommand('copy');
+        document.body.removeChild(textarea);
+      } catch (fallbackErr) {
+        copied = false;
+      }
+
+      if (copied) {
+        this.showToast("¡Lista copiada al portapapeles!", 'success');
+        return true;
+      } else {
+        this.showToast("No se pudo copiar automáticamente al portapapeles. Comprueba los permisos de tu navegador.", 'warning');
+        return false;
+      }
+    }
   }
 
   // ==========================================================================
@@ -11713,9 +11782,42 @@ REGLAS CRÍTICAS:
       if (btnConfirm) btnConfirm.style.display = 'none';
     }
   }
-  confirmSaveImportRecipe() {
+  async confirmSaveImportRecipe(skipUrlDuplicateCheck = false) {
     const newRecipe = this.pendingImportRecipe || this.activeRecipe;
     if (!newRecipe) return;
+
+    // BUG-16: Detectar sourceUrl existente y ofrecer "Abrir existente" o "Guardar copia"
+    if (!skipUrlDuplicateCheck && newRecipe.sourceUrl && (!newRecipe.id || !state.recipes.some(r => r.id === newRecipe.id))) {
+      const cleanSourceUrl = newRecipe.sourceUrl.trim().replace(/\/+$/, '').toLowerCase();
+      const existingUrlRecipe = state.recipes.find(r => 
+        r.id !== newRecipe.id && 
+        r.sourceUrl && 
+        r.sourceUrl.trim().replace(/\/+$/, '').toLowerCase() === cleanSourceUrl
+      );
+
+      if (existingUrlRecipe) {
+        const openExisting = await this.showConfirmDialog({
+          title: 'Receta ya importada',
+          message: `Esta receta ya existe en tu recetario como "${existingUrlRecipe.title}".\n\n¿Deseas abrir la receta existente en lugar de duplicarla?`,
+          confirmText: 'Abrir existente',
+          cancelText: 'Guardar copia',
+          icon: 'content_copy'
+        });
+
+        if (openExisting) {
+          this.isReviewingImport = false;
+          this.pendingImportRecipe = null;
+          this.closeImportModal();
+          this.closeRecipeModal();
+          this.render();
+          this.switchView('view-recipes');
+          this.openRecipeDetail(existingUrlRecipe.id);
+          this.showToast(`Mostrando receta existente: "${existingUrlRecipe.title}".`, 'info');
+          return existingUrlRecipe;
+        }
+        newRecipe.id = generateId('rec-');
+      }
+    }
 
     if (!newRecipe.id) {
       newRecipe.id = generateId('rec-');

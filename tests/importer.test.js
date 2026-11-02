@@ -15,7 +15,8 @@ describe('US-15: Importador de Recetas (Schema.org / JSON-LD & Texto Estructurad
     expect(RecipeParser.parseIsoDuration('PT1H30M')).toBe(90);
     expect(RecipeParser.parseIsoDuration('PT2H')).toBe(120);
     expect(RecipeParser.parseIsoDuration('25 min')).toBe(25);
-    expect(RecipeParser.parseIsoDuration(null)).toBe(15);
+    expect(RecipeParser.parseIsoDuration(null)).toBe(0);
+    expect(RecipeParser.parseIsoDuration(null, 15)).toBe(15);
   });
 
   it('parseServings extrae el número de raciones o comensales', () => {
