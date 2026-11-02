@@ -2992,7 +2992,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.99';
+  window.APP_VERSION = 'v1.00';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -3024,7 +3024,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v0.99';
+    this.appVersion = window.APP_VERSION || 'v1.00';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -8411,6 +8411,11 @@ class FoodAssistantApp {
     return /\b(fin\s+de\s+semana|finde|s[aá]bado\s+y\s+domingo|sabado\s+y\s+domingo)\b/i.test(prompt);
   }
 
+  isRecurringWeeklySlotPrompt(prompt) {
+    if (!prompt || typeof prompt !== 'string') return false;
+    return /\b(pon|mete|asigna|a[ñn]ade|cambia)\b.*?\b(todas?\s+las?\s+|todos?\s+los?\s+|en\s+las?\s+|en\s+los?\s+)?(metiendas?|meriendas?|desayunos?|almuerzos?|comidas?|cenas?)\b.*?\b(semana|d[ií]as?)\b|\b(todas?\s+las?\s+|todos?\s+los?\s+)(metiendas?|meriendas?|desayunos?|almuerzos?|comidas?|cenas?)\b.*?\b(pon|mete|asigna|a[ñn]ade)\b/i.test(prompt);
+  }
+
   isWeeklyPlanPrompt(prompt) {
     if (!prompt || typeof prompt !== 'string') return false;
     // Si el usuario pide un solo día específico o el fin de semana, NO forzar semana completa
@@ -8420,7 +8425,7 @@ class FoodAssistantApp {
 
   isAiActionPrompt(prompt) {
     if (!prompt || typeof prompt !== 'string') return false;
-    if (this.isSingleDayPrompt(prompt) || this.isWeeklyPlanPrompt(prompt)) return true;
+    if (this.isSingleDayPrompt(prompt) || this.isWeeklyPlanPrompt(prompt) || this.isRecurringWeeklySlotPrompt(prompt)) return true;
     return /\b(asigna|pon\s+en\s+el|cambia\s+el|actualiza\s+el\s+plan|crea\s+una\s+receta|crea\s+recetas|inventa|nueva\s+receta|compra|a[ñn]ade|apunta|agrega|quita|borra|elimina|tacha|planifica|organiza)\b/i.test(prompt);
   }
 
@@ -8447,6 +8452,7 @@ class FoodAssistantApp {
     if (/gluten|cel[ií]ac/i.test(lower)) criteria.push({ type: 'tag', tag: 'Sin Gluten' });
     if (/lactosa/i.test(lower)) criteria.push({ type: 'tag', tag: 'Sin Lactosa' });
     if (/r[aá]pida|express|f[aá]cil/i.test(lower)) criteria.push({ type: 'tag', tag: 'Rápida' });
+    if (/merienda|metiendas?/i.test(lower)) criteria.push({ type: 'tag', tag: 'Merienda' });
 
     // Ingredientes o familias clave
     if (/pescado|marisco|at[uú]n|salm[oó]n|merluza|bacalao|gamba/i.test(lower)) {
@@ -8473,13 +8479,38 @@ class FoodAssistantApp {
 
   selectRelevantRecipesForPrompt(recipes, prompt = '') {
     if (!Array.isArray(recipes) || recipes.length <= 120) return recipes || [];
+
+    // Priorizar recetas nombradas directamente en la petición del usuario, ignorando preposiciones y conectores
+    const promptStopWordsRegex = /\b(de|del|la|las|el|los|un|una|unos|unas|con|al|a|en|y|para|sin|por|pon|mete|asigna|a[ñn]ade|todas?|toda|semana|esta|las|los|receta|metiendas?|meriendas?|desayunos?|almuerzos?|cenas?)\b/gi;
+    const promptKeywords = (prompt || '')
+      .toLowerCase()
+      .replace(promptStopWordsRegex, ' ')
+      .split(/\s+/)
+      .map(k => k.trim())
+      .filter(k => k.length >= 3);
+
+    const directMentionRecipes = [];
+    const directMentionIds = new Set();
+    if (promptKeywords.length > 0) {
+      recipes.forEach(r => {
+        const titleNorm = normalizeIngredientText(r.title || '');
+        const titleTokens = titleNorm.replace(promptStopWordsRegex, ' ').split(/\s+/).filter(t => t.length >= 3);
+        if (titleTokens.length === 0) return;
+        const matchingTokens = titleTokens.filter(tt => promptKeywords.some(pk => pk.includes(tt) || tt.includes(pk)));
+        if (matchingTokens.length >= Math.min(2, titleTokens.length)) {
+          directMentionRecipes.push(r);
+          directMentionIds.add(r.id);
+        }
+      });
+    }
+
     const criteria = this.detectPromptCriteria(prompt);
-    if (criteria.length === 0) {
+    if (criteria.length === 0 && directMentionRecipes.length === 0) {
       // Sin criterios específicos de filtro en el prompt: devolver 100% de recetas completas sin recortes
       return recipes;
     }
 
-    const matchedIds = new Set();
+    const matchedIds = new Set(directMentionIds);
     const breakfastOrSnacks = [];
     const mainDishes = [];
 
@@ -8491,22 +8522,24 @@ class FoodAssistantApp {
       const isBreakfastOrSnack = tags.some(t => t.includes('desayuno') || t.includes('merienda')) ||
         /avena|porridge|yogur|chia|smoothie|batido|pancake|torta|tosta|fruta|bowl/i.test(titleLower);
 
-      let isMatch = false;
-      for (const c of criteria) {
-        if (c.type === 'macro' && c.key === 'protein') {
-          if ((nut.protein || 0) >= c.min || tags.some(t => t.includes('prote')) || /pollo|pavo|ternera|atun|atún|salm[oó]n|huevo|lenteja|garbanzo/i.test(titleLower + ' ' + ingText)) {
-            isMatch = true;
-            break;
-          }
-        } else if (c.type === 'tag') {
-          if (tags.some(t => t.includes(c.tag.toLowerCase()))) {
-            isMatch = true;
-            break;
-          }
-        } else if (c.type === 'ingredient') {
-          if (c.regex.test(titleLower) || c.regex.test(ingText)) {
-            isMatch = true;
-            break;
+      let isMatch = directMentionIds.has(r.id);
+      if (!isMatch) {
+        for (const c of criteria) {
+          if (c.type === 'macro' && c.key === 'protein') {
+            if ((nut.protein || 0) >= c.min || tags.some(t => t.includes('prote')) || /pollo|pavo|ternera|atun|atún|salm[oó]n|huevo|lenteja|garbanzo/i.test(titleLower + ' ' + ingText)) {
+              isMatch = true;
+              break;
+            }
+          } else if (c.type === 'tag') {
+            if (tags.some(t => t.includes(c.tag.toLowerCase()))) {
+              isMatch = true;
+              break;
+            }
+          } else if (c.type === 'ingredient') {
+            if (c.regex.test(titleLower) || c.regex.test(ingText)) {
+              isMatch = true;
+              break;
+            }
           }
         }
       }
@@ -8523,7 +8556,11 @@ class FoodAssistantApp {
       }
     });
 
-    const pool = [...mainDishes.filter(r => matchedIds.has(r.id)), ...breakfastOrSnacks];
+    const pool = [
+      ...directMentionRecipes,
+      ...mainDishes.filter(r => matchedIds.has(r.id) && !directMentionIds.has(r.id)),
+      ...breakfastOrSnacks.filter(r => !directMentionIds.has(r.id))
+    ];
     if (pool.length >= 35) {
       return pool.slice(0, 140);
     }
@@ -8587,6 +8624,13 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
   * DEBES invocar OBLIGATORIAMENTE la herramienta "set_weekly_plan" para que los platos queden guardados y aplicados directamente en su Planificador. NUNCA respondas solo con texto plano pidiendo confirmación cuando se te pide explícitamente crear el plan.
   * Utiliza SIEMPRE los IDs ("rec-...") de las recetas ya existentes en el catálogo de Franky. NUNCA uses "create_and_save_recipe" para platos que ya están en el catálogo de Franky ni si solo se te pidió planificar.
   * Si Franky pide exclusiones (ej. "no incluyas el fin de semana", "sin meriendas"), pasa null en esas propiedades en "days" (ej. "snack": null) u omite el fin de semana. El esquema de "set_weekly_plan" ahora permite valores null en comidas excluidas.
+- ASIGNACIÓN RECURRENTE DE UNA RECETA A UN MOMENTO CONCRETO EN LA SEMANA:
+  * Si Franky pide asignar, poner o cambiar una receta concreta en un momento de comida específico para varios días o para toda la semana (ej. "pon en todas las meriendas de esta semana el Batido de proteinas MyProtein", "asigna la ensalada césar a las cenas de la semana", "pon avena en los desayunos"):
+    - NUNCA uses "manage_shopping_list" (NO es un artículo de compra, es una asignación en el planificador).
+    - NUNCA uses "create_and_save_recipe" si el plato ya existe en el catálogo de recetas de Franky (aunque Franky diga "añade la receta X").
+    - DEBES invocar "set_weekly_plan" indicando en "days" los días correspondientes con su "dateKey" y asignando el ID de esa receta ÚNICAMENTE en el momento pedido (ej. "snack": "rec-...", "breakfast": "rec-...", etc.), conservando o dejando intactos los demás momentos de comida existentes.
+    - TOLERANCIA A PREPOSICIONES Y CONECTORES: Franky puede nombrar una receta con o sin conectores como "de", "con", "al", "a la" (ej. "Batido de proteinas MyProtein" frente a "Batido proteinas MyProtein", o "Pollo verduras" frente a "Pollo con verduras"). Empareja SIEMPRE por similitud de palabras clave con el catálogo de Franky y utiliza el ID exacto ("rec-...").
+    - TOLERANCIA A ERRATAS TIPOGRÁFICAS EN MOMENTOS: Entiende erratas menores comunes como "metiendas" -> meriendas, "almuersos" -> almuerzos, "desallunos" -> desayunos.
 - RESPETO RIGUROSO A EXCLUSIONES DEL USUARIO:
   * Si Franky indica "no incluyas el fin de semana", "de lunes a viernes" o excluye ciertos días, DEBES dejar los días Sábado y Domingo con comidas en null o sin modificar.
   * Si Franky indica "sin meriendas", "sin desayunos" o excluye cualquier momento, DEBES dejar esos momentos en null. NUNCA fuerces comidas que el usuario haya pedido excluir explícitamente.
@@ -8598,8 +8642,8 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
   * Si en el catálogo de recetas no hay suficientes platos para cubrir los días solicitados sin repetir o sin incumplir las preferencias, RAZONA con total honestidad: explica a Franky qué días has planificado y pregúntale si quiere que le inventes y guardes recetas nuevas para completar los huecos restantes.
   * Si la petición de Franky es ambigua o contradictoria, PREGUNTA antes de asumir decisiones arbitrarias.
 4. Si Franky pide "Batch Cooking" o modo sobras: planifica cocinar ración doble en la cena de 2 días (ej. Lunes cena y Miércoles cena) para reutilizar como tupper en el almuerzo del día siguiente (Martes almuerzo y Jueves almuerzo) con isLeftoverLunch: true. Todas las demás comidas (desayunos, meriendas y demás cenas/almuerzos) DEBEN ser diferentes, frescas y variadas; NUNCA repitas todo el día idéntico.
-5. REGLA ESTRICTA PARA LA LISTA DE LA COMPRA: Si Franky pide añadir artículos concretos (ej. "añade leche y plátanos", "apunta 3 huevos"), usa SIEMPRE la herramienta "manage_shopping_list" con action: "add" y la lista de artículos pedidos en "items". NUNCA uses action: "add_from_current_plan" a menos que Franky diga explícitamente "añade los ingredientes del plan", "vuelca el menú semanal" o "añade todo lo de la semana".
-6. GUARDAR Y CREAR RECETAS EN EL CATÁLOGO: Si Franky te pide recomendaciones de recetas y a continuación te pide guardarlas (ej: "guárdalas", "guarda las recetas", "guarda esa receta", "añádelas a mis recetas", "guárdame la primera", "créala"), o si te pide directamente inventar o crear una o varias recetas nuevas: DEBES invocar OBLIGATORIAMENTE la herramienta "create_and_save_recipe" (una llamada por cada receta que Franky quiera guardar) con todos los datos estructurados: title, description, prepTimeMinutes, cookTimeMinutes, servings, tags, ingredients (name, amount, unit) e instructions (step, text, timerMinutes) y nutrition (calories, protein, carbs, fat). NUNCA respondas diciendo que has guardado una receta sin haber ejecutado la llamada a "create_and_save_recipe".
+5. REGLA ESTRICTA PARA LA LISTA DE LA COMPRA: Si Franky pide añadir artículos concretos (ej. "añade leche y plátanos", "apunta 3 huevos"), usa SIEMPRE la herramienta "manage_shopping_list" con action: "add" y la lista de artículos pedidos en "items". NUNCA uses action: "add_from_current_plan" a menos que Franky diga explícitamente "añade los ingredientes del plan", "vuelca el menú semanal" o "añade todo lo de la semana". PROHIBIDO ABSOLUTAMENTE usar "manage_shopping_list" si Franky pide poner o asignar un plato a una comida o merienda del planificador (ej. "pon X en las meriendas", "mete X a las cenas"). En esos casos es SIEMPRE "set_weekly_plan" o "set_day_plan".
+6. GUARDAR Y CREAR RECETAS EN EL CATÁLOGO: Si Franky te pide recomendaciones de recetas y a continuación te pide guardarlas (ej: "guárdalas", "guarda las recetas", "guarda esa receta", "añádelas a mis recetas", "guárdame la primera", "créala"), o si te pide directamente inventar o crear una o varias recetas nuevas: DEBES invocar OBLIGATORIAMENTE la herramienta "create_and_save_recipe" (una llamada por cada receta que Franky quiera guardar) con todos los datos estructurados: title, description, prepTimeMinutes, cookTimeMinutes, servings, tags, ingredients (name, amount, unit) e instructions (step, text, timerMinutes) y nutrition (calories, protein, carbs, fat). NUNCA uses esta herramienta si la receta ya existe en el catálogo de Franky (incluso si la frase empieza por "añade la receta X a las meriendas de toda la semana"), pues en ese caso se trata de planificarla con "set_weekly_plan". NUNCA respondas diciendo que has guardado una receta sin haber ejecutado la llamada a "create_and_save_recipe".
 7. PROHIBIDO terminantemente mostrar IDs internos tipo "rec-..." en el texto visible para Franky. Escribe los nombres legibles de los platos de forma limpia y atractiva.
 8. CAPACIDAD DE RAZONAMIENTO Y ASESORAMIENTO CULINARIO: Si Franky hace preguntas abiertas, pide sugerencias o dudas sobre cocina, sustitutos de ingredientes, macros, técnicas o ideas para comer, razona con empatía e inteligencia como un chef y nutricionista experto, ofreciendo explicaciones claras y prácticas. Solo invoca herramientas cuando haya una acción concreta que ejecutar en la app (como apuntar a la compra, planificar comidas o guardar recetas).
 9. CONCISIÓN OBLIGATORIA PARA VOZ HABLADA: Franky escucha tus respuestas mediante sintetizador de voz. Responde SIEMPRE de forma directa y sintética (máximo 1 a 3 frases claras y conversacionales). NUNCA recites monólogos largos ni enumeres listas eternas de ingredientes en el mensaje hablado si no se te pide expresamente. Confirma las acciones realizadas con agilidad y brevedad.`;
@@ -9102,6 +9146,45 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       };
     }
 
+    // 0.2 Asignación recurrente de una receta a un momento concreto en la semana (ej. "pon Batido en todas las meriendas de la semana")
+    if (this.isRecurringWeeklySlotPrompt(prompt)) {
+      let targetSlot = 'snack';
+      let slotLabel = 'las meriendas';
+      if (/desayuno|desalluno/i.test(prompt)) { targetSlot = 'breakfast'; slotLabel = 'los desayunos'; }
+      else if (/almuerzo|almuerso|comida/i.test(prompt)) { targetSlot = 'lunch'; slotLabel = 'los almuerzos'; }
+      else if (/cena/i.test(prompt)) { targetSlot = 'dinner'; slotLabel = 'las cenas'; }
+
+      const cleanedRef = prompt
+        .replace(/\b(por favor|pon|mete|asigna|a[ñn]ade|anade|receta|en|todas?|todos?|las?|los?|de|esta|la|semana|a|para|metiendas?|meriendas?|desayunos?|almuerzos?|comidas?|cenas?)\b/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      const matchedRecipeId = this.resolveRecipeIdForAgent(cleanedRef) || this.resolveRecipeIdForAgent(prompt);
+      const matchedRecipe = (state.recipes || []).find(r => r.id === matchedRecipeId);
+
+      if (matchedRecipe) {
+        const weekDays = this.getPlannerWeekDates();
+        const days = weekDays.map(d => ({
+          dateKey: d.dateKey,
+          dayName: d.dayName,
+          [targetSlot]: matchedRecipe.id
+        }));
+
+        return {
+          text: `¡Listo, Franky! He asignado tu receta **${matchedRecipe.title}** a ${slotLabel} de toda la semana en tu Planificador.`,
+          toolCalls: [
+            {
+              name: 'set_weekly_plan',
+              args: {
+                mode: 'replace',
+                days: days
+              }
+            }
+          ]
+        };
+      }
+    }
+
     // 1. Planificación semanal estructurada respetando preferencias dietéticas o modo Batch Cooking (BUG-15 + US-17 + US-65)
     if (this.isWeeklyPlanPrompt(prompt)) {
       const isBatch = lower.includes('batch cooking') || lower.includes('sobras') || lower.includes('tupper');
@@ -9297,7 +9380,61 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
     const byTitle = state.recipes.find(r => normalizeIngredientText(r.title || '') === normRef) ||
                     state.recipes.find(r => normalizeIngredientText(r.title || '').includes(normRef) || normRef.includes(normalizeIngredientText(r.title || '')));
-    return byTitle ? byTitle.id : null;
+    if (byTitle) return byTitle.id;
+
+    // 4. Limpieza de palabras vacías/conectores ("stop words" como "de", "del", "con", "al", "a", etc.)
+    const stopWordsRegex = /\b(de|del|la|las|el|los|un|una|unos|unas|con|al|a|en|y|para|sin|por)\b/gi;
+    const strippedRef = normRef.replace(stopWordsRegex, ' ').replace(/\s+/g, ' ').trim();
+    if (strippedRef) {
+      const byStripped = state.recipes.find(r => {
+        const rNorm = normalizeIngredientText(r.title || '');
+        const rStripped = rNorm.replace(stopWordsRegex, ' ').replace(/\s+/g, ' ').trim();
+        return rStripped === strippedRef || rStripped.includes(strippedRef) || strippedRef.includes(rStripped);
+      });
+      if (byStripped) return byStripped.id;
+    }
+
+    // 5. Coincidencia difusa por porcentaje de palabras clave significativas (Token Overlap)
+    const refTokens = normRef
+      .replace(stopWordsRegex, ' ')
+      .split(/\s+/)
+      .map(t => t.trim())
+      .filter(t => t.length >= 2);
+
+    if (refTokens.length > 0) {
+      let bestCandidate = null;
+      let highestScore = 0;
+
+      state.recipes.forEach(r => {
+        const rNorm = normalizeIngredientText(r.title || '');
+        const rTokens = rNorm
+          .replace(stopWordsRegex, ' ')
+          .split(/\s+/)
+          .map(t => t.trim())
+          .filter(t => t.length >= 2);
+
+        if (rTokens.length === 0) return;
+
+        let matches = 0;
+        refTokens.forEach(token => {
+          if (rTokens.some(rt => rt === token || rt.startsWith(token) || token.startsWith(rt))) {
+            matches++;
+          }
+        });
+
+        const score = matches / refTokens.length;
+        if (score > highestScore && score >= 0.75) {
+          highestScore = score;
+          bestCandidate = r;
+        }
+      });
+
+      if (bestCandidate && highestScore >= 0.75) {
+        return bestCandidate.id;
+      }
+    }
+
+    return null;
   }
 
   extractWeeklyPlanFromAiText(aiText) {
@@ -9356,7 +9493,16 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
     if (name === 'create_and_save_recipe') {
       const targetTitle = String(args.title || 'Receta creada con IA').trim();
-      const existing = (state.recipes || []).find(r => String(r.title || '').trim().toLowerCase() === targetTitle.toLowerCase());
+      const normTarget = normalizeIngredientText(targetTitle);
+      const stopWordsRegex = /\b(de|del|la|las|el|los|un|una|unos|unas|con|al|a|en|y|para|sin|por)\b/gi;
+      const strippedTarget = normTarget.replace(stopWordsRegex, ' ').replace(/\s+/g, ' ').trim();
+      const existing = (state.recipes || []).find(r => {
+        if (!r.title) return false;
+        const normR = normalizeIngredientText(r.title);
+        if (normR === normTarget) return true;
+        const strippedR = normR.replace(stopWordsRegex, ' ').replace(/\s+/g, ' ').trim();
+        return Boolean(strippedR && strippedTarget && strippedR === strippedTarget);
+      });
       if (existing) {
         return {
           tool: 'create_and_save_recipe',
@@ -11967,7 +12113,7 @@ function formatSafeAiMarkdown(rawText) {
 const AI_TOOLS_DECLARATIONS = [
   {
     name: "create_and_save_recipe",
-    description: "Crea y guarda una nueva receta completa en el catálogo del usuario cuando no tiene una receta adecuada o pide inventar una receta nueva.",
+    description: "Crea y guarda una nueva receta completa en el catálogo del usuario cuando no tiene una receta adecuada o pide inventar una receta nueva. NUNCA uses esta herramienta si la receta ya existe en su catálogo o si el usuario pide asignar una receta a las comidas o meriendas de la semana.",
     parameters: {
       type: "OBJECT",
       properties: {
@@ -12033,11 +12179,11 @@ const AI_TOOLS_DECLARATIONS = [
   },
   {
     name: "set_weekly_plan",
-    description: "Asigna o actualiza el menú semanal completo del usuario en el Planificador (los 7 días de Lunes a Domingo con las 4 comidas de cada día: breakfast, lunch, snack y dinner) usando los IDs reales de las recetas.",
+    description: "Asigna o actualiza el menú semanal en el Planificador. Puede aplicarse a la semana completa (con las 4 comidas: breakfast, lunch, snack y dinner) o a un momento de comida específico para toda la semana (ej. asignar una receta a todas las meriendas, desayunos o cenas de los 7 días) usando los IDs reales de las recetas.",
     parameters: {
       type: "OBJECT",
       properties: {
-        mode: { type: "STRING", description: "'replace' para aplicar todos los slots indicados o 'merge' para rellenar solo los huecos vacíos" },
+        mode: { type: "STRING", description: "'replace' para aplicar los slots indicados o 'merge' para rellenar solo los huecos vacíos" },
         days: {
           type: "ARRAY",
           items: {
@@ -12045,13 +12191,13 @@ const AI_TOOLS_DECLARATIONS = [
             properties: {
               dateKey: { type: "STRING", description: "Fecha ISO local YYYY-MM-DD" },
               dayName: { type: "STRING", description: "Nombre del día (Lunes..Domingo)" },
-              breakfast: { type: "STRING", description: "ID de la receta de Desayuno (obligatorio)" },
-              lunch: { type: "STRING", description: "ID de la receta de Almuerzo (obligatorio)" },
-              snack: { type: "STRING", description: "ID de la receta de Merienda (obligatorio)" },
-              dinner: { type: "STRING", description: "ID de la receta de Cena (obligatorio)" },
+              breakfast: { type: "STRING", description: "ID de la receta de Desayuno (opcional si solo actualizas otro momento)" },
+              lunch: { type: "STRING", description: "ID de la receta de Almuerzo (opcional si solo actualizas otro momento)" },
+              snack: { type: "STRING", description: "ID de la receta de Merienda (opcional si solo actualizas otro momento)" },
+              dinner: { type: "STRING", description: "ID de la receta de Cena (opcional si solo actualizas otro momento)" },
               isLeftoverLunch: { type: "BOOLEAN", description: "true si este almuerzo es tupper de la cena anterior (Batch Cooking)" }
             },
-            required: ["dateKey", "breakfast", "lunch", "snack", "dinner"]
+            required: ["dateKey"]
           }
         }
       },
@@ -12060,7 +12206,7 @@ const AI_TOOLS_DECLARATIONS = [
   },
   {
     name: "manage_shopping_list",
-    description: "Gestiona la lista de la compra. Para añadir artículos sueltos que pida el usuario usa SIEMPRE action: 'add' y la lista en 'items'. NUNCA uses 'add_from_current_plan' para artículos individuales.",
+    description: "Gestiona la lista de la compra. Para añadir artículos sueltos que pida el usuario usa SIEMPRE action: 'add' y la lista en 'items'. NUNCA uses 'add_from_current_plan' para artículos individuales. NUNCA uses esta herramienta si el usuario pide asignar o poner un plato en una comida, merienda o día del planificador.",
     parameters: {
       type: "OBJECT",
       properties: {

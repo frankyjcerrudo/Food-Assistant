@@ -1222,4 +1222,61 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     const all = appInstance.selectRelevantRecipesForPrompt(fakeCatalog, "Organiza mi semana");
     expect(all.length).toBe(200);
   });
+
+  it('v1.00: resolveRecipeIdForAgent resuelve recetas ignorando preposiciones/conectores y con coincidencia difusa', () => {
+    state.recipes = [
+      { id: 'rec-shake-myprotein', title: 'Batido proteinas MyProtein' },
+      { id: 'rec-tortilla', title: 'Tortilla de patatas con cebolla' }
+    ];
+
+    // Con "DE" en el prompt vs sin "DE" en el título
+    expect(appInstance.resolveRecipeIdForAgent('Batido de proteinas MyProtein')).toBe('rec-shake-myprotein');
+    // Sin "DE" exactamente como el título
+    expect(appInstance.resolveRecipeIdForAgent('Batido proteinas MyProtein')).toBe('rec-shake-myprotein');
+    // Con artículo "el" y preposición "de"
+    expect(appInstance.resolveRecipeIdForAgent('el Batido de proteinas MyProtein')).toBe('rec-shake-myprotein');
+    // Coincidencia parcial difusa
+    expect(appInstance.resolveRecipeIdForAgent('Tortilla de patatas')).toBe('rec-tortilla');
+  });
+
+  it('v1.00: Asignación recurrente en la semana (ej. "pon en todas las metiendas de esta semana el Batido de proteinas MyProtein") genera set_weekly_plan y no lista de compra ni creación de receta', () => {
+    state.recipes = [
+      { id: 'rec-shake-myprotein', title: 'Batido proteinas MyProtein' },
+      { id: 'rec-salmon', title: 'Salmón a la plancha' }
+    ];
+
+    const promptWithTypo = 'pon en todas las metiendas de esta semana el Batido de proteinas MyProtein';
+    expect(appInstance.isRecurringWeeklySlotPrompt(promptWithTypo)).toBe(true);
+
+    const res = appInstance.simulateGeminiAgentResponse(promptWithTypo);
+    expect(res.toolCalls.length).toBe(1);
+    expect(res.toolCalls[0].name).toBe('set_weekly_plan');
+    expect(res.toolCalls[0].args.days.length).toBe(7);
+    expect(res.toolCalls[0].args.days[0].snack).toBe('rec-shake-myprotein');
+
+    // No debe llamar a lista de la compra ni crear receta
+    expect(res.toolCalls.some(tc => tc.name === 'manage_shopping_list')).toBe(false);
+    expect(res.toolCalls.some(tc => tc.name === 'create_and_save_recipe')).toBe(false);
+  });
+
+  it('v1.00: "Añade la receta Batido de proteinas MyProtein a las meriendas de toda la semana" actualiza el planificador sin crear recetas duplicadas', () => {
+    state.recipes = [
+      { id: 'rec-shake-myprotein', title: 'Batido proteinas MyProtein' }
+    ];
+
+    const promptAdd = 'Añade la receta Batido de proteinas MyProtein a las meriendas de toda la semana';
+    const res = appInstance.simulateGeminiAgentResponse(promptAdd);
+    expect(res.toolCalls.length).toBe(1);
+    expect(res.toolCalls[0].name).toBe('set_weekly_plan');
+    expect(res.toolCalls[0].args.days[0].snack).toBe('rec-shake-myprotein');
+    expect(res.toolCalls.some(tc => tc.name === 'create_and_save_recipe')).toBe(false);
+
+    // Y si se intentara ejecutar create_and_save_recipe con ese título, no crea duplicados
+    const createToolRes = appInstance.executeAiToolCall({
+      name: 'create_and_save_recipe',
+      args: { title: 'Batido de proteinas MyProtein', ingredients: [], instructions: [] }
+    });
+    expect(createToolRes.alreadyExisted).toBe(true);
+    expect(createToolRes.recipeId).toBe('rec-shake-myprotein');
+  });
 });
