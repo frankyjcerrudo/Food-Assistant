@@ -1303,8 +1303,8 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     expect(res.text).toContain('proteína');
   });
 
-  it('v1.02: callGeminiAgent desactiva thinking extendido (thinkingBudget: 0) para agilizar respuestas interactivas', async () => {
-    state.settings.geminiApiKey = 'AIzaSyThinkingBudgetTest';
+  it('v1.03: callGeminiAgent envía payload estándar limpio sin parámetros inválidos y con timeout ampliado a 25s', async () => {
+    state.settings.geminiApiKey = 'AIzaSyStandardPayloadTest';
     state.settings.geminiModel = 'gemini-3.8-flash';
     const origFetch = globalThis.fetch;
     let sentBody = null;
@@ -1322,9 +1322,8 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     try {
       await appInstance.callGeminiAgent('Planifica mi dia de hoy');
       expect(sentBody).not.toBeNull();
-      expect(sentBody.generationConfig).toBeDefined();
-      expect(sentBody.generationConfig.thinkingConfig).toBeDefined();
-      expect(sentBody.generationConfig.thinkingConfig.thinkingBudget).toBe(0);
+      // No debe enviar thinkingConfig que provoque "Request contains an invalid argument" en generateContent
+      expect(sentBody.generationConfig?.thinkingConfig).toBeUndefined();
     } finally {
       globalThis.fetch = origFetch;
     }

@@ -2992,7 +2992,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.02';
+  window.APP_VERSION = 'v1.03';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -3024,7 +3024,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.02';
+    this.appVersion = window.APP_VERSION || 'v1.03';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -8710,13 +8710,6 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       };
     }
 
-    // Desactivar el modo de pensamiento extendido (thinking) para evitar 20-30s de razonamiento en segundo plano
-    payload.generationConfig = {
-      thinkingConfig: {
-        thinkingBudget: 0
-      }
-    };
-
     let lastErrMsg = "Error al conectar con Gemini API";
     let data = null;
 
@@ -10911,12 +10904,7 @@ REGLAS CRÍTICAS:
             "x-goog-api-key": apiKey
           },
           body: JSON.stringify({
-            contents: [{ parts }],
-            generationConfig: {
-              thinkingConfig: {
-                thinkingBudget: 0
-              }
-            }
+            contents: [{ parts }]
           }),
           signal: controller.signal
         });
