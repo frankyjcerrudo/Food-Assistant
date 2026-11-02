@@ -2,8 +2,8 @@
 
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
-> **Versión Actual**: v0.92  
-> **Última actualización**: Noviembre 2026 (implementación de US-67: Importador Masivo de Colecciones y Migración de Recetas)
+> **Versión Actual**: v0.93  
+> **Última actualización**: Noviembre 2026 (resiliencia de sincronización en lote, fragmentación a 50 recetas y corrección de Unicode en importador masivo US-67)
 
 ---
 

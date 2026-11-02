@@ -2709,8 +2709,8 @@ const RecipeParser = {
         if (clean.includes('\n')) {
           return clean.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
         }
-        if (/[🔸🔹•●■▪️]/.test(clean)) {
-          return clean.split(/[🔸🔹•●■▪️]/).map(s => s.trim()).filter(Boolean);
+        if (/[🔸🔹•●■▪️]/u.test(clean)) {
+          return clean.split(/[🔸🔹•●■▪️]/u).map(s => s.trim()).filter(Boolean);
         }
         if (/\s+-\s+/.test(clean)) {
           return clean.split(/\s+-\s+/).map(s => s.trim()).filter(Boolean);
@@ -2732,6 +2732,8 @@ const RecipeParser = {
           const subLines = splitCompositeIngredientLine(rawString);
           subLines.forEach(line => {
             if (/^(?:#+\s*)?(?:ingredientes(?:\s+para\s+[^:\n]+)?:?|para\s+(?:el\s+)?[^:\n]+:?)$/i.test(line)) return;
+            // Descartar líneas sin letras (ej. emojis sueltos de señalización "👇👇👇" o viñetas vacías)
+            if (!/[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]/.test(line)) return;
             const parsed = this.parseIngredientLine(line);
             if (parsed) {
               if (Array.isArray(parsed)) ingredients.push(...parsed);
@@ -2990,7 +2992,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.92';
+  window.APP_VERSION = 'v0.93';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -3022,7 +3024,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v0.92';
+    this.appVersion = window.APP_VERSION || 'v0.93';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -3810,10 +3812,17 @@ class FoodAssistantApp {
     }
 
     try {
+      let recQuery = this.supabaseClient.from('recipes').select('*').eq('user_id', state.cloudUser.id);
+      if (typeof recQuery.limit === 'function') recQuery = recQuery.limit(5000);
+      let planQuery = this.supabaseClient.from('meal_plans').select('*').eq('user_id', state.cloudUser.id);
+      if (typeof planQuery.limit === 'function') planQuery = planQuery.limit(5000);
+      let shopQuery = this.supabaseClient.from('shopping_items').select('*').eq('user_id', state.cloudUser.id);
+      if (typeof shopQuery.limit === 'function') shopQuery = shopQuery.limit(5000);
+
       const [recRes, planRes, shopRes] = await Promise.all([
-        this.supabaseClient.from('recipes').select('*').eq('user_id', state.cloudUser.id),
-        this.supabaseClient.from('meal_plans').select('*').eq('user_id', state.cloudUser.id),
-        this.supabaseClient.from('shopping_items').select('*').eq('user_id', state.cloudUser.id)
+        recQuery,
+        planQuery,
+        shopQuery
       ]);
 
       if (recRes.error) throw recRes.error;
@@ -3837,6 +3846,9 @@ class FoodAssistantApp {
             if (remoteRecipeIds.has(r.id)) return true;
             if (r.updatedAt && new Date(r.updatedAt).getTime() > lastSyncTime) {
               return true; // Creada o editada offline tras la última sincronización
+            }
+            if (r._isLocalDraft) {
+              return true; // Receta local recién creada/importada pendiente de sincronizar a la nube
             }
             return false;
           });
@@ -4172,7 +4184,8 @@ class FoodAssistantApp {
     }
   }
 
-  // Resilient batch upsert: gracefully handles schema variations & missing composite constraints
+  // Resilient batch upsert: gracefully handles schema variations, missing composite constraints,
+  // and chunks large datasets (CHUNK_SIZE = 50) to prevent Kong/PostgREST payload threshold errors.
   async upsertWithSchemaFallback(table, payload) {
     if (!payload || payload.length === 0) return { success: true };
     if (!this.unsupportedColumns) {
@@ -4181,6 +4194,22 @@ class FoodAssistantApp {
     if (!this.preferredConflictTargets) {
       this.preferredConflictTargets = { recipes: 'user_id,id', meal_plans: 'user_id,id', shopping_items: 'user_id,id', user_settings: 'user_id' };
     }
+
+    const CHUNK_SIZE = 50;
+    if (payload.length > CHUNK_SIZE) {
+      for (let i = 0; i < payload.length; i += CHUNK_SIZE) {
+        const chunk = payload.slice(i, i + CHUNK_SIZE);
+        const chunkRes = await this._upsertSingleBatchWithSchemaFallback(table, chunk);
+        if (!chunkRes.success) return chunkRes;
+      }
+      return { success: true };
+    }
+
+    return this._upsertSingleBatchWithSchemaFallback(table, payload);
+  }
+
+  async _upsertSingleBatchWithSchemaFallback(table, payload) {
+    if (!payload || payload.length === 0) return { success: true };
 
     let conflict = this.preferredConflictTargets[table] || 'user_id,id';
     let currentPayload = payload.map(item => ({ ...item }));
@@ -4284,6 +4313,11 @@ class FoodAssistantApp {
 
       // 2. Batch Upsert Recipes (BUG-22, BUG-24)
       if (Array.isArray(state.recipes) && state.recipes.length > 0) {
+        const safeString = (s) => {
+          if (typeof s !== 'string') return s ? String(s) : '';
+          return typeof s.toWellFormed === 'function' ? s.toWellFormed() : s;
+        };
+
         const recipesPayload = state.recipes.map(recipe => {
           // Asegurar cálculo de nutrición persistente si la receta aún no lo tenía explícito
           const calculatedNutrition = recipe.nutrition || (typeof getRecipeNutrition === 'function' ? getRecipeNutrition(recipe) : null);
@@ -4292,7 +4326,15 @@ class FoodAssistantApp {
           }
 
           let instructionsCopy = Array.isArray(recipe.instructions)
-            ? recipe.instructions.map(inst => (typeof inst === 'object' && inst !== null ? { ...inst } : { text: String(inst) }))
+            ? recipe.instructions.map(inst => {
+                if (typeof inst === 'object' && inst !== null) {
+                  return {
+                    ...inst,
+                    text: safeString(inst.text)
+                  };
+                }
+                return { text: safeString(inst) };
+              })
             : [];
 
           // Adjuntar _nutrition como metadato seguro en instructions[0] para persistencia ante fallbacks de esquema
@@ -4304,19 +4346,27 @@ class FoodAssistantApp {
             }
           }
 
+          const safeIngredients = Array.isArray(recipe.ingredients)
+            ? recipe.ingredients.map(ing => ({
+                ...ing,
+                name: safeString(ing.name),
+                unit: safeString(ing.unit)
+              }))
+            : [];
+
           return {
             id: recipe.id,
             user_id: state.cloudUser.id,
-            title: recipe.title,
-            description: recipe.description || '',
+            title: safeString(recipe.title),
+            description: safeString(recipe.description || ''),
             image_url: recipe.imageUrl || null,
             source_url: recipe.sourceUrl || '',
             source_domain: recipe.sourceDomain || '',
             prep_time_minutes: recipe.prepTimeMinutes || 0,
             cook_time_minutes: recipe.cookTimeMinutes || 0,
             servings: recipe.servings || 2,
-            tags: Array.isArray(recipe.tags) ? recipe.tags : [],
-            ingredients: recipe.ingredients || [],
+            tags: Array.isArray(recipe.tags) ? recipe.tags.map(t => safeString(t)) : [],
+            ingredients: safeIngredients,
             instructions: instructionsCopy,
             nutrition: recipe.nutrition || null,
             is_favorite: !!recipe.isFavorite,
@@ -4327,6 +4377,18 @@ class FoodAssistantApp {
 
         const rRes = await this.upsertWithSchemaFallback('recipes', recipesPayload);
         if (!rRes.success) throw rRes.error;
+
+        // Limpiar marca de borrador local tras subida exitosa a la nube
+        let clearedDrafts = false;
+        state.recipes.forEach(r => {
+          if (r._isLocalDraft) {
+            delete r._isLocalDraft;
+            clearedDrafts = true;
+          }
+        });
+        if (clearedDrafts) {
+          state.save('fa_recipes', state.recipes);
+        }
       }
 
       // 3. Batch Upsert Meal Plans (BUG-23, BUG-24)
@@ -11573,12 +11635,17 @@ Autenticación: API Key → Bearer → ${tk}`;
 
       const finalRecipe = RecipeParser.finalizeImportRecipe(cand);
 
+      const importTimestamp = new Date().toISOString();
+      finalRecipe.createdAt = cand.createdAt || importTimestamp;
+      finalRecipe.updatedAt = importTimestamp;
+      finalRecipe._isLocalDraft = true;
+
       if (cand.isDuplicate && overwrite && cand.duplicateOf) {
         const idx = state.recipes.findIndex(r => r.id === cand.duplicateOf.id);
         if (idx >= 0) {
           finalRecipe.id = cand.duplicateOf.id;
           finalRecipe.createdAt = cand.duplicateOf.createdAt || finalRecipe.createdAt;
-          finalRecipe.updatedAt = new Date().toISOString();
+          finalRecipe.updatedAt = importTimestamp;
           state.recipes[idx] = finalRecipe;
         } else {
           state.recipes.unshift(finalRecipe);

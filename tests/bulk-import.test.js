@@ -421,6 +421,34 @@ describe('US-67: Importador Masivo de Colecciones y Migración de Recetas (Samsu
       // Modal cerrado tras importación
       const modal = document.getElementById('modal-bulk-import');
       expect(modal.classList.contains('active')).toBe(false);
+
+      // Marca de borrador local (_isLocalDraft) asignada para evitar borrado antes de subir a la nube
+      expect(newGuacamole._isLocalDraft).toBe(true);
+      expect(newGuacamole.updatedAt).toBeDefined();
+    });
+
+    it('splitCompositeIngredientLine maneja emojis de forma segura con Unicode flag (/u) sin romper pares sustitutos', () => {
+      const rawWithEmojis = [
+        {
+          id: 'rec-emoji-test',
+          title: 'Carpaccio con Vinagreta',
+          ingredients: [
+            { rawText: '🔹Vinagreta👇👇👇👇👇' },
+            { rawText: 'VINAGRETA' },
+            { rawText: '🔹50ml Aceite de oliva' }
+          ],
+          instructions: ['1. Mezclar todo.']
+        }
+      ];
+
+      const { candidates } = RecipeParser.parseBulkCollection(rawWithEmojis);
+      expect(candidates).toHaveLength(1);
+      const ingNames = candidates[0].ingredients.map(i => i.name);
+      // No debe contener caracteres sustitutos huérfanos (\udc47)
+      ingNames.forEach(name => {
+        expect(typeof name.isWellFormed === 'function' ? name.isWellFormed() : true).toBe(true);
+      });
+      expect(ingNames).toContain('Aceite de oliva');
     });
   });
 });

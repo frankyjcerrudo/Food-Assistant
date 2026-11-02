@@ -802,6 +802,58 @@ describe('US-35 & Bugs Bloqueantes: Sincronización Supabase, IDs Únicos y Esqu
       expect(updatedRecipe.instructions[0]._nutrition).toBeUndefined();
       expect(updatedRecipe.instructions[0].text).toBe('Cortar pechuga en tiras');
     });
+
+    it('v0.93: upsertWithSchemaFallback fragmenta lotes grandes (>50) en trozos seguros para evitar errores Kong/PostgREST PGRST102', async () => {
+      let callCount = 0;
+      let batchSizes = [];
+      const mockSupabase = {
+        from: vi.fn().mockImplementation((table) => ({
+          upsert: vi.fn().mockImplementation((payload) => {
+            callCount++;
+            batchSizes.push(payload.length);
+            return Promise.resolve({ data: payload, error: null });
+          })
+        }))
+      };
+
+      appInstance.supabaseClient = mockSupabase;
+      // Generar 120 elementos
+      const largePayload = Array.from({ length: 120 }, (_, i) => ({ id: `rec-${i}`, title: `Receta ${i}` }));
+      const res = await appInstance.upsertWithSchemaFallback('recipes', largePayload);
+
+      expect(res.success).toBe(true);
+      expect(callCount).toBe(3); // 50 + 50 + 20
+      expect(batchSizes).toEqual([50, 50, 20]);
+    });
+
+    it('v0.93: pullFromCloud nunca elimina recetas con _isLocalDraft: true aunque updatedAt <= lastSyncTime', async () => {
+      state.lastSyncedAt = '2026-11-02T10:00:00Z';
+      state.recipes = [
+        { id: 'rec-synced', title: 'Receta Remota', updatedAt: '2026-11-02T09:00:00Z' },
+        { id: 'rec-local-draft', title: 'Receta Recién Importada', updatedAt: '2026-11-02T09:30:00Z', _isLocalDraft: true }
+      ];
+
+      // En la nube solo está rec-synced
+      const mockSupabase = {
+        from: vi.fn().mockImplementation((table) => ({
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({
+              data: table === 'recipes' ? [{ id: 'rec-synced', title: 'Receta Remota', updated_at: '2026-11-02T09:00:00Z' }] : [],
+              error: null
+            })
+          })
+        }))
+      };
+
+      appInstance.supabaseClient = mockSupabase;
+      const res = await appInstance.pullFromCloud();
+
+      expect(res.success).toBe(true);
+      // rec-synced se conserva porque está en la nube
+      expect(state.recipes.some(r => r.id === 'rec-synced')).toBe(true);
+      // rec-local-draft se conserva porque es borrador local pendiente de sync
+      expect(state.recipes.some(r => r.id === 'rec-local-draft')).toBe(true);
+    });
   });
 });
 
