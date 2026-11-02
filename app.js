@@ -8432,7 +8432,105 @@ class FoodAssistantApp {
       .replace(/\s*rec-[a-zA-Z0-9_-]+/gi, '');
   }
 
-  buildAiSystemInstruction() {
+  detectPromptCriteria(prompt) {
+    if (!prompt || typeof prompt !== 'string') return [];
+    const lower = prompt.toLowerCase();
+    const criteria = [];
+
+    // Metas de macros y dietas
+    if (/prote[ií]n/i.test(lower)) criteria.push({ type: 'macro', key: 'protein', min: 20 });
+    if (/calor[ií]a|baja\s+en\s+calor/i.test(lower)) criteria.push({ type: 'tag', tag: 'Baja en Calorías' });
+    if (/carbohidrato|baja\s+en\s+carbo|low\s*carb/i.test(lower)) criteria.push({ type: 'tag', tag: 'Baja en Carbohidratos' });
+    if (/keto|cetog[eé]nic/i.test(lower)) criteria.push({ type: 'tag', tag: 'Keto' });
+    if (/vegan/i.test(lower)) criteria.push({ type: 'tag', tag: 'Vegano' });
+    if (/vegetar/i.test(lower)) criteria.push({ type: 'tag', tag: 'Vegetariano' });
+    if (/gluten|cel[ií]ac/i.test(lower)) criteria.push({ type: 'tag', tag: 'Sin Gluten' });
+    if (/lactosa/i.test(lower)) criteria.push({ type: 'tag', tag: 'Sin Lactosa' });
+    if (/r[aá]pida|express|f[aá]cil/i.test(lower)) criteria.push({ type: 'tag', tag: 'Rápida' });
+
+    // Ingredientes o familias clave
+    if (/pescado|marisco|at[uú]n|salm[oó]n|merluza|bacalao|gamba/i.test(lower)) {
+      criteria.push({ type: 'ingredient', regex: /pescado|marisco|at[uú]n|salm[oó]n|merluza|bacalao|gambas?|langostinos?|lubina|dorada|trucha/i });
+    }
+    if (/pollo|pavo|ave/i.test(lower)) {
+      criteria.push({ type: 'ingredient', regex: /pollo|pavo/i });
+    }
+    if (/ternera|carne|vaca|cerdo|lomo/i.test(lower)) {
+      criteria.push({ type: 'ingredient', regex: /ternera|carne|vaca|lomo|solomillo|cerdo/i });
+    }
+    if (/legumbre|garbanzo|lenteja|alubia|frijol/i.test(lower)) {
+      criteria.push({ type: 'ingredient', regex: /garbanz|lentej|alubi|frijol|legumbre/i });
+    }
+    if (/pasta|arroz/i.test(lower)) {
+      criteria.push({ type: 'ingredient', regex: /pasta|arroz|espagueti|macarron|fideos?/i });
+    }
+    if (/huevo|tortilla/i.test(lower)) {
+      criteria.push({ type: 'ingredient', regex: /huevo|tortilla/i });
+    }
+
+    return criteria;
+  }
+
+  selectRelevantRecipesForPrompt(recipes, prompt = '') {
+    if (!Array.isArray(recipes) || recipes.length <= 120) return recipes || [];
+    const criteria = this.detectPromptCriteria(prompt);
+    if (criteria.length === 0) {
+      // Sin criterios específicos de filtro en el prompt: devolver 100% de recetas completas sin recortes
+      return recipes;
+    }
+
+    const matchedIds = new Set();
+    const breakfastOrSnacks = [];
+    const mainDishes = [];
+
+    recipes.forEach(r => {
+      const nut = getRecipeNutrition(r);
+      const tags = (r.tags || []).map(t => String(t).toLowerCase());
+      const ingText = (r.ingredients || []).map(i => typeof i === 'string' ? i : (i.name || '')).join(' ').toLowerCase();
+      const titleLower = String(r.title || '').toLowerCase();
+      const isBreakfastOrSnack = tags.some(t => t.includes('desayuno') || t.includes('merienda')) ||
+        /avena|porridge|yogur|chia|smoothie|batido|pancake|torta|tosta|fruta|bowl/i.test(titleLower);
+
+      let isMatch = false;
+      for (const c of criteria) {
+        if (c.type === 'macro' && c.key === 'protein') {
+          if ((nut.protein || 0) >= c.min || tags.some(t => t.includes('prote')) || /pollo|pavo|ternera|atun|atún|salm[oó]n|huevo|lenteja|garbanzo/i.test(titleLower + ' ' + ingText)) {
+            isMatch = true;
+            break;
+          }
+        } else if (c.type === 'tag') {
+          if (tags.some(t => t.includes(c.tag.toLowerCase()))) {
+            isMatch = true;
+            break;
+          }
+        } else if (c.type === 'ingredient') {
+          if (c.regex.test(titleLower) || c.regex.test(ingText)) {
+            isMatch = true;
+            break;
+          }
+        }
+      }
+
+      if (isMatch) {
+        matchedIds.add(r.id);
+        if (isBreakfastOrSnack) {
+          breakfastOrSnacks.push(r);
+        } else {
+          mainDishes.push(r);
+        }
+      } else if (isBreakfastOrSnack) {
+        breakfastOrSnacks.push(r);
+      }
+    });
+
+    const pool = [...mainDishes.filter(r => matchedIds.has(r.id)), ...breakfastOrSnacks];
+    if (pool.length >= 35) {
+      return pool.slice(0, 140);
+    }
+    return recipes;
+  }
+
+  buildAiSystemInstruction(prompt = '') {
     const todayKey = toLocalDateKey(new Date());
     const weekDays = this.getPlannerWeekDates();
     const prefs = (state.dietaryPreferences || []).join(', ') || 'Ninguna restricción específica';
@@ -8440,7 +8538,8 @@ class FoodAssistantApp {
       ? `${state.settings.nutritionGoals.calories} kcal, ${state.settings.nutritionGoals.protein}g Proteínas, ${state.settings.nutritionGoals.carbs}g Carbos, ${state.settings.nutritionGoals.fat}g Grasas`
       : 'Sin metas numéricas estrictas activas';
 
-    const recipesCatalog = (state.recipes || []).map(r => {
+    const sourceRecipes = this.selectRelevantRecipesForPrompt(state.recipes || [], prompt);
+    const recipesCatalog = sourceRecipes.map(r => {
       const nut = getRecipeNutrition(r);
       const cleanTitle = String(r.title || '').replace(/[\r\n]+/g, ' ').slice(0, 80);
       const cleanTags = (r.tags || []).slice(0, 4).join(', ');
@@ -8546,7 +8645,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       ]
     };
 
-    const effectiveSystemInstruction = systemInstruction || this.buildAiSystemInstruction();
+    const effectiveSystemInstruction = systemInstruction || this.buildAiSystemInstruction(prompt);
     if (effectiveSystemInstruction) {
       payload.systemInstruction = { parts: [{ text: effectiveSystemInstruction }] };
     }
@@ -8569,7 +8668,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 18000);
+      const timeoutId = setTimeout(() => controller.abort(), 38000);
       let response;
 
       try {
@@ -9579,12 +9678,14 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
     const aiBubble = document.createElement('div');
     aiBubble.style = 'background-color: var(--m3-surface-container); padding: 12px 14px; border-radius: var(--radius-lg); font-size: 13px; line-height: 1.45; align-self: flex-start; max-width: 88%;';
-    aiBubble.innerHTML = '<em>Consultando a Gemini...</em>';
+    const isFullCatalog = (state.recipes && state.recipes.length > 120 && this.detectPromptCriteria(text).length === 0);
+    const waitNotice = isFullCatalog ? `<div style="font-size:11px; margin-top:4px; opacity:0.85;">Analizando recetario completo (${state.recipes.length} recetas)... unos segundos.</div>` : '';
+    aiBubble.innerHTML = `<em>Consultando al Asistente...</em>${waitNotice}`;
     history.appendChild(aiBubble);
     history.scrollTop = history.scrollHeight;
 
     try {
-      const systemPrompt = this.buildAiSystemInstruction();
+      const systemPrompt = this.buildAiSystemInstruction(text);
       const agentResult = await this.callGeminiAgent(text, systemPrompt, true);
       const isSingleDay = this.isSingleDayPrompt(text);
       const isWeekend = this.isWeekendPrompt(text);
@@ -9999,16 +10100,21 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     const resultActions = document.getElementById('gemini-invoke-result-actions');
     const sendBtn = document.getElementById('btn-gemini-invoke-send');
 
+    const isFullCatalog = (state.recipes && state.recipes.length > 120 && this.detectPromptCriteria(prompt).length === 0);
+    const noticeHtml = isFullCatalog
+      ? `<div style="font-size:11px; margin-top:4px; opacity:0.85; color:var(--m3-on-surface-variant);">Analizando tu recetario completo (${state.recipes.length} recetas)... Esto puede tardar unos segundos.</div>`
+      : '';
     if (transcription) {
       transcription.innerHTML = `<span style="display:inline-flex; align-items:center; gap:6px; color:var(--m3-primary); font-weight:500;">
         <span class="material-symbols-outlined icon-sm" style="animation: spin 1s linear infinite;">sync</span>
         El Asistente está pensando...
-      </span>`;
+      </span>${noticeHtml}`;
     }
     if (sendBtn) sendBtn.disabled = true;
 
     try {
-      const response = await this.callGeminiAgent(prompt, "", true);
+      const systemPrompt = this.buildAiSystemInstruction(prompt);
+      const response = await this.callGeminiAgent(prompt, systemPrompt, true);
       let executedToolsCount = 0;
       let primaryActionTarget = null; // 'view-shopping' | 'view-planner' | 'view-recipes'
       const createdRecipes = [];

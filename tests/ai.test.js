@@ -1194,4 +1194,32 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     const day = state.getDayPlan('2026-11-02', 'Lunes');
     expect(day.snack).toBeNull();
   });
+
+  it('v0.98: detectPromptCriteria y selectRelevantRecipesForPrompt pre-seleccionan recetas relevantes cuando hay criterios y devuelven 100% si no los hay', () => {
+    const promptWithProtein = "Crea un plan semanal rico en proteinas, equilibrado y saludable. No incluyas fin de semana ni meriendas";
+    const criteria = appInstance.detectPromptCriteria(promptWithProtein);
+    expect(criteria.length).toBeGreaterThan(0);
+    expect(criteria.some(c => c.key === 'protein')).toBe(true);
+
+    const emptyCriteria = appInstance.detectPromptCriteria("Organiza mi semana");
+    expect(emptyCriteria.length).toBe(0);
+
+    // Con catálogo simulado de 200 recetas
+    const fakeCatalog = Array.from({ length: 200 }, (_, i) => ({
+      id: `fake-${i}`,
+      title: i % 2 === 0 ? `Salmón al horno ${i}` : `Postre dulce ${i}`,
+      tags: i % 2 === 0 ? ['Cena', 'Pescado'] : ['Postre'],
+      ingredients: i % 2 === 0 ? [{ name: 'salmón' }, { name: 'espárragos' }] : [{ name: 'azúcar' }],
+      nutrition: { protein: i % 2 === 0 ? 35 : 2, calories: 300, carbs: 10, fat: 5 }
+    }));
+
+    // Con criterios: pre-selecciona subconjunto amplio
+    const filtered = appInstance.selectRelevantRecipesForPrompt(fakeCatalog, promptWithProtein);
+    expect(filtered.length).toBeLessThan(200);
+    expect(filtered.length).toBeGreaterThanOrEqual(35);
+
+    // Sin criterios: no hace recortes aleatorios, devuelve todas las 200
+    const all = appInstance.selectRelevantRecipesForPrompt(fakeCatalog, "Organiza mi semana");
+    expect(all.length).toBe(200);
+  });
 });
