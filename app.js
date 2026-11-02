@@ -2992,7 +2992,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.97';
+  window.APP_VERSION = 'v0.98';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -3024,7 +3024,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v0.97';
+    this.appVersion = window.APP_VERSION || 'v0.98';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -3059,7 +3059,6 @@ class FoodAssistantApp {
     this.initEvents();
     this.updateUserAccountUI();
     this.sanitizeRecipeProteinTags();
-    this.cleanDuplicateRecipes();
     this.render();
   }
 
@@ -3517,7 +3516,7 @@ class FoodAssistantApp {
 
         // Listen for real-time auth changes
         this.supabaseClient.auth.onAuthStateChange((event, session) => {
-          if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user) {
+          if (event === 'SIGNED_IN' && session?.user) {
             state.cloudUser = {
               email: session.user.email,
               name: session.user.user_metadata?.full_name || session.user.email.split('@')[0],
@@ -3527,6 +3526,16 @@ class FoodAssistantApp {
             state.save('fa_cloud_user', state.cloudUser);
             this.updateUserAccountUI();
             this.syncDataWithCloud(true);
+          } else if (event === 'USER_UPDATED' && session?.user) {
+            // Actualizar datos del usuario local sin disparar bucle recursivo de sync
+            state.cloudUser = {
+              email: session.user.email,
+              name: session.user.user_metadata?.full_name || session.user.email.split('@')[0],
+              id: session.user.id,
+              provider: session.user.app_metadata?.provider || 'email'
+            };
+            state.save('fa_cloud_user', state.cloudUser);
+            this.updateUserAccountUI();
           } else if (event === 'SIGNED_OUT') {
             state.cloudUser = null;
             state.save('fa_cloud_user', null);
@@ -4328,14 +4337,23 @@ class FoodAssistantApp {
     try {
       // 1. Propagar borrados pendientes (BUG-23)
       if (state.deletedRecords.recipes?.length > 0) {
-        const { error } = await this.supabaseClient.from('recipes')
-          .delete()
-          .in('id', state.deletedRecords.recipes)
-          .eq('user_id', state.cloudUser.id);
-        if (!error) {
-          state.clearDeletedRecords('recipes', [...state.deletedRecords.recipes]);
-        } else {
-          console.warn('Error al propagar borrado de recetas:', error);
+        const toDelete = [...state.deletedRecords.recipes];
+        const CHUNK_SIZE = 50;
+        const successfullyDeleted = [];
+        for (let i = 0; i < toDelete.length; i += CHUNK_SIZE) {
+          const chunk = toDelete.slice(i, i + CHUNK_SIZE);
+          const { error } = await this.supabaseClient.from('recipes')
+            .delete()
+            .in('id', chunk)
+            .eq('user_id', state.cloudUser.id);
+          if (!error) {
+            successfullyDeleted.push(...chunk);
+          } else {
+            console.warn('Error al propagar borrado de recetas:', error);
+          }
+        }
+        if (successfullyDeleted.length > 0) {
+          state.clearDeletedRecords('recipes', successfullyDeleted);
         }
       }
 
@@ -4364,13 +4382,25 @@ class FoodAssistantApp {
       }
 
       // 2. Batch Upsert Recipes (BUG-22, BUG-24)
-      if (Array.isArray(state.recipes) && state.recipes.length > 0) {
+      const lastSyncTimeMs = state.lastSyncedAt ? new Date(state.lastSyncedAt).getTime() : 0;
+      const dirtyRecipes = Array.isArray(state.recipes)
+        ? state.recipes.filter(recipe => {
+            if (!recipe || !recipe.id) return false;
+            if (state.deletedRecords.recipes?.includes(recipe.id)) return false;
+            if (recipe._isLocalDraft) return true;
+            if (!lastSyncTimeMs) return true;
+            const modTime = new Date(recipe.updatedAt || recipe.createdAt || 0).getTime();
+            return modTime > lastSyncTimeMs;
+          })
+        : [];
+
+      if (dirtyRecipes.length > 0) {
         const safeString = (s) => {
           if (typeof s !== 'string') return s ? String(s) : '';
           return typeof s.toWellFormed === 'function' ? s.toWellFormed() : s;
         };
 
-        const recipesPayload = state.recipes.map(recipe => {
+        const recipesPayload = dirtyRecipes.map(recipe => {
           // Asegurar cálculo de nutrición persistente si la receta aún no lo tenía explícito
           const calculatedNutrition = recipe.nutrition || (typeof getRecipeNutrition === 'function' ? getRecipeNutrition(recipe) : null);
           if (!recipe.nutrition && calculatedNutrition && (calculatedNutrition.calories > 0 || calculatedNutrition.protein > 0)) {
@@ -4432,9 +4462,10 @@ class FoodAssistantApp {
 
         // Limpiar marca de borrador local tras subida exitosa a la nube
         let clearedDrafts = false;
-        state.recipes.forEach(r => {
-          if (r._isLocalDraft) {
-            delete r._isLocalDraft;
+        dirtyRecipes.forEach(dr => {
+          const localR = state.recipes.find(r => r.id === dr.id);
+          if (localR && localR._isLocalDraft) {
+            delete localR._isLocalDraft;
             clearedDrafts = true;
           }
         });

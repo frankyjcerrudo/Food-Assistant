@@ -2,8 +2,8 @@
 
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
-> **Versión Actual**: v0.94  
-> **Última actualización**: Noviembre 2026 (resolución de deadlocks 40P01 en PostgreSQL mediante ordenación determinista por id, mutex en pushToCloud y reintentos automáticos)
+> **Versión Actual**: v0.98  
+> **Última actualización**: Noviembre 2026 (resolución de bucle infinito en onAuthStateChange con USER_UPDATED, sincronización delta para recetas modificadas, fragmentación de borrado en lotes de 50 y eliminación de purga destructiva automática en init)
 
 ---
 

@@ -895,6 +895,125 @@ describe('US-35 & Bugs Bloqueantes: Sincronización Supabase, IDs Únicos y Esqu
 
       expect(receivedIds).toEqual(['rec-a', 'rec-m', 'rec-z']);
     });
+
+    it('v0.98: USER_UPDATED en onAuthStateChange actualiza state.cloudUser sin disparar syncDataWithCloud (rompe bucle infinito)', () => {
+      let authCallback;
+      const mockSupabase = {
+        auth: {
+          getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+          onAuthStateChange: vi.fn().mockImplementation((cb) => {
+            authCallback = cb;
+          })
+        }
+      };
+      window.supabase = { createClient: () => mockSupabase };
+      state.supabaseConfig = { url: 'https://xyz.supabase.co', anonKey: 'anon-key-123' };
+
+      const testApp = new FoodAssistantApp();
+      const syncSpy = vi.spyOn(testApp, 'syncDataWithCloud').mockImplementation(() => Promise.resolve({}));
+
+      expect(authCallback).toBeDefined();
+
+      // Disparar evento USER_UPDATED (provocado por auth.updateUser en pushToCloud)
+      authCallback('USER_UPDATED', {
+        user: {
+          id: 'test-user-uuid-1234',
+          email: 'franky@example.com',
+          user_metadata: { full_name: 'Franky Cerrudo' },
+          app_metadata: { provider: 'email' }
+        }
+      });
+
+      expect(state.cloudUser.name).toBe('Franky Cerrudo');
+      // syncDataWithCloud NO debe haberse llamado para USER_UPDATED (evita bucle infinito)
+      expect(syncSpy).not.toHaveBeenCalled();
+
+      // En cambio, SIGNED_IN sí debe invocar syncDataWithCloud
+      authCallback('SIGNED_IN', {
+        user: {
+          id: 'test-user-uuid-1234',
+          email: 'franky@example.com',
+          user_metadata: { full_name: 'Franky Cerrudo' },
+          app_metadata: { provider: 'email' }
+        }
+      });
+      expect(syncSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('v0.98: pushToCloud aplica sincronización delta y solo envía recetas modificadas o borradores locales', async () => {
+      state.lastSyncedAt = '2026-11-02T10:00:00Z';
+      state.recipes = [
+        { id: 'rec-old', title: 'Receta Antigua', updatedAt: '2026-11-02T09:00:00Z' },
+        { id: 'rec-dirty', title: 'Receta Modificada', updatedAt: '2026-11-02T10:30:00Z' },
+        { id: 'rec-draft', title: 'Borrador Importado', _isLocalDraft: true }
+      ];
+
+      let pushedRecipes = [];
+      const mockSupabase = {
+        from: vi.fn().mockImplementation((table) => ({
+          delete: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ error: null })
+            })
+          }),
+          upsert: vi.fn().mockImplementation((payload) => {
+            if (table === 'recipes') {
+              pushedRecipes = payload;
+            }
+            return Promise.resolve({ data: payload, error: null });
+          })
+        })),
+        auth: {
+          updateUser: vi.fn().mockResolvedValue({ data: {}, error: null })
+        }
+      };
+
+      appInstance.supabaseClient = mockSupabase;
+      const res = await appInstance.pushToCloud(true);
+
+      expect(res.success).toBe(true);
+      // Solo deben haberse enviado las 2 recetas dirty/draft, ordenadas deterministamente por ID
+      expect(pushedRecipes.map(r => r.id)).toEqual(['rec-dirty', 'rec-draft']);
+      // Y _isLocalDraft debe haberse limpiado
+      expect(state.recipes.find(r => r.id === 'rec-draft')._isLocalDraft).toBeUndefined();
+    });
+
+    it('v0.98: pushToCloud propaga borrado de recetas en lotes de 50', async () => {
+      const deleteCalls = [];
+      const idsToDelete = Array.from({ length: 120 }, (_, i) => `rec-del-${i}`);
+      state.deletedRecords = { recipes: [...idsToDelete], mealPlans: [], shoppingItems: [] };
+
+      const mockSupabase = {
+        from: vi.fn().mockImplementation((table) => ({
+          delete: vi.fn().mockReturnValue({
+            in: vi.fn().mockImplementation((col, chunk) => {
+              if (table === 'recipes') {
+                deleteCalls.push(chunk);
+              }
+              return {
+                eq: vi.fn().mockResolvedValue({ error: null })
+              };
+            })
+          }),
+          upsert: vi.fn().mockResolvedValue({ data: [], error: null })
+        })),
+        auth: {
+          updateUser: vi.fn().mockResolvedValue({ data: {}, error: null })
+        }
+      };
+
+      appInstance.supabaseClient = mockSupabase;
+      const res = await appInstance.pushToCloud(true);
+
+      expect(res.success).toBe(true);
+      // 120 elementos deben dividirse en 3 llamadas: 50, 50, 20
+      expect(deleteCalls.length).toBe(3);
+      expect(deleteCalls[0].length).toBe(50);
+      expect(deleteCalls[1].length).toBe(50);
+      expect(deleteCalls[2].length).toBe(20);
+      // Se vaciaron los registros borrados
+      expect(state.deletedRecords.recipes).toHaveLength(0);
+    });
   });
 });
 
