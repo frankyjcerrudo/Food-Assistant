@@ -854,6 +854,47 @@ describe('US-35 & Bugs Bloqueantes: Sincronización Supabase, IDs Únicos y Esqu
       // rec-local-draft se conserva porque es borrador local pendiente de sync
       expect(state.recipes.some(r => r.id === 'rec-local-draft')).toBe(true);
     });
+
+    it('v0.94: _upsertSingleBatchWithSchemaFallback se recupera automáticamente tras deadlock (40P01)', async () => {
+      let attempts = 0;
+      const mockSupabase = {
+        from: vi.fn().mockImplementation(() => ({
+          upsert: vi.fn().mockImplementation(() => {
+            attempts++;
+            if (attempts === 1) {
+              return Promise.resolve({ data: null, error: { code: '40P01', message: 'deadlock detected' } });
+            }
+            return Promise.resolve({ data: [{ id: 'rec-1' }], error: null });
+          })
+        }))
+      };
+
+      appInstance.supabaseClient = mockSupabase;
+      const res = await appInstance.upsertWithSchemaFallback('recipes', [{ id: 'rec-1', title: 'Test' }]);
+      expect(res.success).toBe(true);
+      expect(attempts).toBe(2);
+    });
+
+    it('v0.94: upsertWithSchemaFallback ordena deterministamente por id para prevenir bloqueos mutuos', async () => {
+      let receivedIds = [];
+      const mockSupabase = {
+        from: vi.fn().mockImplementation(() => ({
+          upsert: vi.fn().mockImplementation((payload) => {
+            receivedIds = payload.map(r => r.id);
+            return Promise.resolve({ data: payload, error: null });
+          })
+        }))
+      };
+
+      appInstance.supabaseClient = mockSupabase;
+      await appInstance.upsertWithSchemaFallback('recipes', [
+        { id: 'rec-z', title: 'Z' },
+        { id: 'rec-a', title: 'A' },
+        { id: 'rec-m', title: 'M' }
+      ]);
+
+      expect(receivedIds).toEqual(['rec-a', 'rec-m', 'rec-z']);
+    });
   });
 });
 

@@ -2992,7 +2992,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.93';
+  window.APP_VERSION = 'v0.94';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -3024,7 +3024,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v0.93';
+    this.appVersion = window.APP_VERSION || 'v0.94';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -4195,17 +4195,19 @@ class FoodAssistantApp {
       this.preferredConflictTargets = { recipes: 'user_id,id', meal_plans: 'user_id,id', shopping_items: 'user_id,id', user_settings: 'user_id' };
     }
 
+    const sortedPayload = [...payload].sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
+
     const CHUNK_SIZE = 50;
-    if (payload.length > CHUNK_SIZE) {
-      for (let i = 0; i < payload.length; i += CHUNK_SIZE) {
-        const chunk = payload.slice(i, i + CHUNK_SIZE);
+    if (sortedPayload.length > CHUNK_SIZE) {
+      for (let i = 0; i < sortedPayload.length; i += CHUNK_SIZE) {
+        const chunk = sortedPayload.slice(i, i + CHUNK_SIZE);
         const chunkRes = await this._upsertSingleBatchWithSchemaFallback(table, chunk);
         if (!chunkRes.success) return chunkRes;
       }
       return { success: true };
     }
 
-    return this._upsertSingleBatchWithSchemaFallback(table, payload);
+    return this._upsertSingleBatchWithSchemaFallback(table, sortedPayload);
   }
 
   async _upsertSingleBatchWithSchemaFallback(table, payload) {
@@ -4254,6 +4256,14 @@ class FoodAssistantApp {
         continue;
       }
 
+      // Fallback 3: Deadlock detected (40P01) due to concurrent operations from another device
+      if (error.code === '40P01' || (error.message && error.message.toLowerCase().includes('deadlock detected'))) {
+        console.warn(`[Sync] Concurrencia detectada (deadlock 40P01) en '${table}'. Reintentando intento ${attempt + 1}/8 tras espera...`);
+        const jitterMs = 250 + Math.floor(Math.random() * 350);
+        await new Promise(resolve => setTimeout(resolve, jitterMs));
+        continue;
+      }
+
       // Unrecoverable error (e.g. auth / RLS / network)
       return { success: false, error };
     }
@@ -4270,6 +4280,14 @@ class FoodAssistantApp {
       this.updateSyncIndicator('Sin conexión (modo local)', 'warning');
       return { success: false, reason: 'offline' };
     }
+
+    // Mutex de sincronización: encola si ya hay una subida en curso para evitar concurrencia en el mismo cliente
+    if (this.isPushingToCloud) {
+      this.hasQueuedPush = true;
+      this.queuedPushSilent = this.queuedPushSilent === false ? false : silent;
+      return { success: true, queued: true };
+    }
+    this.isPushingToCloud = true;
 
     this.updateSyncIndicator('Sincronizando con la nube...', 'syncing');
 
@@ -4498,6 +4516,14 @@ class FoodAssistantApp {
         this.showToast("Error al sincronizar con la nube: " + (err.message || 'Fallo de conexión'), 'error');
       }
       return { success: false, error: err };
+    } finally {
+      this.isPushingToCloud = false;
+      if (this.hasQueuedPush) {
+        this.hasQueuedPush = false;
+        const nextSilent = this.queuedPushSilent !== false;
+        this.queuedPushSilent = null;
+        setTimeout(() => this.pushToCloud(nextSilent), 250);
+      }
     }
   }
 

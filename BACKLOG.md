@@ -2,8 +2,8 @@
 
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
-> **Versión Actual**: v0.93  
-> **Última actualización**: Noviembre 2026 (resiliencia de sincronización en lote, fragmentación a 50 recetas y corrección de Unicode en importador masivo US-67)
+> **Versión Actual**: v0.94  
+> **Última actualización**: Noviembre 2026 (resolución de deadlocks 40P01 en PostgreSQL mediante ordenación determinista por id, mutex en pushToCloud y reintentos automáticos)
 
 ---
 
