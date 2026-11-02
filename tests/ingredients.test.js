@@ -276,5 +276,42 @@ describe('US-20: Autocompletado Inteligente de Ingredientes e Iconos Distintivos
       });
       expect(resolvedResult).toBe('produce');
     });
+
+    it('BUGFIX RENDIMIENTO: getIngredientSuggestions es de alto rendimiento incluso con cientos de ingredientes en el recetario', () => {
+      const largeCatalog = [];
+      for (let i = 0; i < 400; i++) {
+        largeCatalog.push({ name: `Ingrediente Especial ${i}`, unit: 'g', aisle: 'produce' });
+      }
+
+      const start = performance.now();
+      const results = getIngredientSuggestions('Ingrediente Especial 10', 5, largeCatalog);
+      const duration = performance.now() - start;
+
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0].name).toContain('Ingrediente Especial 10');
+      // Debe ejecutarse en unos pocos milisegundos sin congelar el hilo UI
+      expect(duration).toBeLessThan(35);
+    });
+
+    it('BUGFIX RENDIMIENTO: borrar el texto del ingrediente oculta y resetea el dropdown instantáneamente', () => {
+      appInstance.addIngredientRow({ name: 'Cebolla morada', amount: 1, unit: 'ud', aisle: 'produce' });
+
+      const container = document.getElementById('edit-ingredients-container');
+      const row = container.querySelector('.edit-ing-row');
+      const nameInput = row.querySelector('.ing-name');
+      const dropdown = row.querySelector('.ing-autocomplete-dropdown');
+
+      // 1. Escribir para desplegar sugerencias
+      nameInput.value = 'Ceb';
+      nameInput.dispatchEvent(new Event('input'));
+      expect(dropdown.style.display).toBe('flex');
+      expect(dropdown.children.length).toBeGreaterThan(0);
+
+      // 2. Borrar el ingrediente por completo (ej. backspace o select all + delete)
+      nameInput.value = '';
+      nameInput.dispatchEvent(new Event('input'));
+      expect(dropdown.style.display).toBe('none');
+      expect(dropdown.innerHTML).toBe('');
+    });
   });
 });

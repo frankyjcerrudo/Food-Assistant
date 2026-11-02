@@ -1036,45 +1036,87 @@ const COMMON_INGREDIENTS = [
   { name: 'Zumo de naranja', aisle: 'beverages', defaultUnit: 'l', icon: 'local_cafe' }
 ];
 
+// Pre-computed common ingredients with normalized and stemmed names for O(1) matching
+let _PREPARED_COMMON_INGREDIENTS = null;
+let _PREPARED_COMMON_INGREDIENTS_LEN = 0;
+function getPreparedCommonIngredients() {
+  if (!_PREPARED_COMMON_INGREDIENTS || _PREPARED_COMMON_INGREDIENTS_LEN !== COMMON_INGREDIENTS.length) {
+    _PREPARED_COMMON_INGREDIENTS = COMMON_INGREDIENTS.map(item => {
+      const norm = normalizeIngredientText(item.name);
+      return {
+        item,
+        norm,
+        stem: norm.replace(/(?:es|s)$/i, '').trim()
+      };
+    });
+    _PREPARED_COMMON_INGREDIENTS_LEN = COMMON_INGREDIENTS.length;
+  }
+  return _PREPARED_COMMON_INGREDIENTS;
+}
+
 function getIngredientSuggestions(query, max = 6, extraItems = []) {
   if (!query || typeof query !== 'string') return [];
   const qNorm = normalizeIngredientText(query);
   if (!qNorm) return [];
 
-  const all = [...COMMON_INGREDIENTS];
-  if (Array.isArray(extraItems)) {
-    extraItems.forEach(item => {
-      if (item && item.name && !all.some(c => normalizeIngredientText(c.name) === normalizeIngredientText(item.name))) {
-        all.push({
+  const common = getPreparedCommonIngredients();
+  const seenNorms = new Set();
+  const all = [];
+
+  for (let i = 0; i < common.length; i++) {
+    all.push(common[i]);
+    seenNorms.add(common[i].norm);
+  }
+
+  if (Array.isArray(extraItems) && extraItems.length > 0) {
+    for (let i = 0; i < extraItems.length; i++) {
+      const item = extraItems[i];
+      if (!item || !item.name) continue;
+      const norm = normalizeIngredientText(item.name);
+      if (!norm || seenNorms.has(norm)) continue;
+      seenNorms.add(norm);
+
+      const aisle = item.aisle || (typeof categorizeIngredientAisle === 'function' ? categorizeIngredientAisle(item.name) : 'other');
+      const icon = item.icon || (typeof getIngredientIcon === 'function' ? getIngredientIcon(item.name, aisle) : (AISLE_METADATA[aisle]?.icon || 'inventory_2'));
+      all.push({
+        item: {
           name: item.name,
-          aisle: item.aisle || categorizeIngredientAisle(item.name),
+          aisle,
           defaultUnit: item.unit || 'ud',
-          icon: getIngredientIcon(item.name, item.aisle)
-        });
-      }
-    });
+          icon
+        },
+        norm,
+        stem: norm.replace(/(?:es|s)$/i, '').trim()
+      });
+    }
   }
 
   const prefixMatches = [];
   const containsMatches = [];
 
   // Lematización básica de plurales en español (ej. doradas -> dorada, patatas -> patata)
-  const stem = (s) => s.replace(/(?:es|s)$/i, '').trim();
-  const qStem = stem(qNorm);
+  const qStem = qNorm.replace(/(?:es|s)$/i, '').trim();
 
-  for (const item of all) {
-    const itemNorm = normalizeIngredientText(item.name);
-    const itemStem = stem(itemNorm);
+  for (let i = 0; i < all.length; i++) {
+    const entry = all[i];
+    const itemNorm = entry.norm;
+    const itemStem = entry.stem;
     const startsMatch = itemNorm.startsWith(qNorm) || (qStem.length >= 3 && itemNorm.startsWith(qStem)) || (qStem.length >= 3 && itemStem.startsWith(qStem));
-    const containsMatch = itemNorm.includes(qNorm) || (qStem.length >= 3 && itemNorm.includes(qStem)) || (qStem.length >= 3 && itemStem.includes(qStem));
 
     if (startsMatch) {
-      prefixMatches.push(item);
-    } else if (containsMatch) {
-      containsMatches.push(item);
+      prefixMatches.push(entry.item);
+      if (prefixMatches.length >= max) break;
+    } else {
+      const containsMatch = itemNorm.includes(qNorm) || (qStem.length >= 3 && itemNorm.includes(qStem)) || (qStem.length >= 3 && itemStem.includes(qStem));
+      if (containsMatch) {
+        containsMatches.push(entry.item);
+      }
     }
   }
 
+  if (prefixMatches.length >= max) {
+    return prefixMatches.slice(0, max);
+  }
   return [...prefixMatches, ...containsMatches].slice(0, max);
 }
 
@@ -2992,7 +3034,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.03';
+  window.APP_VERSION = 'v1.04';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -3024,7 +3066,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.03';
+    this.appVersion = window.APP_VERSION || 'v1.04';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -6246,14 +6288,56 @@ class FoodAssistantApp {
     this.scheduleSyncWithCloud();
   }
 
+  getCustomIngredientsFromState() {
+    const recipesCount = (typeof state !== 'undefined' && state.recipes) ? state.recipes.length : 0;
+    if (this._cachedCustomIngredients && this._cachedCustomIngredientsCount === recipesCount) {
+      return this._cachedCustomIngredients;
+    }
+    const extra = [];
+    const seen = new Set();
+    if (typeof state !== 'undefined' && state.recipes) {
+      state.recipes.forEach(r => {
+        (r.ingredients || []).forEach(ing => {
+          if (ing && ing.name) {
+            const norm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(ing.name) : ing.name.toLowerCase().trim();
+            if (norm && !seen.has(norm)) {
+              seen.add(norm);
+              extra.push(ing);
+            }
+          }
+        });
+      });
+    }
+    this._cachedCustomIngredients = extra;
+    this._cachedCustomIngredientsCount = recipesCount;
+    return extra;
+  }
+
   attachIngredientAutocomplete(inputElem, dropdownElem, onSelect) {
     if (!inputElem || !dropdownElem) return;
 
     let activeIndex = -1;
     let currentSuggestions = [];
 
+    // Delegación de clic en sugerencias
+    if (!dropdownElem._clickBound) {
+      dropdownElem.addEventListener('mousedown', (e) => {
+        const itemEl = e.target.closest('.autocomplete-item');
+        if (!itemEl) return;
+        e.preventDefault();
+        const idx = parseInt(itemEl.getAttribute('data-index'), 10);
+        if (currentSuggestions[idx]) {
+          onSelect(currentSuggestions[idx]);
+          dropdownElem.innerHTML = '';
+          dropdownElem.style.display = 'none';
+          currentSuggestions = [];
+        }
+      });
+      dropdownElem._clickBound = true;
+    }
+
     const renderSuggestions = (items) => {
-      currentSuggestions = items;
+      currentSuggestions = items || [];
       activeIndex = -1;
       if (!items || items.length === 0) {
         dropdownElem.innerHTML = '';
@@ -6277,17 +6361,6 @@ class FoodAssistantApp {
       }).join('');
 
       dropdownElem.style.display = 'flex';
-
-      dropdownElem.querySelectorAll('.autocomplete-item').forEach(el => {
-        el.addEventListener('mousedown', (e) => {
-          e.preventDefault();
-          const idx = parseInt(el.getAttribute('data-index'), 10);
-          if (currentSuggestions[idx]) {
-            onSelect(currentSuggestions[idx]);
-            dropdownElem.style.display = 'none';
-          }
-        });
-      });
     };
 
     const updateActiveItem = () => {
@@ -6313,19 +6386,13 @@ class FoodAssistantApp {
       }
 
       if (searchTerm.length < 1) {
+        dropdownElem.innerHTML = '';
         dropdownElem.style.display = 'none';
+        currentSuggestions = [];
         return;
       }
 
-      const extra = [];
-      if (typeof state !== 'undefined' && state.recipes) {
-        state.recipes.forEach(r => {
-          (r.ingredients || []).forEach(ing => {
-            if (ing && ing.name) extra.push(ing);
-          });
-        });
-      }
-
+      const extra = this.getCustomIngredientsFromState();
       const suggestions = getIngredientSuggestions(searchTerm, 6, extra);
       renderSuggestions(suggestions);
     });
@@ -6346,18 +6413,25 @@ class FoodAssistantApp {
           e.preventDefault();
           e.stopPropagation();
           onSelect(currentSuggestions[activeIndex]);
+          dropdownElem.innerHTML = '';
           dropdownElem.style.display = 'none';
+          currentSuggestions = [];
         }
       } else if (e.key === 'Escape') {
+        dropdownElem.innerHTML = '';
         dropdownElem.style.display = 'none';
+        currentSuggestions = [];
       }
     });
 
-    document.addEventListener('click', (e) => {
-      if (!inputElem.contains(e.target) && !dropdownElem.contains(e.target)) {
-        dropdownElem.style.display = 'none';
-      }
-    });
+    if (!dropdownElem._docClickBound) {
+      document.addEventListener('click', (e) => {
+        if (!inputElem.contains(e.target) && !dropdownElem.contains(e.target)) {
+          dropdownElem.style.display = 'none';
+        }
+      });
+      dropdownElem._docClickBound = true;
+    }
   }
 
   renumberSteps() {
