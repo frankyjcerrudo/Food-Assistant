@@ -2992,7 +2992,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.94';
+  window.APP_VERSION = 'v0.95';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -3024,7 +3024,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v0.94';
+    this.appVersion = window.APP_VERSION || 'v0.95';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -8339,6 +8339,10 @@ class FoodAssistantApp {
 
   isWeekendPrompt(prompt) {
     if (!prompt || typeof prompt !== 'string') return false;
+    // Si hay una negación o exclusión expresa, NO es un comando enfocado en el fin de semana
+    if (/\b(no\s+(incluyas?|pongas?|metas?|cuentes?)|sin|excepto|quitar|fuera|nada\s+de|no\s+quiero)\b.*?\b(fin\s+de\s+semana|finde|s[aá]bado|domingo)\b/i.test(prompt)) {
+      return false;
+    }
     return /\b(fin\s+de\s+semana|finde|s[aá]bado\s+y\s+domingo|sabado\s+y\s+domingo)\b/i.test(prompt);
   }
 
@@ -8346,7 +8350,7 @@ class FoodAssistantApp {
     if (!prompt || typeof prompt !== 'string') return false;
     // Si el usuario pide un solo día específico o el fin de semana, NO forzar semana completa
     if (this.isSingleDayPrompt(prompt) || this.isWeekendPrompt(prompt)) return false;
-    return /\b(planifica|completa|rellena|organiza|pon|asigna)\b.*?\b(semana|men[uú]|plan)\b|\b(men[uú]\s+semanal|plan\s+semanal|semana\s+completa|dejad[oa]s?\s+vac[ií][ao]s?|huecos?\s+libres?|huecos?\s+vac[ií][ao]s?|faltan\s+comidas|sin\s+aparecer\s+muchas\s+comidas|platos\s+en\s+el\s+plan|desayunos\s+y\s+meriendas|batch\s+cooking|sobras|tuppers?)\b/i.test(prompt);
+    return /\b(planifica|planifiques|planificar|organiza|organices|organizar|completa|completes|rellena|rellenes|pon|pongas|asigna|asignes|prepara|prepares|haz|hazme)\b.*?\b(semana|men[uú]|plan)\b|\b(men[uú]\s+semanal|plan\s+semanal|semana\s+completa|dejad[oa]s?\s+vac[ií][ao]s?|huecos?\s+libres?|huecos?\s+vac[ií][ao]s?|faltan\s+comidas|sin\s+aparecer\s+muchas\s+comidas|platos\s+en\s+el\s+plan|desayunos\s+y\s+meriendas|batch\s+cooking|sobras|tuppers?)\b/i.test(prompt);
   }
 
   isAiActionPrompt(prompt) {
@@ -8406,7 +8410,18 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 - Si Franky pide ideas, dudas o sugerencias para un momento concreto (ej. "dame ideas para cenar hoy", "¿qué puedo cenar?", "ideas para el almuerzo"): NUNCA planifiques ni reemplaces el día entero. Ofrece 2 o 3 opciones apetecibles y saludables para ese momento específico (cena, almuerzo, etc.) de forma conversacional.
 - Si Franky pide asignar un plato a una comida concreta (ej. "pon salmón para cenar hoy"), usa "set_day_plan" manteniendo intactos el desayuno, almuerzo y merienda existentes del día.
 - Solo invoca "set_day_plan" con las 4 comidas completas cuando Franky pida explícitamente planificar u organizar todo el día ("planifica mi día de hoy", "organiza todas las comidas de hoy"). NUNCA invoques "set_weekly_plan" para un solo día ni toques el resto de la semana.
-3. Si Franky pide crear, planificar, completar o modificar su menú semanal (o indica que faltan comidas, que hay huecos o que pongas los platos en el plan), DEBES invocar SIEMPRE la herramienta "set_weekly_plan" con los 7 días (${weekDays.map(w => `${w.dayName}=${w.dateKey}`).join(', ')}) y las 4 comidas completas ("breakfast", "lunch", "snack" y "dinner") usando los IDs reales de su catálogo. NUNCA dejes huecos vacíos ni te limites a responder con texto plano.
+3. PLANIFICACIÓN SEMANAL INTELIGENTE, VARIEDAD Y RESPETO A EXCLUSIONES:
+- Cuando Franky pida planificar, completar o modificar su menú semanal, utiliza la herramienta "set_weekly_plan".
+- RESPETO RIGUROSO A EXCLUSIONES DEL USUARIO:
+  * Si Franky indica "no incluyas el fin de semana", "de lunes a viernes" o excluye ciertos días, DEBES dejar los días Sábado y Domingo con comidas en null o sin modificar.
+  * Si Franky indica "sin meriendas", "sin desayunos" o excluye cualquier momento, DEBES dejar esos momentos en null. NUNCA fuerces comidas que el usuario haya pedido excluir explícitamente.
+- REGLA ESTRICTA DE VARIEDAD Y ROTACIÓN DE PROTEÍNAS (ANTI-MONOTONÍA):
+  * NUNCA repitas la misma receta en la misma semana (excepto si Franky solicita expresamente modo sobras o Batch Cooking).
+  * NUNCA repitas la misma fuente de proteína principal (ej. pollo) en días seguidos ni dos veces en el mismo día. Alterna obligatoriamente fuentes proteicas: pescados (blanco o azul), legumbres, aves (pollo/pavo), huevos, ternera magra y opciones vegetales/tofu.
+  * Si Franky pide un enfoque nutricional (ej. "enfoque en proteínas", "bajo en calorías"), selecciona preferentemente recetas del catálogo con altos valores de ese macro y explica brevemente en tu mensaje tu razonamiento y cómo se distribuyen los nutrientes a lo largo de los días planificados.
+- RAZONAMIENTO, TRANSPARENCIA Y PREGUNTAS:
+  * Si en el catálogo de recetas no hay suficientes platos para cubrir los días solicitados sin repetir o sin incumplir las preferencias, RAZONA con total honestidad: explica a Franky qué días has planificado y pregúntale si quiere que le inventes y guardes recetas nuevas para completar los huecos restantes.
+  * Si la petición de Franky es ambigua o contradictoria, PREGUNTA antes de asumir decisiones arbitrarias.
 4. Si Franky pide "Batch Cooking" o modo sobras: planifica cocinar ración doble en la cena de 2 días (ej. Lunes cena y Miércoles cena) para reutilizar como tupper en el almuerzo del día siguiente (Martes almuerzo y Jueves almuerzo) con isLeftoverLunch: true. Todas las demás comidas (desayunos, meriendas y demás cenas/almuerzos) DEBEN ser diferentes, frescas y variadas; NUNCA repitas todo el día idéntico.
 5. REGLA ESTRICTA PARA LA LISTA DE LA COMPRA: Si Franky pide añadir artículos concretos (ej. "añade leche y plátanos", "apunta 3 huevos"), usa SIEMPRE la herramienta "manage_shopping_list" con action: "add" y la lista de artículos pedidos en "items". NUNCA uses action: "add_from_current_plan" a menos que Franky diga explícitamente "añade los ingredientes del plan", "vuelca el menú semanal" o "añade todo lo de la semana".
 6. GUARDAR Y CREAR RECETAS EN EL CATÁLOGO: Si Franky te pide recomendaciones de recetas y a continuación te pide guardarlas (ej: "guárdalas", "guarda las recetas", "guarda esa receta", "añádelas a mis recetas", "guárdame la primera", "créala"), o si te pide directamente inventar o crear una o varias recetas nuevas: DEBES invocar OBLIGATORIAMENTE la herramienta "create_and_save_recipe" (una llamada por cada receta que Franky quiera guardar) con todos los datos estructurados: title, description, prepTimeMinutes, cookTimeMinutes, servings, tags, ingredients (name, amount, unit) e instructions (step, text, timerMinutes) y nutrition (calories, protein, carbs, fat). NUNCA respondas diciendo que has guardado una receta sin haber ejecutado la llamada a "create_and_save_recipe".
@@ -8474,7 +8489,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
       let response;
 
       try {
@@ -8517,7 +8532,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
         try {
           const fallbackEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`;
           const fbController = new AbortController();
-          const fbTimeout = setTimeout(() => fbController.abort(), 6000);
+          const fbTimeout = setTimeout(() => fbController.abort(), 25000);
           const fbResponse = await fetch(fallbackEndpoint, {
             method: "POST",
             headers: {
@@ -8543,7 +8558,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
         try {
           const fallbackEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`;
           const fbController = new AbortController();
-          const fbTimeout = setTimeout(() => fbController.abort(), 6000);
+          const fbTimeout = setTimeout(() => fbController.abort(), 25000);
           const fbResponse = await fetch(fallbackEndpoint, {
             method: "POST",
             headers: {
@@ -8561,7 +8576,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
             // Si 2.5-flash no está disponible para nuevos usuarios, probar gemini-3.5-flash-lite
             const liteEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`;
             const liteController = new AbortController();
-            const liteTimeout = setTimeout(() => liteController.abort(), 6000);
+            const liteTimeout = setTimeout(() => liteController.abort(), 25000);
             const liteResponse = await fetch(liteEndpoint, {
               method: "POST",
               headers: {
@@ -8631,7 +8646,10 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     return res.text || "";
   }
 
-  buildSimulatedWeeklyPlanArgs(mode = 'replace', isBatchCooking = false) {
+  buildSimulatedWeeklyPlanArgs(mode = 'replace', isBatchCooking = false, prompt = '') {
+    const noWeekend = /\b(no\s+(incluyas?|pongas?|metas?|cuentes?)|sin|excepto|quitar|fuera|nada\s+de)\b.*?\b(fin\s+de\s+semana|finde|s[aá]bado|domingo)\b/i.test(prompt || '');
+    const noSnacks = /\b(no\s+(incluyas?|pongas?|metas?|cuentes?)|sin|excepto|quitar|fuera|nada\s+de)\b.*?\b(merienda|meriendas)\b/i.test(prompt || '');
+    const noBreakfast = /\b(no\s+(incluyas?|pongas?|metas?|cuentes?)|sin|excepto|quitar|fuera|nada\s+de)\b.*?\b(desayuno|desayunos)\b/i.test(prompt || '');
     const activePrefs = Array.isArray(state.dietaryPreferences) ? state.dietaryPreferences : [];
     const allRecipes = Array.isArray(state.recipes) ? state.recipes : [];
     const compliantRecipes = activePrefs.length > 0
@@ -8699,13 +8717,34 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       }
 
       prevDinnerId = dinnerId;
+
+      // Deduplicación almuerzo vs cena en el mismo día
+      const safeDinnerPool = dinnerList.filter(r => r.id !== lunchId);
+      const safeDinnerId = safeDinnerPool.length > 0 ? pick(safeDinnerPool, 0) : dinnerId;
+
+      const isWeekendDay = String(wDay.dayName || '').toLowerCase().includes('sáb') ||
+        String(wDay.dayName || '').toLowerCase().includes('sab') ||
+        String(wDay.dayName || '').toLowerCase().includes('dom');
+
+      if (noWeekend && isWeekendDay) {
+        return {
+          dateKey: wDay.dateKey,
+          dayName: wDay.dayName,
+          breakfast: null,
+          lunch: null,
+          snack: null,
+          dinner: null,
+          isLeftoverLunch: false
+        };
+      }
+
       return {
         dateKey: wDay.dateKey,
         dayName: wDay.dayName,
-        breakfast: pick(breakfastList, 0),
+        breakfast: noBreakfast ? null : pick(breakfastList, 0),
         lunch: lunchId,
-        snack: pick(snackList, 0),
-        dinner: dinnerId,
+        snack: noSnacks ? null : pick(snackList, 0),
+        dinner: safeDinnerId,
         isLeftoverLunch
       };
     });
@@ -8888,7 +8927,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     const isSingleDay = !isSlotQuery && /\b(planifica|organiza|prepara|haz|asigna|men[uú]|plan)\b.*\b(hoy|dia\s+de\s+hoy|d[ií]a\s+de\s+hoy|ma[ñn]ana|solo\s+hoy|este\s+d[ií]a)\b/i.test(prompt);
     if (isSingleDay) {
       const todayKey = toLocalDateKey(new Date());
-      const planArgs = this.buildSimulatedWeeklyPlanArgs('replace');
+      const planArgs = this.buildSimulatedWeeklyPlanArgs('replace', false, typeof prompt !== 'undefined' ? prompt : '');
       const todayPlan = planArgs.days[0] || {};
       const findTitle = (id) => state.recipes.find(r => r.id === id)?.title || 'Comida equilibrada';
       const dayName = new Date().toLocaleDateString('es-ES', { weekday: 'long' });
@@ -8918,7 +8957,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
     // 0.1 Planificación específica de fin de semana (Sábado y Domingo únicamente)
     if (this.isWeekendPrompt(prompt)) {
-      const planArgs = this.buildSimulatedWeeklyPlanArgs('replace');
+      const planArgs = this.buildSimulatedWeeklyPlanArgs('replace', false, typeof prompt !== 'undefined' ? prompt : '');
       const weekendDays = planArgs.days.filter(d => {
         const dName = String(d.dayName || '').toLowerCase();
         return dName.includes('sáb') || dName.includes('sab') || dName.includes('dom');
@@ -9121,7 +9160,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
   }
 
   extractWeeklyPlanFromAiText(aiText) {
-    const fallbackPlan = this.buildSimulatedWeeklyPlanArgs('replace');
+    const fallbackPlan = this.buildSimulatedWeeklyPlanArgs('replace', false, typeof prompt !== 'undefined' ? prompt : '');
     if (!aiText || typeof aiText !== 'string') {
       return { ...fallbackPlan, completeWeek: true };
     }
@@ -9274,7 +9313,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       const mode = args.mode === 'merge' ? 'merge' : 'replace';
       const daysInput = Array.isArray(args.days) ? args.days : [];
       const weekDays = this.getPlannerWeekDates();
-      const fallbackPlan = this.buildSimulatedWeeklyPlanArgs('replace');
+      const fallbackPlan = this.buildSimulatedWeeklyPlanArgs('replace', false, typeof prompt !== 'undefined' ? prompt : '');
       const shouldCompleteAllWeek = args.completeWeek === true || daysInput.length >= 5;
       const updatedDateKeys = new Set();
 
@@ -9507,7 +9546,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
       let rawToolCalls = Array.isArray(agentResult.toolCalls) ? [...agentResult.toolCalls] : [];
 
-      if (isWeekend) {
+      if (isWeekend && agentResult.isSimulatedFallback) {
         rawToolCalls = rawToolCalls.map(tc => {
           if (tc.name === 'set_weekly_plan') {
             const days = Array.isArray(tc.args?.days) ? tc.args.days : [];
@@ -9527,7 +9566,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
         });
 
         if (!rawToolCalls.some(tc => tc.name === 'set_weekly_plan')) {
-          const planArgs = this.buildSimulatedWeeklyPlanArgs('replace');
+          const planArgs = this.buildSimulatedWeeklyPlanArgs('replace', false, typeof prompt !== 'undefined' ? prompt : '');
           const weekendDays = planArgs.days.filter(d => {
             const dName = String(d.dayName || '').toLowerCase();
             return dName.includes('sáb') || dName.includes('sab') || dName.includes('dom');
@@ -9565,7 +9604,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
         });
 
         if (!rawToolCalls.some(tc => tc.name === 'set_day_plan')) {
-          const planArgs = this.buildSimulatedWeeklyPlanArgs('replace');
+          const planArgs = this.buildSimulatedWeeklyPlanArgs('replace', false, typeof prompt !== 'undefined' ? prompt : '');
           const todayPlan = planArgs.days[0] || {};
           rawToolCalls.push({
             name: 'set_day_plan',
@@ -9982,7 +10021,14 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
       if (resultBox && resultText) {
         resultBox.style.display = 'flex';
-        resultText.innerHTML = formatSafeAiMarkdown(cleanText);
+        let fallbackBanner = '';
+        if (response && response.isSimulatedFallback) {
+          fallbackBanner = `<div style="display:flex; align-items:flex-start; gap:8px; background: rgba(234, 67, 53, 0.08); border: 1px solid rgba(234, 67, 53, 0.25); color: #c5221f; border-radius: 8px; padding: 8px 10px; font-size: 11px; margin-bottom: 10px; line-height: 1.4;">
+            <span class="material-symbols-outlined" style="font-size:18px; line-height:1; flex-shrink:0;">cloud_off</span>
+            <span><strong>Aviso de conexión:</strong> No se pudo contactar con Gemini en la nube (${response.originalError || 'tiempo de espera agotado'}). Se ha activado la simulación local provisional de emergencia.</span>
+          </div>`;
+        }
+        resultText.innerHTML = fallbackBanner + formatSafeAiMarkdown(cleanText);
 
         if (resultActions) {
           resultActions.innerHTML = '';
@@ -10126,7 +10172,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
   }
 
   applySampleAiPlan(planOverride = null) {
-    const targetPlan = planOverride || this.lastAiProposedPlan || this.buildSimulatedWeeklyPlanArgs('replace');
+    const targetPlan = planOverride || this.lastAiProposedPlan || this.buildSimulatedWeeklyPlanArgs('replace', false, typeof prompt !== 'undefined' ? prompt : '');
     this.executeAiToolCall({
       name: 'set_weekly_plan',
       args: targetPlan

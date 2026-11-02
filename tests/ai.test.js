@@ -1021,4 +1021,46 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
   });
 
 
+  it('v0.95: isWeekendPrompt detecta exclusiones y negaciones ("no incluyas fin de semana") sin confundirlo con plan de finde', () => {
+    const promptExclusion = 'Quiero que planifiques mi semana, haciendo un plan equilibrado, variado, y con enfoque en proteínas. No incluyas el fin de semana ni las meriendas';
+    expect(appInstance.isWeekendPrompt(promptExclusion)).toBe(false);
+    expect(appInstance.isWeeklyPlanPrompt(promptExclusion)).toBe(true);
+
+    const promptWeekendOnly = 'Planifica únicamente mi fin de semana';
+    expect(appInstance.isWeekendPrompt(promptWeekendOnly)).toBe(true);
+  });
+
+  it('v0.95: buildSimulatedWeeklyPlanArgs respeta exclusiones de fin de semana y meriendas sin duplicar recetas el mismo día', () => {
+    const prompt = 'Planifica mi semana sin fin de semana ni meriendas';
+    const planArgs = appInstance.buildSimulatedWeeklyPlanArgs('replace', false, prompt);
+    expect(planArgs.days.length).toBe(7);
+
+    // Días de lunes a viernes: merienda debe ser null
+    const weekdays = planArgs.days.slice(0, 5);
+    weekdays.forEach(d => {
+      expect(d.snack).toBeNull();
+      // Si hay recetas distintas para almuerzo y cena, no deben ser iguales en el mismo día
+      if (d.lunch && d.dinner) {
+        expect(d.lunch).not.toBe(d.dinner);
+      }
+    });
+
+    // Días de fin de semana (Sábado y Domingo): comidas en null
+    const weekendDays = planArgs.days.slice(5);
+    weekendDays.forEach(d => {
+      expect(d.breakfast).toBeNull();
+      expect(d.lunch).toBeNull();
+      expect(d.snack).toBeNull();
+      expect(d.dinner).toBeNull();
+    });
+  });
+
+  it('v0.95: buildAiSystemInstruction exige razonamiento culinario, rotación de fuentes de proteína, variedad estricta y respeto a exclusiones', () => {
+    const sysPrompt = appInstance.buildAiSystemInstruction();
+    expect(sysPrompt).toContain('RESPETO RIGUROSO A EXCLUSIONES DEL USUARIO');
+    expect(sysPrompt).toContain('REGLA ESTRICTA DE VARIEDAD Y ROTACIÓN DE PROTEÍNAS');
+    expect(sysPrompt).toContain('NUNCA repitas la misma receta en la misma semana');
+    expect(sysPrompt).toContain('NUNCA repitas la misma fuente de proteína principal');
+    expect(sysPrompt).toContain('RAZONAMIENTO, TRANSPARENCIA Y PREGUNTAS');
+  });
 });
