@@ -8440,28 +8440,17 @@ class FoodAssistantApp {
       ? `${state.settings.nutritionGoals.calories} kcal, ${state.settings.nutritionGoals.protein}g Proteínas, ${state.settings.nutritionGoals.carbs}g Carbos, ${state.settings.nutritionGoals.fat}g Grasas`
       : 'Sin metas numéricas estrictas activas';
 
-    let catalogList = state.recipes || [];
-    if (catalogList.length > 70) {
-      // Si el catálogo es extenso, priorizar favoritos, platos en uso y variedad
-      // para evitar exceder el límite de tokens y prevenir timeouts en conexiones móviles
-      const activeIds = new Set();
-      weekDays.forEach(d => {
-        const dp = state.getDayPlan(d.dateKey, d.dayName);
-        if (dp.breakfast) activeIds.add(dp.breakfast);
-        if (dp.lunch) activeIds.add(dp.lunch);
-        if (dp.snack) activeIds.add(dp.snack);
-        if (dp.dinner) activeIds.add(dp.dinner);
-      });
-      const prioritized = catalogList.filter(r => r.isFavorite || activeIds.has(r.id));
-      const rest = catalogList.filter(r => !r.isFavorite && !activeIds.has(r.id));
-      catalogList = [...prioritized, ...rest].slice(0, 70);
-    }
-
-    const recipesCatalog = catalogList.map(r => {
+    const recipesCatalog = (state.recipes || []).map(r => {
       const nut = getRecipeNutrition(r);
-      const cleanTitle = String(r.title || '').replace(/[\r\n]+/g, ' ').slice(0, 70);
+      const cleanTitle = String(r.title || '').replace(/[\r\n]+/g, ' ').slice(0, 80);
       const cleanTags = (r.tags || []).slice(0, 4).join(', ');
-      return `- ID: "${r.id}" | "${cleanTitle}" | Tags: [${cleanTags}] | Macros: ${nut.calories}kcal, P:${nut.protein}g, C:${nut.carbs}g, G:${nut.fat}g`;
+      const cleanIngredients = (r.ingredients || [])
+        .map(i => typeof i === 'string' ? i : (i.name || ''))
+        .map(n => n.replace(/[\r\n]+/g, ' ').trim())
+        .filter(Boolean)
+        .slice(0, 10)
+        .join(', ');
+      return `- ID: "${r.id}" | "${cleanTitle}" | Ingredientes: [${cleanIngredients}] | Tags: [${cleanTags}] | Macros: ${nut.calories}kcal, P:${nut.protein}g, C:${nut.carbs}g, G:${nut.fat}g`;
     }).join('\n');
 
     const currentPlanSummary = weekDays.map(d => {
