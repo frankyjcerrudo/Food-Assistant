@@ -1107,4 +1107,58 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     expect(sysPrompt).toContain('NUNCA repitas la misma fuente de proteína principal');
     expect(sysPrompt).toContain('RAZONAMIENTO, TRANSPARENCIA Y PREGUNTAS');
   });
+  it('v0.97: create_and_save_recipe no duplica recetas si el título ya existe en el catálogo', () => {
+    state.recipes = [
+      { id: 'rec-orig-1', title: 'Tortitas Proteicas de Avena', tags: [], ingredients: [], instructions: [] }
+    ];
+
+    const res = appInstance.executeAiToolCall({
+      name: 'create_and_save_recipe',
+      args: {
+        title: 'Tortitas Proteicas de Avena',
+        ingredients: [{ name: 'Avena', amount: 50, unit: 'g' }]
+      }
+    });
+
+    expect(res.alreadyExisted).toBe(true);
+    expect(res.recipeId).toBe('rec-orig-1');
+    expect(state.recipes.length).toBe(1);
+  });
+
+  it('v0.97: cleanDuplicateRecipes limpia recetas duplicadas conservando la primera versión', () => {
+    state.recipes = [
+      { id: 'rec-1', title: 'Pollo al Horno', tags: [] },
+      { id: 'rec-2', title: 'Salmón a la plancha', tags: [] },
+      { id: 'rec-3', title: 'pollo al horno', tags: [] },
+      { id: 'rec-4', title: 'POLLETO', tags: [] }
+    ];
+
+    const removed = appInstance.cleanDuplicateRecipes();
+    expect(removed).toBe(1);
+    expect(state.recipes.length).toBe(3);
+    expect(state.recipes.map(r => r.id)).toEqual(['rec-1', 'rec-2', 'rec-4']);
+  });
+
+  it('v0.97: set_weekly_plan respeta merienda en null sin forzar recetas fallback si el usuario excluyó meriendas', () => {
+    const res = appInstance.executeAiToolCall({
+      name: 'set_weekly_plan',
+      args: {
+        mode: 'replace',
+        days: [
+          {
+            dateKey: '2026-11-02',
+            dayName: 'Lunes',
+            breakfast: 'rec-1',
+            lunch: 'rec-1',
+            snack: null,
+            dinner: 'rec-2'
+          }
+        ]
+      }
+    });
+
+    expect(res.tool).toBe('set_weekly_plan');
+    const day = state.getDayPlan('2026-11-02', 'Lunes');
+    expect(day.snack).toBeNull();
+  });
 });

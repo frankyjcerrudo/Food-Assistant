@@ -2992,7 +2992,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v0.96';
+  window.APP_VERSION = 'v0.97';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -3024,7 +3024,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v0.96';
+    this.appVersion = window.APP_VERSION || 'v0.97';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -3059,7 +3059,41 @@ class FoodAssistantApp {
     this.initEvents();
     this.updateUserAccountUI();
     this.sanitizeRecipeProteinTags();
+    this.cleanDuplicateRecipes();
     this.render();
+  }
+
+  cleanDuplicateRecipes() {
+    if (!Array.isArray(state.recipes)) return 0;
+    const seenTitles = new Map();
+    const unique = [];
+    const removedIds = [];
+
+    state.recipes.forEach(r => {
+      const key = String(r.title || '').trim().toLowerCase();
+      if (!key) {
+        unique.push(r);
+        return;
+      }
+      if (!seenTitles.has(key)) {
+        seenTitles.set(key, r);
+        unique.push(r);
+      } else {
+        removedIds.push(r.id);
+        if (typeof state.trackDeletion === 'function') {
+          state.trackDeletion('recipes', r.id);
+        }
+      }
+    });
+
+    if (removedIds.length > 0) {
+      state.recipes = unique;
+      if (typeof state.save === 'function') {
+        state.save('fa_recipes', state.recipes);
+      }
+      console.log(`[FoodAssistant] Limpieza de duplicados: ${removedIds.length} recetas duplicadas eliminadas del catálogo.`);
+    }
+    return removedIds.length;
   }
 
   sanitizeRecipeProteinTags() {
@@ -8410,8 +8444,11 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 - Si Franky pide ideas, dudas o sugerencias para un momento concreto (ej. "dame ideas para cenar hoy", "¿qué puedo cenar?", "ideas para el almuerzo"): NUNCA planifiques ni reemplaces el día entero. Ofrece 2 o 3 opciones apetecibles y saludables para ese momento específico (cena, almuerzo, etc.) de forma conversacional.
 - Si Franky pide asignar un plato a una comida concreta (ej. "pon salmón para cenar hoy"), usa "set_day_plan" manteniendo intactos el desayuno, almuerzo y merienda existentes del día.
 - Solo invoca "set_day_plan" con las 4 comidas completas cuando Franky pida explícitamente planificar u organizar todo el día ("planifica mi día de hoy", "organiza todas las comidas de hoy"). NUNCA invoques "set_weekly_plan" para un solo día ni toques el resto de la semana.
-3. PLANIFICACIÓN SEMANAL INTELIGENTE, VARIEDAD Y RESPETO A EXCLUSIONES:
-- Cuando Franky pida planificar, completar o modificar su menú semanal, utiliza la herramienta "set_weekly_plan".
+3. PLANIFICACIÓN SEMANAL INTELIGENTE Y APLICACIÓN DIRECTA EN EL PLANIFICADOR:
+- Cuando Franky pida crear, armar, planificar o modificar su menú semanal (ej. "Crea un plan semanal...", "Planifica mi semana...", "Organiza las comidas..."):
+  * DEBES invocar OBLIGATORIAMENTE la herramienta "set_weekly_plan" para que los platos queden guardados y aplicados directamente en su Planificador. NUNCA respondas solo con texto plano pidiendo confirmación cuando se te pide explícitamente crear el plan.
+  * Utiliza SIEMPRE los IDs ("rec-...") de las recetas ya existentes en el catálogo de Franky. NUNCA uses "create_and_save_recipe" para platos que ya están en el catálogo de Franky ni si solo se te pidió planificar.
+  * Si Franky pide exclusiones (ej. "no incluyas el fin de semana", "sin meriendas"), pasa null en esas propiedades en "days" (ej. "snack": null) u omite el fin de semana. El esquema de "set_weekly_plan" ahora permite valores null en comidas excluidas.
 - RESPETO RIGUROSO A EXCLUSIONES DEL USUARIO:
   * Si Franky indica "no incluyas el fin de semana", "de lunes a viernes" o excluye ciertos días, DEBES dejar los días Sábado y Domingo con comidas en null o sin modificar.
   * Si Franky indica "sin meriendas", "sin desayunos" o excluye cualquier momento, DEBES dejar esos momentos en null. NUNCA fuerces comidas que el usuario haya pedido excluir explícitamente.
@@ -9234,6 +9271,18 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     const args = toolCall.args || {};
 
     if (name === 'create_and_save_recipe') {
+      const targetTitle = String(args.title || 'Receta creada con IA').trim();
+      const existing = (state.recipes || []).find(r => String(r.title || '').trim().toLowerCase() === targetTitle.toLowerCase());
+      if (existing) {
+        return {
+          tool: 'create_and_save_recipe',
+          success: true,
+          recipeId: existing.id,
+          title: existing.title,
+          alreadyExisted: true,
+          recipe: existing
+        };
+      }
       const nowIso = new Date().toISOString();
       const rawIngredients = Array.isArray(args.ingredients) ? args.ingredients : [];
       const normalizedIngredients = rawIngredients.map((ing, idx) => {
@@ -9334,7 +9383,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       const daysInput = Array.isArray(args.days) ? args.days : [];
       const weekDays = this.getPlannerWeekDates();
       const fallbackPlan = this.buildSimulatedWeeklyPlanArgs('replace', false, typeof prompt !== 'undefined' ? prompt : '');
-      const shouldCompleteAllWeek = args.completeWeek === true || daysInput.length >= 5;
+      const shouldCompleteAllWeek = args.completeWeek === true;
       const updatedDateKeys = new Set();
 
       daysInput.forEach((dayEntry, idx) => {
@@ -9361,29 +9410,22 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
         ['breakfast', 'lunch', 'snack', 'dinner'].forEach(slotKey => {
           const rawVal = dayEntry[slotKey];
-          const isExplicitClear = typeof rawVal === 'string' && rawVal.trim().toUpperCase() === 'CLEAR';
+          const isExplicitClear = (typeof rawVal === 'string' && rawVal.trim().toUpperCase() === 'CLEAR') || rawVal === null;
 
           if (isExplicitClear) {
             if (mode === 'replace') dayData[slotKey] = null;
             return;
           }
 
-          if (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '') {
+          if (rawVal !== undefined && String(rawVal).trim() !== '') {
             const resolvedId = this.resolveRecipeIdForAgent(String(rawVal));
             if (resolvedId && (mode === 'replace' || !dayData[slotKey])) {
               dayData[slotKey] = resolvedId;
             }
-          }
-
-          // Si el hueco sigue vacío (porque Gemini omitió desayunos/meriendas o envió un ID no válido),
-          // rellenarlo automáticamente con una receta compatible para ese momento del día
-          if (!dayData[slotKey] && fallbackDay && fallbackDay[slotKey]) {
-            dayData[slotKey] = fallbackDay[slotKey];
-          }
-          if (!dayData[slotKey]) {
-            const allAvailable = (state.recipes && state.recipes.length > 0) ? state.recipes : DEFAULT_RECIPES;
-            const picked = allAvailable[(idx + slotKey.length) % allAvailable.length];
-            if (picked) dayData[slotKey] = picked.id;
+          } else if (rawVal === undefined && args.completeWeek === true) {
+            if (!dayData[slotKey] && fallbackDay && fallbackDay[slotKey]) {
+              dayData[slotKey] = fallbackDay[slotKey];
+            }
           }
         });
 
@@ -10079,8 +10121,22 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
               this.switchView(primaryActionTarget);
             });
             resultActions.appendChild(btnTarget);
+          } else if (/\b(Lunes|Martes|Miércoles|Miercoles|Jueves|Viernes|Sábado|Sabado|Domingo)\b.*?[:\-]/i.test(cleanText)) {
+            // Si el Asistente propuso un menú semanal en texto, ofrecer botón directo para aplicarlo al planificador
+            const btnApplyPlan = document.createElement('button');
+            btnApplyPlan.type = 'button';
+            btnApplyPlan.className = 'btn btn-primary btn-sm';
+            btnApplyPlan.innerHTML = `<span class="material-symbols-outlined icon-sm">calendar_month</span> Aplicar al Planificador`;
+            btnApplyPlan.addEventListener('click', () => {
+              const input = document.getElementById('gemini-invoke-input');
+              if (input) {
+                input.value = 'Aplica este menú semanal en mi Planificador con los IDs de mi catálogo';
+                this.handleGeminiInvokeSubmit(isVoice);
+              }
+            });
+            resultActions.appendChild(btnApplyPlan);
           } else if (/receta|plato|ingrediente|1\.|2\./i.test(cleanText)) {
-            // Si el Asistente propuso recetas en texto pero aún no se guardaron, ofrecer botón directo de 1 toque para guardarlas
+            // Si el Asistente propuso recetas sueltas en texto que no existen, ofrecer guardarlas
             const btnSaveRecipes = document.createElement('button');
             btnSaveRecipes.type = 'button';
             btnSaveRecipes.className = 'btn btn-tonal btn-sm';
