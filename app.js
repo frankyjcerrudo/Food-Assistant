@@ -674,6 +674,74 @@ function normalizeIngredientText(str) {
     .trim();
 }
 
+const normalizeSearchText = normalizeIngredientText;
+
+function getSearchWordVariants(word) {
+  const norm = normalizeSearchText(word);
+  if (!norm) return [];
+  const variants = new Set([norm]);
+
+  // Reglas de número en español (singular/plural)
+  // 1. Plurales en -ces (ej: nueces -> nuez, raices -> raiz, peces -> pez)
+  if (norm.endsWith('ces') && norm.length > 4) {
+    variants.add(norm.slice(0, -3) + 'z');
+  }
+  if (norm.endsWith('z')) {
+    variants.add(norm.slice(0, -1) + 'ces');
+  }
+
+  // 2. Plurales en -es tras consonante (ej: limones -> limon, champinones -> champinon, panes -> pan, frijoles -> frijol)
+  if (norm.endsWith('es') && norm.length > 3) {
+    variants.add(norm.slice(0, -2)); // limon
+    variants.add(norm.slice(0, -1)); // tomate
+  }
+
+  // 3. Plurales regulares en -s (ej: platanos -> platano, fresas -> fresa, patatas -> patata)
+  if (norm.endsWith('s') && norm.length > 2) {
+    variants.add(norm.slice(0, -1));
+  } else if (!norm.endsWith('s')) {
+    // Si la palabra es singular:
+    // Termina en vocal -> añadir -s (platano -> platanos, fresa -> fresas)
+    // Termina en consonante distinta de z -> añadir -es (limon -> limones)
+    if (/[aeiou]$/.test(norm)) {
+      variants.add(norm + 's');
+    } else if (!norm.endsWith('z')) {
+      variants.add(norm + 'es');
+    }
+  }
+
+  return Array.from(variants);
+}
+
+function getRecipeSearchText(recipe) {
+  if (!recipe) return '';
+  const title = recipe.title || '';
+  const desc = recipe.description || '';
+  const tags = Array.isArray(recipe.tags) ? recipe.tags.join(' ') : '';
+  const ingredients = Array.isArray(recipe.ingredients)
+    ? recipe.ingredients.map(i => {
+        if (!i) return '';
+        if (typeof i === 'string') return i;
+        return `${i.name || ''} ${i.ingredient || ''} ${i.original || ''} ${i.text || ''}`;
+      }).join(' ')
+    : '';
+  return normalizeSearchText(`${title} ${desc} ${tags} ${ingredients}`);
+}
+
+function matchRecipeSearch(recipe, query) {
+  if (!query || !query.trim()) return true;
+  const rawTerms = query.trim().split(/\s+/).filter(Boolean);
+  if (rawTerms.length === 0) return true;
+
+  const targetText = getRecipeSearchText(recipe);
+
+  // Cada término de la búsqueda (AND logic) debe coincidir con alguna de sus variantes léxicas
+  return rawTerms.every(term => {
+    const variants = getSearchWordVariants(term);
+    return variants.some(v => targetText.includes(v));
+  });
+}
+
 function categorizeIngredientAisle(ingredientName) {
   const text = normalizeIngredientText(ingredientName);
   if (!text) return 'other';
@@ -3054,7 +3122,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.06';
+  window.APP_VERSION = 'v1.07';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -3087,7 +3155,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.06';
+    this.appVersion = window.APP_VERSION || 'v1.07';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -5777,7 +5845,6 @@ class FoodAssistantApp {
   applyRecipeFilters(overrideTerm) {
     const searchInput = document.getElementById('recipes-search-input');
     const term = (overrideTerm !== undefined ? overrideTerm : (searchInput?.value || '')).trim();
-    const termNorm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(term) : term.toLowerCase();
 
     const filtered = state.recipes.filter(r => {
       // 1. Tag multi-selection (AND logic: debe contener todas las etiquetas seleccionadas)
@@ -5791,20 +5858,14 @@ class FoodAssistantApp {
         }
       }
 
-      // 2. Término de búsqueda (título, etiquetas o ingredientes) con normalización de acentos
-      if (termNorm) {
-        const titleNorm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(r.title || '') : (r.title || '').toLowerCase();
-        const titleMatch = titleNorm.includes(termNorm);
-        const tagsMatch = (r.tags || []).some(t => {
-          const tNorm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(String(t)) : String(t).toLowerCase();
-          return tNorm.includes(termNorm);
-        });
-        const ingMatch = (r.ingredients || []).some(i => {
-          if (!i || !i.name) return false;
-          const iNorm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(i.name) : i.name.toLowerCase();
-          return iNorm.includes(termNorm);
-        });
-        if (!titleMatch && !tagsMatch && !ingMatch) return false;
+      // 2. Término de búsqueda con normalización de acentos, tokenización y variantes singular/plural
+      if (term) {
+        if (typeof matchRecipeSearch === 'function') {
+          if (!matchRecipeSearch(r, term)) return false;
+        } else {
+          const titleNorm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(r.title || '') : (r.title || '').toLowerCase();
+          if (!titleNorm.includes(term.toLowerCase())) return false;
+        }
       }
 
       // 3. US-34: Nevera reverse search (si hay ingredientes en nevera, mostrar preferentemente las que tengan al menos 1 coincidencia)
@@ -5832,14 +5893,14 @@ class FoodAssistantApp {
     const badge = document.getElementById('recipes-count-badge');
     const subtitle = document.getElementById('recipes-count-subtitle');
     if (badge) {
-      if (this.selectedRecipeTags.size > 0 || termNorm || this.fridgeIngredients.length > 0) {
+      if (this.selectedRecipeTags.size > 0 || term || this.fridgeIngredients.length > 0) {
         badge.textContent = `${filtered.length} de ${state.recipes.length}`;
       } else {
         badge.textContent = `${state.recipes.length}`;
       }
     }
     if (subtitle) {
-      if (this.selectedRecipeTags.size > 0 || termNorm || this.fridgeIngredients.length > 0) {
+      if (this.selectedRecipeTags.size > 0 || term || this.fridgeIngredients.length > 0) {
         const filtersDesc = [];
         if (this.fridgeIngredients.length > 0) filtersDesc.push(`Nevera: ${this.fridgeIngredients.join(', ')}`);
         if (this.selectedRecipeTags.size > 0) filtersDesc.push(`etiquetas: ${Array.from(this.selectedRecipeTags).join(', ')}`);
@@ -7842,22 +7903,18 @@ class FoodAssistantApp {
       recipes = recipes.filter(r => checkDietaryCompliance(r, state.dietaryPreferences).compliant);
     }
 
-    // US-71: Filtrado reactivo en tiempo real por término de búsqueda (título e ingredientes)
+    // US-71: Filtrado reactivo en tiempo real por término de búsqueda (título, descripción e ingredientes)
     const q = (this.pickerSearchQuery || '').trim();
-    const qNorm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(q) : q.toLowerCase();
-
-    if (qNorm) {
-      recipes = recipes.filter(r => {
-        const titleNorm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(r.title || '') : (r.title || '').toLowerCase();
-        if (titleNorm.includes(qNorm)) return true;
-        if (Array.isArray(r.ingredients)) {
-          return r.ingredients.some(ing => {
-            const ingNorm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(ing?.name || '') : (ing?.name || '').toLowerCase();
-            return ingNorm.includes(qNorm);
-          });
-        }
-        return false;
-      });
+    if (q) {
+      if (typeof matchRecipeSearch === 'function') {
+        recipes = recipes.filter(r => matchRecipeSearch(r, q));
+      } else {
+        const qNorm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(q) : q.toLowerCase();
+        recipes = recipes.filter(r => {
+          const titleNorm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(r.title || '') : (r.title || '').toLowerCase();
+          return titleNorm.includes(qNorm);
+        });
+      }
     }
 
     if (recipes.length === 0) {
@@ -12792,6 +12849,10 @@ if (typeof window !== 'undefined') {
   window.AISLE_METADATA = AISLE_METADATA;
   window.COMMON_INGREDIENTS = COMMON_INGREDIENTS;
   window.normalizeIngredientText = normalizeIngredientText;
+  window.normalizeSearchText = normalizeSearchText;
+  window.getSearchWordVariants = getSearchWordVariants;
+  window.getRecipeSearchText = getRecipeSearchText;
+  window.matchRecipeSearch = matchRecipeSearch;
   window.categorizeIngredientAisle = categorizeIngredientAisle;
   window.resolveAisleOnline = resolveAisleOnline;
   window.getCachedAisle = getCachedAisle;
@@ -12819,6 +12880,10 @@ if (typeof module !== 'undefined' && module.exports) {
     COMMON_INGREDIENTS,
     escapeHtml,
     normalizeIngredientText,
+    normalizeSearchText,
+    getSearchWordVariants,
+    getRecipeSearchText,
+    matchRecipeSearch,
     categorizeIngredientAisle,
     resolveAisleOnline,
     getCachedAisle,

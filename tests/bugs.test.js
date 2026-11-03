@@ -248,7 +248,7 @@ describe('Verificación y Cobertura de Bugs Abiertos (v1.06)', () => {
   });
 
   describe('BUG-18: Búsqueda combinada con etiquetas y búsqueda de ingredientes con acentos', () => {
-    it('busca por ingrediente tolerando tildes y mayúsculas', () => {
+    it('busca por ingrediente tolerando tildes y mayúsculas con resultados idénticos con o sin tilde', () => {
       state.recipes = [
         {
           id: 'rec-1',
@@ -258,17 +258,85 @@ describe('Verificación y Cobertura de Bugs Abiertos (v1.06)', () => {
         },
         {
           id: 'rec-2',
+          title: 'Bizcocho de platano',
+          tags: ['Postre'],
+          ingredients: [{ name: 'Harina' }]
+        },
+        {
+          id: 'rec-3',
+          title: 'Pancakes de Avena',
+          tags: ['Desayuno'],
+          ingredients: ['1 plátano troceado']
+        },
+        {
+          id: 'rec-4',
           title: 'Ensalada César',
           tags: ['Cena'],
           ingredients: [{ name: 'Pechuga de pollo' }]
         }
       ];
 
-      // Búsqueda sin tilde ("platano") debe encontrar "Plátano maduro"
-      appInstance.filterRecipes('platano');
+      // Búsqueda con tilde ("plátano")
+      appInstance.filterRecipes('plátano');
+      const badgeWithAccent = document.getElementById('recipes-count-badge').textContent;
 
-      const badge = document.getElementById('recipes-count-badge');
-      expect(badge.textContent).toContain('1 de 2');
+      // Búsqueda sin tilde ("platano")
+      appInstance.filterRecipes('platano');
+      const badgeWithoutAccent = document.getElementById('recipes-count-badge').textContent;
+
+      // Ambas búsquedas deben devolver exactamente los mismos 3 resultados de 4
+      expect(badgeWithAccent).toBe('3 de 4');
+      expect(badgeWithoutAccent).toBe('3 de 4');
+      expect(badgeWithAccent).toBe(badgeWithoutAccent);
+    });
+
+    it('lematiza plurales y singulares en español (platanos encuentra plátano y viceversa)', () => {
+      state.recipes = [
+        {
+          id: 'rec-1',
+          title: 'Tarta de Plátano',
+          ingredients: [{ name: 'Plátano' }]
+        },
+        {
+          id: 'rec-2',
+          title: 'Brochetas de frutas',
+          ingredients: [{ name: 'Plátanos en rodajas' }]
+        },
+        {
+          id: 'rec-3',
+          title: 'Sopa de verduras',
+          ingredients: [{ name: 'Zanahoria' }]
+        }
+      ];
+
+      // Buscar plural "platanos" debe encontrar tanto la receta con singular como la de plural
+      appInstance.filterRecipes('platanos');
+      expect(document.getElementById('recipes-count-badge').textContent).toBe('2 de 3');
+
+      // Buscar singular "plátano" debe encontrar ambas
+      appInstance.filterRecipes('plátano');
+      expect(document.getElementById('recipes-count-badge').textContent).toBe('2 de 3');
+    });
+
+    it('busca en la descripción de las recetas y soporta multi-términos', () => {
+      state.recipes = [
+        {
+          id: 'rec-1',
+          title: 'Tarta casera',
+          description: 'Elaborada con auténtico plátano de Canarias y chocolate negro',
+          ingredients: [{ name: 'Harina' }]
+        },
+        {
+          id: 'rec-2',
+          title: 'Tarta de queso',
+          description: 'Clásica tarta horneada',
+          ingredients: [{ name: 'Queso crema' }]
+        }
+      ];
+
+      // Búsqueda multi-palabra que combina palabra del título y palabra de la descripción
+      appInstance.filterRecipes('tarta platano');
+      expect(document.getElementById('recipes-count-badge').textContent).toBe('1 de 2');
     });
 
     it('combina filtro de etiqueta y término de búsqueda de forma simultánea', () => {

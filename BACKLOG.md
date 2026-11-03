@@ -2,8 +2,8 @@
 
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
-> **Versión Actual**: v1.06  
-> **Última actualización**: Noviembre 2026 (Resolución de todos los bugs abiertos BUG-06, BUG-11, BUG-12, BUG-13, BUG-16, BUG-18, BUG-19, BUG-20 en v1.06)
+> **Versión Actual**: v1.07  
+> **Última actualización**: Noviembre 2026 (Resolución de todos los bugs abiertos BUG-06, BUG-11, BUG-12, BUG-13, BUG-16, BUG-18, BUG-19, BUG-20 en v1.07 con normalización avanzada de búsqueda, lematización léxica y recarga de PWA sin caché)
 
 ---
 
