@@ -674,7 +674,15 @@ function normalizeIngredientText(str) {
     .trim();
 }
 
-const normalizeSearchText = normalizeIngredientText;
+function normalizeSearchText(str) {
+  if (!str) return '';
+  return str.toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[,;+._\-\/]/g, ' ')
+    .trim();
+}
 
 function getSearchWordVariants(word) {
   const norm = normalizeSearchText(word);
@@ -730,7 +738,8 @@ function getRecipeSearchText(recipe) {
 
 function matchRecipeSearch(recipe, query) {
   if (!query || !query.trim()) return true;
-  const rawTerms = query.trim().split(/\s+/).filter(Boolean);
+  const cleanQuery = normalizeSearchText(query);
+  const rawTerms = cleanQuery.split(/\s+/).filter(Boolean);
   if (rawTerms.length === 0) return true;
 
   const targetText = getRecipeSearchText(recipe);
@@ -739,6 +748,30 @@ function matchRecipeSearch(recipe, query) {
   return rawTerms.every(term => {
     const variants = getSearchWordVariants(term);
     return variants.some(v => targetText.includes(v));
+  });
+}
+
+function matchFridgeIngredient(ingName, fridgeItem) {
+  if (!ingName || !fridgeItem) return false;
+  const rawIng = typeof ingName === 'string' ? ingName : (ingName?.name || ingName?.ingredient || '');
+  const ingNorm = normalizeSearchText(rawIng);
+  const fNorm = normalizeSearchText(fridgeItem);
+  if (!ingNorm || !fNorm) return false;
+
+  // 1. Variantes léxicas completas del ítem de la nevera (ej: aguacate -> [aguacate, aguacates])
+  const fVariants = getSearchWordVariants(fNorm);
+  if (fVariants.some(v => ingNorm.includes(v))) {
+    return true;
+  }
+
+  // 2. Si el ítem de la nevera o el ingrediente tienen varias palabras (ej: 'dientes de ajo' vs 'ajo', 'pechuga de pollo' vs 'pollo')
+  // Comprobar coincidencia por palabras significativas (> 2 caracteres para no confundir subcadenas como 'agua' en 'aguacate')
+  const ingTokens = ingNorm.split(/\s+/).filter(t => t.length > 2);
+  const fTokens = fNorm.split(/\s+/).filter(t => t.length > 2);
+
+  return fTokens.some(ft => {
+    const ftVariants = getSearchWordVariants(ft);
+    return ingTokens.some(it => ftVariants.includes(it));
   });
 }
 
@@ -3122,7 +3155,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.07';
+  window.APP_VERSION = 'v1.08';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -3155,7 +3188,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.07';
+    this.appVersion = window.APP_VERSION || 'v1.08';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -5812,13 +5845,16 @@ class FoodAssistantApp {
     const ingredients = Array.isArray(recipe?.ingredients) ? recipe.ingredients : [];
     const matchedNames = [];
     ingredients.forEach(ing => {
-      const ingNorm = normalizeIngredientText(ing?.name || '');
       const hasMatch = this.fridgeIngredients.some(f => {
+        if (typeof matchFridgeIngredient === 'function') {
+          return matchFridgeIngredient(ing, f);
+        }
+        const ingNorm = normalizeIngredientText(typeof ing === 'string' ? ing : (ing?.name || ''));
         const fNorm = normalizeIngredientText(f);
-        return ingNorm.includes(fNorm) || fNorm.includes(ingNorm);
+        return ingNorm.includes(fNorm);
       });
       if (hasMatch) {
-        matchedNames.push(ing.name);
+        matchedNames.push(typeof ing === 'string' ? ing : (ing?.name || ''));
       }
     });
 
@@ -12853,6 +12889,7 @@ if (typeof window !== 'undefined') {
   window.getSearchWordVariants = getSearchWordVariants;
   window.getRecipeSearchText = getRecipeSearchText;
   window.matchRecipeSearch = matchRecipeSearch;
+  window.matchFridgeIngredient = matchFridgeIngredient;
   window.categorizeIngredientAisle = categorizeIngredientAisle;
   window.resolveAisleOnline = resolveAisleOnline;
   window.getCachedAisle = getCachedAisle;
@@ -12884,6 +12921,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getSearchWordVariants,
     getRecipeSearchText,
     matchRecipeSearch,
+    matchFridgeIngredient,
     categorizeIngredientAisle,
     resolveAisleOnline,
     getCachedAisle,

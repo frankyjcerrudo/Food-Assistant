@@ -361,6 +361,96 @@ describe('Verificación y Cobertura de Bugs Abiertos (v1.06)', () => {
       const badge = document.getElementById('recipes-count-badge');
       expect(badge.textContent).toContain('1 de 2');
     });
+
+    it('sanea signos de puntuación (comas, puntos, etc.) de modo que "aguacate," y "aguacate" devuelven lo mismo', () => {
+      state.recipes = [
+        {
+          id: 'rec-1',
+          title: 'Tostada saludable',
+          ingredients: [{ name: 'Aguacate Hass' }]
+        },
+        {
+          id: 'rec-2',
+          title: 'Ensalada verde',
+          ingredients: [{ name: 'Aguacates maduros' }]
+        },
+        {
+          id: 'rec-3',
+          title: 'Tacos de pollo',
+          ingredients: [{ name: 'Pollo' }]
+        }
+      ];
+
+      appInstance.filterRecipes('aguacate,');
+      const badgeWithComma = document.getElementById('recipes-count-badge').textContent;
+
+      appInstance.filterRecipes('aguacate');
+      const badgeWithoutComma = document.getElementById('recipes-count-badge').textContent;
+
+      expect(badgeWithComma).toBe('2 de 3');
+      expect(badgeWithoutComma).toBe('2 de 3');
+      expect(badgeWithComma).toBe(badgeWithoutComma);
+    });
+
+    it('permite buscar múltiples ingredientes separados por comas o espacios con lógica AND', () => {
+      state.recipes = [
+        {
+          id: 'rec-1',
+          title: 'Tartar especial',
+          ingredients: [{ name: 'Aguacate' }, { name: 'Salmón' }]
+        },
+        {
+          id: 'rec-2',
+          title: 'Guacamole casero',
+          ingredients: [{ name: 'Aguacate' }, { name: 'Cebolla' }]
+        },
+        {
+          id: 'rec-3',
+          title: 'Salmón a la plancha',
+          ingredients: [{ name: 'Salmón' }]
+        }
+      ];
+
+      appInstance.filterRecipes('aguacate, salmon');
+      expect(document.getElementById('recipes-count-badge').textContent).toBe('1 de 3');
+    });
+
+    it('US-34 / Nevera: evita falsos positivos por subcadenas (aguacate no debe coincidir con agua ni salmon con sal)', () => {
+      const recConAgua = {
+        id: 'rec-agua',
+        title: 'Caldo ligero',
+        ingredients: [{ name: 'Agua' }, { name: 'Sal' }]
+      };
+      const recConAguacate = {
+        id: 'rec-aguacate',
+        title: 'Ensalada de aguacate',
+        ingredients: [{ name: '1 aguacate maduro' }, { name: 'Aceite de oliva' }]
+      };
+
+      appInstance.fridgeIngredients = ['aguacate'];
+
+      const matchAgua = appInstance.getRecipeFridgeMatch(recConAgua);
+      const matchAguacate = appInstance.getRecipeFridgeMatch(recConAguacate);
+
+      expect(matchAgua.matchCount).toBe(0);
+      expect(matchAguacate.matchCount).toBe(1);
+      expect(matchAguacate.matchedNames).toContain('1 aguacate maduro');
+
+      // Prueba con salmón vs sal
+      appInstance.fridgeIngredients = ['salmon'];
+      const matchSal = appInstance.getRecipeFridgeMatch(recConAgua);
+      expect(matchSal.matchCount).toBe(0);
+
+      // Prueba con ingredientes compuestos en la nevera (ej: dientes de ajo coincide con ajo)
+      appInstance.fridgeIngredients = ['dientes de ajo'];
+      const recConAjo = {
+        id: 'rec-ajo',
+        title: 'Alioli casero',
+        ingredients: [{ name: 'Ajo picado' }]
+      };
+      const matchAjo = appInstance.getRecipeFridgeMatch(recConAjo);
+      expect(matchAjo.matchCount).toBe(1);
+    });
   });
 
   describe('BUG-19: Gestión de portapapeles sin fallos silenciosos', () => {
