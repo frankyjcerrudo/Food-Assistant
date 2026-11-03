@@ -733,13 +733,16 @@ function getRecipeSearchText(recipe) {
   const title = recipe.title || '';
   const desc = recipe.description || '';
   const tags = Array.isArray(recipe.tags) ? recipe.tags.join(' ') : '';
-  const ingredients = Array.isArray(recipe.ingredients)
-    ? recipe.ingredients.map(i => {
-        if (!i) return '';
-        if (typeof i === 'string') return i;
-        return `${i.name || ''} ${i.ingredient || ''} ${i.original || ''} ${i.text || ''}`;
-      }).join(' ')
-    : '';
+  let ingredients = '';
+  if (Array.isArray(recipe.ingredients)) {
+    ingredients = recipe.ingredients.map(i => {
+      if (!i) return '';
+      if (typeof i === 'string') return i;
+      return [i.name, i.ingredient, i.original, i.text, i.raw, i.item, i.line].filter(Boolean).join(' ');
+    }).join(' ');
+  } else if (typeof recipe.ingredients === 'string') {
+    ingredients = recipe.ingredients;
+  }
   return normalizeSearchText(`${title} ${desc} ${tags} ${ingredients}`);
 }
 
@@ -760,7 +763,9 @@ function matchRecipeSearch(recipe, query) {
 
 function matchFridgeIngredient(ingName, fridgeItem) {
   if (!ingName || !fridgeItem) return false;
-  const rawIng = typeof ingName === 'string' ? ingName : (ingName?.name || ingName?.ingredient || '');
+  const rawIng = typeof ingName === 'string' ? ingName : (
+    ingName.name || ingName.ingredient || ingName.original || ingName.text || ingName.raw || ingName.item || ingName.line || ''
+  );
   const ingNorm = normalizeSearchText(rawIng);
   const fNorm = normalizeSearchText(fridgeItem);
   if (!ingNorm || !fNorm) return false;
@@ -3162,7 +3167,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.09';
+  window.APP_VERSION = 'v1.10';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -3195,7 +3200,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.09';
+    this.appVersion = window.APP_VERSION || 'v1.10';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -5965,25 +5970,31 @@ class FoodAssistantApp {
     if (!this.fridgeIngredients || this.fridgeIngredients.length === 0) {
       return { matchCount: 0, totalCount: recipe?.ingredients?.length || 0, percent: 0, matchedNames: [] };
     }
-    const ingredients = Array.isArray(recipe?.ingredients) ? recipe.ingredients : [];
     const matchedNames = [];
-    ingredients.forEach(ing => {
-      const hasMatch = this.fridgeIngredients.some(f => {
-        if (typeof matchFridgeIngredient === 'function') {
-          return matchFridgeIngredient(ing, f);
+    const recipeIngredients = Array.isArray(recipe?.ingredients)
+      ? recipe.ingredients
+      : (typeof recipe?.ingredients === 'string' ? recipe.ingredients.split('\n').filter(Boolean) : []);
+
+    this.fridgeIngredients.forEach(f => {
+      // Coincidencia consistente con el motor general de recetas (título, descripción, tags o ingredientes)
+      const matchesSearch = typeof matchRecipeSearch === 'function' ? matchRecipeSearch(recipe, f) : false;
+      const matchesIng = recipeIngredients.some(ing => typeof matchFridgeIngredient === 'function' && matchFridgeIngredient(ing, f));
+
+      if (matchesSearch || matchesIng) {
+        let repName = f;
+        if (recipeIngredients.length > 0) {
+          const matchedItem = recipeIngredients.find(ing => typeof matchFridgeIngredient === 'function' && matchFridgeIngredient(ing, f));
+          if (matchedItem) {
+            repName = typeof matchedItem === 'string' ? matchedItem : (matchedItem.name || matchedItem.ingredient || f);
+          }
         }
-        const ingNorm = normalizeIngredientText(typeof ing === 'string' ? ing : (ing?.name || ''));
-        const fNorm = normalizeIngredientText(f);
-        return ingNorm.includes(fNorm);
-      });
-      if (hasMatch) {
-        matchedNames.push(typeof ing === 'string' ? ing : (ing?.name || ''));
+        matchedNames.push(repName);
       }
     });
 
-    const totalCount = ingredients.length || 1;
+    const totalCount = recipeIngredients.length || 1;
     const matchCount = matchedNames.length;
-    const percent = Math.round((matchCount / totalCount) * 100);
+    const percent = Math.min(100, Math.round((matchCount / totalCount) * 100));
     return { matchCount, totalCount, percent, matchedNames };
   }
 

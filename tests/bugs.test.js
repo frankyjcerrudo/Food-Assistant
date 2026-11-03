@@ -451,6 +451,82 @@ describe('Verificación y Cobertura de Bugs Abiertos (v1.06)', () => {
       const matchAjo = appInstance.getRecipeFridgeMatch(recConAjo);
       expect(matchAjo.matchCount).toBe(1);
     });
+
+    it('v1.10: normaliza diacríticos (plátano vs platano) asegurando resultados idénticos sin importar tildes', () => {
+      state.recipes = [
+        { id: 'rec-1', title: 'Batido de plátano', ingredients: [{ name: 'Leche' }] },
+        { id: 'rec-2', title: 'Pancakes de platano', ingredients: [{ name: 'Harina' }] },
+        { id: 'rec-3', title: 'Tostada de aguacate', ingredients: [{ name: 'Aguacate' }] }
+      ];
+
+      appInstance.fridgeIngredients = [];
+      appInstance.selectedRecipeTags.clear();
+
+      appInstance.filterRecipes('plátano');
+      const countConTilde = document.getElementById('recipes-count-badge').textContent;
+
+      appInstance.filterRecipes('platano');
+      const countSinTilde = document.getElementById('recipes-count-badge').textContent;
+
+      expect(countConTilde).toBe('2 de 3');
+      expect(countSinTilde).toBe('2 de 3');
+      expect(countConTilde).toBe(countSinTilde);
+    });
+
+    it('v1.10: paridad exacta entre Buscador General y Nevera para cualquier ingrediente (aguacate, plátano)', () => {
+      // Recetas con mención en título únicamente, ingredientes objeto, y formato texto crudo
+      state.recipes = [
+        {
+          id: 'rec-1',
+          title: 'Tostas de aguacate',
+          ingredients: [{ name: 'Pan integral' }, { name: 'Aceite' }] // Mención en título
+        },
+        {
+          id: 'rec-2',
+          title: 'Guacamole tradicional',
+          ingredients: [{ name: 'Aguacate Hass maduro' }] // Mención en ingrediente objeto
+        },
+        {
+          id: 'rec-3',
+          title: 'Bowl proteico de platano',
+          ingredients: '1 plátano maduro\n200g yogur griego' // Mención en ingredientes texto crudo
+        },
+        {
+          id: 'rec-4',
+          title: 'Ensalada César',
+          ingredients: [{ name: 'Pollo' }, { name: 'Lechuga' }]
+        }
+      ];
+
+      // Test aguacate en buscador general vs nevera
+      appInstance.fridgeIngredients = [];
+      appInstance.selectedRecipeTags.clear();
+      appInstance.filterRecipes('aguacate');
+      const searchAguacateCount = document.getElementById('recipes-count-badge').textContent;
+
+      appInstance.filterRecipes('');
+      appInstance.fridgeIngredients = ['aguacate'];
+      appInstance.applyRecipeFilters();
+      const fridgeAguacateCount = document.getElementById('recipes-count-badge').textContent;
+
+      expect(searchAguacateCount).toBe('2 de 4');
+      expect(fridgeAguacateCount).toBe('2 de 4');
+      expect(searchAguacateCount).toBe(fridgeAguacateCount);
+
+      // Test plátano en buscador general vs nevera
+      appInstance.fridgeIngredients = [];
+      appInstance.filterRecipes('platano');
+      const searchPlatanoCount = document.getElementById('recipes-count-badge').textContent;
+
+      appInstance.filterRecipes('');
+      appInstance.fridgeIngredients = ['platano'];
+      appInstance.applyRecipeFilters();
+      const fridgePlatanoCount = document.getElementById('recipes-count-badge').textContent;
+
+      expect(searchPlatanoCount).toBe('1 de 4');
+      expect(fridgePlatanoCount).toBe('1 de 4');
+      expect(searchPlatanoCount).toBe(fridgePlatanoCount);
+    });
   });
 
   describe('BUG-19: Gestión de portapapeles sin fallos silenciosos', () => {
