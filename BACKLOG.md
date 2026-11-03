@@ -2,8 +2,8 @@
 
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
-> **Versión Actual**: v1.08  
-> **Última actualización**: Noviembre 2026 (Resolución de todos los bugs abiertos BUG-06, BUG-11, BUG-12, BUG-13, BUG-16, BUG-18, BUG-19, BUG-20 en v1.08 con corrección de puntuación en búsqueda y corrección de matching en Nevera)
+> **Versión Actual**: v1.09  
+> **Última actualización**: Noviembre 2026 (Resolución de todos los bugs abiertos BUG-06, BUG-11, BUG-12, BUG-13, BUG-16, BUG-18, BUG-19, BUG-20 en v1.09 con renderizado progresivo infinito y cambio de pestaña instantáneo)
 
 ---
 

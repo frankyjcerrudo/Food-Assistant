@@ -367,6 +367,9 @@ function getRecipeNutrition(recipe) {
   if (!recipe) {
     return { calories: 0, protein: 0, carbs: 0, fat: 0 };
   }
+  if (recipe._cachedNutrition) {
+    return recipe._cachedNutrition;
+  }
   const raw = recipe.nutrition || recipe.nutritionSummary;
   if (raw && typeof raw === 'object') {
     const calories = Number(raw.calories) || 0;
@@ -374,15 +377,19 @@ function getRecipeNutrition(recipe) {
     const carbs = Number(raw.carbs) || 0;
     const fat = Number(raw.fat) || 0;
     if (calories > 0 || protein > 0 || carbs > 0 || fat > 0) {
-      return {
+      const res = {
         calories: Math.round(calories),
         protein: Math.round(protein * 10) / 10,
         carbs: Math.round(carbs * 10) / 10,
         fat: Math.round(fat * 10) / 10
       };
+      recipe._cachedNutrition = res;
+      return res;
     }
   }
-  return estimateRecipeNutrition(recipe);
+  const estimated = estimateRecipeNutrition(recipe);
+  recipe._cachedNutrition = estimated;
+  return estimated;
 }
 
 // ==========================================================================
@@ -3155,7 +3162,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.08';
+  window.APP_VERSION = 'v1.09';
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -3188,7 +3195,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.08';
+    this.appVersion = window.APP_VERSION || 'v1.09';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -3203,6 +3210,12 @@ class FoodAssistantApp {
     
     // US-34: Fridge Reverse Search state
     this.fridgeIngredients = [];
+
+    // Progressive Recipe Catalog Rendering (eliminates lag with 800+ recipes)
+    this.recipesPageSize = 36;
+    this.recipesRenderedCount = 0;
+    this.currentRenderedRecipesList = [];
+    this.recipesScrollObserver = null;
 
     // Cook mode state
     this.cookStepIndex = 0;
@@ -5176,8 +5189,31 @@ class FoodAssistantApp {
       item.classList.toggle('active', item.dataset.view === viewId);
     });
 
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    this.render();
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    this.renderView(viewId);
+  }
+
+  renderView(viewId = this.activeView) {
+    switch (viewId) {
+      case 'view-today':
+        this.renderTodayView();
+        break;
+      case 'view-recipes':
+        this.initRecipeTagFilters();
+        this.applyRecipeFilters();
+        break;
+      case 'view-planner':
+        this.renderPlanner();
+        break;
+      case 'view-shopping':
+        this.renderShoppingList();
+        break;
+      case 'view-settings':
+        this.renderSettings();
+        break;
+      default:
+        this.render();
+    }
   }
 
   render() {
@@ -5626,47 +5662,13 @@ class FoodAssistantApp {
     });
   }
 
-  renderRecipesGrid(recipesList) {
-    const grid = document.getElementById('recipes-cards-grid');
-    if (!grid) return;
+  renderSingleRecipeCardHtml(rec, showCardMacros) {
+    const nut = showCardMacros ? getRecipeNutrition(rec) : null;
+    const fridgeMatch = (this.fridgeIngredients && this.fridgeIngredients.length > 0)
+      ? this.getRecipeFridgeMatch(rec)
+      : null;
 
-    const totalCount = Array.isArray(state.recipes) ? state.recipes.length : 0;
-    const currentCount = Array.isArray(recipesList) ? recipesList.length : 0;
-    const badge = document.getElementById('recipes-count-badge');
-    if (badge) {
-      if (currentCount === totalCount) {
-        badge.textContent = `${totalCount}`;
-      } else {
-        badge.textContent = `${currentCount} de ${totalCount}`;
-      }
-    }
-    const subtitle = document.getElementById('recipes-count-subtitle');
-    if (subtitle) {
-      subtitle.textContent = 'Tu recetario personal.';
-    }
-
-    if (!recipesList.length) {
-      grid.innerHTML = `
-        <div style="grid-column: 1/-1; text-align: center; padding: 48px 16px; color: var(--m3-on-surface-variant);">
-          <span class="material-symbols-outlined" style="font-size: 40px; margin-bottom: 8px;">menu_book</span>
-          <h3>No se encontraron recetas</h3>
-        </div>
-      `;
-      return;
-    }
-
-    const sortedList = (this.fridgeIngredients && this.fridgeIngredients.length > 0)
-      ? recipesList
-      : this.getSortedRecipes(recipesList);
-    const showCardMacros = !!(state.settings?.nutritionGoals?.enabled);
-
-    grid.innerHTML = sortedList.map(rec => {
-      const nut = showCardMacros ? getRecipeNutrition(rec) : null;
-      const fridgeMatch = (this.fridgeIngredients && this.fridgeIngredients.length > 0)
-        ? this.getRecipeFridgeMatch(rec)
-        : null;
-
-      return `
+    return `
       <article class="recipe-card" onclick="app.openRecipeDetail('${rec.id}')">
         <div class="recipe-image-wrap">
           ${rec.imageUrl ? `
@@ -5726,7 +5728,128 @@ class FoodAssistantApp {
         </div>
       </article>
     `;
-    }).join('');
+  }
+
+  renderRecipesGrid(recipesList) {
+    const grid = document.getElementById('recipes-cards-grid');
+    if (!grid) return;
+
+    const totalCount = Array.isArray(state.recipes) ? state.recipes.length : 0;
+    const currentCount = Array.isArray(recipesList) ? recipesList.length : 0;
+    const badge = document.getElementById('recipes-count-badge');
+    if (badge) {
+      if (currentCount === totalCount) {
+        badge.textContent = `${totalCount}`;
+      } else {
+        badge.textContent = `${currentCount} de ${totalCount}`;
+      }
+    }
+    const subtitle = document.getElementById('recipes-count-subtitle');
+    if (subtitle) {
+      subtitle.textContent = 'Tu recetario personal.';
+    }
+
+    if (!recipesList.length) {
+      grid.innerHTML = `
+        <div style="grid-column: 1/-1; text-align: center; padding: 48px 16px; color: var(--m3-on-surface-variant);">
+          <span class="material-symbols-outlined" style="font-size: 40px; margin-bottom: 8px;">menu_book</span>
+          <h3>No se encontraron recetas</h3>
+        </div>
+      `;
+      this.currentRenderedRecipesList = [];
+      this.recipesRenderedCount = 0;
+      return;
+    }
+
+    const sortedList = (this.fridgeIngredients && this.fridgeIngredients.length > 0)
+      ? recipesList
+      : this.getSortedRecipes(recipesList);
+    
+    this.currentRenderedRecipesList = sortedList;
+    const batchSize = this.recipesPageSize || 36;
+    this.recipesRenderedCount = Math.min(sortedList.length, batchSize);
+
+    const showCardMacros = !!(state.settings?.nutritionGoals?.enabled);
+    const initialBatch = sortedList.slice(0, this.recipesRenderedCount);
+
+    let html = initialBatch.map(rec => this.renderSingleRecipeCardHtml(rec, showCardMacros)).join('');
+
+    if (sortedList.length > this.recipesRenderedCount) {
+      const remaining = sortedList.length - this.recipesRenderedCount;
+      html += `
+        <div id="recipes-load-more-sentinel" style="grid-column: 1/-1; text-align: center; padding: 24px 16px;">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-load-more-recipes" onclick="app.loadMoreRecipes()">
+            <span class="material-symbols-outlined icon-sm">expand_more</span>
+            Mostrar más recetas (${remaining} restantes)
+          </button>
+        </div>
+      `;
+    }
+
+    grid.innerHTML = html;
+    this.setupRecipesInfiniteScroll();
+  }
+
+  loadMoreRecipes() {
+    const grid = document.getElementById('recipes-cards-grid');
+    const sentinel = document.getElementById('recipes-load-more-sentinel');
+    if (!grid || !this.currentRenderedRecipesList) return;
+
+    const list = this.currentRenderedRecipesList;
+    const start = this.recipesRenderedCount;
+    const batchSize = this.recipesPageSize || 36;
+    const end = Math.min(list.length, start + batchSize);
+
+    if (start >= list.length) {
+      sentinel?.remove();
+      return;
+    }
+
+    const nextBatch = list.slice(start, end);
+    this.recipesRenderedCount = end;
+
+    const showCardMacros = !!(state.settings?.nutritionGoals?.enabled);
+    const nextHtml = nextBatch.map(rec => this.renderSingleRecipeCardHtml(rec, showCardMacros)).join('');
+
+    if (sentinel) {
+      sentinel.insertAdjacentHTML('beforebegin', nextHtml);
+      const remaining = list.length - this.recipesRenderedCount;
+      if (remaining > 0) {
+        const btn = document.getElementById('btn-load-more-recipes');
+        if (btn) {
+          btn.innerHTML = `
+            <span class="material-symbols-outlined icon-sm">expand_more</span>
+            Mostrar más recetas (${remaining} restantes)
+          `;
+        }
+      } else {
+        sentinel.remove();
+      }
+    } else {
+      grid.insertAdjacentHTML('beforeend', nextHtml);
+    }
+  }
+
+  setupRecipesInfiniteScroll() {
+    if (this.recipesScrollObserver) {
+      this.recipesScrollObserver.disconnect();
+      this.recipesScrollObserver = null;
+    }
+
+    const sentinel = document.getElementById('recipes-load-more-sentinel');
+    if (!sentinel || typeof IntersectionObserver === 'undefined') return;
+
+    this.recipesScrollObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          this.loadMoreRecipes();
+        }
+      });
+    }, {
+      rootMargin: '400px 0px'
+    });
+
+    this.recipesScrollObserver.observe(sentinel);
   }
 
   // US-02: Filtro múltiple combinado con el buscador de recetas

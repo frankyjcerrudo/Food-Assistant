@@ -521,4 +521,44 @@ describe('Verificación y Cobertura de Bugs Abiertos (v1.06)', () => {
       expect(state.cloudUser).toBeNull();
     });
   });
+
+  describe('Optimización de Rendimiento: Cambio de Pestaña y Carga Progresiva (v1.09)', () => {
+    it('renderRecipesGrid aplica renderizado progresivo por lotes y añade botón/sentinela si hay más de 36 recetas', () => {
+      state.recipes = Array.from({ length: 80 }, (_, i) => ({
+        id: `rec-${i}`,
+        title: `Receta de prueba ${i}`,
+        ingredients: [{ name: 'Pollo' }]
+      }));
+
+      appInstance.renderRecipesGrid(state.recipes);
+
+      const grid = document.getElementById('recipes-cards-grid');
+      const renderedCards = grid.querySelectorAll('.recipe-card');
+      expect(renderedCards.length).toBe(36);
+
+      const sentinel = document.getElementById('recipes-load-more-sentinel');
+      expect(sentinel).not.toBeNull();
+      expect(sentinel.textContent).toContain('44 restantes');
+
+      // Cargar siguiente lote
+      appInstance.loadMoreRecipes();
+      const updatedCards = grid.querySelectorAll('.recipe-card');
+      expect(updatedCards.length).toBe(72);
+      expect(sentinel.textContent).toContain('8 restantes');
+
+      // Cargar último lote
+      appInstance.loadMoreRecipes();
+      const finalCards = grid.querySelectorAll('.recipe-card');
+      expect(finalCards.length).toBe(80);
+      expect(document.getElementById('recipes-load-more-sentinel')).toBeNull();
+    });
+
+    it('switchView cambia la vista de forma inmediata llamando selectivamente a renderView', () => {
+      const renderSpy = vi.spyOn(appInstance, 'renderView');
+      appInstance.switchView('view-recipes');
+
+      expect(appInstance.activeView).toBe('view-recipes');
+      expect(renderSpy).toHaveBeenCalledWith('view-recipes');
+    });
+  });
 });
