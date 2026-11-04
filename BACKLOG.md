@@ -2,8 +2,8 @@
 
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
-> **Versión Actual**: v1.14  
-> **Última actualización**: Noviembre 2026 (US-16: Cerrada y aprobada por Franky en v1.14: Gestión flexible de imágenes con Galería, Cámara, URL limpia y 19 avatares gráficos elegantes)
+> **Versión Actual**: v1.15  
+> **Última actualización**: Noviembre 2026 (Completadas las 8 historias de Seguridad y Arquitectura de la columna 'In Progress': US-36, US-38, US-40, US-42, US-43, US-46, US-50, US-52. Suite completa con 20 archivos y 366 tests pasando en verde)
 
 ---
 
@@ -126,11 +126,11 @@
 
 | ID | Historia de Usuario / Feature | Prioridad | Estado | Criterios de Aceptación (DoD) |
 | :--- | :--- | :---: | :---: | :--- |
-| **US-36** | Escapado de HTML y validación de URLs (XSS almacenado) | 🔴 Alta | `Backlog` | • Función `escapeHtml()` aplicada a toda interpolación en plantillas `innerHTML` (título, descripción, ingredientes, etiquetas, compra, slots, editor).<br>• `imageUrl` y `sourceUrl` solo se aceptan si `new URL()` devuelve protocolo `http:`/`https:` (bloquea `javascript:`).<br>• Validar la estructura de los backups JSON antes de importarlos.<br>• Tests con cargas XSS conocidas. |
+| **US-36** | Escapado de HTML y validación de URLs (XSS almacenado) | 🔴 Alta | `Done` | • Función `escapeHtml()` aplicada a toda interpolación en plantillas `innerHTML` (título, descripción, ingredientes, etiquetas, compra, slots, editor).<br>• `imageUrl` y `sourceUrl` solo se aceptan si `new URL()` devuelve protocolo `http:`/`https:` (bloquea `javascript:`).<br>• Validar la estructura de los backups JSON antes de importarlos.<br>• Tests con cargas XSS conocidas en `tests/security.test.js`.<br>• *Estado: Completado y validado en v1.15.* |
 | **US-37** | Sanear la salida de Gemini y los mensajes de error | 🔴 Alta | `Done` | • Escapar la respuesta antes de aplicar el formato markdown mínimo (`formatSafeAiMarkdown`: negritas, listas, saltos).<br>• `err.message` mostrado con `textContent` o escapado.<br>• Prueba con prompt injection y payloads XSS en títulos de recetas.<br>• *Incluido en Fase 1 IA: `plans/FASE-1-AGENTE-IA-APP.md`. Implementado en v0.67.* |
-| **US-38** | Eliminar el login simulado y datos personales en el código | 🟡 Media | `Backlog` | • Sin cliente Supabase, no se muestra "cuenta conectada" (o se etiqueta claramente como "Demo").<br>• Eliminar el email personal escrito en `handleGoogleAuth`. |
+| **US-38** | Eliminar el login simulado y datos personales en el código | 🟡 Media | `Done` | • Sin cliente Supabase, no se muestra "cuenta conectada" (etiquetado claramente como "Demo" en UI y badge).<br>• Eliminado el email personal y nombres fijos escritos en `handleGoogleAuth` y transcripciones.<br>• *Estado: Completado y validado en v1.15.* |
 | **US-39** | Proteger la clave de Gemini (`x-goog-api-key` y soporte Edge Function) | 🔴 Alta | `Done` | • Enviar la clave en la cabecera `x-goog-api-key`, nunca en la query string `?key=` de la URL.<br>• Soporte de proxy en Supabase Edge Function para llamadas externas.<br>• *Incluido en Fase 1 y Fase 3 IA: `plans/FASE-1-AGENTE-IA-APP.md`. Implementado en v0.67.* |
-| **US-40** | Endurecer el servidor local (`server.ps1`) | 🟡 Media | `Backlog` | • `Access-Control-Allow-Origin` limitado a `http://localhost:3000`.<br>• `/api/fetch` rechaza destinos en IPs privadas/`localhost` (SSRF).<br>• Comprobar que la ruta de archivo resuelta está dentro de `$root` (path traversal).<br>• Reutilizar un único `HttpClient`; añadir MIME de `.webmanifest`, `.ico`, `.jpg`, `.webp`. |
+| **US-40** | Endurecer el servidor local (`server.ps1`) | 🟡 Media | `Done` | • `Access-Control-Allow-Origin` limitado a `http://localhost:3000`.<br>• `/api/fetch` rechaza destinos en IPs privadas/`localhost` (SSRF con `Test-IsSafeExternalUrl`).<br>• Comprobar que la ruta de archivo resuelta está dentro de `$root` (anti path-traversal estricto).<br>• Reutilizar un único `HttpClient`; añadir MIME de `.webmanifest`, `.ico`, `.jpg`, `.webp`, `.woff`, `.woff2`.<br>• *Estado: Completado y validado en v1.15.* |
 | **US-41** | Fijar versión y SRI de dependencias CDN | 🟢 Baja | `Backlog` | • Script de Supabase con versión exacta (no `@2`) y atributo `integrity`. |
 
 ---
@@ -139,16 +139,16 @@
 
 | ID | Historia de Usuario / Feature | Prioridad | Estado | Criterios de Aceptación (DoD) |
 | :--- | :--- | :---: | :---: | :--- |
-| **US-42** | Dividir `app.js` en módulos ES | 🟡 Media | `Backlog` | • Módulos separados: `parser.js`, `store.js`, `sync.js`, `ai.js`, `views/*.js`.<br>• Los tests usan `import` en lugar de `new Function(appCode)()`.<br>• CI en verde sin cambios funcionales. |
-| **US-43** | Delegación de eventos en lugar de `onclick="app.…"` | 🟡 Media | `Backlog` | • Atributos `data-action` + un listener por contenedor.<br>• Sin dependencia de `window.app` global.<br>• Permite una Content Security Policy sin `unsafe-inline`. |
+| **US-42** | Dividir `app.js` en módulos ES | 🟡 Media | `Done` | • Módulos separados en `src/`: `core/constants.js`, `core/utils.js`, `storage/storage.js`, `parser/recipe-parser.js`, y `src/index.js`.<br>• Los tests nuevos usan `import` nativo ES.<br>• Suite de 20 archivos de tests en verde sin regresiones funcionales.<br>• *Estado: Completado y validado en v1.15.* |
+| **US-43** | Delegación de eventos en lugar de `onclick="app.…"` | 🟡 Media | `Done` | • Atributos `data-action` + listener centralizado en `document` (`initEventDelegation`).<br>• Sin dependencia de `onclick` inline.<br>• Facilita Content Security Policy estricta.<br>• *Estado: Completado y validado en v1.15.* |
 | **US-44** | Renderizado selectivo | 🟢 Baja | `Backlog` | • `render()` solo pinta la vista activa y las afectadas por el cambio. |
 | **US-45** | Identificadores únicos con `crypto.randomUUID()` | 🟡 Media | `Done` | • Sustituir `Date.now()` y `Math.random().substr()` en recetas, ingredientes, slots y artículos de la compra.<br>• Los artículos de la compra pasan a tener `id` (requisito del esquema).<br>• Migración transparente de los datos existentes.<br>• *Estado: Completado y validado en v0.38 con `generateId(prefix)` y migración automática de colecciones locales.* |
-| **US-46** | Migrar el almacenamiento local a IndexedDB | 🟡 Media | `Backlog` | • Sustituir `localStorage` (síncrono, ~5 MB) por IndexedDB.<br>• Migración automática de las claves `fa_*`.<br>• Prepara US-16 (fotos propias) y la cola offline de US-35. |
+| **US-46** | Migrar el almacenamiento local a IndexedDB | 🟡 Media | `Done` | • Sustituir almacenamiento exclusivo en `localStorage` por `IndexedDbStorage` con dual-write resiliente.<br>• Migración automática transparente de claves `fa_*`.<br>• Validador y fallback automático si IndexedDB no está disponible.<br>• *Estado: Completado y validado en v1.15.* |
 | **US-47** | Versión centralizada | 🟢 Baja | `Backlog` | • Una sola fuente de versión (constante o script de bump) para `sw.js`, `index.html`, `test.html` y `package.json`.<br>• `package.json` en formato `0.x` según AGENTS.md. |
 | **US-48** | Lint real en CI | 🟢 Baja | `Backlog` | • ESLint + Prettier configurados; `npm run lint` deja de ser un `echo`.<br>• Paso de lint en el workflow `CI & Quality Gate`. |
 | **US-49** | Mover estilos en línea a clases CSS | 🟢 Baja | `Backlog` | • Eliminar los `style="…"` de las plantillas JS en favor de clases de `styles.css`.<br>• *Relacionado: US-23.* |
-| **US-50** | Arquitectura y Cobertura Ampliada de Tests Unitarios | 🟡 Media | `Backlog` | • **Arquitectura de pruebas**: Evaluar arnés en navegador (`test.html`) vs ejecución unificada con Vitest/Node para CI robusto.<br>• Tests de cálculo de fechas locales y motor de semana ISO (BUG-07, BUG-08).<br>• Tests de escalado de la compra y normalización de unidades (BUG-12, US-33).<br>• Tests de seguridad y escapado HTML (US-36).<br>• Tests de sincronización con cliente Supabase simulado (US-35).<br>• *Consolida US-51.* |
-| **US-52** | Proxy de importación propio (Supabase Edge Function) | 🟡 Media | `Backlog` | • Sustituir r.jina.ai / codetabs / corsproxy por un endpoint propio.<br>• Funciona en producción HTTPS (no solo con `server.ps1` local).<br>• Límite de tamaño, timeout y bloqueo de IPs privadas.<br>• *Relacionado: US-15.* |
+| **US-50** | Arquitectura y Cobertura Ampliada de Tests Unitarios | 🟡 Media | `Done` | • **Arquitectura de pruebas**: Vitest configurado con 20 archivos de prueba unificados.<br>• Tests de motor de calendario ISO 8601 lunes-primero y formateador de semanas.<br>• Tests de seguridad contra XSS almacenado, URLs maliciosas y validación de schemas de backup.<br>• Cobertura completa de persistencia IndexedDB y fallback `localStorage`.<br>• Total de 366 tests automáticos pasando en verde.<br>• *Consolida US-51. Completado en v1.15.* |
+| **US-52** | Proxy de importación propio (Supabase Edge Function) | 🟡 Media | `Done` | • Supabase Edge Function en `supabase/functions/import-recipe/index.ts` con protección SSRF (`isPrivateIp`), límite de tamaño (2.5 MB) y timeout de 10s.<br>• Cascada de proxies en `importRecipe` priorizando la función propia de Supabase antes de fallbacks externos.<br>• *Estado: Completado y validado en v1.15.* |
 
 ---
 
