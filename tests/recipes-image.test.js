@@ -18,7 +18,7 @@ const {
   escapeHtml
 } = window;
 
-describe('US-16: Gestión Flexible de Imágenes de Recetas y Avatares Gráficos Elegantes (v1.11)', () => {
+describe('US-16: Gestión Flexible de Imágenes de Recetas y Avatares Gráficos Elegantes (v1.12)', () => {
   let appInstance;
 
   beforeEach(() => {
@@ -109,90 +109,157 @@ describe('US-16: Gestión Flexible de Imágenes de Recetas y Avatares Gráficos 
   });
 
   // ========================================================================
-  // 2. Detección de Temas y Paletas Gastronómicas (getRecipeTheme)
+  // 2. Detección Ampliada de Temas y Paletas Gastronómicas (getRecipeTheme)
   // ========================================================================
-  describe('Clasificación Temática Gastronómica para Avatares (getRecipeTheme)', () => {
-    it('clasifica recetas de pescado y marisco (set_meal, teal)', () => {
-      const theme = getRecipeTheme('Salmón al horno con espárragos');
+  describe('Clasificación Temática Gastronómica Ampliada (getRecipeTheme)', () => {
+    it('clasifica pescados (set_meal, teal)', () => {
+      const theme = getRecipeTheme('Salmón al horno con patatas');
       expect(theme.type).toBe('fish');
       expect(theme.icon).toBe('set_meal');
-      expect(theme.label).toBe('Pescado y Marisco');
     });
 
-    it('clasifica recetas de pasta y arroces (local_pizza, terracotta)', () => {
-      const theme = getRecipeTheme('Espaguetis al pesto fresco');
+    it('clasifica mariscos y crustáceos (phishing, ocean blue)', () => {
+      const theme = getRecipeTheme('Gambas al ajillo');
+      expect(theme.type).toBe('seafood');
+      expect(theme.icon).toBe('phishing');
+    });
+
+    it('clasifica pastas y fideos (ramen_dining, terracotta)', () => {
+      const theme = getRecipeTheme('Espaguetis al pesto casero');
       expect(theme.type).toBe('pasta');
+      expect(theme.icon).toBe('ramen_dining');
+    });
+
+    it('clasifica arroces y paellas (rice_bowl, saffron)', () => {
+      const theme = getRecipeTheme('Paella valenciana tradicional');
+      expect(theme.type).toBe('rice');
+      expect(theme.icon).toBe('rice_bowl');
+    });
+
+    it('clasifica pizzas y masas (local_pizza, brick red)', () => {
+      const theme = getRecipeTheme('Pizza artesana margarita');
+      expect(theme.type).toBe('pizza');
       expect(theme.icon).toBe('local_pizza');
-      expect(theme.label).toBe('Pasta y Arroces');
     });
 
-    it('clasifica recetas de carne y guisos (skillet, amber)', () => {
-      const theme = getRecipeTheme('Pechuga de pollo al limón con romero');
-      expect(theme.type).toBe('meat');
+    it('clasifica hamburguesas y barbacoa (lunch_dining, maroon)', () => {
+      const theme = getRecipeTheme('Hamburguesa de buey con queso');
+      expect(theme.type).toBe('burger');
+      expect(theme.icon).toBe('lunch_dining');
+    });
+
+    it('clasifica aves y pollo (skillet, amber)', () => {
+      const theme = getRecipeTheme('Pechugas de pollo al limón');
+      expect(theme.type).toBe('poultry');
       expect(theme.icon).toBe('skillet');
-      expect(theme.label).toBe('Carnes y Guisos');
     });
 
-    it('clasifica recetas de ensaladas y huerta (eco, olive green)', () => {
-      const theme = getRecipeTheme('Ensalada fresca de garbanzos y pepino');
+    it('clasifica carnes rojas y solomillo (kebab_dining, deep warm)', () => {
+      const theme = getRecipeTheme('Solomillo de cerdo a la pimienta');
+      expect(theme.type).toBe('meat');
+      expect(theme.icon).toBe('kebab_dining');
+    });
+
+    it('clasifica sopas, purés y legumbres (soup_kitchen, ochre)', () => {
+      const theme = getRecipeTheme('Lentejas estofadas con verduras');
+      expect(theme.type).toBe('soup');
+      expect(theme.icon).toBe('soup_kitchen');
+    });
+
+    it('clasifica huevos y tortillas (egg, golden yellow)', () => {
+      const theme = getRecipeTheme('Tortilla de patatas con cebolla');
+      expect(theme.type).toBe('egg');
+      expect(theme.icon).toBe('egg');
+    });
+
+    it('clasifica bocadillos, tacos y wraps (breakfast_dining, orange)', () => {
+      const theme = getRecipeTheme('Tacos de ternera con guacamole');
+      expect(theme.type).toBe('sandwich');
+      expect(theme.icon).toBe('breakfast_dining');
+    });
+
+    it('clasifica ensaladas y frescos (nutrition, green)', () => {
+      const theme = getRecipeTheme('Ensalada fresca de garbanzos');
       expect(theme.type).toBe('salad');
-      expect(theme.icon).toBe('eco');
-      expect(theme.label).toBe('Ensaladas y Huerta');
+      expect(theme.icon).toBe('nutrition');
     });
 
-    it('clasifica recetas de desayunos y dulces (bakery_dining, honey/berry)', () => {
-      const theme = getRecipeTheme('Porridge de avena con arándanos');
-      expect(theme.type).toBe('breakfast');
+    it('clasifica verduras y huerta (eco, emerald)', () => {
+      const theme = getRecipeTheme('Pisto manchego con calabacín');
+      expect(theme.type).toBe('vegetable');
+      expect(theme.icon).toBe('eco');
+    });
+
+    it('clasifica avena y cereales (grain, oat sand)', () => {
+      const theme = getRecipeTheme('Porridge de avena con chía');
+      expect(theme.type).toBe('oats');
+      expect(theme.icon).toBe('grain');
+    });
+
+    it('clasifica panadería y bollería (bakery_dining, bronze)', () => {
+      const theme = getRecipeTheme('Pan casero de masa madre');
+      expect(theme.type).toBe('bakery');
       expect(theme.icon).toBe('bakery_dining');
-      expect(theme.label).toBe('Desayunos y Dulces');
+    });
+
+    it('clasifica postres y dulces (cake, pink/berry)', () => {
+      const theme = getRecipeTheme('Tarta de queso al horno');
+      expect(theme.type).toBe('dessert');
+      expect(theme.icon).toBe('cake');
+    });
+
+    it('clasifica bebidas y batidos (emoji_food_beverage, violet)', () => {
+      const theme = getRecipeTheme('Batido de proteínas de fresa');
+      expect(theme.type).toBe('beverage');
+      expect(theme.icon).toBe('emoji_food_beverage');
+    });
+
+    it('clasifica aperitivos y snacks (cookie, caramel)', () => {
+      const theme = getRecipeTheme('Snack de nueces y almendras');
+      expect(theme.type).toBe('snack');
+      expect(theme.icon).toBe('cookie');
     });
 
     it('aplica tema default con icono restaurant para platos genéricos', () => {
       const theme = getRecipeTheme('Plato sorpresa casero');
       expect(theme.type).toBe('default');
       expect(theme.icon).toBe('restaurant');
-      expect(theme.label).toBe('Plato Casero');
     });
   });
 
   // ========================================================================
-  // 3. Generación de Avatares Gráficos en SVG y HTML
+  // 3. Generación Limpia sin Textos Innecesarios en Placeholders
   // ========================================================================
-  describe('Generación de Placeholders SVG y HTML (getRecipePlaceholderSvg & getRecipePlaceholderHtml)', () => {
-    it('getRecipePlaceholderSvg genera Data URI SVG válido y autónomo', () => {
+  describe('Generación Limpia sin Texto en Fotos (getRecipePlaceholderSvg & getRecipePlaceholderHtml)', () => {
+    it('getRecipePlaceholderSvg NO incluye etiquetas de texto en la imagen', () => {
       const svgUri = getRecipePlaceholderSvg('Salmón al Horno', 'card');
-      expect(svgUri.startsWith('data:image/svg+xml;utf8,')).toBe(true);
-
       const decoded = decodeURIComponent(svgUri);
+
       expect(decoded).toContain('<svg');
       expect(decoded).toContain('linearGradient');
-      expect(decoded).toContain('Pescado y Marisco');
-      // Contiene los anillos y cubiertos vectoriales
+      // No debe contener textos en la imagen
+      expect(decoded).not.toContain('<text');
+      expect(decoded).not.toContain('PESCADO');
+      expect(decoded).not.toContain('CARNES');
+      // Conserva el arte decorativo y avatar vajilla
       expect(decoded).toContain('stroke');
-      expect(decoded).toContain('</svg>');
     });
 
-    it('getRecipePlaceholderSvg soporta modo thumb con esquinas redondeadas', () => {
-      const thumbUri = getRecipePlaceholderSvg('Tostadas de Aguacate', 'thumb');
-      const decoded = decodeURIComponent(thumbUri);
-      expect(decoded).toContain('viewBox="0 0 96 96"');
-      expect(decoded).toContain('rx="16"');
-    });
-
-    it('getRecipePlaceholderHtml devuelve bloque HTML estilizado con Material 3 y accesibilidad', () => {
+    it('getRecipePlaceholderHtml NO incluye etiquetas de texto de categoría en el placeholder', () => {
       const html = getRecipePlaceholderHtml({ title: 'Risotto de Setas', tags: ['Italiana'] }, 'card');
       expect(html).toContain('recipe-placeholder-art');
-      expect(html).toContain('size-card');
       expect(html).toContain('recipe-placeholder-avatar');
-      expect(html).toContain('recipe-placeholder-label');
-      expect(html).toContain('Pasta y Arroces');
-      expect(html).toContain('role="img"');
+      expect(html).toContain('material-symbols-outlined');
+      expect(html).toContain('rice_bowl');
+      // Sin badge de texto visible en la foto
+      expect(html).not.toContain('recipe-placeholder-label');
+      expect(html).not.toContain('Arroces');
     });
 
-    it('getRecipePlaceholderHtml soporta tamaño detail para cabecera de modal', () => {
+    it('getRecipePlaceholderHtml soporta tamaño detail con avatar limpio', () => {
       const html = getRecipePlaceholderHtml('Sepia estofada', 'detail');
       expect(html).toContain('size-detail');
-      expect(html).toContain('Pescado y Marisco');
+      expect(html).not.toContain('recipe-placeholder-label');
     });
   });
 
@@ -200,21 +267,22 @@ describe('US-16: Gestión Flexible de Imágenes de Recetas y Avatares Gráficos 
   // 4. Integración en Catálogo y Ficha de Detalle
   // ========================================================================
   describe('Renderizado de Tarjetas y Modal Detalle con Fallback Elegante', () => {
-    it('renderSingleRecipeCardHtml muestra avatar gráfico si la receta no tiene imagen', () => {
+    it('renderSingleRecipeCardHtml muestra avatar gráfico limpio si la receta no tiene imagen', () => {
       const recipeSinFoto = {
         id: 'rec-sin-foto',
-        title: 'Guiso Tradicional de la Abuela',
-        description: 'Delicioso guiso sin foto',
+        title: 'Lentejas Caseras',
+        description: 'Deliciosas lentejas sin foto',
         imageUrl: '',
         prepTimeMinutes: 10,
-        cookTimeMinutes: 20,
+        cookTimeMinutes: 30,
         tags: ['Guiso']
       };
 
       const cardHtml = appInstance.renderSingleRecipeCardHtml(recipeSinFoto, false);
       expect(cardHtml).toContain('recipe-placeholder-art');
-      expect(cardHtml).toContain('Carnes y Guisos');
+      expect(cardHtml).toContain('soup_kitchen');
       expect(cardHtml).not.toContain('<img class="recipe-img" src=""');
+      expect(cardHtml).not.toContain('recipe-placeholder-label');
     });
 
     it('renderSingleRecipeCardHtml incluye onerror inteligente para rescatar imágenes rotas', () => {
@@ -232,16 +300,16 @@ describe('US-16: Gestión Flexible de Imágenes de Recetas y Avatares Gráficos 
       expect(cardHtml).toContain('onerror="this.onerror=null; this.parentElement.innerHTML=app.getRecipePlaceholderHtml');
     });
 
-    it('renderRecipeModalContent muestra avatar de cabecera si la receta carece de imagen', () => {
+    it('renderRecipeModalContent muestra avatar de cabecera limpio si la receta carece de imagen', () => {
       appInstance.activeRecipe = {
         id: 'rec-modal-sin-foto',
-        title: 'Lentejas Caseras',
-        description: 'Plato reconfortante',
+        title: 'Tortilla Española',
+        description: 'Plato tradicional',
         imageUrl: '',
         servings: 4,
         prepTimeMinutes: 15,
-        cookTimeMinutes: 45,
-        tags: ['Legumbres']
+        cookTimeMinutes: 20,
+        tags: ['Huevos']
       };
       appInstance.activeServings = 4;
 
@@ -249,6 +317,8 @@ describe('US-16: Gestión Flexible de Imágenes de Recetas y Avatares Gráficos 
       const modalBody = document.getElementById('recipe-modal-body');
       expect(modalBody.innerHTML).toContain('recipe-placeholder-art');
       expect(modalBody.innerHTML).toContain('size-detail');
+      expect(modalBody.innerHTML).toContain('egg');
+      expect(modalBody.innerHTML).not.toContain('recipe-placeholder-label');
     });
   });
 
@@ -256,13 +326,12 @@ describe('US-16: Gestión Flexible de Imágenes de Recetas y Avatares Gráficos 
   // 5. Gestión de Imágenes en el Editor de Recetas (Subida, URL, IA y Quitar)
   // ========================================================================
   describe('Editor de Recetas: Previsualización, Subida, URL Limpia y Generación IA', () => {
-    it('openCreateRecipeModal inicializa preview en modo avatar gráfico elegante sin foto', () => {
+    it('openCreateRecipeModal inicializa preview en modo avatar gráfico elegante sin foto ni texto', () => {
       appInstance.openCreateRecipeModal();
       const preview = document.getElementById('recipe-editor-image-preview-content');
       const removeBtn = document.getElementById('btn-edit-recipe-remove-image');
 
       expect(preview.innerHTML).toContain('recipe-placeholder-art');
-      expect(preview.innerHTML).toContain('Avatar Elegante (Sin foto)');
       expect(removeBtn.style.display).toBe('none');
     });
 
@@ -294,7 +363,7 @@ describe('US-16: Gestión Flexible de Imágenes de Recetas y Avatares Gráficos 
       appInstance.removeRecipeImage();
       expect(document.getElementById('edit-recipe-image').value).toBe('');
       const preview = document.getElementById('recipe-editor-image-preview-content');
-      expect(preview.innerHTML).toContain('Avatar Elegante (Sin foto)');
+      expect(preview.innerHTML).toContain('recipe-placeholder-art');
     });
 
     it('handleRecipeImageFileUpload comprime el archivo y asigna el Data URL', async () => {

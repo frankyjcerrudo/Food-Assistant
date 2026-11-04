@@ -1681,65 +1681,247 @@ function getRecipeTheme(recipeOrTitle, tags = []) {
     title = (recipeOrTitle.title || '').toLowerCase();
     allTags = Array.isArray(recipeOrTitle.tags) ? recipeOrTitle.tags.map(t => String(t).toLowerCase()) : [];
   } else if (typeof recipeOrTitle === 'string') {
-    title = recipeOrTitle.toLowerCase();
-    allTags = Array.isArray(tags) ? tags.map(t => String(t).toLowerCase()) : [];
+    const found = (typeof state !== 'undefined' && state.recipes) ? state.recipes.find(r => r.id === recipeOrTitle) : null;
+    if (found) {
+      title = (found.title || '').toLowerCase();
+      allTags = Array.isArray(found.tags) ? found.tags.map(t => String(t).toLowerCase()) : [];
+    } else {
+      title = recipeOrTitle.toLowerCase();
+      allTags = Array.isArray(tags) ? tags.map(t => String(t).toLowerCase()) : [];
+    }
   }
 
   const combined = title + ' ' + allTags.join(' ');
 
-  // Temas gastronómicos
-  if (/\b(?:salm[oó]n|pescado|sepia|vieiras|at[uú]n|bacalao|merluza|gambas?|langostinos?|marisco|dorada|lubina)\b/i.test(combined)) {
+  // 1. Pescados
+  if (/\b(?:salm[oó]n|pescado|sepia|at[uú]n|bacalao|merluza|dorada|lubina|trucha|calamar|calamares|pulpo|rape|sardinas?|boquerones?)\b/i.test(combined)) {
     return {
       type: 'fish',
       icon: 'set_meal',
-      label: 'Pescado y Marisco',
+      label: 'Pescado',
       gradient: 'linear-gradient(135deg, #0d9488 0%, #115e59 50%, #134e4a 100%)',
       avatarBg: '#ccfbf1',
       avatarColor: '#0f766e'
     };
   }
-  if (/\b(?:pasta|espaguetis?|macarrones?|tallarines?|risotto|arroz|paella|pizza|lasa[ñn]a|pesto|gnocchis?)\b/i.test(combined)) {
+
+  // 2. Mariscos y Crustáceos
+  if (/\b(?:gambas?|langostinos?|mejillones?|almejas?|vieiras?|bogavante|centollo|mariscos?|n[eé]coras?|percebes?|carabineros?)\b/i.test(combined)) {
+    return {
+      type: 'seafood',
+      icon: 'phishing',
+      label: 'Marisco',
+      gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 50%, #075985 100%)',
+      avatarBg: '#e0f2fe',
+      avatarColor: '#0284c7'
+    };
+  }
+
+  // 3. Pastas y Fideos
+  if (/\b(?:pasta|espaguetis?|macarrones?|tallarines?|lasa[ñn]a|fideos?|noodles?|ramen|gnocchis?|canelones?|raviolis?|tortellini|tagliatelle|penne)\b/i.test(combined)) {
     return {
       type: 'pasta',
-      icon: 'local_pizza',
-      label: 'Pasta y Arroces',
+      icon: 'ramen_dining',
+      label: 'Pasta y Fideos',
       gradient: 'linear-gradient(135deg, #ea580c 0%, #c2410c 50%, #9a3412 100%)',
       avatarBg: '#ffedd5',
       avatarColor: '#c2410c'
     };
   }
-  if (/\b(?:pollo|carne|cerdo|ternera|lomo|hamburguesa|filete|pavo|guiso|estofado|alitas|bistec)\b/i.test(combined)) {
+
+  // 4. Arroces y Paellas
+  if (/\b(?:arroz|paella|risotto|arroz\s+(?:caldoso|negro|con\s+pollo))\b/i.test(combined)) {
     return {
-      type: 'meat',
-      icon: 'skillet',
-      label: 'Carnes y Guisos',
-      gradient: 'linear-gradient(135deg, #b45309 0%, #92400e 50%, #78350f 100%)',
-      avatarBg: '#fef3c7',
-      avatarColor: '#b45309'
-    };
-  }
-  if (/\b(?:ensalada|aguacate|verduras?|vegano|vegetariano|salmorejo|gazpacho|bowl|vegetal|espinacas?)\b/i.test(combined)) {
-    return {
-      type: 'salad',
-      icon: 'eco',
-      label: 'Ensaladas y Huerta',
-      gradient: 'linear-gradient(135deg, #16a34a 0%, #15803d 50%, #14532d 100%)',
-      avatarBg: '#dcfce7',
-      avatarColor: '#15803d'
-    };
-  }
-  if (/\b(?:avena|porridge|tostadas?|pan|tarta|postre|frutas?|yogur|batido|smoothie|snack|bizcocho|galletas?)\b/i.test(combined)) {
-    return {
-      type: 'breakfast',
-      icon: 'bakery_dining',
-      label: 'Desayunos y Dulces',
-      gradient: 'linear-gradient(135deg, #d97706 0%, #b45309 50%, #831843 100%)',
+      type: 'rice',
+      icon: 'rice_bowl',
+      label: 'Arroces',
+      gradient: 'linear-gradient(135deg, #d97706 0%, #b45309 50%, #92400e 100%)',
       avatarBg: '#fef3c7',
       avatarColor: '#d97706'
     };
   }
 
-  // Por defecto (Plato Casero con elegante gradiente pizarra-ámbar)
+  // 5. Pizzas y Masas
+  if (/\b(?:pizza|calzone|empanadas?|focaccia)\b/i.test(combined)) {
+    return {
+      type: 'pizza',
+      icon: 'local_pizza',
+      label: 'Pizza',
+      gradient: 'linear-gradient(135deg, #e11d48 0%, #be123c 50%, #9f1239 100%)',
+      avatarBg: '#ffe4e6',
+      avatarColor: '#e11d48'
+    };
+  }
+
+  // 6. Hamburguesas y Barbacoa
+  if (/\b(?:hamburguesas?|burger|costillas?|bbq|barbacoa|buey|chulet[oó]n|chuletas?|churrasco|kebab)\b/i.test(combined)) {
+    return {
+      type: 'burger',
+      icon: 'lunch_dining',
+      label: 'Hamburguesas y Barbacoa',
+      gradient: 'linear-gradient(135deg, #881337 0%, #701a75 50%, #4c0519 100%)',
+      avatarBg: '#ffe4e6',
+      avatarColor: '#881337'
+    };
+  }
+
+  // 7. Bocadillos, Sandwiches, Tacos y Wraps (evaluado antes de carnes/aves específicas)
+  if (/\b(?:bocadillos?|sandwich(?:es)?|tostas?|tacos?|fajitas?|burritos?|wraps?|arepas?|paninis?)\b/i.test(combined)) {
+    return {
+      type: 'sandwich',
+      icon: 'breakfast_dining',
+      label: 'Bocadillos y Tacos',
+      gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 50%, #c2410c 100%)',
+      avatarBg: '#ffedd5',
+      avatarColor: '#ea580c'
+    };
+  }
+
+  // 8. Ensaladas y Frescos (evaluado antes de legumbres/sopas/carnes)
+  if (/\b(?:ensaladas?|bowl|poke|ensaladilla|tartar|carpaccio)\b/i.test(combined)) {
+    return {
+      type: 'salad',
+      icon: 'nutrition',
+      label: 'Ensaladas',
+      gradient: 'linear-gradient(135deg, #16a34a 0%, #15803d 50%, #14532d 100%)',
+      avatarBg: '#dcfce7',
+      avatarColor: '#15803d'
+    };
+  }
+
+  // 9. Huevos y Tortillas
+  if (/\b(?:tortillas?|huevos?|revueltos?|omelette|poch[eé]|frittata)\b/i.test(combined)) {
+    return {
+      type: 'egg',
+      icon: 'egg',
+      label: 'Huevos y Tortillas',
+      gradient: 'linear-gradient(135deg, #eab308 0%, #ca8a04 50%, #a16207 100%)',
+      avatarBg: '#fef9c3',
+      avatarColor: '#a16207'
+    };
+  }
+
+  // 10. Desayunos, Avena y Cereales
+  if (/\b(?:avena|porridge|granola|muesli|cereales|tostadas?)\b/i.test(combined)) {
+    return {
+      type: 'oats',
+      icon: 'grain',
+      label: 'Avena y Cereales',
+      gradient: 'linear-gradient(135deg, #d97706 0%, #a16207 50%, #78350f 100%)',
+      avatarBg: '#fef3c7',
+      avatarColor: '#a16207'
+    };
+  }
+
+  // 11. Aves y Pollo
+  if (/\b(?:pollo|pavo|pechugas?|alitas?|muslos?|ave)\b/i.test(combined)) {
+    return {
+      type: 'poultry',
+      icon: 'skillet',
+      label: 'Aves y Pollo',
+      gradient: 'linear-gradient(135deg, #b45309 0%, #92400e 50%, #78350f 100%)',
+      avatarBg: '#fef3c7',
+      avatarColor: '#b45309'
+    };
+  }
+
+  // 12. Carnes Rojas y Guisos de Carne
+  if (/\b(?:carne|cerdo|ternera|lomo|solomillo|bistec|alb[oó]ndigas?|entrecot)\b/i.test(combined)) {
+    return {
+      type: 'meat',
+      icon: 'kebab_dining',
+      label: 'Carnes',
+      gradient: 'linear-gradient(135deg, #9a3412 0%, #7c2d12 50%, #451a03 100%)',
+      avatarBg: '#ffedd5',
+      avatarColor: '#9a3412'
+    };
+  }
+
+  // 13. Sopas, Cremas y Caldos
+  if (/\b(?:sopas?|cremas?|pur[eé]|caldos?|potajes?|guisos?|estofados?|lentejas?|garbanzos?|alubias?|cocido|fabada)\b/i.test(combined)) {
+    return {
+      type: 'soup',
+      icon: 'soup_kitchen',
+      label: 'Sopas y Guisos',
+      gradient: 'linear-gradient(135deg, #b45309 0%, #854d0e 50%, #713f12 100%)',
+      avatarBg: '#fef3c7',
+      avatarColor: '#854d0e'
+    };
+  }
+
+  // 14. Verduras, Huerta y Vegano
+  if (/\b(?:verduras?|huerta|vegano|vegetariano|salmorejo|gazpacho|espinacas?|calabac[ií]n|berenjenas?|pisto|setas?|champi[ñn]ones?|alcachofas?|br[oó]coli|aguacate)\b/i.test(combined)) {
+    return {
+      type: 'vegetable',
+      icon: 'eco',
+      label: 'Verduras y Huerta',
+      gradient: 'linear-gradient(135deg, #059669 0%, #047857 50%, #064e3b 100%)',
+      avatarBg: '#d1fae5',
+      avatarColor: '#047857'
+    };
+  }
+
+  // 14. Desayunos, Avena y Cereales
+  if (/\b(?:avena|porridge|granola|muesli|cereales|tostadas?)\b/i.test(combined)) {
+    return {
+      type: 'oats',
+      icon: 'grain',
+      label: 'Avena y Cereales',
+      gradient: 'linear-gradient(135deg, #d97706 0%, #a16207 50%, #78350f 100%)',
+      avatarBg: '#fef3c7',
+      avatarColor: '#a16207'
+    };
+  }
+
+  // 15. Panadería y Bollería
+  if (/\b(?:pan|hogaza|baguette|croissant|brioche|bollos?|panecillos?)\b/i.test(combined)) {
+    return {
+      type: 'bakery',
+      icon: 'bakery_dining',
+      label: 'Panadería',
+      gradient: 'linear-gradient(135deg, #c2410c 0%, #9a3412 50%, #7c2d12 100%)',
+      avatarBg: '#ffedd5',
+      avatarColor: '#9a3412'
+    };
+  }
+
+  // 16. Postres, Tartas y Dulces
+  if (/\b(?:tartas?|pasteles?|bizcochos?|galletas?|flan|brownie|mousse|postres?|helados?|cupcakes?|pud[ií]n|chocolate)\b/i.test(combined)) {
+    return {
+      type: 'dessert',
+      icon: 'cake',
+      label: 'Postres y Dulces',
+      gradient: 'linear-gradient(135deg, #db2777 0%, #be185d 50%, #9d174d 100%)',
+      avatarBg: '#fce7f3',
+      avatarColor: '#be185d'
+    };
+  }
+
+  // 17. Bebidas, Batidos y Smoothies
+  if (/\b(?:batidos?|smoothies?|zumos?|t[eé]|caf[eé]|infusi[oó]n|shakes?|c[oó]ctel)\b/i.test(combined)) {
+    return {
+      type: 'beverage',
+      icon: 'emoji_food_beverage',
+      label: 'Bebidas y Batidos',
+      gradient: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 50%, #5b21b6 100%)',
+      avatarBg: '#ede9fe',
+      avatarColor: '#6d28d9'
+    };
+  }
+
+  // 18. Aperitivos y Snacks
+  if (/\b(?:snacks?|aperitivos?|frutos\s+secos|nueces|almendras|patatas\s+fritas|chips|nachos)\b/i.test(combined)) {
+    return {
+      type: 'snack',
+      icon: 'cookie',
+      label: 'Snacks y Aperitivos',
+      gradient: 'linear-gradient(135deg, #d97706 0%, #b45309 50%, #854d0e 100%)',
+      avatarBg: '#fef3c7',
+      avatarColor: '#b45309'
+    };
+  }
+
+  // 19. Por defecto: Plato Casero
   return {
     type: 'default',
     icon: 'restaurant',
@@ -1752,13 +1934,12 @@ function getRecipeTheme(recipeOrTitle, tags = []) {
 
 function getRecipePlaceholderSvg(recipeOrTitle, size = 'card') {
   const theme = getRecipeTheme(recipeOrTitle);
-  const themeLabel = typeof escapeHtml === 'function' ? escapeHtml(theme.label) : theme.label;
 
   const isThumb = size === 'thumb';
   const width = isThumb ? 96 : (size === 'detail' ? 800 : 400);
   const height = isThumb ? 96 : (size === 'detail' ? 400 : 280);
   const radius = isThumb ? 16 : 0;
-  const avatarSize = isThumb ? 44 : (size === 'detail' ? 72 : 56);
+  const avatarSize = isThumb ? 44 : (size === 'detail' ? 76 : 58);
 
   const hexColors = theme.gradient.match(/#[0-9a-fA-F]{6}/g) || ['#475569', '#334155', '#1e293b'];
   const startColor = hexColors[0] || '#475569';
@@ -1792,12 +1973,6 @@ function getRecipePlaceholderSvg(recipeOrTitle, size = 'card') {
       <path d="M 5,-9 Q 8,-6 6,-1 L 5,1 L 5,9" fill="none" stroke="${theme.avatarColor}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
   </g>
-  ${!isThumb ? `
-  <g transform="translate(${width / 2}, ${height / 2 + avatarSize / 2 + 20})">
-    <rect x="-65" y="-10" width="130" height="20" rx="10" fill="#000000" fill-opacity="0.32"/>
-    <text text-anchor="middle" dominant-baseline="central" y="1" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#ffffff" font-weight="600" letter-spacing="0.5">${themeLabel}</text>
-  </g>
-  ` : ''}
 </svg>`;
 
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -1807,14 +1982,12 @@ function getRecipePlaceholderHtml(recipeOrTitle, size = 'card') {
   const theme = getRecipeTheme(recipeOrTitle);
   const isDetail = size === 'detail';
   const sizeClass = isDetail ? 'size-detail' : 'size-card';
-  const label = typeof escapeHtml === 'function' ? escapeHtml(theme.label) : theme.label;
 
   return `
-    <div class="recipe-placeholder-art ${sizeClass}" style="background: ${theme.gradient};" role="img" aria-label="${label}">
+    <div class="recipe-placeholder-art ${sizeClass}" style="background: ${theme.gradient};" aria-hidden="true">
       <div class="recipe-placeholder-avatar" style="background: ${theme.avatarBg}; color: ${theme.avatarColor};">
         <span class="material-symbols-outlined" style="font-size: ${isDetail ? '36px' : '28px'};">${theme.icon}</span>
       </div>
-      <span class="recipe-placeholder-label">${label}</span>
     </div>
   `;
 }
@@ -3341,7 +3514,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.11';
+  window.APP_VERSION = 'v1.12';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -3378,7 +3551,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.11';
+    this.appVersion = window.APP_VERSION || 'v1.12';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -6770,9 +6943,6 @@ class FoodAssistantApp {
       previewContent.innerHTML = `
         <div style="width: 100%; height: 140px; position: relative; border-radius: var(--radius-sm); overflow: hidden;">
           ${this.getRecipePlaceholderHtml(currentTitle, 'card')}
-          <span class="recipe-image-preview-badge" style="background: rgba(0,0,0,0.55);">
-            <span class="material-symbols-outlined" style="font-size: 12px;">palette</span> Avatar Elegante (Sin foto)
-          </span>
         </div>
       `;
     }
