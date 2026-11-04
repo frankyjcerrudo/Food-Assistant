@@ -193,8 +193,8 @@ describe('US-05 & BUG-08 & BUG-17: Motor de Navegación Semanal y Persistencia D
   });
 
   it('Persistencia y creación bajo demanda (BUG-08 y BUG-17): getDayPlan crea días con dayName en español', () => {
-    // Clave futura
-    const futureDate = '2026-11-04'; // Miércoles
+    // Clave futura (que no coincida con la semana actual ni hoy)
+    const futureDate = '2028-11-08'; // Miércoles
     const day = window.state.getDayPlan(futureDate);
 
     expect(day).toBeDefined();

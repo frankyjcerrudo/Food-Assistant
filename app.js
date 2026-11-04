@@ -1645,6 +1645,181 @@ class StateStore {
 const state = new StateStore();
 
 // ==========================================================================
+// US-16: GESTIÓN FLEXIBLE DE IMÁGENES Y AVATARES GRÁFICOS ELEGANTES
+// ==========================================================================
+
+function cleanRecipeImageUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  let cleaned = url.trim();
+  // Quitar comillas externas, backticks o corchetes angulares accidentales ("...", '...', <...>)
+  cleaned = cleaned.replace(/^["'`<]+|["'`>]+$/g, '').trim();
+  if (!cleaned) return '';
+  // Si es un data URI base64, devolverlo intacto
+  if (cleaned.startsWith('data:image/')) return cleaned;
+  // Entidades HTML
+  cleaned = cleaned.replace(/&amp;/g, '&');
+  try {
+    const parsed = new URL(cleaned);
+    // Eliminar parámetros de seguimiento y analítica (manteniendo tamaño, crop o calidad de CDN)
+    const trackingParams = [
+      'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+      'fbclid', 'gclid', 'igshid', 'msclkid', 'mc_cid', 'mc_eid', '_ga', '_gl',
+      'ref', 'source', 'feature', 'ncid', 'wt.mc_id'
+    ];
+    trackingParams.forEach(param => parsed.searchParams.delete(param));
+    parsed.hash = '';
+    return parsed.toString();
+  } catch (e) {
+    return cleaned;
+  }
+}
+
+function getRecipeTheme(recipeOrTitle, tags = []) {
+  let title = '';
+  let allTags = [];
+  if (typeof recipeOrTitle === 'object' && recipeOrTitle !== null) {
+    title = (recipeOrTitle.title || '').toLowerCase();
+    allTags = Array.isArray(recipeOrTitle.tags) ? recipeOrTitle.tags.map(t => String(t).toLowerCase()) : [];
+  } else if (typeof recipeOrTitle === 'string') {
+    title = recipeOrTitle.toLowerCase();
+    allTags = Array.isArray(tags) ? tags.map(t => String(t).toLowerCase()) : [];
+  }
+
+  const combined = title + ' ' + allTags.join(' ');
+
+  // Temas gastronómicos
+  if (/\b(?:salm[oó]n|pescado|sepia|vieiras|at[uú]n|bacalao|merluza|gambas?|langostinos?|marisco|dorada|lubina)\b/i.test(combined)) {
+    return {
+      type: 'fish',
+      icon: 'set_meal',
+      label: 'Pescado y Marisco',
+      gradient: 'linear-gradient(135deg, #0d9488 0%, #115e59 50%, #134e4a 100%)',
+      avatarBg: '#ccfbf1',
+      avatarColor: '#0f766e'
+    };
+  }
+  if (/\b(?:pasta|espaguetis?|macarrones?|tallarines?|risotto|arroz|paella|pizza|lasa[ñn]a|pesto|gnocchis?)\b/i.test(combined)) {
+    return {
+      type: 'pasta',
+      icon: 'local_pizza',
+      label: 'Pasta y Arroces',
+      gradient: 'linear-gradient(135deg, #ea580c 0%, #c2410c 50%, #9a3412 100%)',
+      avatarBg: '#ffedd5',
+      avatarColor: '#c2410c'
+    };
+  }
+  if (/\b(?:pollo|carne|cerdo|ternera|lomo|hamburguesa|filete|pavo|guiso|estofado|alitas|bistec)\b/i.test(combined)) {
+    return {
+      type: 'meat',
+      icon: 'skillet',
+      label: 'Carnes y Guisos',
+      gradient: 'linear-gradient(135deg, #b45309 0%, #92400e 50%, #78350f 100%)',
+      avatarBg: '#fef3c7',
+      avatarColor: '#b45309'
+    };
+  }
+  if (/\b(?:ensalada|aguacate|verduras?|vegano|vegetariano|salmorejo|gazpacho|bowl|vegetal|espinacas?)\b/i.test(combined)) {
+    return {
+      type: 'salad',
+      icon: 'eco',
+      label: 'Ensaladas y Huerta',
+      gradient: 'linear-gradient(135deg, #16a34a 0%, #15803d 50%, #14532d 100%)',
+      avatarBg: '#dcfce7',
+      avatarColor: '#15803d'
+    };
+  }
+  if (/\b(?:avena|porridge|tostadas?|pan|tarta|postre|frutas?|yogur|batido|smoothie|snack|bizcocho|galletas?)\b/i.test(combined)) {
+    return {
+      type: 'breakfast',
+      icon: 'bakery_dining',
+      label: 'Desayunos y Dulces',
+      gradient: 'linear-gradient(135deg, #d97706 0%, #b45309 50%, #831843 100%)',
+      avatarBg: '#fef3c7',
+      avatarColor: '#d97706'
+    };
+  }
+
+  // Por defecto (Plato Casero con elegante gradiente pizarra-ámbar)
+  return {
+    type: 'default',
+    icon: 'restaurant',
+    label: 'Plato Casero',
+    gradient: 'linear-gradient(135deg, #475569 0%, #334155 50%, #1e293b 100%)',
+    avatarBg: '#f1f5f9',
+    avatarColor: '#334155'
+  };
+}
+
+function getRecipePlaceholderSvg(recipeOrTitle, size = 'card') {
+  const theme = getRecipeTheme(recipeOrTitle);
+  const themeLabel = typeof escapeHtml === 'function' ? escapeHtml(theme.label) : theme.label;
+
+  const isThumb = size === 'thumb';
+  const width = isThumb ? 96 : (size === 'detail' ? 800 : 400);
+  const height = isThumb ? 96 : (size === 'detail' ? 400 : 280);
+  const radius = isThumb ? 16 : 0;
+  const avatarSize = isThumb ? 44 : (size === 'detail' ? 72 : 56);
+
+  const hexColors = theme.gradient.match(/#[0-9a-fA-F]{6}/g) || ['#475569', '#334155', '#1e293b'];
+  const startColor = hexColors[0] || '#475569';
+  const endColor = hexColors[hexColors.length - 1] || '#1e293b';
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+  <defs>
+    <linearGradient id="g_${theme.type}" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="${startColor}"/>
+      <stop offset="100%" stop-color="${endColor}"/>
+    </linearGradient>
+    <radialGradient id="r_${theme.type}" cx="75%" cy="25%" r="65%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.2"/>
+    </radialGradient>
+  </defs>
+  <rect width="${width}" height="${height}" rx="${radius}" fill="url(#g_${theme.type})"/>
+  <rect width="${width}" height="${height}" rx="${radius}" fill="url(#r_${theme.type})"/>
+  <!-- Anillos concéntricos decorativos de plato gastronómico -->
+  <circle cx="${width / 2}" cy="${height / 2}" r="${height * 0.42}" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="2"/>
+  <circle cx="${width / 2}" cy="${height / 2}" r="${height * 0.32}" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.5" stroke-dasharray="4,4"/>
+  <!-- Avatar central con vajilla estilizada -->
+  <g transform="translate(${width / 2}, ${height / 2})">
+    <circle r="${avatarSize / 2}" fill="${theme.avatarBg}" stroke="#ffffff" stroke-width="2" filter="drop-shadow(0 4px 8px rgba(0,0,0,0.25))"/>
+    <g transform="scale(${avatarSize / 48})">
+      <circle r="16" fill="none" stroke="${theme.avatarColor}" stroke-width="2.2" opacity="0.85"/>
+      <circle r="12" fill="none" stroke="${theme.avatarColor}" stroke-width="1" opacity="0.4"/>
+      <!-- Tenedor -->
+      <path d="M -6,-9 L -6,-2 Q -6,1 -3,1 L -3,9 M -8,-9 L -8,-4 M -4,-9 L -4,-4" fill="none" stroke="${theme.avatarColor}" stroke-width="1.5" stroke-linecap="round"/>
+      <!-- Cuchillo -->
+      <path d="M 5,-9 Q 8,-6 6,-1 L 5,1 L 5,9" fill="none" stroke="${theme.avatarColor}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+  ${!isThumb ? `
+  <g transform="translate(${width / 2}, ${height / 2 + avatarSize / 2 + 20})">
+    <rect x="-65" y="-10" width="130" height="20" rx="10" fill="#000000" fill-opacity="0.32"/>
+    <text text-anchor="middle" dominant-baseline="central" y="1" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#ffffff" font-weight="600" letter-spacing="0.5">${themeLabel}</text>
+  </g>
+  ` : ''}
+</svg>`;
+
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function getRecipePlaceholderHtml(recipeOrTitle, size = 'card') {
+  const theme = getRecipeTheme(recipeOrTitle);
+  const isDetail = size === 'detail';
+  const sizeClass = isDetail ? 'size-detail' : 'size-card';
+  const label = typeof escapeHtml === 'function' ? escapeHtml(theme.label) : theme.label;
+
+  return `
+    <div class="recipe-placeholder-art ${sizeClass}" style="background: ${theme.gradient};" role="img" aria-label="${label}">
+      <div class="recipe-placeholder-avatar" style="background: ${theme.avatarBg}; color: ${theme.avatarColor};">
+        <span class="material-symbols-outlined" style="font-size: ${isDetail ? '36px' : '28px'};">${theme.icon}</span>
+      </div>
+      <span class="recipe-placeholder-label">${label}</span>
+    </div>
+  `;
+}
+
+// ==========================================================================
 // US-15: RECIPE PARSER (SCHEMA.ORG / JSON-LD & STRUCTURED TEXT)
 // ==========================================================================
 const RecipeParser = {
@@ -2158,8 +2333,7 @@ const RecipeParser = {
   },
 
   cleanImageUrl(url) {
-    if (!url) return '';
-    return url.replace(/&amp;/g, '&').trim();
+    return cleanRecipeImageUrl(url);
   },
 
   detectRobotFeatures(recipe) {
@@ -3167,7 +3341,11 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.10';
+  window.APP_VERSION = 'v1.11';
+  window.cleanRecipeImageUrl = cleanRecipeImageUrl;
+  window.getRecipeTheme = getRecipeTheme;
+  window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
+  window.getRecipePlaceholderHtml = getRecipePlaceholderHtml;
   window.generateId = generateId;
   window.toLocalDateKey = toLocalDateKey;
   window.parseLocalDateKey = parseLocalDateKey;
@@ -3200,7 +3378,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.10';
+    this.appVersion = window.APP_VERSION || 'v1.11';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -4932,6 +5110,36 @@ class FoodAssistantApp {
     document.getElementById('btn-add-ingredient-row')?.addEventListener('click', () => this.addIngredientRow());
     document.getElementById('btn-add-step-row')?.addEventListener('click', () => this.addStepRow());
 
+    // US-16: Gestión flexible de imágenes de recetas
+    const fileUploadBtn = document.getElementById('btn-edit-recipe-upload-file');
+    const fileInput = document.getElementById('edit-recipe-file-input');
+    fileUploadBtn?.addEventListener('click', () => fileInput?.click());
+    fileInput?.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) this.handleRecipeImageFileUpload(file);
+    });
+
+    document.getElementById('btn-edit-recipe-ai-image')?.addEventListener('click', () => this.generateRecipeImageWithAi());
+    document.getElementById('btn-edit-recipe-remove-image')?.addEventListener('click', () => this.removeRecipeImage());
+
+    const editImageInput = document.getElementById('edit-recipe-image');
+    if (editImageInput) {
+      editImageInput.addEventListener('input', () => this.updateRecipeEditorImagePreview());
+      editImageInput.addEventListener('change', () => {
+        editImageInput.value = cleanRecipeImageUrl(editImageInput.value);
+        this.updateRecipeEditorImagePreview();
+      });
+    }
+
+    const editTitleInput = document.getElementById('edit-recipe-title');
+    if (editTitleInput) {
+      editTitleInput.addEventListener('input', () => {
+        if (!editImageInput?.value.trim()) {
+          this.updateRecipeEditorImagePreview();
+        }
+      });
+    }
+
     // Recipe search and tag chips (US-02: Filtro múltiple combinado)
     const searchInput = document.getElementById('recipes-search-input');
     if (searchInput) {
@@ -5598,10 +5806,10 @@ class FoodAssistantApp {
             </div>
             <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px; min-width: 0;">
               ${recipe.imageUrl ? `
-                <img src="${recipe.imageUrl}" alt="" style="width: 48px; height: 48px; border-radius: 10px; object-fit: cover; flex-shrink: 0;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\\'http://www.w3.org/2000/svg\\\' viewBox=\\\'0 0 48 48\\\'><rect width=\\\'48\\\' height=\\\'48\\\' rx=\\\'10\\\' fill=\\\'%23f1f3f4\\\'/><text x=\\\'50%25\\\' y=\\\'55%25\\\' dominant-baseline=\\\'middle\\\' text-anchor=\\\'middle\\\' font-size=\\\'20\\\'>🍲</text></svg>'">
+                <img src="${recipe.imageUrl}" alt="" style="width: 48px; height: 48px; border-radius: 10px; object-fit: cover; flex-shrink: 0;" onerror="this.onerror=null; this.src=app.getRecipePlaceholderSvg('${(typeof escapeHtml === 'function' ? escapeHtml(recipe.title) : recipe.title).replace(/'/g, "\\'")}', 'thumb');">
               ` : `
-                <div style="width: 48px; height: 48px; border-radius: 10px; background: var(--m3-surface-container-high); color: var(--m3-primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                  <span class="material-symbols-outlined">restaurant</span>
+                <div style="width: 48px; height: 48px; border-radius: 10px; overflow: hidden; flex-shrink: 0;">
+                  <img src="${this.getRecipePlaceholderSvg(recipe.title, 'thumb')}" alt="" style="width: 100%; height: 100%; object-fit: cover;">
                 </div>
               `}
               <div style="flex: 1; min-width: 0; overflow: hidden;">
@@ -5677,11 +5885,9 @@ class FoodAssistantApp {
       <article class="recipe-card" onclick="app.openRecipeDetail('${rec.id}')">
         <div class="recipe-image-wrap">
           ${rec.imageUrl ? `
-            <img class="recipe-img" src="${rec.imageUrl}" alt="${rec.title}" loading="lazy">
+            <img class="recipe-img" src="${rec.imageUrl}" alt="${rec.title}" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML=app.getRecipePlaceholderHtml('${rec.id}', 'card');">
           ` : `
-            <div class="recipe-img-placeholder" style="width: 100%; height: 100%; background: var(--m3-surface-container-high); color: var(--m3-on-surface-variant); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;">
-              <span class="material-symbols-outlined" style="font-size: 36px; opacity: 0.55;">restaurant_menu</span>
-            </div>
+            ${this.getRecipePlaceholderHtml(rec, 'card')}
           `}
           <div class="recipe-time-badge">
             <span class="material-symbols-outlined icon-sm">schedule</span> ${rec.prepTimeMinutes + rec.cookTimeMinutes} min
@@ -6225,10 +6431,14 @@ class FoodAssistantApp {
 
     body.innerHTML = `
       ${r.imageUrl ? `
-      <div style="position: relative; height: 220px; background: #000; overflow: hidden;">
-        <img src="${r.imageUrl}" alt="${r.title}" style="width: 100%; height: 100%; object-fit: cover;">
+      <div style="position: relative; height: 220px; background: var(--m3-surface-container); overflow: hidden;">
+        <img src="${r.imageUrl}" alt="${r.title}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.onerror=null; this.parentElement.innerHTML=app.getRecipePlaceholderHtml('${r.id}', 'detail');">
       </div>
-      ` : ''}
+      ` : `
+      <div style="position: relative; height: 180px; overflow: hidden;">
+        ${this.getRecipePlaceholderHtml(r, 'detail')}
+      </div>
+      `}
       
       <div style="padding: 18px;">
         ${this.isReviewingImport ? `
@@ -6434,7 +6644,9 @@ class FoodAssistantApp {
     document.getElementById('edit-recipe-prep').value = "15";
     document.getElementById('edit-recipe-cook').value = "20";
     document.getElementById('edit-recipe-servings').value = state.settings.defaultServings || "2";
-    document.getElementById('edit-recipe-image').value = "";
+    const imgEl = document.getElementById('edit-recipe-image');
+    if (imgEl) imgEl.value = "";
+    this.updateRecipeEditorImagePreview();
     document.getElementById('edit-recipe-tags').value = "Cena, Saludable";
     const calEl = document.getElementById('edit-recipe-calories');
     const proEl = document.getElementById('edit-recipe-protein');
@@ -6474,7 +6686,9 @@ class FoodAssistantApp {
     document.getElementById('edit-recipe-prep').value = r.prepTimeMinutes || 0;
     document.getElementById('edit-recipe-cook').value = r.cookTimeMinutes || 0;
     document.getElementById('edit-recipe-servings').value = r.servings || 2;
-    document.getElementById('edit-recipe-image').value = r.imageUrl || "";
+    const editImgEl = document.getElementById('edit-recipe-image');
+    if (editImgEl) editImgEl.value = r.imageUrl || "";
+    this.updateRecipeEditorImagePreview();
     document.getElementById('edit-recipe-tags').value = (r.tags || []).join(', ');
     const calEl = document.getElementById('edit-recipe-calories');
     const proEl = document.getElementById('edit-recipe-protein');
@@ -6503,6 +6717,144 @@ class FoodAssistantApp {
     this.closeDialogModal(this.modalRecipeEdit);
     if (this.isReviewingImport && this.pendingImportRecipe) {
       this.openImportReview(this.pendingImportRecipe);
+    }
+  }
+
+  // ==========================================================================
+  // US-16: GESTIÓN FLEXIBLE DE IMÁGENES DE RECETAS (AVATAR, SUBIDA, URL, IA)
+  // ==========================================================================
+  getRecipeTheme(recipeOrTitle, tags) {
+    return getRecipeTheme(recipeOrTitle, tags);
+  }
+
+  getRecipePlaceholderSvg(recipeOrTitle, size) {
+    return getRecipePlaceholderSvg(recipeOrTitle, size);
+  }
+
+  getRecipePlaceholderHtml(recipeOrTitle, size) {
+    return getRecipePlaceholderHtml(recipeOrTitle, size);
+  }
+
+  cleanRecipeImageUrl(url) {
+    return cleanRecipeImageUrl(url);
+  }
+
+  updateRecipeEditorImagePreview() {
+    const previewContent = document.getElementById('recipe-editor-image-preview-content');
+    const removeBtn = document.getElementById('btn-edit-recipe-remove-image');
+    const imgInput = document.getElementById('edit-recipe-image');
+    const titleInput = document.getElementById('edit-recipe-title');
+    if (!previewContent || !imgInput) return;
+
+    const currentUrl = cleanRecipeImageUrl(imgInput.value.trim());
+    const currentTitle = titleInput?.value.trim() || 'Nueva Receta';
+
+    if (currentUrl) {
+      if (removeBtn) removeBtn.style.display = 'inline-flex';
+      const isBase64 = currentUrl.startsWith('data:image/');
+      const isAi = currentUrl.includes('pollinations.ai');
+      const badgeText = isBase64 ? 'Foto propia' : (isAi ? 'Generada con IA' : 'URL Externa');
+      const badgeIcon = isBase64 ? 'photo_camera' : (isAi ? 'auto_awesome' : 'link');
+
+      const safeTitle = (typeof escapeHtml === 'function' ? escapeHtml(currentTitle) : currentTitle).replace(/'/g, "\\'");
+      previewContent.innerHTML = `
+        <div style="position: relative; width: 100%; height: 140px; background: #000; overflow: hidden; border-radius: var(--radius-sm);">
+          <img src="${currentUrl}" alt="Vista previa" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.onerror=null; this.parentElement.innerHTML=app.getRecipePlaceholderHtml('${safeTitle}', 'card');">
+          <span class="recipe-image-preview-badge">
+            <span class="material-symbols-outlined" style="font-size: 12px;">${badgeIcon}</span> ${badgeText}
+          </span>
+        </div>
+      `;
+    } else {
+      if (removeBtn) removeBtn.style.display = 'none';
+      previewContent.innerHTML = `
+        <div style="width: 100%; height: 140px; position: relative; border-radius: var(--radius-sm); overflow: hidden;">
+          ${this.getRecipePlaceholderHtml(currentTitle, 'card')}
+          <span class="recipe-image-preview-badge" style="background: rgba(0,0,0,0.55);">
+            <span class="material-symbols-outlined" style="font-size: 12px;">palette</span> Avatar Elegante (Sin foto)
+          </span>
+        </div>
+      `;
+    }
+  }
+
+  removeRecipeImage() {
+    const imgInput = document.getElementById('edit-recipe-image');
+    const fileInput = document.getElementById('edit-recipe-file-input');
+    if (imgInput) imgInput.value = '';
+    if (fileInput) fileInput.value = '';
+    this.updateRecipeEditorImagePreview();
+    this.showToast('Foto eliminada. Se usará el avatar gráfico elegante.', 'info');
+  }
+
+  async handleRecipeImageFileUpload(file) {
+    if (!file) return;
+    try {
+      this.showToast('Optimizando foto...', 'info');
+      const result = await this.compressImageToBase64(file, 1024, 1024, 0.8);
+      if (result && result.dataUrl) {
+        const imgInput = document.getElementById('edit-recipe-image');
+        if (imgInput) {
+          imgInput.value = result.dataUrl;
+        }
+        this.updateRecipeEditorImagePreview();
+        this.showToast('Foto optimizada y cargada correctamente.', 'success');
+      }
+    } catch (err) {
+      console.error('[FoodAssistant] Error al procesar imagen:', err);
+      this.showToast('No se pudo procesar la imagen seleccionada.', 'error');
+    }
+  }
+
+  async generateRecipeImageWithAi() {
+    const titleInput = document.getElementById('edit-recipe-title');
+    const title = titleInput?.value.trim();
+    if (!title) {
+      this.highlightInputError(titleInput, 'Escribe primero el título del plato para que la IA genere la foto adecuada.');
+      this.showToast('Por favor, introduce el título del plato antes de generar la foto.', 'error');
+      return;
+    }
+
+    const tags = Array.from(this.editorSelectedTags || []).join(', ');
+    const aiBtn = document.getElementById('btn-edit-recipe-ai-image');
+    const prevHtml = aiBtn ? aiBtn.innerHTML : '';
+
+    if (aiBtn) {
+      aiBtn.disabled = true;
+      aiBtn.innerHTML = '<span class="material-symbols-outlined icon-sm" style="animation: spin 1s linear infinite;">sync</span> Generando foto con IA...';
+    }
+
+    const previewContent = document.getElementById('recipe-editor-image-preview-content');
+    if (previewContent) {
+      previewContent.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 140px; gap: 8px; color: var(--m3-primary);">
+          <span class="material-symbols-outlined" style="font-size: 32px; animation: spin 1.2s linear infinite;">auto_awesome</span>
+          <span style="font-size: 12px; font-weight: 500;">Creando fotografía gastronómica con IA...</span>
+        </div>
+      `;
+    }
+
+    try {
+      const cleanTitle = title.replace(/["']/g, '');
+      const seed = Math.floor(Math.random() * 900000) + 100000;
+      const promptQuery = `appetizing gourmet culinary food photography of ${cleanTitle}${tags ? ', ' + tags : ''}, beautifully plated in a modern restaurant ceramic dish, warm studio soft light, appetizing garnish, high quality professional food photography, 4k`;
+      const generatedUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptQuery)}?width=800&height=600&nologo=true&seed=${seed}`;
+
+      const imgInput = document.getElementById('edit-recipe-image');
+      if (imgInput) {
+        imgInput.value = generatedUrl;
+      }
+      this.updateRecipeEditorImagePreview();
+      this.showToast(`Foto gastronómica generada con éxito para "${title}".`, 'success');
+    } catch (err) {
+      console.error('[FoodAssistant] Error generando foto con IA:', err);
+      this.showToast('No se pudo generar la foto con IA en este momento.', 'error');
+      this.updateRecipeEditorImagePreview();
+    } finally {
+      if (aiBtn) {
+        aiBtn.disabled = false;
+        aiBtn.innerHTML = prevHtml;
+      }
     }
   }
 
@@ -7053,7 +7405,7 @@ class FoodAssistantApp {
 
     const id = document.getElementById('edit-recipe-id').value || generateId('rec-');
     const description = document.getElementById('edit-recipe-desc').value.trim();
-    const imageUrl = document.getElementById('edit-recipe-image')?.value.trim() || '';
+    const imageUrl = cleanRecipeImageUrl(document.getElementById('edit-recipe-image')?.value.trim() || '');
     const prepTimeMinutes = parseInt(document.getElementById('edit-recipe-prep').value, 10) || 0;
     const cookTimeMinutes = parseInt(document.getElementById('edit-recipe-cook').value, 10) || 0;
     const servings = parseInt(document.getElementById('edit-recipe-servings').value, 10) || 2;
@@ -7415,10 +7767,10 @@ class FoodAssistantApp {
           </div>
           <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; min-width: 0;">
             ${recipe.imageUrl ? `
-              <img src="${recipe.imageUrl}" alt="" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\\'http://www.w3.org/2000/svg\\\' viewBox=\\\'0 0 48 48\\\'><rect width=\\\'48\\\' height=\\\'48\\\' rx=\\\'8\\\' fill=\\\'%23f1f3f4\\\'/><text x=\\\'50%25\\\' y=\\\'55%25\\\' dominant-baseline=\\\'middle\\\' text-anchor=\\\'middle\\\' font-size=\\\'18\\\'>🍲</text></svg>'">
+              <img src="${recipe.imageUrl}" alt="" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.onerror=null; this.src=app.getRecipePlaceholderSvg('${(typeof escapeHtml === 'function' ? escapeHtml(recipe.title) : recipe.title).replace(/'/g, "\\'")}', 'thumb');">
             ` : `
-              <div style="width: 36px; height: 36px; border-radius: 6px; background: var(--m3-surface-container-high); color: var(--m3-primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                <span class="material-symbols-outlined icon-sm">restaurant</span>
+              <div style="width: 36px; height: 36px; border-radius: 6px; overflow: hidden; flex-shrink: 0;">
+                <img src="${this.getRecipePlaceholderSvg(recipe.title, 'thumb')}" alt="" style="width: 100%; height: 100%; object-fit: cover;">
               </div>
             `}
             <div style="flex: 1; min-width: 0; overflow: hidden;">
@@ -7472,10 +7824,10 @@ class FoodAssistantApp {
           </div>
           <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; min-width: 0;">
             ${recipe.imageUrl ? `
-              <img src="${recipe.imageUrl}" alt="" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\\'http://www.w3.org/2000/svg\\\' viewBox=\\\'0 0 48 48\\\'><rect width=\\\'48\\\' height=\\\'48\\\' rx=\\\'8\\\' fill=\\\'%23f1f3f4\\\'/><text x=\\\'50%25\\\' y=\\\'55%25\\\' dominant-baseline=\\\'middle\\\' text-anchor=\\\'middle\\\' font-size=\\\'18\\\'>🍲</text></svg>'">
+              <img src="${recipe.imageUrl}" alt="" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.onerror=null; this.src=app.getRecipePlaceholderSvg('${(typeof escapeHtml === 'function' ? escapeHtml(recipe.title) : recipe.title).replace(/'/g, "\\'")}', 'thumb');">
             ` : `
-              <div style="width: 36px; height: 36px; border-radius: 6px; background: var(--m3-surface-container-high); color: var(--m3-primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                <span class="material-symbols-outlined icon-sm">restaurant</span>
+              <div style="width: 36px; height: 36px; border-radius: 6px; overflow: hidden; flex-shrink: 0;">
+                <img src="${this.getRecipePlaceholderSvg(recipe.title, 'thumb')}" alt="" style="width: 100%; height: 100%; object-fit: cover;">
               </div>
             `}
             <div style="flex: 1; min-width: 0; overflow: hidden;">
@@ -8129,10 +8481,10 @@ class FoodAssistantApp {
              onclick="app.selectRecipeForSlot('${r.id}')">
           <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; padding-right: 8px;">
             ${r.imageUrl ? `
-              <img src="${r.imageUrl}" alt="" style="width: 42px; height: 42px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 48 48\\'><rect width=\\'48\\' height=\\'48\\' rx=\\'8\\' fill=\\'%23f1f3f4\\'/><text x=\\'50%25\\' y=\\'55%25\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' font-size=\\'18\\'>🍲</text></svg>'">
+              <img src="${r.imageUrl}" alt="" style="width: 42px; height: 42px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.onerror=null; this.src=app.getRecipePlaceholderSvg('${(typeof escapeHtml === 'function' ? escapeHtml(r.title) : r.title).replace(/'/g, "\\'")}', 'thumb');">
             ` : `
-              <div style="width: 42px; height: 42px; border-radius: 6px; background: var(--m3-surface-container-high); color: var(--m3-primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                <span class="material-symbols-outlined icon-sm">restaurant</span>
+              <div style="width: 42px; height: 42px; border-radius: 6px; overflow: hidden; flex-shrink: 0;">
+                <img src="${this.getRecipePlaceholderSvg(r.title, 'thumb')}" alt="" style="width: 100%; height: 100%; object-fit: cover;">
               </div>
             `}
             <div style="min-width: 0;">
