@@ -3514,7 +3514,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.13';
+  window.APP_VERSION = 'v1.14';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -3551,7 +3551,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.13';
+    this.appVersion = window.APP_VERSION || 'v1.14';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -5305,8 +5305,6 @@ class FoodAssistantApp {
       const file = e.target.files && e.target.files[0];
       if (file) this.handleRecipeImageFileUpload(file);
     });
-
-    document.getElementById('btn-edit-recipe-ai-image')?.addEventListener('click', () => this.generateRecipeImageWithAi());
     document.getElementById('btn-edit-recipe-remove-image')?.addEventListener('click', () => this.removeRecipeImage());
 
     const editImageInput = document.getElementById('edit-recipe-image');
@@ -6939,9 +6937,8 @@ class FoodAssistantApp {
     if (currentUrl) {
       if (removeBtn) removeBtn.style.display = 'inline-flex';
       const isBase64 = currentUrl.startsWith('data:image/');
-      const isAi = currentUrl.includes('pollinations.ai');
-      const badgeText = isBase64 ? 'Foto propia' : (isAi ? 'Generada con IA' : 'URL Externa');
-      const badgeIcon = isBase64 ? 'photo_camera' : (isAi ? 'auto_awesome' : 'link');
+      const badgeText = isBase64 ? 'Foto propia' : 'URL Externa';
+      const badgeIcon = isBase64 ? 'photo_camera' : 'link';
 
       const safeTitle = (typeof escapeHtml === 'function' ? escapeHtml(currentTitle) : currentTitle).replace(/'/g, "\\'");
       previewContent.innerHTML = `

@@ -57,7 +57,6 @@ describe('US-16: Gestión Flexible de Imágenes de Recetas y Avatares Gráficos 
         <input type="file" id="edit-recipe-camera-input" accept="image/*" capture="environment">
         <button id="btn-edit-recipe-upload-file"></button>
         <button id="btn-edit-recipe-camera"></button>
-        <button id="btn-edit-recipe-ai-image"></button>
         <button id="btn-edit-recipe-remove-image"></button>
         <input type="url" id="edit-recipe-image">
       </dialog>
@@ -407,28 +406,13 @@ describe('US-16: Gestión Flexible de Imágenes de Recetas y Avatares Gráficos 
       expect(preview.innerHTML).toContain('Foto propia');
     });
 
-    it('generateRecipeImageWithAi alerta si el título está vacío', async () => {
-      document.getElementById('edit-recipe-title').value = '';
-      const toastSpy = vi.spyOn(appInstance, 'showToast');
-
-      await appInstance.generateRecipeImageWithAi();
-      expect(toastSpy).toHaveBeenCalledWith(expect.stringContaining('introduce el título del plato'), 'error');
-    });
-
-    it('generateRecipeImageWithAi crea fotografía gastronómica con IA cuando hay título', async () => {
-      document.getElementById('edit-recipe-title').value = 'Risotto de Setas Silvestres';
-      document.getElementById('edit-recipe-desc').value = 'Cremoso arroz con boletus y parmesano';
-      appInstance.editorSelectedTags = new Set(['Cena', 'Italiana']);
-
-      await appInstance.generateRecipeImageWithAi();
-      const generatedUrl = document.getElementById('edit-recipe-image').value;
-
-      expect(generatedUrl).toContain('image.pollinations.ai/prompt/');
-      expect(generatedUrl).toContain('Risotto%20de%20Setas%20Silvestres');
-      expect(generatedUrl).toContain('width=800');
+    it('updateRecipeEditorImagePreview muestra badge para Foto propia o URL Externa sin generador IA', () => {
+      document.getElementById('edit-recipe-image').value = 'https://ejemplo.com/plato.jpg';
+      appInstance.updateRecipeEditorImagePreview();
 
       const preview = document.getElementById('recipe-editor-image-preview-content');
-      expect(preview.innerHTML).toContain('Generada con IA');
+      expect(preview.innerHTML).toContain('URL Externa');
+      expect(preview.innerHTML).not.toContain('Generada con IA');
     });
 
     it('saveRecipeEdit guarda la URL saneada en la receta sin parámetros de tracking', () => {
