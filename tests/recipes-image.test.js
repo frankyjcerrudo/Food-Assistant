@@ -53,8 +53,10 @@ describe('US-16: Gestión Flexible de Imágenes de Recetas y Avatares Gráficos 
         <div id="recipe-editor-image-preview-container">
           <div id="recipe-editor-image-preview-content"></div>
         </div>
-        <input type="file" id="edit-recipe-file-input">
+        <input type="file" id="edit-recipe-file-input" accept="image/*">
+        <input type="file" id="edit-recipe-camera-input" accept="image/*" capture="environment">
         <button id="btn-edit-recipe-upload-file"></button>
+        <button id="btn-edit-recipe-camera"></button>
         <button id="btn-edit-recipe-ai-image"></button>
         <button id="btn-edit-recipe-remove-image"></button>
         <input type="url" id="edit-recipe-image">
@@ -354,6 +356,30 @@ describe('US-16: Gestión Flexible de Imágenes de Recetas y Avatares Gráficos 
       expect(preview.innerHTML).toContain('<img src="https://images.unsplash.com/photo-salmon?w=800"');
       expect(preview.innerHTML).toContain('URL Externa');
       expect(removeBtn.style.display).toBe('inline-flex');
+    });
+
+    it('el botón Galería abre el input de archivos sin atributo capture (permite elegir fotos de la galería)', () => {
+      const fileInput = document.getElementById('edit-recipe-file-input');
+      const uploadBtn = document.getElementById('btn-edit-recipe-upload-file');
+      expect(fileInput.hasAttribute('capture')).toBe(false);
+      expect(fileInput.getAttribute('accept')).toBe('image/*');
+
+      let clicked = false;
+      fileInput.click = () => { clicked = true; };
+      uploadBtn.click();
+      expect(clicked).toBe(true);
+    });
+
+    it('el botón Cámara abre el input dedicado con capture=environment (dispara cámara directamente)', () => {
+      const cameraInput = document.getElementById('edit-recipe-camera-input');
+      const cameraBtn = document.getElementById('btn-edit-recipe-camera');
+      expect(cameraInput.getAttribute('capture')).toBe('environment');
+      expect(cameraInput.getAttribute('accept')).toBe('image/*');
+
+      let clicked = false;
+      cameraInput.click = () => { clicked = true; };
+      cameraBtn.click();
+      expect(clicked).toBe(true);
     });
 
     it('removeRecipeImage limpia la foto, restaura avatar elegante y avisa al usuario', () => {

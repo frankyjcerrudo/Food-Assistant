@@ -3514,7 +3514,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.12';
+  window.APP_VERSION = 'v1.13';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -3551,7 +3551,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.12';
+    this.appVersion = window.APP_VERSION || 'v1.13';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -5283,11 +5283,25 @@ class FoodAssistantApp {
     document.getElementById('btn-add-ingredient-row')?.addEventListener('click', () => this.addIngredientRow());
     document.getElementById('btn-add-step-row')?.addEventListener('click', () => this.addStepRow());
 
-    // US-16: Gestión flexible de imágenes de recetas
+    // US-16: Gestión flexible de imágenes de recetas (Galería, Cámara, IA, Quitar)
     const fileUploadBtn = document.getElementById('btn-edit-recipe-upload-file');
     const fileInput = document.getElementById('edit-recipe-file-input');
-    fileUploadBtn?.addEventListener('click', () => fileInput?.click());
+    fileUploadBtn?.addEventListener('click', () => {
+      if (fileInput) fileInput.value = '';
+      fileInput?.click();
+    });
     fileInput?.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) this.handleRecipeImageFileUpload(file);
+    });
+
+    const cameraBtn = document.getElementById('btn-edit-recipe-camera');
+    const cameraInput = document.getElementById('edit-recipe-camera-input');
+    cameraBtn?.addEventListener('click', () => {
+      if (cameraInput) cameraInput.value = '';
+      cameraInput?.click();
+    });
+    cameraInput?.addEventListener('change', (e) => {
       const file = e.target.files && e.target.files[0];
       if (file) this.handleRecipeImageFileUpload(file);
     });
@@ -6951,8 +6965,10 @@ class FoodAssistantApp {
   removeRecipeImage() {
     const imgInput = document.getElementById('edit-recipe-image');
     const fileInput = document.getElementById('edit-recipe-file-input');
+    const cameraInput = document.getElementById('edit-recipe-camera-input');
     if (imgInput) imgInput.value = '';
     if (fileInput) fileInput.value = '';
+    if (cameraInput) cameraInput.value = '';
     this.updateRecipeEditorImagePreview();
     this.showToast('Foto eliminada. Se usará el avatar gráfico elegante.', 'info');
   }
