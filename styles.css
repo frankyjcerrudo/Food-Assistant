@@ -634,6 +634,67 @@ textarea {
   font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
 }
 
+/* Modal Recipe Importer Segmented Tabs (US-30, US-68 / v1.23) */
+.import-tabs-bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  background-color: var(--m3-surface-container);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  margin-bottom: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.import-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  width: 100%;
+  padding: 8px 4px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--m3-on-surface-variant);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  box-sizing: border-box;
+  transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease, box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.import-tab-btn .material-symbols-outlined {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.import-tab-btn .import-tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.import-tab-btn:hover {
+  color: var(--m3-on-surface);
+}
+
+.import-tab-btn.active {
+  background-color: var(--m3-surface);
+  color: var(--m3-on-surface);
+  box-shadow: var(--elevation-1);
+  font-weight: 600;
+}
+
+.import-tab-btn.active .material-symbols-outlined {
+  font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 20;
+}
+
 /* Forms & Inputs */
 .form-group {
   margin-bottom: 14px;

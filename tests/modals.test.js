@@ -165,8 +165,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
   });
 
   it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-    expect(window.APP_VERSION).toBe('v1.22');
-    expect(appInstance.appVersion).toBe('v1.22');
+    expect(window.APP_VERSION).toBe('v1.23');
+    expect(appInstance.appVersion).toBe('v1.23');
 
     const badge = document.createElement('span');
     badge.id = 'app-version-badge';
@@ -176,8 +176,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     document.body.appendChild(settingsVer);
 
     appInstance.initVersion();
-    expect(badge.textContent).toBe('v1.22');
-    expect(settingsVer.textContent).toBe('v1.22');
+    expect(badge.textContent).toBe('v1.23');
+    expect(settingsVer.textContent).toBe('v1.23');
 
     document.body.removeChild(badge);
     document.body.removeChild(settingsVer);
@@ -344,6 +344,59 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     confirmDialog.querySelector('#btn-confirm-dialog-cancel').click();
     const cancelled = await cancelPromise;
     expect(cancelled).toBe(false);
+  });
+
+  it('v1.23: switchImportTab alterna correctamente clases activas, ARIA states y no ensucia con inline styles', () => {
+    // Setup tab elements
+    const tabUrl = document.createElement('button');
+    tabUrl.id = 'tab-import-url';
+    const tabText = document.createElement('button');
+    tabText.id = 'tab-import-text';
+    const tabAi = document.createElement('button');
+    tabAi.id = 'tab-import-ai';
+
+    const secUrl = document.createElement('div');
+    secUrl.id = 'section-import-url';
+    const secText = document.createElement('div');
+    secText.id = 'section-import-text';
+    const secAi = document.createElement('div');
+    secAi.id = 'section-import-ai';
+
+    document.body.appendChild(tabUrl);
+    document.body.appendChild(tabText);
+    document.body.appendChild(tabAi);
+    document.body.appendChild(secUrl);
+    document.body.appendChild(secText);
+    document.body.appendChild(secAi);
+
+    // Switch to 'ai'
+    appInstance.switchImportTab('ai');
+    expect(tabAi.classList.contains('active')).toBe(true);
+    expect(tabAi.getAttribute('aria-selected')).toBe('true');
+    expect(secAi.style.display).toBe('block');
+    expect(tabUrl.classList.contains('active')).toBe(false);
+    expect(tabUrl.getAttribute('aria-selected')).toBe('false');
+    expect(secUrl.style.display).toBe('none');
+    expect(tabText.classList.contains('active')).toBe(false);
+    expect(tabText.getAttribute('aria-selected')).toBe('false');
+    expect(secText.style.display).toBe('none');
+
+    // Switch to 'text'
+    appInstance.switchImportTab('text');
+    expect(tabText.classList.contains('active')).toBe(true);
+    expect(tabText.getAttribute('aria-selected')).toBe('true');
+    expect(secText.style.display).toBe('block');
+    expect(tabAi.classList.contains('active')).toBe(false);
+    expect(tabAi.getAttribute('aria-selected')).toBe('false');
+    expect(secAi.style.display).toBe('none');
+
+    // Clean up DOM
+    document.body.removeChild(tabUrl);
+    document.body.removeChild(tabText);
+    document.body.removeChild(tabAi);
+    document.body.removeChild(secUrl);
+    document.body.removeChild(secText);
+    document.body.removeChild(secAi);
   });
 });
 

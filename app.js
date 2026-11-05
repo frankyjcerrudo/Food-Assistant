@@ -4130,7 +4130,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.22';
+  window.APP_VERSION = 'v1.23';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4167,7 +4167,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.22';
+    this.appVersion = window.APP_VERSION || 'v1.23';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -13481,13 +13481,14 @@ REGLAS CRÍTICAS:
     const corsBanner = document.getElementById('import-cors-banner');
     if (corsBanner) corsBanner.style.display = 'none';
 
-    // Reset styles
+    // Reset styles & ARIA states (US-30, US-68 / v1.23)
     [tabUrl, tabText, tabAi].forEach(t => {
       if (t) {
-        t.style.background = 'transparent';
-        t.style.color = 'var(--m3-on-surface-variant)';
-        t.style.boxShadow = 'none';
+        t.style.background = '';
+        t.style.color = '';
+        t.style.boxShadow = '';
         t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
       }
     });
     [secUrl, secText, secAi].forEach(s => {
@@ -13496,26 +13497,20 @@ REGLAS CRÍTICAS:
 
     if (tab === 'url') {
       if (tabUrl) {
-        tabUrl.style.background = 'var(--m3-surface)';
-        tabUrl.style.color = 'var(--m3-on-surface)';
-        tabUrl.style.boxShadow = 'var(--elevation-1)';
         tabUrl.classList.add('active');
+        tabUrl.setAttribute('aria-selected', 'true');
       }
       if (secUrl) secUrl.style.display = 'block';
     } else if (tab === 'text') {
       if (tabText) {
-        tabText.style.background = 'var(--m3-surface)';
-        tabText.style.color = 'var(--m3-on-surface)';
-        tabText.style.boxShadow = 'var(--elevation-1)';
         tabText.classList.add('active');
+        tabText.setAttribute('aria-selected', 'true');
       }
       if (secText) secText.style.display = 'block';
     } else if (tab === 'ai') {
       if (tabAi) {
-        tabAi.style.background = 'var(--m3-surface)';
-        tabAi.style.color = 'var(--m3-on-surface)';
-        tabAi.style.boxShadow = 'var(--elevation-1)';
         tabAi.classList.add('active');
+        tabAi.setAttribute('aria-selected', 'true');
       }
       if (secAi) secAi.style.display = 'block';
     }
