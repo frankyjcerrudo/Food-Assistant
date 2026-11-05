@@ -808,16 +808,54 @@ function singularizeSpanishToken(token) {
   return token;
 }
 
+const INGREDIENT_MODIFIERS = new Set([
+  // Tamaños
+  'grande', 'grandes', 'mediano', 'mediana', 'medianos', 'medianas',
+  'pequeno', 'pequena', 'pequenos', 'pequenas', 'chico', 'chica', 'chicos', 'chicas', 'mini', 'xl',
+  // Cortes y estados
+  'entero', 'entera', 'enteros', 'enteras',
+  'picado', 'picada', 'picados', 'picadas',
+  'troceado', 'troceada', 'troceados', 'troceadas',
+  'laminado', 'laminada', 'laminados', 'laminadas',
+  'rallado', 'rallada', 'rallados', 'ralladas',
+  'molido', 'molida', 'molidos', 'molidas',
+  'triturado', 'triturada', 'triturados', 'trituradas',
+  'cortado', 'cortada', 'cortados', 'cortadas',
+  'desmenuzado', 'desmenuzada', 'desmigado', 'desmigada',
+  // Madurez y frescura
+  'maduro', 'madura', 'maduros', 'maduras',
+  'fresco', 'fresca', 'frescos', 'frescas',
+  'congelado', 'congelada', 'congelados', 'congeladas',
+  'crudo', 'cruda', 'crudos', 'crudas',
+  'cocido', 'cocida', 'cocidos', 'cocidas',
+  'asado', 'asada', 'asados', 'asadas',
+  // Limpieza y preparación
+  'pelado', 'pelada', 'pelados', 'peladas',
+  'limpio', 'limpia', 'limpios', 'limpias',
+  'deshuesado', 'deshuesada', 'deshuesados', 'deshuesadas',
+  // Dietéticos y sal
+  'desnatado', 'desnatada', 'semidesnatado', 'semidesnatada',
+  'desgrasado', 'desgrasada'
+]);
+
 function getCanonicalIngredientKey(name) {
   if (!name) return '';
-  const norm = normalizeIngredientText(name)
-    .replace(/[,;+._\-\/()]/g, ' ')
+  const clean = normalizeIngredientText(name)
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\bcon\s+\d+%\s+de\s+grasa\b/g, ' ')
+    .replace(/\b(en\s+(?:dados|trozos|rodajas|cubos|juliana|tiras|polvo))\b/g, ' ')
+    .replace(/\b(?:bajo|baja|sin)\s+en\s+sal\b/g, ' ')
+    .replace(/\b(?:sin|con)\s+(?:sal|gluten|azucar|lactosa|piel|hueso|espinas)\b/g, ' ')
+    .replace(/[,;+._\-\/]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  if (!norm) return '';
-  return norm
-    .split(' ')
-    .filter(Boolean)
+  if (!clean) return '';
+
+  const rawTokens = clean.split(' ').filter(Boolean);
+  const filtered = rawTokens.filter(t => !INGREDIENT_MODIFIERS.has(t));
+  const tokens = filtered.length > 0 ? filtered : rawTokens;
+
+  return tokens
     .map(singularizeSpanishToken)
     .join(' ');
 }
@@ -1006,13 +1044,116 @@ function mergeShoppingQuantities(amountA, unitA, amountB, unitB) {
   return { compatible: false };
 }
 
+function recalculateShoppingItemQuantities(item) {
+  if (!item) return;
+  if (!Array.isArray(item.recipeBreakdown) || item.recipeBreakdown.length === 0) {
+    const norm = normalizeAndConvertUnit(item.amount, item.unit);
+    item.amount = norm.amount;
+    item.unit = norm.unit;
+    item.displayAmount = item.amount !== null && item.amount !== undefined ? `${item.amount} ${item.unit || ''}`.trim() : (item.unit || '');
+    return;
+  }
+
+  let totalMassGrams = 0;
+  let hasMass = false;
+
+  let totalVolumeMl = 0;
+  let hasVolume = false;
+
+  let totalCount = 0;
+  let hasCount = false;
+
+  const customUnits = {};
+  const noAmountUnits = [];
+
+  item.recipeBreakdown.forEach(b => {
+    const norm = normalizeAndConvertUnit(b.amount, b.unit);
+    if (norm.baseAmount !== null) {
+      if (norm.dimension === 'mass') {
+        totalMassGrams += norm.baseAmount;
+        hasMass = true;
+      } else if (norm.dimension === 'volume') {
+        totalVolumeMl += norm.baseAmount;
+        hasVolume = true;
+      } else if (norm.dimension === 'count') {
+        totalCount += norm.baseAmount;
+        hasCount = true;
+      } else if (norm.dimension === 'custom') {
+        const u = norm.canonicalUnit || 'ud';
+        customUnits[u] = (customUnits[u] || 0) + norm.baseAmount;
+      }
+    } else if (norm.unit) {
+      if (!noAmountUnits.includes(norm.unit)) noAmountUnits.push(norm.unit);
+    }
+  });
+
+  const parts = [];
+
+  if (hasMass) {
+    if (totalMassGrams >= 1000) {
+      parts.push(`${Math.round((totalMassGrams / 1000) * 100) / 100} kg`);
+    } else {
+      parts.push(`${Math.round(totalMassGrams * 100) / 100} g`);
+    }
+  }
+
+  if (hasVolume) {
+    if (totalVolumeMl >= 1000) {
+      parts.push(`${Math.round((totalVolumeMl / 1000) * 100) / 100} l`);
+    } else {
+      parts.push(`${Math.round(totalVolumeMl * 100) / 100} ml`);
+    }
+  }
+
+  if (hasCount) {
+    parts.push(`${Math.round(totalCount * 100) / 100} ud`);
+  }
+
+  Object.entries(customUnits).forEach(([u, amt]) => {
+    parts.push(`${Math.round(amt * 100) / 100} ${u}`);
+  });
+
+  noAmountUnits.forEach(u => {
+    parts.push(u);
+  });
+
+  if (parts.length === 0) {
+    item.amount = null;
+    item.unit = '';
+    item.displayAmount = '';
+  } else if (parts.length === 1) {
+    const match = parts[0].match(/^([\d.,]+)\s*(.*)$/);
+    if (match) {
+      item.amount = parseFloat(match[1].replace(',', '.'));
+      item.unit = match[2];
+    } else {
+      item.amount = null;
+      item.unit = parts[0];
+    }
+    item.displayAmount = parts[0];
+  } else {
+    // Fusión multi-unidad inteligente (ej: 800 g + 6 ud)
+    const summary = parts.join(' + ');
+    item.amount = null;
+    item.unit = summary;
+    item.displayAmount = summary;
+  }
+}
+
 function mergeOrAddShoppingItem(shoppingList, newItem) {
   if (!Array.isArray(shoppingList) || !newItem || !newItem.name) return null;
   const targetKey = getCanonicalIngredientKey(newItem.name);
   if (!targetKey) return null;
 
-  const normNew = normalizeAndConvertUnit(newItem.amount, newItem.unit);
   const nowIso = new Date().toISOString();
+  const incomingBreakdown = Array.isArray(newItem.recipeBreakdown) && newItem.recipeBreakdown.length > 0
+    ? newItem.recipeBreakdown
+    : [{
+        recipe: newItem.recipeOrigin ? String(newItem.recipeOrigin).trim() : 'Añadido manualmente',
+        name: String(newItem.name).trim(),
+        amount: newItem.amount !== undefined && newItem.amount !== null && !isNaN(Number(newItem.amount)) ? Number(newItem.amount) : null,
+        unit: newItem.unit || ''
+      }];
 
   for (let i = 0; i < shoppingList.length; i++) {
     const existing = shoppingList[i];
@@ -1020,28 +1161,47 @@ function mergeOrAddShoppingItem(shoppingList, newItem) {
     const existingKey = getCanonicalIngredientKey(existing.name);
     if (existingKey !== targetKey) continue;
 
-    const mergedQty = mergeShoppingQuantities(existing.amount, existing.unit, newItem.amount, newItem.unit);
-    if (!mergedQty.compatible) continue;
+    // 1. Inicializar breakdown si no existía en el item previo
+    if (!Array.isArray(existing.recipeBreakdown) || existing.recipeBreakdown.length === 0) {
+      existing.recipeBreakdown = [{
+        recipe: existing.recipeOrigin ? String(existing.recipeOrigin).trim() : 'Añadido manualmente',
+        name: String(existing.name).trim(),
+        amount: existing.amount !== undefined && existing.amount !== null && !isNaN(Number(existing.amount)) ? Number(existing.amount) : null,
+        unit: existing.unit || ''
+      }];
+    }
 
-    existing.amount = mergedQty.amount;
-    existing.unit = mergedQty.unit;
+    // 2. Anexar ingredientes desglosados
+    incomingBreakdown.forEach(inc => {
+      existing.recipeBreakdown.push({
+        recipe: inc.recipe,
+        name: inc.name,
+        amount: inc.amount,
+        unit: inc.unit
+      });
+    });
+
+    // 3. Recalcular cantidades (soporta suma dimensional exacta y multi-unidad 800 g + 6 ud)
+    recalculateShoppingItemQuantities(existing);
+
+    // 4. Mejorar pasillo si era 'other'
     if ((!existing.aisle || existing.aisle === 'other') && newItem.aisle && newItem.aisle !== 'other') {
       existing.aisle = newItem.aisle;
     }
 
-    if (newItem.recipeOrigin) {
-      const incomingOrigins = String(newItem.recipeOrigin).split(',').map(s => s.trim()).filter(Boolean);
-      const currentOrigins = existing.recipeOrigin
-        ? String(existing.recipeOrigin).split(',').map(s => s.trim()).filter(Boolean)
-        : [];
-      incomingOrigins.forEach(orig => {
-        if (!currentOrigins.includes(orig)) {
-          currentOrigins.push(orig);
-        }
-      });
-      existing.recipeOrigin = currentOrigins.join(', ');
+    // 5. Normalizar título si el nuevo es más limpio/canónico (sin adjetivos o más corto)
+    const existingHasMod = Array.from(INGREDIENT_MODIFIERS).some(m => new RegExp(`\\b${m}\\b`, 'i').test(existing.name));
+    const newHasMod = Array.from(INGREDIENT_MODIFIERS).some(m => new RegExp(`\\b${m}\\b`, 'i').test(newItem.name));
+    if (existingHasMod && !newHasMod) {
+      existing.name = String(newItem.name).trim();
+    } else if (!existingHasMod && !newHasMod && newItem.name.length < existing.name.length) {
+      existing.name = String(newItem.name).trim();
     }
 
+    // 6. Actualizar recipeOrigin acumulativo
+    const origins = existing.recipeBreakdown.map(b => b.recipe).filter(Boolean);
+    const uniqueOrigins = Array.from(new Set(origins));
+    existing.recipeOrigin = uniqueOrigins.join(', ');
     existing.updatedAt = nowIso;
     return existing;
   }
@@ -1050,15 +1210,31 @@ function mergeOrAddShoppingItem(shoppingList, newItem) {
   const created = {
     id: newItem.id || generateId('shop-'),
     name: String(newItem.name).trim(),
-    amount: normNew.amount,
-    unit: normNew.unit,
+    amount: newItem.amount !== undefined && newItem.amount !== null && !isNaN(Number(newItem.amount)) ? Number(newItem.amount) : null,
+    unit: newItem.unit || '',
+    displayAmount: '',
     aisle: newItem.aisle || categorizeIngredientAisle(newItem.name),
     isChecked: isItemChecked,
     recipeOrigin: newItem.recipeOrigin ? String(newItem.recipeOrigin).trim() : '',
+    recipeBreakdown: incomingBreakdown,
     updatedAt: newItem.updatedAt || nowIso
   };
+  recalculateShoppingItemQuantities(created);
   shoppingList.push(created);
   return created;
+}
+
+function consolidateShoppingList(list) {
+  if (!Array.isArray(list) || list.length <= 1) return list;
+  const result = [];
+  list.forEach(item => {
+    if (item.isChecked || item.checked) {
+      result.push(item);
+    } else {
+      mergeOrAddShoppingItem(result, item);
+    }
+  });
+  return result;
 }
 
 function categorizeIngredientAisle(ingredientName) {
@@ -3954,7 +4130,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.21';
+  window.APP_VERSION = 'v1.22';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -3991,7 +4167,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.21';
+    this.appVersion = window.APP_VERSION || 'v1.22';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5735,6 +5911,12 @@ class FoodAssistantApp {
         case 'selectOnboardingServings':
           this.selectOnboardingServings(target.dataset.servings);
           break;
+        case 'stepOnboardingServings':
+          this.stepOnboardingServings(target.dataset.step);
+          break;
+        case 'inputOnboardingServings':
+          this.inputOnboardingServings(e);
+          break;
         case 'openAuthFromOnboarding':
           this.openAuthFromOnboarding();
           break;
@@ -5749,6 +5931,12 @@ class FoodAssistantApp {
 
   initEvents() {
     this.initEventDelegation();
+    document.addEventListener('input', (e) => {
+      const target = e.target.closest('[data-action="inputOnboardingServings"]');
+      if (target) {
+        this.inputOnboardingServings(e);
+      }
+    });
     // Navigation
     this.navItems.forEach(item => {
       item.addEventListener('click', () => {
@@ -9946,14 +10134,32 @@ class FoodAssistantApp {
     if (isRecipeView) {
       const groupedByRecipe = {};
       state.shoppingList.forEach((item, index) => {
-        const rawOrigin = item.recipeOrigin ? String(item.recipeOrigin).trim() : '';
-        const origins = rawOrigin
-          ? rawOrigin.split(',').map(s => s.trim()).filter(Boolean)
-          : ['Añadido manualmente'];
-        origins.forEach(originLabel => {
-          if (!groupedByRecipe[originLabel]) groupedByRecipe[originLabel] = [];
-          groupedByRecipe[originLabel].push({ ...item, originalIndex: index });
-        });
+        if (Array.isArray(item.recipeBreakdown) && item.recipeBreakdown.length > 0) {
+          item.recipeBreakdown.forEach(b => {
+            const recipeLabel = b.recipe ? String(b.recipe).trim() : 'Añadido manualmente';
+            if (!groupedByRecipe[recipeLabel]) groupedByRecipe[recipeLabel] = [];
+            groupedByRecipe[recipeLabel].push({
+              ...item,
+              recipeSpecificName: b.name || item.name,
+              recipeSpecificAmount: (b.amount !== null && b.amount !== undefined) ? `${b.amount} ${b.unit || ''}`.trim() : (b.unit || ''),
+              originalIndex: index
+            });
+          });
+        } else {
+          const rawOrigin = item.recipeOrigin ? String(item.recipeOrigin).trim() : '';
+          const origins = rawOrigin
+            ? rawOrigin.split(',').map(s => s.trim()).filter(Boolean)
+            : ['Añadido manualmente'];
+          origins.forEach(originLabel => {
+            if (!groupedByRecipe[originLabel]) groupedByRecipe[originLabel] = [];
+            groupedByRecipe[originLabel].push({
+              ...item,
+              recipeSpecificName: item.name,
+              recipeSpecificAmount: item.displayAmount || (item.amount ? `${item.amount} ${item.unit || ''}`.trim() : (item.unit || '')),
+              originalIndex: index
+            });
+          });
+        }
       });
 
       container.innerHTML = Object.entries(groupedByRecipe).map(([recipeLabel, items]) => {
@@ -9974,20 +10180,22 @@ class FoodAssistantApp {
             <div>
               ${items.map(item => {
                 const aisleMeta = AISLE_METADATA[item.aisle || 'other'] || AISLE_METADATA.other;
+                const displayName = item.recipeSpecificName || item.name;
+                const displayAmt = item.recipeSpecificAmount || item.displayAmount || (item.amount ? `${item.amount} ${item.unit || ''}`.trim() : (item.unit || ''));
                 return `
                   <div class="grocery-item-row ${item.isChecked ? 'checked' : ''}">
                     <div class="grocery-left" onclick="app.toggleGroceryCheck(${item.originalIndex})">
                       <input type="checkbox" class="grocery-checkbox" ${item.isChecked ? 'checked' : ''} onclick="event.stopPropagation(); app.toggleGroceryCheck(${item.originalIndex})">
-                      <div class="grocery-item-icon-badge" title="${escapeHtml(item.name)}">
-                        <span class="material-symbols-outlined icon-sm">${getIngredientIcon(item.name, item.aisle)}</span>
+                      <div class="grocery-item-icon-badge" title="${escapeHtml(displayName)}">
+                        <span class="material-symbols-outlined icon-sm">${getIngredientIcon(displayName, item.aisle)}</span>
                       </div>
                       <div class="u-flex-1-truncate">
-                        <div class="grocery-name">${escapeHtml(item.name)}</div>
+                        <div class="grocery-name">${escapeHtml(displayName)}</div>
                         <div class="grocery-origin-sub">${escapeHtml(aisleMeta.label)}</div>
                       </div>
                     </div>
                     <div class="u-flex-center-gap-8-shrink">
-                      ${item.amount ? `<span class="grocery-amount">${item.amount} ${item.unit || ''}</span>` : ''}
+                      ${displayAmt ? `<span class="grocery-amount">${escapeHtml(displayAmt)}</span>` : ''}
                       <button type="button" class="btn btn-ghost btn-sm btn-grocery-remove btn-remove-circle" onclick="app.deleteGroceryItem(${item.originalIndex})" title="Eliminar artículo">
                         <span class="material-symbols-outlined icon-sm">close</span>
                       </button>
@@ -10024,26 +10232,56 @@ class FoodAssistantApp {
           </div>
 
           <div>
-            ${items.map(item => `
-              <div class="grocery-item-row ${item.isChecked ? 'checked' : ''}">
-                <div class="grocery-left" onclick="app.toggleGroceryCheck(${item.originalIndex})">
-                  <input type="checkbox" class="grocery-checkbox" ${item.isChecked ? 'checked' : ''} onclick="event.stopPropagation(); app.toggleGroceryCheck(${item.originalIndex})">
-                  <div class="grocery-item-icon-badge" title="${item.name}">
-                    <span class="material-symbols-outlined icon-sm">${getIngredientIcon(item.name, item.aisle)}</span>
+            ${items.map(item => {
+              const displayAmt = item.displayAmount || (item.amount ? `${item.amount} ${item.unit || ''}`.trim() : (item.unit || ''));
+              let subtextHtml = '';
+              if (Array.isArray(item.recipeBreakdown) && item.recipeBreakdown.length > 0) {
+                if (item.recipeBreakdown.length === 1) {
+                  const b = item.recipeBreakdown[0];
+                  const nameDiff = b.name && b.name.toLowerCase().trim() !== item.name.toLowerCase().trim() ? ` (como "${escapeHtml(b.name)}")` : '';
+                  subtextHtml = `<div class="grocery-origin-sub">Para: ${escapeHtml(b.recipe)}${nameDiff}</div>`;
+                } else {
+                  subtextHtml = `
+                    <div class="grocery-breakdown-list">
+                      ${item.recipeBreakdown.map(b => {
+                        const qtyStr = (b.amount !== null && b.amount !== undefined) ? `${b.amount} ${b.unit || ''}`.trim() : (b.unit || '');
+                        const nameDiff = b.name && b.name.toLowerCase().trim() !== item.name.toLowerCase().trim() ? ` (${escapeHtml(b.name)})` : '';
+                        return `
+                          <div class="grocery-breakdown-row" title="${escapeHtml(b.recipe)}">
+                            <span class="grocery-breakdown-dot">•</span>
+                            <span class="grocery-breakdown-recipe">${escapeHtml(b.recipe)}:</span>
+                            <span class="grocery-breakdown-qty">${escapeHtml(qtyStr)}${nameDiff}</span>
+                          </div>
+                        `;
+                      }).join('')}
+                    </div>
+                  `;
+                }
+              } else if (item.recipeOrigin) {
+                subtextHtml = `<div class="grocery-origin-sub">Para: ${escapeHtml(item.recipeOrigin)}</div>`;
+              }
+
+              return `
+                <div class="grocery-item-row ${item.isChecked ? 'checked' : ''}">
+                  <div class="grocery-left" onclick="app.toggleGroceryCheck(${item.originalIndex})">
+                    <input type="checkbox" class="grocery-checkbox" ${item.isChecked ? 'checked' : ''} onclick="event.stopPropagation(); app.toggleGroceryCheck(${item.originalIndex})">
+                    <div class="grocery-item-icon-badge" title="${escapeHtml(item.name)}">
+                      <span class="material-symbols-outlined icon-sm">${getIngredientIcon(item.name, item.aisle)}</span>
+                    </div>
+                    <div class="u-flex-1-truncate">
+                      <div class="grocery-name">${escapeHtml(item.name)}</div>
+                      ${subtextHtml}
+                    </div>
                   </div>
-                  <div class="u-flex-1-truncate">
-                    <div class="grocery-name">${item.name}</div>
-                    ${item.recipeOrigin ? `<div class="grocery-origin-sub">Para: ${item.recipeOrigin}</div>` : ''}
+                  <div class="u-flex-center-gap-8-shrink">
+                    ${displayAmt ? `<span class="grocery-amount">${escapeHtml(displayAmt)}</span>` : ''}
+                    <button type="button" class="btn btn-ghost btn-sm btn-grocery-remove btn-remove-circle" onclick="app.deleteGroceryItem(${item.originalIndex})" title="Eliminar artículo">
+                      <span class="material-symbols-outlined icon-sm">close</span>
+                    </button>
                   </div>
                 </div>
-                <div class="u-flex-center-gap-8-shrink">
-                  ${item.amount ? `<span class="grocery-amount">${item.amount} ${item.unit || ''}</span>` : ''}
-                  <button type="button" class="btn btn-ghost btn-sm btn-grocery-remove btn-remove-circle" onclick="app.deleteGroceryItem(${item.originalIndex})" title="Eliminar artículo">
-                    <span class="material-symbols-outlined icon-sm">close</span>
-                  </button>
-                </div>
-              </div>
-            `).join('')}
+              `;
+            }).join('')}
           </div>
         </div>
       `;
@@ -14516,8 +14754,9 @@ Autenticación: API Key → Bearer → ${tk}`;
     if (carbsInput) carbsInput.value = chosen.carbs;
     if (fatInput) fatInput.value = chosen.fat;
 
-    document.querySelectorAll('#onboarding-goal-presets .onboarding-preset-btn').forEach(btn => {
+    document.querySelectorAll('#onboarding-goal-presets .onboarding-preset-pill, #onboarding-goal-presets .onboarding-preset-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.preset === preset);
+      btn.setAttribute('aria-pressed', btn.dataset.preset === preset ? 'true' : 'false');
     });
   }
 
@@ -14525,11 +14764,38 @@ Autenticación: API Key → Bearer → ${tk}`;
     const rawVal = typeof servingsOrDataset === 'object' && servingsOrDataset !== null ? servingsOrDataset.servings : servingsOrDataset;
     const num = parseInt(rawVal, 10);
     if (!isNaN(num) && num > 0) {
-      this.onboardingServings = num;
+      this.onboardingServings = Math.min(50, Math.max(1, num));
     }
-    document.querySelectorAll('#onboarding-servings-grid .onboarding-serving-card').forEach(btn => {
+    this.updateOnboardingServingsUI();
+  }
+
+  stepOnboardingServings(stepOrDataset) {
+    const delta = typeof stepOrDataset === 'object' && stepOrDataset !== null ? parseInt(stepOrDataset.step, 10) : parseInt(stepOrDataset, 10);
+    const current = Number(this.onboardingServings) || 2;
+    const nextVal = Math.min(50, Math.max(1, current + (isNaN(delta) ? 1 : delta)));
+    this.selectOnboardingServings(nextVal);
+  }
+
+  inputOnboardingServings(e) {
+    const raw = e?.target?.value;
+    const num = parseInt(raw, 10);
+    if (!isNaN(num) && num > 0) {
+      this.onboardingServings = Math.min(50, Math.max(1, num));
+      this.updateOnboardingServingsUI(false);
+    }
+  }
+
+  updateOnboardingServingsUI(updateInput = true) {
+    const num = Number(this.onboardingServings) || 2;
+    const input = document.getElementById('onboarding-servings-input');
+    const unitText = document.getElementById('onboarding-servings-unit-text');
+    if (input && updateInput) input.value = num;
+    if (unitText) unitText.textContent = num === 1 ? 'persona' : 'personas';
+
+    document.querySelectorAll('#onboarding-servings-grid .onboarding-serving-chip, #onboarding-servings-grid .onboarding-serving-card').forEach(btn => {
       const btnVal = parseInt(btn.dataset.servings, 10);
-      btn.classList.toggle('active', btnVal === this.onboardingServings);
+      btn.classList.toggle('active', btnVal === num);
+      btn.setAttribute('aria-pressed', btnVal === num ? 'true' : 'false');
     });
   }
 
@@ -14808,6 +15074,10 @@ function bootstrapApp() {
   if (typeof window !== 'undefined' && !window.app) {
     app = new FoodAssistantApp();
     window.app = app;
+    if (Array.isArray(state.shoppingList) && state.shoppingList.length > 0) {
+      state.shoppingList = consolidateShoppingList(state.shoppingList);
+      state.save('fa_shopping', state.shoppingList);
+    }
     app.checkAndLaunchOnboarding();
   }
 }
@@ -14833,6 +15103,8 @@ if (typeof window !== 'undefined') {
   window.normalizeAndConvertUnit = normalizeAndConvertUnit;
   window.mergeShoppingQuantities = mergeShoppingQuantities;
   window.mergeOrAddShoppingItem = mergeOrAddShoppingItem;
+  window.recalculateShoppingItemQuantities = recalculateShoppingItemQuantities;
+  window.consolidateShoppingList = consolidateShoppingList;
   window.categorizeIngredientAisle = categorizeIngredientAisle;
   window.resolveAisleOnline = resolveAisleOnline;
   window.getCachedAisle = getCachedAisle;
@@ -14874,6 +15146,8 @@ if (typeof module !== 'undefined' && module.exports) {
     normalizeAndConvertUnit,
     mergeShoppingQuantities,
     mergeOrAddShoppingItem,
+    recalculateShoppingItemQuantities,
+    consolidateShoppingList,
     categorizeIngredientAisle,
     resolveAisleOnline,
     getCachedAisle,

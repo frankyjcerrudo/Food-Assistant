@@ -2,8 +2,8 @@
 
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
-> **Versión Actual**: v1.21  
-> **Última actualización**: Noviembre 2026 (v1.21 en curso — Fase 1 de preparación para Google Play: US-68 Onboarding Wizard, US-33 vistas Por Pasillo/Por Receta con normalización y fusión de unidades, US-60 Wake Lock en receta abierta y Modo Cocina, US-70 Recetas Favoritas con ponderación en el Asistente IA. Todas en 'In Progress' pendientes de validación)
+> **Versión Actual**: v1.22  
+> **Última actualización**: Noviembre 2026 (v1.22 en curso — Fase 1 de preparación para Google Play: US-68 Onboarding Wizard con stepper interactivo de comensales [1..50], pills de macros no desbordables y campos editables intuitivos; US-33 lista de compra con unificación inteligente de descriptores culinarios [medianas, entera, maduro], cantidades multi-unidad [ej: 800 g + 6 ud] y desglose detallado de recetas; US-60 Wake Lock en receta abierta y Modo Cocina; US-70 Recetas Favoritas con ponderación en el Asistente IA. Todas en 'In Progress' pendientes de validación)
 
 ---
 

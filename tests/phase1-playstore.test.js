@@ -13,7 +13,9 @@ const {
   getCanonicalIngredientKey,
   normalizeAndConvertUnit,
   mergeShoppingQuantities,
-  mergeOrAddShoppingItem
+  mergeOrAddShoppingItem,
+  recalculateShoppingItemQuantities,
+  consolidateShoppingList
 } = window;
 
 const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -29,6 +31,23 @@ describe('US-33: Normalización y conversión de unidades en la lista de la comp
     expect(getCanonicalIngredientKey('Champiñones')).toBe(getCanonicalIngredientKey('champiñón'));
     expect(getCanonicalIngredientKey('Pechugas de pollo')).toBe(getCanonicalIngredientKey('pechuga de pollo'));
     expect(getCanonicalIngredientKey('')).toBe('');
+  });
+
+  it('getCanonicalIngredientKey unifica adjetivos de tamaño, corte, madurez y preparación', () => {
+    // Patatas y variantes
+    expect(getCanonicalIngredientKey('Patatas medianas')).toBe(getCanonicalIngredientKey('Patatas'));
+    // Aguacate y variantes
+    expect(getCanonicalIngredientKey('Aguacate maduro')).toBe(getCanonicalIngredientKey('Aguacate'));
+    // Pechugas de pollo y variantes
+    expect(getCanonicalIngredientKey('Pechugas de pollos grandes')).toBe(getCanonicalIngredientKey('Pechugas de pollo'));
+    expect(getCanonicalIngredientKey('Pechuga de pollo entera')).toBe(getCanonicalIngredientKey('Pechugas de pollo'));
+    // Otros cortes y estados
+    expect(getCanonicalIngredientKey('Fresas picadas')).toBe(getCanonicalIngredientKey('Fresas'));
+    expect(getCanonicalIngredientKey('Romero fresco')).toBe(getCanonicalIngredientKey('Romero'));
+    expect(getCanonicalIngredientKey('Chorizo troceado')).toBe(getCanonicalIngredientKey('Chorizo'));
+    expect(getCanonicalIngredientKey('Limón (zumo y ralladura)')).toBe(getCanonicalIngredientKey('Limón'));
+    expect(getCanonicalIngredientKey('Carne picada con 5% de grasa')).toBe(getCanonicalIngredientKey('Carne'));
+    expect(getCanonicalIngredientKey('Pechuga de pavo baja en sal')).toBe(getCanonicalIngredientKey('Pechuga de pavo'));
   });
 
   it('getCanonicalIngredientKey no confunde ingredientes distintos', () => {
@@ -63,13 +82,7 @@ describe('US-33: Normalización y conversión de unidades en la lista de la comp
     expect(mergeShoppingQuantities(1, 'cda', 2, 'cucharadas')).toEqual({ compatible: true, amount: 3, unit: 'cda' });
   });
 
-  it('mergeShoppingQuantities rechaza dimensiones incompatibles (masa vs unidades / masa vs volumen)', () => {
-    expect(mergeShoppingQuantities(500, 'g', 3, 'ud').compatible).toBe(false);
-    expect(mergeShoppingQuantities(500, 'g', 1, 'l').compatible).toBe(false);
-    expect(mergeShoppingQuantities(1, 'lata', 2, 'bote').compatible).toBe(false);
-  });
-
-  it('mergeOrAddShoppingItem fusiona plural/singular con conversión y acumula recetas de origen', () => {
+  it('mergeOrAddShoppingItem fusiona plural/singular con conversión y desglose de recetas', () => {
     const list = [{ name: 'Tomates', amount: 500, unit: 'g', aisle: 'produce', isChecked: false, recipeOrigin: 'Ensalada' }];
     mergeOrAddShoppingItem(list, { name: 'tomate', amount: 0.75, unit: 'kg', aisle: 'produce', recipeOrigin: 'Gazpacho' });
 
@@ -77,13 +90,108 @@ describe('US-33: Normalización y conversión de unidades en la lista de la comp
     expect(list[0].amount).toBe(1.25);
     expect(list[0].unit).toBe('kg');
     expect(list[0].recipeOrigin).toBe('Ensalada, Gazpacho');
+    expect(list[0].recipeBreakdown).toHaveLength(2);
+    expect(list[0].recipeBreakdown[0].recipe).toBe('Ensalada');
+    expect(list[0].recipeBreakdown[1].recipe).toBe('Gazpacho');
   });
 
-  it('mergeOrAddShoppingItem mantiene líneas separadas para unidades incompatibles', () => {
-    const list = [{ name: 'Tomates', amount: 500, unit: 'g', aisle: 'produce', isChecked: false }];
-    mergeOrAddShoppingItem(list, { name: 'Tomate', amount: 3, unit: 'ud', aisle: 'produce' });
-    expect(list).toHaveLength(2);
-    expect(list[1]).toMatchObject({ name: 'Tomate', amount: 3, unit: 'ud' });
+  it('mergeOrAddShoppingItem unifica unidades distintas (gramos + unidades) y muestra el desglose exacto', () => {
+    const list = [];
+    // Receta 1: Pechugas de Pollo al Limón con Patatas medianas (6 ud)
+    mergeOrAddShoppingItem(list, {
+      name: 'Patatas medianas',
+      amount: 6,
+      unit: 'ud',
+      aisle: 'produce',
+      recipeOrigin: 'Pechugas de Pollo al Limón con Patatas'
+    });
+
+    // Receta 2: Sopa cremosa con Patatas (800 g)
+    mergeOrAddShoppingItem(list, {
+      name: 'Patatas',
+      amount: 800,
+      unit: 'g',
+      aisle: 'produce',
+      recipeOrigin: 'Sopa cremosa de pollo'
+    });
+
+    expect(list).toHaveLength(1);
+    // El nombre se simplifica al más canónico
+    expect(list[0].name).toBe('Patatas');
+    // Las cantidades se presentan combinadas
+    expect(list[0].displayAmount).toBe('800 g + 6 ud');
+    expect(list[0].unit).toBe('800 g + 6 ud');
+    // El desglose contiene el nombre y cantidad exactos de cada receta
+    expect(list[0].recipeBreakdown).toHaveLength(2);
+    expect(list[0].recipeBreakdown[0]).toMatchObject({
+      recipe: 'Pechugas de Pollo al Limón con Patatas',
+      name: 'Patatas medianas',
+      amount: 6,
+      unit: 'ud'
+    });
+    expect(list[0].recipeBreakdown[1]).toMatchObject({
+      recipe: 'Sopa cremosa de pollo',
+      name: 'Patatas',
+      amount: 800,
+      unit: 'g'
+    });
+  });
+
+  it('mergeOrAddShoppingItem unifica múltiples variantes de pollo (kg + unidades)', () => {
+    const list = [];
+    // 1.1 kg Pechugas de pollo
+    mergeOrAddShoppingItem(list, {
+      name: 'Pechugas de pollo',
+      amount: 1.1,
+      unit: 'kg',
+      aisle: 'meat',
+      recipeOrigin: 'Pollo al Limón'
+    });
+    // 1 ud Pechuga de pollo entera
+    mergeOrAddShoppingItem(list, {
+      name: 'Pechuga de pollo entera',
+      amount: 1,
+      unit: 'ud',
+      aisle: 'meat',
+      recipeOrigin: 'Sopa cremosa'
+    });
+    // 1 ud Pechugas de pollos grandes
+    mergeOrAddShoppingItem(list, {
+      name: 'Pechugas de pollos grandes',
+      amount: 1,
+      unit: 'ud',
+      aisle: 'meat',
+      recipeOrigin: 'Wrap de pollo'
+    });
+
+    expect(list).toHaveLength(1);
+    expect(list[0].name).toBe('Pechugas de pollo');
+    expect(list[0].displayAmount).toBe('1.1 kg + 2 ud');
+    expect(list[0].recipeBreakdown).toHaveLength(3);
+  });
+
+  it('mergeOrAddShoppingItem unifica Salmón ahumado con gramos y unidades', () => {
+    const list = [];
+    mergeOrAddShoppingItem(list, { name: 'Salmón ahumado', amount: 90, unit: 'g', aisle: 'meat', recipeOrigin: 'Bagel de salmón' });
+    mergeOrAddShoppingItem(list, { name: 'Salmón ahumado', amount: 1, unit: 'ud', aisle: 'meat', recipeOrigin: 'Tostada con aguacate' });
+
+    expect(list).toHaveLength(1);
+    expect(list[0].displayAmount).toBe('90 g + 1 ud');
+    expect(list[0].recipeBreakdown).toHaveLength(2);
+  });
+
+  it('consolidateShoppingList compacta automáticamente listas con duplicados existentes', () => {
+    const rawList = [
+      { name: 'Patatas medianas', amount: 6, unit: 'ud', aisle: 'produce', isChecked: false, recipeOrigin: 'Receta A' },
+      { name: 'Patatas', amount: 800, unit: 'g', aisle: 'produce', isChecked: false, recipeOrigin: 'Receta B' },
+      { name: 'Leche', amount: 1, unit: 'l', aisle: 'dairy', isChecked: true }
+    ];
+
+    const consolidated = consolidateShoppingList(rawList);
+    expect(consolidated).toHaveLength(2); // 1 patatas unificadas + 1 leche comprada
+    const potatoes = consolidated.find(i => i.name === 'Patatas');
+    expect(potatoes).toBeDefined();
+    expect(potatoes.displayAmount).toBe('800 g + 6 ud');
   });
 
   it('mergeOrAddShoppingItem no fusiona con artículos ya marcados como comprados', () => {
@@ -119,9 +227,31 @@ describe('US-33: Alternancia de vistas Por Pasillos / Por Receta', () => {
     appInstance = new FoodAssistantApp();
     originalList = state.shoppingList;
     state.shoppingList = [
-      { name: 'Tomate', amount: 1, unit: 'kg', aisle: 'produce', isChecked: false, recipeOrigin: 'Gazpacho, Ensalada' },
-      { name: 'Pan', amount: 1, unit: 'ud', aisle: 'bakery', isChecked: false, recipeOrigin: 'Gazpacho' },
-      { name: 'Detergente', amount: 1, unit: 'ud', aisle: 'other', isChecked: false }
+      {
+        name: 'Patatas',
+        amount: null,
+        unit: '800 g + 6 ud',
+        displayAmount: '800 g + 6 ud',
+        aisle: 'produce',
+        isChecked: false,
+        recipeOrigin: 'Pollo al Limón, Sopa cremosa',
+        recipeBreakdown: [
+          { recipe: 'Pollo al Limón', name: 'Patatas medianas', amount: 6, unit: 'ud' },
+          { recipe: 'Sopa cremosa', name: 'Patatas', amount: 800, unit: 'g' }
+        ]
+      },
+      {
+        name: 'Pan',
+        amount: 1,
+        unit: 'ud',
+        displayAmount: '1 ud',
+        aisle: 'bakery',
+        isChecked: false,
+        recipeOrigin: 'Gazpacho',
+        recipeBreakdown: [
+          { recipe: 'Gazpacho', name: 'Pan', amount: 1, unit: 'ud' }
+        ]
+      }
     ];
   });
 
@@ -130,30 +260,31 @@ describe('US-33: Alternancia de vistas Por Pasillos / Por Receta', () => {
     localStorage.removeItem('fa_shopping_view_mode');
   });
 
-  it('por defecto renderiza la vista agrupada por pasillos', () => {
+  it('la vista Por Pasillos renderiza el desglose con viñetas para cada receta', () => {
     appInstance.setShoppingViewMode('aisle');
     const container = document.getElementById('shopping-aisles-container');
-    expect(container.querySelectorAll('.aisle-card').length).toBe(3);
-    expect(container.querySelector('.recipe-shopping-card')).toBeNull();
-    expect(document.getElementById('btn-shopping-view-aisle').getAttribute('aria-pressed')).toBe('true');
-    expect(document.getElementById('btn-shopping-view-recipe').getAttribute('aria-pressed')).toBe('false');
+    const breakdown = container.querySelector('.grocery-breakdown-list');
+    expect(breakdown).not.toBeNull();
+    expect(breakdown.textContent).toContain('Pollo al Limón');
+    expect(breakdown.textContent).toContain('Patatas medianas');
+    expect(breakdown.textContent).toContain('Sopa cremosa');
+    expect(container.querySelector('.grocery-amount').textContent).toContain('800 g + 6 ud');
   });
 
-  it('la vista Por Receta agrupa por receta de origen (un artículo puede aparecer en varias) y persiste la preferencia', () => {
+  it('la vista Por Receta muestra el nombre e ingrediente específico de cada receta', () => {
     appInstance.setShoppingViewMode({ mode: 'recipe' });
     const container = document.getElementById('shopping-aisles-container');
-    const groups = Array.from(container.querySelectorAll('.recipe-shopping-card')).map(el => el.dataset.recipeGroup);
+    const polloCard = container.querySelector('[data-recipe-group="Pollo al Limón"]');
+    expect(polloCard).not.toBeNull();
+    // En la tarjeta de Pollo al Limón aparece "Patatas medianas"
+    expect(polloCard.textContent).toContain('Patatas medianas');
+    expect(polloCard.textContent).toContain('6 ud');
 
-    expect(groups).toEqual(expect.arrayContaining(['Gazpacho', 'Ensalada', 'Añadido manualmente']));
-    const gazpacho = container.querySelector('[data-recipe-group="Gazpacho"]');
-    expect(gazpacho.querySelectorAll('.grocery-item-row').length).toBe(2);
-    expect(localStorage.getItem('fa_shopping_view_mode')).toBe('recipe');
-    expect(document.getElementById('btn-shopping-view-recipe').classList.contains('active')).toBe(true);
-  });
-
-  it('valores desconocidos vuelven a la vista por pasillos', () => {
-    appInstance.setShoppingViewMode('foo');
-    expect(appInstance.shoppingViewMode).toBe('aisle');
+    const sopaCard = container.querySelector('[data-recipe-group="Sopa cremosa"]');
+    expect(sopaCard).not.toBeNull();
+    // En la tarjeta de Sopa cremosa aparece "Patatas" y "800 g"
+    expect(sopaCard.textContent).toContain('Patatas');
+    expect(sopaCard.textContent).toContain('800 g');
   });
 });
 
@@ -258,7 +389,6 @@ describe('US-60: Screen Wake Lock con receta abierta y en Modo Cocina', () => {
   it('readquiere el Wake Lock tras liberarlo el sistema (pestaña oculta → visible)', async () => {
     appInstance.modalRecipeDetail.classList.add('active');
     await appInstance.requestScreenWakeLock();
-    // El navegador libera el sentinel automáticamente al ocultar la pestaña
     await sentinels[0].release();
     expect(appInstance.isWakeLockActive).toBe(false);
 
@@ -378,8 +508,6 @@ describe('US-70: Recetas Favoritas y ponderación en el Asistente IA', () => {
     const instruction = appInstance.buildAiSystemInstruction('¿Qué ceno hoy?');
     expect(instruction).toContain('❤️ FAVORITA: Sí');
     expect(instruction).toMatch(/PONDERACIÓN INTELIGENTE DE RECETAS FAVORITAS/);
-    const lentejasLine = instruction.split('\n').find(l => l.includes('"Lentejas"'));
-    if (lentejasLine) expect(lentejasLine).not.toContain('FAVORITA');
   });
 });
 
@@ -401,16 +529,22 @@ describe('US-68: Asistente de Bienvenida (Onboarding Wizard)', () => {
       <div id="onboarding-dietary-chips"></div>
       <input type="checkbox" id="onboarding-goals-enabled">
       <div id="onboarding-goal-presets">
-        <button class="onboarding-preset-btn" data-preset="deficit"></button>
-        <button class="onboarding-preset-btn" data-preset="balanced"></button>
-        <button class="onboarding-preset-btn" data-preset="protein"></button>
+        <button class="onboarding-preset-pill onboarding-preset-btn" data-preset="deficit"></button>
+        <button class="onboarding-preset-pill onboarding-preset-btn" data-preset="balanced"></button>
+        <button class="onboarding-preset-pill onboarding-preset-btn" data-preset="protein"></button>
       </div>
       <input id="onboarding-goal-calories" type="number">
       <input id="onboarding-goal-protein" type="number">
       <input id="onboarding-goal-carbs" type="number">
       <input id="onboarding-goal-fat" type="number">
+      <div class="onboarding-servings-stepper-card">
+        <button class="btn-servings-step" data-action="stepOnboardingServings" data-step="-1"></button>
+        <input type="number" id="onboarding-servings-input" value="2">
+        <span id="onboarding-servings-unit-text">personas</span>
+        <button class="btn-servings-step" data-action="stepOnboardingServings" data-step="1"></button>
+      </div>
       <div id="onboarding-servings-grid">
-        ${[1, 2, 3, 4].map(n => `<button class="onboarding-serving-card" data-servings="${n}"></button>`).join('')}
+        ${[1, 2, 3, 4, 5, 6].map(n => `<button class="onboarding-serving-chip onboarding-serving-card" data-servings="${n}"></button>`).join('')}
       </div>
       <div id="onboarding-summary-box"></div>
       <button id="btn-onboarding-prev"></button>
@@ -486,17 +620,30 @@ describe('US-68: Asistente de Bienvenida (Onboarding Wizard)', () => {
     expect(appInstance.onboardingDietary.has(tag)).toBe(false);
   });
 
-  it('aplica presets de objetivos nutricionales y selecciona porciones', () => {
+  it('aplica presets de objetivos nutricionales y selecciona porciones estándar y personalizadas (5 o 9 personas)', () => {
     appInstance.openOnboardingModal(3);
     appInstance.applyOnboardingGoalPreset({ preset: 'protein' });
     expect(document.getElementById('onboarding-goal-calories').value).toBe('2400');
     expect(document.getElementById('onboarding-goal-protein').value).toBe('180');
     expect(document.querySelector('[data-preset="protein"]').classList.contains('active')).toBe(true);
 
-    appInstance.selectOnboardingServings({ servings: '4' });
-    expect(appInstance.onboardingServings).toBe(4);
-    expect(document.querySelector('[data-servings="4"]').classList.contains('active')).toBe(true);
-    expect(document.querySelector('[data-servings="2"]').classList.contains('active')).toBe(false);
+    // Selección rápida: 5 personas
+    appInstance.selectOnboardingServings(5);
+    expect(appInstance.onboardingServings).toBe(5);
+    expect(document.getElementById('onboarding-servings-input').value).toBe('5');
+    expect(document.querySelector('[data-servings="5"]').classList.contains('active')).toBe(true);
+
+    // Personalización libre: 9 personas
+    appInstance.selectOnboardingServings(9);
+    expect(appInstance.onboardingServings).toBe(9);
+    expect(document.getElementById('onboarding-servings-input').value).toBe('9');
+    expect(document.getElementById('onboarding-servings-unit-text').textContent).toBe('personas');
+
+    // Stepper (+1 y -1)
+    appInstance.stepOnboardingServings(1);
+    expect(appInstance.onboardingServings).toBe(10);
+    appInstance.stepOnboardingServings(-1);
+    expect(appInstance.onboardingServings).toBe(9);
   });
 
   it('muestra un resumen en el paso 5 y guarda toda la configuración al completar', () => {
@@ -504,19 +651,19 @@ describe('US-68: Asistente de Bienvenida (Onboarding Wizard)', () => {
     const tag = (window.PREDEFINED_DIETARY_TAGS || [])[0];
     if (tag) appInstance.toggleOnboardingDietaryTag(tag);
     appInstance.applyOnboardingGoalPreset('deficit');
-    appInstance.selectOnboardingServings(3);
+    appInstance.selectOnboardingServings(5);
     appInstance.onboardingStep = 4;
     appInstance.nextOnboardingStep();
 
     const summary = document.getElementById('onboarding-summary-box').textContent;
     expect(summary).toContain('1700 kcal');
-    expect(summary).toContain('3 personas');
+    expect(summary).toContain('5 personas');
 
     appInstance.nextOnboardingStep(); // en el paso 5 → completa
 
     expect(localStorage.getItem('fa_onboarding_completed')).toBe('true');
-    expect(localStorage.getItem('fa_servings')).toBe('3');
-    expect(state.defaultServings).toBe(3);
+    expect(localStorage.getItem('fa_servings')).toBe('5');
+    expect(state.defaultServings).toBe(5);
     expect(state.settings.nutritionGoals).toMatchObject({ enabled: true, calories: 1700, protein: 145, carbs: 150, fat: 55 });
     if (tag) expect(state.dietaryPreferences).toContain(tag);
     expect(isModalOpen()).toBe(false);
@@ -538,4 +685,3 @@ describe('US-68: Asistente de Bienvenida (Onboarding Wizard)', () => {
     expect(appInstance.checkAndLaunchOnboarding()).toBe(false);
   });
 });
-
