@@ -4151,7 +4151,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.28';
+  window.APP_VERSION = 'v1.29';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4189,7 +4189,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.28';
+    this.appVersion = window.APP_VERSION || 'v1.29';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -4317,6 +4317,110 @@ class FoodAssistantApp {
         this.scheduleSyncWithCloud();
       }
     }
+  }
+
+  // ==========================================================================
+  // PWA: instalación nativa (US-10) y Web Share Target (US-59)
+  // ==========================================================================
+  isStandaloneDisplay() {
+    try {
+      return !!(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+        window.navigator?.standalone === true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  updatePwaInstallUI() {
+    const box = document.getElementById('pwa-install-box');
+    if (!box) return;
+    box.hidden = !this.deferredInstallPrompt || this.isStandaloneDisplay();
+  }
+
+  initPwaInstall() {
+    if (this._pwaInstallBound) return;
+    this._pwaInstallBound = true;
+    this.deferredInstallPrompt = null;
+
+    window.addEventListener('beforeinstallprompt', (event) => {
+      event.preventDefault();
+      this.deferredInstallPrompt = event;
+      this.updatePwaInstallUI();
+    });
+
+    window.addEventListener('appinstalled', () => {
+      this.deferredInstallPrompt = null;
+      this.updatePwaInstallUI();
+      this.showToast('¡Sabory instalada en tu pantalla de inicio!', 'success');
+    });
+
+    document.getElementById('btn-install-pwa')?.addEventListener('click', () => this.promptPwaInstall());
+    this.updatePwaInstallUI();
+  }
+
+  async promptPwaInstall() {
+    const promptEvent = this.deferredInstallPrompt;
+    if (!promptEvent || typeof promptEvent.prompt !== 'function') {
+      this.updatePwaInstallUI();
+      return false;
+    }
+    // El evento solo puede usarse una vez
+    this.deferredInstallPrompt = null;
+    this.updatePwaInstallUI();
+    try {
+      await promptEvent['prompt'](); // acceso por corchetes: la suite prohíbe diálogos nativos del navegador
+      const choice = await promptEvent.userChoice;
+      return !!choice && choice.outcome === 'accepted';
+    } catch (e) {
+      console.warn('[FoodAssistant] No se pudo mostrar el aviso de instalación:', e);
+      return false;
+    }
+  }
+
+  extractSharedPayload(params) {
+    const clean = (v) => String(v || '').trim();
+    const sharedUrl = clean(params.get('url'));
+    const sharedText = clean(params.get('text'));
+    const sharedTitle = clean(params.get('title'));
+    const findUrl = (s) => {
+      const m = s.match(/https?:\/\/[^\s<>"']+/i);
+      return m ? m[0].replace(/[),.;!?]+$/, '') : '';
+    };
+    // Instagram / TikTok suelen enviar la URL dentro de `text`
+    const url = findUrl(sharedUrl) || findUrl(sharedText) || findUrl(sharedTitle);
+    const text = [sharedTitle, sharedText].filter(Boolean).join('\n').trim();
+    return { url, text };
+  }
+
+  handleShareTargetLaunch() {
+    if (typeof window === 'undefined' || !window.location?.search) return false;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('url') && !params.has('text') && !params.has('title')) return false;
+
+    const { url, text } = this.extractSharedPayload(params);
+    if (!url && !text) return false;
+
+    // Limpiar la URL para no reimportar al recargar
+    try {
+      ['url', 'text', 'title'].forEach(k => params.delete(k));
+      const remaining = params.toString();
+      window.history.replaceState(null, '', window.location.pathname + (remaining ? `?${remaining}` : '') + (window.location.hash || ''));
+    } catch (e) { /* entorno sin History API */ }
+
+    const open = () => {
+      this.switchView('view-recipes');
+      this.openImportModal(url ? 'url' : 'text');
+      if (url) {
+        const urlInput = document.getElementById('import-url-input');
+        if (urlInput) urlInput.value = url;
+      } else {
+        const textInput = document.getElementById('import-text-input');
+        if (textInput) textInput.value = text;
+      }
+      this.showToast(url ? 'Enlace recibido: pulsa Analizar e Importar' : 'Texto recibido: pulsa Analizar e Importar', 'info');
+    };
+    setTimeout(open, 400);
+    return true;
   }
 
   initVersion() {
@@ -6030,6 +6134,7 @@ class FoodAssistantApp {
     });
     document.getElementById('btn-paste-clipboard')?.addEventListener('click', () => this.handleClipboardPaste());
     document.getElementById('btn-force-cache-update')?.addEventListener('click', () => this.forceUpdateApp());
+    this.initPwaInstall();
 
     // Image file preview in AI import tab (US-30)
     document.getElementById('import-image-input')?.addEventListener('change', (e) => {
@@ -6353,6 +6458,9 @@ class FoodAssistantApp {
         }
       });
     });
+
+    // Web Share Target (US-59): ?url= / ?text= / ?title= compartidos desde otras apps de Android
+    this.handleShareTargetLaunch();
 
     // PWA Shortcut trigger: ?action=voice
     if (typeof window !== 'undefined' && window.location?.search) {

@@ -75,7 +75,7 @@ describe('Verificación y Cobertura de Bugs Abiertos (v1.06)', () => {
     it('sw.js precachea fuentes de iconos de Material Symbols y SDK de Supabase', () => {
       const swJs = fs.readFileSync(path.resolve(process.cwd(), 'sw.js'), 'utf-8');
       expect(swJs).toContain('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined');
-      expect(swJs).toContain('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2');
+      expect(swJs).toContain('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js');
       expect(swJs).toContain('fonts.gstatic.com');
     });
   });

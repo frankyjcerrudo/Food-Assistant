@@ -1,17 +1,20 @@
-const CACHE_NAME = 'food-assistant-v1.28';
+const CACHE_NAME = 'food-assistant-v1.29';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './styles.css?v=1.28',
-  './config.js?v=1.28',
-  './app.js?v=1.28',
+  './styles.css?v=1.29',
+  './config.js?v=1.29',
+  './app.js?v=1.29',
   './manifest.json',
   './icon.svg',
   './icon-192.png',
   './icon-512.png',
+  './icon-maskable.svg',
+  './icon-maskable-192.png',
+  './icon-maskable-512.png',
   './apple-touch-icon.png',
   'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js'
 ];
 
 self.addEventListener('install', (event) => {

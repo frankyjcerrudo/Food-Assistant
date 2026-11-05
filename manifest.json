@@ -1,24 +1,41 @@
 {
+  "id": "./index.html",
   "name": "Sabory — Planificador Culinario & IA",
   "short_name": "Sabory",
   "description": "Tu compañero de cocina inteligente: organiza tus recetas, planifica tu menú semanal con IA y haz la compra por pasillos sin esfuerzo.",
+  "lang": "es",
+  "dir": "ltr",
+  "categories": ["food", "lifestyle", "productivity"],
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#FAF7F2",
-  "theme_color": "#C85A32",
+  "theme_color": "#FAF7F2",
   "orientation": "portrait-primary",
   "icons": [
     {
       "src": "./icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "./icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "./icon.svg",
@@ -27,6 +44,15 @@
       "purpose": "any"
     }
   ],
+  "share_target": {
+    "action": "./index.html",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
   "shortcuts": [
     {
       "name": "🎙️ Hablar al Asistente",

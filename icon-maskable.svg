@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Maskable icon (US-10): full-bleed background, glyph kept inside the 80% safe zone circle -->
+  <defs>
+    <linearGradient id="saboryBgMask" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#C85A32"/>
+      <stop offset="100%" stop-color="#E07A5F"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#saboryBgMask)"/>
+  <g transform="translate(102, 114) scale(11)" fill="#FAF7F2">
+    <path d="M11.5 5.2C11.5 3.9 12.6 3.1 12.6 1.8" stroke="#FAF7F2" stroke-width="1.6" stroke-linecap="round" fill="none" opacity="0.9"/>
+    <path d="M16.5 5.2C16.5 3.9 17.6 3.1 17.6 1.8" stroke="#FAF7F2" stroke-width="1.6" stroke-linecap="round" fill="none" opacity="0.9"/>
+    <circle cx="14" cy="7.5" r="1.5"/>
+    <path d="M6.5 11.5C8 9.2 10.7 8.2 14 8.2C17.3 8.2 20 9.2 21.5 11.5H6.5Z"/>
+    <path d="M3.2 13.5H5.8V15.5H3.2C2.65 15.5 2.2 15.050 2.2 14.5C2.2 13.95 2.65 13.5 3.2 13.5ZM22.2 13.5H24.8C25.35 13.5 25.8 13.95 25.8 14.5C25.8 15.05 25.35 15.5 24.8 15.5H22.2V13.5Z"/>
+    <path d="M6 13H22V16.8C22 20.78 18.64 24 14.5 24H13.5C9.36 24 6 20.78 6 16.8V13Z"/>
+  </g>
+</svg>
+
