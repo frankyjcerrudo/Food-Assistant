@@ -50,6 +50,13 @@ describe('US-73: Auditoría Integral de UX, Arquitectura de Información e Ident
     // Dock en isla cápsula flotante y botones circulares estilizados para quitar (✕)
     expect(cssContent).toContain('max-width: 440px');
     expect(cssContent).toContain('.btn-remove-circle');
+
+    // Iconos de instalación PWA (manifest.json + PNG/SVG de la Cocotte de Sabory, sin el huevo frito antiguo)
+    const manifestJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'manifest.json'), 'utf-8'));
+    expect(manifestJson.short_name).toBe('Sabory');
+    expect(JSON.stringify(manifestJson.icons)).not.toContain('🍳');
+    expect(manifestJson.icons.some(i => i.src.includes('icon-192.png'))).toBe(true);
+    expect(manifestJson.icons.some(i => i.src.includes('icon-512.png'))).toBe(true);
   });
 
   it('2. Cabecera minimalista (Top Bar): sin badge de versión ni botón de tema en header', () => {

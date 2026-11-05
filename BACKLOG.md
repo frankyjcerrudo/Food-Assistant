@@ -2,8 +2,8 @@
 
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
-> **Versión Actual**: v1.19  
-> **Última actualización**: Noviembre 2026 (Implementada v1.19 — US-73 en 'In Progress': Rebranding definitivo a "Sabory" (Sabor + Savory, 100% libre en tiendas y multilenguaje) con isotipo SVG de Cocotte en cabecera, icono de Gorro de Chef (*Toque*) en el botón central del Asistente, dock inferior en isla cápsula flotante con fuente DM Sans unificada, widget discreto de macros a la derecha de la cabecera de Hoy (`P · C · G` + barra mini + desplegable), botones circulares estilizados (`✕`) para quitar platos/ingredientes y modo oscuro cálido suavizado "Piedra Cálida / Warm Dusk" `#26221E`. Suite completa con 22 archivos de tests pasando en verde)
+> **Versión Actual**: v1.20  
+> **Última actualización**: Noviembre 2026 (Implementada v1.20 — US-73 en 'In Progress': Rebranding definitivo a "Sabory" con iconos PWA nativos de Cocotte en alta resolución `icon-192.png`, `icon-512.png`, `apple-touch-icon.png` e `icon.svg` en `manifest.json` e `index.html`, isotipo SVG de Cocotte en cabecera, icono de Gorro de Chef (*Toque*) en el botón central del Asistente, dock inferior en isla cápsula flotante con fuente DM Sans unificada, widget discreto de macros a la derecha de la cabecera de Hoy, botones circulares estilizados (`✕`) y modo oscuro cálido suavizado "Piedra Cálida / Warm Dusk" `#26221E`. Suite completa con 22 archivos de tests pasando en verde)
 
 ---
 
