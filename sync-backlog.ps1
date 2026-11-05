@@ -274,7 +274,7 @@ while ($true) {
 }
 Write-Host "Total issues ya registrados en GitHub: $($existingMap.Count)" -ForegroundColor Yellow
 
-$missingItems = $itemsToProcess | Where-Object { -not $existingMap.ContainsKey($_.ID) }
+$missingItems = @($itemsToProcess | Where-Object { -not $existingMap.ContainsKey($_.ID) })
 Write-Host "Nuevos elementos pendientes de crear: $($missingItems.Count)" -ForegroundColor Magenta
 
 # 4. Asegurar que las etiquetas necesarias existan en el repositorio

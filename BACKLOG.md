@@ -2,8 +2,8 @@
 
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
-> **Versión Actual**: v1.17  
-> **Última actualización**: Noviembre 2026 (Completadas y aprobadas por Franky US-23, US-24 y US-49 en estado 'Done': Sistema de Diseño Moderno con paleta botánica gourmet, superficies multicapa en alabastro/obsidiana, barra superior y dock inferior flotante translúcido, escala tipográfica editorial 2.5x, micro-interacciones táctiles de Emil Kowalski, 0 `transition: all` y plantillas JS sin `style="..."` estáticos. Añadida US-73 para Auditoría de UX e Identidad de Producto. Suite completa con 21 archivos y 378 tests pasando en verde)
+> **Versión Actual**: v1.18  
+> **Última actualización**: Noviembre 2026 (Implementada v1.18 — US-73 en 'In Progress': Rebranding a "Savory" con Dirección Editorial Culinaria Cálida en Crema Alabastro `#FAF7F2`, Terracota `#C85A32` y Salvia `#2D6A4F`, tipografía Playfair Display + DM Sans, vista Hoy Meals-First con píldora nutricional colapsable, Planificador con acordeón inteligente Hoy+Mañana, chip "Mi Nevera" integrado, eliminación de `#view-ai` y Ajustes en 2 niveles. Cerradas US-23, US-24 y US-49 en 'Done'. Sincronizado con GitHub Issues #1 al #98. Suite completa con 22 archivos y 383 tests pasando en verde)
 
 ---
 
