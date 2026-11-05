@@ -416,6 +416,27 @@ const ALL_PREDEFINED_TAGS = [
   ...PREDEFINED_PRACTICAL_TAGS
 ];
 
+function getPrimaryProteinCategory(recipe) {
+  if (!recipe) return 'otro';
+  const title = String(recipe.title || '').toLowerCase();
+  const tags = (Array.isArray(recipe.tags) ? recipe.tags : []).join(' ').toLowerCase();
+  const ings = (Array.isArray(recipe.ingredients) ? recipe.ingredients : [])
+    .map(i => typeof i === 'string' ? i : (i?.name || ''))
+    .join(' ')
+    .toLowerCase();
+  const allText = `${title} ${tags} ${ings}`;
+
+  if (/\b(pollo|pechuga[s]?(\s+de\s+pollo)?|contramuslo[s]?|alitas?|muslo[s]?(\s+de\s+pollo)?)\b/i.test(allText)) return 'pollo';
+  if (/\b(pavo|pechuga[s]?\s+de\s+pavo|pavos)\b/i.test(allText)) return 'pavo';
+  if (/\b(salm[oó]n|at[uú]n|merluza|bacalao|gamba[s]?|langostino[s]?|calamar(es)?|pulpo|sepia|sardina[s]?|lubina|dorada|bonito|pescado|marisco|anchoa[s]?|trucha|mejill[oó]n|mejillones)\b/i.test(allText)) return 'pescado';
+  if (/\b(ternera|vaca|buey|cerdo|lomo|jam[oó]n|solomillo|carne\s+picada|chuleta[s]?|costilla[s]?)\b/i.test(allText)) return 'carne';
+  if (/\b(huevo[s]?|tortilla|revuelto|claras?)\b/i.test(allText)) return 'huevos';
+  if (/\b(lenteja[s]?|garbanzo[s]?|alubia[s]?|tofu|soja|heura|edamame|seit[aá]n|tempeh)\b/i.test(allText)) return 'legumbres_vegetal';
+  if (/\b(pasta|espagueti[s]?|macarron(es)?|lasa[ñn]a|arroz|quinoa|gnocchi[s]?|couscous)\b/i.test(allText)) return 'cereal_pasta';
+
+  return 'otro';
+}
+
 function checkDietaryCompliance(recipe, preferences) {
   if (!recipe || !Array.isArray(preferences) || preferences.length === 0) {
     return { compliant: true, violations: [] };
@@ -4130,7 +4151,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.27';
+  window.APP_VERSION = 'v1.28';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4162,12 +4183,13 @@ if (typeof window !== 'undefined') {
   window.analyzeAndInferRecipeTags = analyzeAndInferRecipeTags;
   window.estimateRecipeNutrition = estimateRecipeNutrition;
   window.getRecipeNutrition = getRecipeNutrition;
+  window.getPrimaryProteinCategory = getPrimaryProteinCategory;
 }
 
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.27';
+    this.appVersion = window.APP_VERSION || 'v1.28';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -12204,7 +12226,67 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       const weekDays = this.getPlannerWeekDates();
       const fallbackPlan = this.buildSimulatedWeeklyPlanArgs('replace', false, typeof prompt !== 'undefined' ? prompt : '');
       const shouldCompleteAllWeek = args.completeWeek === true;
-      const updatedDateKeys = new Set();
+            const updatedDateKeys = new Set();
+
+      // Paso 1: Completar desayunos y meriendas faltantes en días planificados si el usuario no los excluyó explícitamente
+      const isMultiMealRequest = daysInput.some(d => (d.lunch || d.dinner) && (d.breakfast === undefined || d.snack === undefined));
+      if (isMultiMealRequest) {
+        daysInput.forEach(d => {
+          let wIdx = weekDays.findIndex(w => w.dateKey === d.dateKey);
+          if (wIdx < 0 && d.dayName) {
+            wIdx = weekDays.findIndex(w => normalizeIngredientText(w.dayName) === normalizeIngredientText(d.dayName));
+          }
+          if (wIdx < 0) wIdx = 0;
+          const fb = fallbackPlan.days[wIdx] || fallbackPlan.days[0];
+          if (d.breakfast === undefined && fb?.breakfast) d.breakfast = fb.breakfast;
+          if (d.snack === undefined && fb?.snack) d.snack = fb.snack;
+        });
+      }
+
+      // Paso 2: Validación y rotación balanceada de proteínas (Anti-Pollo y Anti-Monotonía)
+      let lastDinnerProtein = null;
+      let totalChickenCount = 0;
+      const maxAllowedChicken = daysInput.length <= 2 ? 1 : Math.min(3, Math.ceil(daysInput.length * 0.35));
+
+      daysInput.forEach((d) => {
+        const lunchRec = d.lunch ? (state.recipes || []).find(r => r.id === d.lunch || r.id === this.resolveRecipeIdForAgent(d.lunch)) : null;
+        let lunchProt = getPrimaryProteinCategory(lunchRec);
+
+        if (lunchProt === 'pollo' && totalChickenCount >= maxAllowedChicken) {
+          const altLunch = (state.recipes || []).find(r => 
+            r.id !== d.lunch && 
+            getPrimaryProteinCategory(r) !== 'pollo' && 
+            (r.tags || []).some(t => /almuerzo|comida|cena/i.test(t))
+          );
+          if (altLunch) {
+            d.lunch = altLunch.id;
+            lunchProt = getPrimaryProteinCategory(altLunch);
+          }
+        }
+        if (lunchProt === 'pollo') totalChickenCount++;
+
+        const dinnerRec = d.dinner ? (state.recipes || []).find(r => r.id === d.dinner || r.id === this.resolveRecipeIdForAgent(d.dinner)) : null;
+        let dinnerProt = getPrimaryProteinCategory(dinnerRec);
+
+        const isSameAsLunch = dinnerProt !== 'otro' && dinnerProt === lunchProt;
+        const isExcessChicken = dinnerProt === 'pollo' && (totalChickenCount >= maxAllowedChicken || lunchProt === 'pollo' || lastDinnerProtein === 'pollo');
+
+        if (isSameAsLunch || isExcessChicken) {
+          const altDinner = (state.recipes || []).find(r => 
+            r.id !== d.lunch && 
+            r.id !== d.dinner && 
+            getPrimaryProteinCategory(r) !== lunchProt && 
+            getPrimaryProteinCategory(r) !== 'pollo' &&
+            (r.tags || []).some(t => /cena|almuerzo|comida/i.test(t))
+          );
+          if (altDinner) {
+            d.dinner = altDinner.id;
+            dinnerProt = getPrimaryProteinCategory(altDinner);
+          }
+        }
+        if (dinnerProt === 'pollo') totalChickenCount++;
+        lastDinnerProtein = dinnerProt;
+      });
 
       daysInput.forEach((dayEntry, idx) => {
         if (!dayEntry) return;

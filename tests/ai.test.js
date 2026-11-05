@@ -1181,6 +1181,50 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     expect(sysPrompt).toContain('NUNCA repitas la misma fuente de proteína principal');
     expect(sysPrompt).toContain('RAZONAMIENTO, TRANSPARENCIA Y PREGUNTAS');
   });
+
+  it('v1.28: getPrimaryProteinCategory categoriza fuentes proteicas con precisión', () => {
+    expect(getPrimaryProteinCategory({ title: 'Pechuga de pollo al limón', ingredients: [] })).toBe('pollo');
+    expect(getPrimaryProteinCategory({ title: 'Contramuslo al horno', ingredients: [{ name: 'Pollo' }] })).toBe('pollo');
+    expect(getPrimaryProteinCategory({ title: 'Salmón a la plancha', ingredients: [] })).toBe('pescado');
+    expect(getPrimaryProteinCategory({ title: 'Lasaña con carne picada de ternera', ingredients: [] })).toBe('carne');
+    expect(getPrimaryProteinCategory({ title: 'Tortilla francesa con espinacas', ingredients: [] })).toBe('huevos');
+  });
+
+  it('v1.28: set_weekly_plan auto-rellena desayunos/meriendas faltantes y evita repetir pollo en almuerzo y cena', () => {
+    const sampleRecipes = [
+      { id: 'rec-bf-1', title: 'Tortitas de Avena', tags: ['Desayuno'] },
+      { id: 'rec-sn-1', title: 'Batido Proteico', tags: ['Merienda'] },
+      { id: 'rec-ch-1', title: 'Pechuga de pollo con arroz', tags: ['Almuerzo'], ingredients: [{ name: 'Pollo' }] },
+      { id: 'rec-ch-2', title: 'Contramuslo de pollo con ensalada', tags: ['Cena'], ingredients: [{ name: 'Pollo' }] },
+      { id: 'rec-fish-1', title: 'Salmón al horno con verduras', tags: ['Cena'], ingredients: [{ name: 'Salmón' }] }
+    ];
+    state.recipes = sampleRecipes;
+
+    const res = appInstance.executeAiToolCall({
+      name: 'set_weekly_plan',
+      args: {
+        mode: 'replace',
+        days: [
+          {
+            dateKey: '2026-11-07',
+            dayName: 'Sábado',
+            lunch: 'rec-ch-1',
+            dinner: 'rec-ch-2' // ¡Pollo duplicado en el mismo día!
+          }
+        ]
+      }
+    });
+
+    expect(res.success).toBe(true);
+    const satPlan = state.getDayPlan('2026-11-07', 'Sábado');
+    // Desayuno y merienda deben haberse auto-asignado sin dejarlos vacíos
+    expect(satPlan.breakfast).toBeTruthy();
+    expect(satPlan.snack).toBeTruthy();
+    // Almuerzo y cena no deben tener ambos pollo en el mismo día
+    expect(satPlan.lunch).toBe('rec-ch-1');
+    expect(satPlan.dinner).not.toBe('rec-ch-2');
+    expect(satPlan.dinner).toBe('rec-fish-1');
+  });
   it('v0.97: create_and_save_recipe no duplica recetas si el título ya existe en el catálogo', () => {
     state.recipes = [
       { id: 'rec-orig-1', title: 'Tortitas Proteicas de Avena', tags: [], ingredients: [], instructions: [] }
