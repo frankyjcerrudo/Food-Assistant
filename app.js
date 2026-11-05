@@ -3680,7 +3680,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.16';
+  window.APP_VERSION = 'v1.17';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -3717,7 +3717,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.16';
+    this.appVersion = window.APP_VERSION || 'v1.17';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;

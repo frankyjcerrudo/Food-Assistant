@@ -2,8 +2,8 @@
 
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
-> **Versión Actual**: v1.16  
-> **Última actualización**: Noviembre 2026 (Implementadas US-23, US-24 y US-49 en estado 'In Progress': Sistema de Diseño Moderno con escala tipográfica 2.5x, grid de 8pt, bordes alfa translúcidos, sombras multicapa, micro-interacciones táctiles de Emil Kowalski, eliminación total de `transition: all` y migración de todos los `style="..."` estáticos de plantillas JS a clases CSS. Suite completa con 21 archivos y 378 tests pasando en verde)
+> **Versión Actual**: v1.17  
+> **Última actualización**: Noviembre 2026 (Implementadas US-23, US-24 y US-49 en estado 'In Progress': Sistema de Diseño Moderno con paleta botánica gourmet, superficies multicapa en alabastro/obsidiana, barra superior y dock inferior flotante translúcido, escala tipográfica editorial 2.5x, micro-interacciones táctiles de Emil Kowalski, 0 `transition: all` y plantillas JS sin `style="..."` estáticos. Suite completa con 21 archivos y 378 tests pasando en verde)
 
 ---
 

@@ -18,8 +18,8 @@ describe('US-23, US-24 & US-49: Sistema de Diseño Moderno, Micro-interacciones 
       expect(stylesCss).toContain('--text-display: 2.5rem');
     });
 
-    it('define tracking editorial negativo (-0.02em) en cabeceras y font-variant-numeric: tabular-nums en contadores', () => {
-      expect(stylesCss).toContain('letter-spacing: -0.02em');
+    it('define tracking editorial negativo (-0.02em / -0.025em) en cabeceras y font-variant-numeric: tabular-nums en contadores', () => {
+      expect(stylesCss).toContain('--tracking-editorial: -0.025em');
       expect(stylesCss).toContain('font-variant-numeric: tabular-nums');
     });
 
