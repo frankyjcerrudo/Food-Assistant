@@ -165,8 +165,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
   });
 
   it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-    expect(window.APP_VERSION).toBe('v1.25');
-    expect(appInstance.appVersion).toBe('v1.25');
+    expect(window.APP_VERSION).toBe('v1.26');
+    expect(appInstance.appVersion).toBe('v1.26');
 
     const badge = document.createElement('span');
     badge.id = 'app-version-badge';
@@ -176,8 +176,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     document.body.appendChild(settingsVer);
 
     appInstance.initVersion();
-    expect(badge.textContent).toBe('v1.25');
-    expect(settingsVer.textContent).toBe('v1.25');
+    expect(badge.textContent).toBe('v1.26');
+    expect(settingsVer.textContent).toBe('v1.26');
 
     document.body.removeChild(badge);
     document.body.removeChild(settingsVer);
@@ -399,7 +399,7 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     document.body.removeChild(secAi);
   });
 
-  it('v1.25: modal-gemini-invoke header desacopla acciones del título para prevenir compresión en pantallas estrechas', () => {
+  it('v1.24: modal-gemini-invoke header desacopla acciones del título para prevenir compresión en pantallas estrechas', () => {
     const cssContent = fs.readFileSync(path.resolve(process.cwd(), 'styles.css'), 'utf-8');
     expect(cssContent).toContain('.gemini-invoke-header-top');
     expect(cssContent).toContain('.gemini-invoke-header-actions');

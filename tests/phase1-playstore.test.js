@@ -543,9 +543,6 @@ describe('US-68: Asistente de Bienvenida (Onboarding Wizard)', () => {
         <span id="onboarding-servings-unit-text">personas</span>
         <button class="btn-servings-step" data-action="stepOnboardingServings" data-step="1"></button>
       </div>
-      <div id="onboarding-servings-grid">
-        ${[1, 2, 3, 4, 5, 6].map(n => `<button class="onboarding-serving-chip onboarding-serving-card" data-servings="${n}"></button>`).join('')}
-      </div>
       <div id="onboarding-summary-box"></div>
       <button id="btn-onboarding-prev"></button>
       <button id="btn-onboarding-next"></button>
@@ -626,12 +623,10 @@ describe('US-68: Asistente de Bienvenida (Onboarding Wizard)', () => {
     expect(document.getElementById('onboarding-goal-calories').value).toBe('2400');
     expect(document.getElementById('onboarding-goal-protein').value).toBe('180');
     expect(document.querySelector('[data-preset="protein"]').classList.contains('active')).toBe(true);
-
-    // Selección rápida: 5 personas
+    // Ajuste de comensales: 5 personas
     appInstance.selectOnboardingServings(5);
     expect(appInstance.onboardingServings).toBe(5);
     expect(document.getElementById('onboarding-servings-input').value).toBe('5');
-    expect(document.querySelector('[data-servings="5"]').classList.contains('active')).toBe(true);
 
     // Personalización libre: 9 personas
     appInstance.selectOnboardingServings(9);

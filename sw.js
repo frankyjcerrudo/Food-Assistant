@@ -1,10 +1,10 @@
-const CACHE_NAME = 'food-assistant-v1.25';
+const CACHE_NAME = 'food-assistant-v1.26';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './styles.css?v=1.24',
-  './config.js?v=1.24',
-  './app.js?v=1.24',
+  './styles.css?v=1.26',
+  './config.js?v=1.26',
+  './app.js?v=1.26',
   './manifest.json',
   './icon.svg',
   './icon-192.png',
@@ -40,8 +40,8 @@ self.addEventListener('fetch', (event) => {
   const url = event.request.url;
   const isSameOrigin = url.startsWith(self.location.origin);
   const isPrecachedExternal = url.includes('fonts.googleapis.com') ||
-                              url.includes('fonts.gstatic.com') ||
-                              url.includes('cdn.jsdelivr.net');
+    url.includes('fonts.gstatic.com') ||
+    url.includes('cdn.jsdelivr.net');
 
   // Only handle same-origin GET requests or precached external assets (fonts/icons, Supabase SDK)
   if (event.request.method !== 'GET' || (!isSameOrigin && !isPrecachedExternal)) {

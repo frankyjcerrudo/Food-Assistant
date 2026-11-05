@@ -6043,11 +6043,12 @@ h2,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
+  padding: 16px 20px;
   border-radius: var(--radius-lg);
   border: 1.5px solid var(--m3-outline-variant);
   background-color: var(--m3-surface-container-low);
-  margin-top: 8px;
+  margin-top: 16px;
+  margin-bottom: 12px;
 }
 
 .btn-servings-step {
