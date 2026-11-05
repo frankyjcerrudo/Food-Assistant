@@ -34,9 +34,9 @@ describe('US-23, US-24 & US-49: Sistema de Diseño Moderno, Micro-interacciones 
       expect(stylesCss).toContain('--space-6: 48px');
     });
 
-    it('define bordes translúcidos sutiles en modo claro y oscuro (1px solid rgba(255, 255, 255, 0.08))', () => {
-      expect(stylesCss).toContain('--border-subtle: 1px solid rgba(15, 23, 42, 0.08)');
-      expect(stylesCss).toContain('--border-subtle: 1px solid rgba(255, 255, 255, 0.08)');
+    it('define bordes translúcidos sutiles en modo claro y oscuro (1px solid rgba(..., 0.08))', () => {
+      expect(stylesCss).toMatch(/--border-subtle:\s*1px solid rgba\(\d+,\s*\d+,\s*\d+,\s*0\.08\)/);
+      expect(stylesCss).toMatch(/:root\[data-theme="dark"\][\s\S]*?--border-subtle:\s*1px solid rgba\(\d+,\s*\d+,\s*\d+,\s*0\.08\)/);
     });
 
     it('define sombras multicapa compuestas (--elevation-1, --elevation-2, --elevation-3)', () => {

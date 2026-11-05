@@ -85,27 +85,30 @@ describe('Camino B (US-17 & BUG-26): Asistente de Voz Integrado, Plurales y Fin 
   });
 
   describe('Asistente de Voz (Web Speech Recognition & Synthesis)', () => {
-    it('inicializa los elementos de interfaz del micrófono en la vista de IA y botón central', () => {
-      const micBtn = document.getElementById('btn-mic-ai-chat');
+    it('inicializa los elementos de interfaz del micrófono en el modal del Asistente y botón central', () => {
+      const invokeMicBtn = document.getElementById('btn-gemini-invoke-mic');
       const centralBtn = document.getElementById('btn-central-gemini-invoke');
-      const voiceBadge = document.getElementById('voice-listening-indicator');
+      const pulseIndicator = document.getElementById('gemini-invoke-pulse');
 
-      expect(micBtn).not.toBeNull();
+      expect(invokeMicBtn).not.toBeNull();
       expect(centralBtn).not.toBeNull();
-      expect(voiceBadge).not.toBeNull();
+      expect(pulseIndicator).not.toBeNull();
     });
 
     it('updateVoiceUI actualiza los botones y el badge de escucha', () => {
-      const micBtn = document.getElementById('btn-mic-ai-chat');
-      const voiceBadge = document.getElementById('voice-listening-indicator');
+      const invokeMicBtn = document.getElementById('btn-gemini-invoke-mic');
+      const centralBtn = document.getElementById('btn-central-gemini-invoke');
+      const pulseIndicator = document.getElementById('gemini-invoke-pulse');
 
       app.updateVoiceUI(true);
-      expect(micBtn.classList.contains('listening')).toBe(true);
-      expect(voiceBadge.style.display).toBe('flex');
+      expect(invokeMicBtn.classList.contains('listening')).toBe(true);
+      expect(centralBtn.classList.contains('listening')).toBe(true);
+      expect(pulseIndicator.style.display).toBe('flex');
 
       app.updateVoiceUI(false);
-      expect(micBtn.classList.contains('listening')).toBe(false);
-      expect(voiceBadge.style.display).toBe('none');
+      expect(invokeMicBtn.classList.contains('listening')).toBe(false);
+      expect(centralBtn.classList.contains('listening')).toBe(false);
+      expect(pulseIndicator.style.display).toBe('none');
     });
 
     it('speakAiResponse limpia markdown y llama a SpeechSynthesisUtterance si está disponible', () => {

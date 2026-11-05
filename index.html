@@ -4,16 +4,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Food Assistant</title>
-  <meta name="description" content="Planificador de comidas y recetas minimalista estilo Google.">
+  <title>Savory</title>
+  <meta name="description" content="Savory — Recetario editorial, planificador semanal y lista de la compra inteligente.">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#ffffff">
+  <meta name="theme-color" content="#FAF7F2">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=1.17">
+  <link rel="stylesheet" href="styles.css?v=1.18">
   <link rel="icon"
-    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%231a73e8'/><path d='M30 30h40v40H30z' fill='%23ffffff'/></svg>">
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='26' fill='%23C85A32'/><text x='50' y='68' font-family='Georgia,serif' font-size='58' font-weight='bold' fill='%23FAF7F2' text-anchor='middle'>S</text></svg>">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -22,21 +22,12 @@
 
   <div class="app-container">
 
-    <!-- Top App Bar (Google Style) -->
+    <!-- Savory Editorial Top Bar (US-73 Decluttered Header) -->
     <header class="app-header">
       <div class="brand-wrapper">
-        <div class="brand-logo-icon">
-          <span class="material-symbols-outlined">restaurant_menu</span>
-        </div>
-        <h1 class="brand-name">Food Assistant</h1>
-        <span class="app-version-badge" id="app-version-badge" title="Versión de Food Assistant">v1.17</span>
+        <h1 class="brand-name">Savory</h1>
       </div>
       <div class="header-actions">
-        <!-- Theme quick toggle -->
-        <button class="btn btn-ghost btn-icon" id="btn-header-theme" title="Aspecto del tema">
-          <span class="material-symbols-outlined" id="header-theme-icon">brightness_auto</span>
-        </button>
-
         <!-- Cloud User Account Pill -->
         <button class="user-pill" id="btn-header-account" title="Mi Cuenta">
           <span class="material-symbols-outlined icon-sm" id="header-account-icon">account_circle</span>
@@ -49,30 +40,27 @@
       </div>
     </header>
 
-    <!-- VIEW 1: TODAY / ZERO CLUTTER (US-28) -->
+    <!-- VIEW 1: TODAY / MEALS FIRST + COMPACT NUTRITION PILL (US-28 / US-73) -->
     <main class="view-panel active" id="view-today">
       <div class="today-header">
         <div class="today-header-info">
           <div class="today-date-badge">
-            <span class="material-symbols-outlined icon-sm" style="color: var(--m3-primary);">today</span>
+            <span class="material-symbols-outlined icon-sm">calendar_today</span>
             <span id="today-date-text">Hoy</span>
           </div>
-          <h2 class="today-title">Comidas de Hoy</h2>
+          <h2 class="today-title">Menú de Hoy</h2>
           <p class="today-subtitle" id="today-summary-text">Tus comidas organizadas para el día.</p>
         </div>
-        <button class="btn btn-tonal btn-sm today-btn-planner" id="btn-goto-planner" title="Ver planificador semanal">
-          <span>Semana</span>
-          <span class="material-symbols-outlined icon-sm">arrow_forward</span>
-        </button>
       </div>
 
-      <!-- DAILY NUTRITION SUMMARY (US-01) -->
-      <div class="today-nutrition-card" id="today-nutrition-card">
-        <!-- Generated dynamically via JS -->
-      </div>
-
+      <!-- PLANNED MEALS FIRST (US-73) -->
       <div class="slots-grid" id="today-slots-container">
         <!-- Generated via JS -->
+      </div>
+
+      <!-- COMPACT COLLAPSIBLE NUTRITION BAR UNDERNEATH (US-01 / US-73) -->
+      <div class="today-nutrition-card" id="today-nutrition-card">
+        <!-- Generated dynamically via JS -->
       </div>
     </main>
 
@@ -81,11 +69,10 @@
       <div class="section-header">
         <div>
           <h2 class="section-title">
-            Recetas
-            <span class="app-version-badge" id="recipes-count-badge"
-              style="font-size: 13px; font-weight: 600; vertical-align: middle; margin-left: 8px; padding: 2px 8px; border-radius: 12px; background: var(--m3-surface-container-high); color: var(--m3-primary);">0</span>
+            Recetario
+            <span class="recipes-header-count-pill" id="recipes-count-badge">0</span>
           </h2>
-          <p class="section-subtitle" id="recipes-count-subtitle">Tu recetario personal.</p>
+          <p class="section-subtitle" id="recipes-count-subtitle">Tu colección culinaria personal.</p>
         </div>
         <button class="btn btn-primary btn-sm" id="btn-open-create-recipe">
           <span class="material-symbols-outlined icon-sm">add</span>
@@ -93,16 +80,11 @@
         </button>
       </div>
 
-      <!-- Google Pill Search Bar -->
+      <!-- Clean Editorial Search Bar (US-73) -->
       <div class="m3-search-bar">
         <span class="material-symbols-outlined">search</span>
         <input type="text" class="m3-search-input" id="recipes-search-input"
-          placeholder="Buscar recetas o ingredientes...">
-        <button type="button" class="btn btn-tonal btn-sm" id="btn-toggle-fridge-panel"
-          style="border-radius: var(--radius-full); font-size: 12px; padding: 4px 10px; gap: 4px; flex-shrink: 0;">
-          <span class="material-symbols-outlined icon-sm">kitchen</span>
-          <span>Nevera</span>
-        </button>
+          placeholder="Buscar por plato, ingrediente o técnica...">
       </div>
 
       <!-- US-34: Fridge Reverse Search Panel ("¿Qué cocino con mi nevera?") -->
@@ -130,6 +112,10 @@
       </div>
 
       <div class="chips-scroll-container" id="recipes-tag-filters">
+        <button type="button" class="m3-filter-chip m3-filter-chip-fridge" id="btn-toggle-fridge-panel" title="Buscar recetas con ingredientes de tu nevera">
+          <span class="material-symbols-outlined icon-sm">kitchen</span>
+          <span>Mi Nevera</span>
+        </button>
         <button class="m3-filter-chip active" data-tag="all">Todas</button>
         <button class="m3-filter-chip" data-tag="Desayuno">Desayunos</button>
         <button class="m3-filter-chip" data-tag="Almuerzo">Almuerzos</button>
@@ -188,6 +174,11 @@
         <div class="week-nav-range" id="planner-week-range">
           <span class="material-symbols-outlined icon-sm">calendar_month</span>
           <span id="planner-week-range-text">Cargando semana...</span>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-toggle-all-planner-days"
+            data-action="toggleAllPlannerDays" title="Expandir o plegar todos los días de la semana">
+            <span class="material-symbols-outlined icon-sm">unfold_more</span>
+            <span id="btn-toggle-all-planner-days-label">Expandir semana</span>
+          </button>
         </div>
       </div>
 
@@ -236,91 +227,16 @@
       </div>
     </section>
 
-    <!-- VIEW 5: COOKING ASSISTANT -->
-    <section class="view-panel" id="view-ai">
-      <div class="card" style="background-color: var(--m3-surface-container-low); margin-bottom: 16px;">
-        <h2
-          style="font-size: 16px; font-weight: 500; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-          <span class="material-symbols-outlined" style="color: var(--m3-primary);">auto_awesome</span> Asistente de
-          Cocina
-        </h2>
-        <p style="font-size: 13px; color: var(--m3-on-surface-variant); line-height: 1.4;">
-          Pídele a tu Asistente que te sugiera menús, resuelva dudas culinarias y de nutrición, o gestione tu lista de
-          la compra.
-        </p>
-      </div>
-
-      <div class="chips-scroll-container">
-        <button class="m3-filter-chip"
-          data-prompt="Planifica mi menú semanal equilibrado de lunes a domingo con mis recetas guardadas.">
-          <span class="material-symbols-outlined icon-sm">calendar_month</span> Planificar mi semana
-        </button>
-        <button class="m3-filter-chip"
-          data-prompt="Tengo pollo, calabacín y patatas en la nevera. ¿Qué cena rica y rápida puedo preparar?">
-          <span class="material-symbols-outlined icon-sm">kitchen</span> Cocinar con lo que tengo
-        </button>
-        <button class="m3-filter-chip"
-          data-prompt="Crea una receta de cena saludable, alta en proteínas y lista en 15 minutos.">
-          <span class="material-symbols-outlined icon-sm">timer</span> Cena en 15 min
-        </button>
-        <button class="m3-filter-chip" data-prompt="Añade aguacates, leche y pechuga de pollo a la lista de la compra.">
-          <span class="material-symbols-outlined icon-sm">add_shopping_cart</span> Añadir a la compra
-        </button>
-        <button class="m3-filter-chip"
-          data-prompt="Planifica mi semana en modo Batch Cooking (cocinar doble para reutilizar sobras al día siguiente).">
-          <span class="material-symbols-outlined icon-sm">takeout_dining</span> Batch Cooking / Tuppers
-        </button>
-      </div>
-
-      <div
-        style="display: flex; flex-direction: column; gap: 10px; max-height: 440px; overflow-y: auto; margin-bottom: 12px; padding-right: 4px;"
-        id="chat-history-container">
-        <div
-          style="background-color: var(--m3-surface-container); padding: 12px 14px; border-radius: var(--radius-lg); font-size: 13px; line-height: 1.45; align-self: flex-start; max-width: 88%;">
-          Hola. Puedo consultar tus recetas guardadas para sugerirte el menú semanal o crear recetas nuevas al instante.
-          ¿Qué necesitas?
-        </div>
-      </div>
-
-      <div style="display: flex; gap: 8px; align-items: center;">
-        <input type="text" class="form-input" id="ai-chat-input" placeholder="Escribe o pulsa el micro para hablar...">
-        <button class="btn btn-secondary" id="btn-mic-ai-chat" title="Hablar por voz (Web Speech API)"
-          style="border-radius: var(--radius-full); width: 44px; height: 44px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-          <span class="material-symbols-outlined icon-sm">mic</span>
-        </button>
-        <button class="btn btn-primary" id="btn-send-ai-chat" style="flex-shrink: 0;">
-          <span class="material-symbols-outlined icon-sm">send</span>
-          <span>Enviar</span>
-        </button>
-      </div>
-      <div id="voice-listening-indicator"
-        style="display: none; align-items: center; gap: 8px; margin-top: 8px; padding: 6px 12px; background: var(--m3-surface-container); border-radius: var(--radius-full); font-size: 12px; color: var(--color-brand); font-weight: 500;">
-        <span class="material-symbols-outlined"
-          style="font-size: 16px; animation: pulse 1s infinite; color: var(--m3-error, #ba1a1a);">mic</span>
-        <span>Escuchando... habla ahora (se enviará automáticamente al terminar)</span>
-      </div>
-      <div id="ai-chat-speaking-indicator"
-        style="display: none; align-items: center; justify-content: space-between; margin-top: 8px; padding: 6px 12px; background: rgba(59, 130, 246, 0.08); border-radius: var(--radius-full); font-size: 12px; color: var(--color-brand); font-weight: 500;">
-        <span style="display: flex; align-items: center; gap: 6px;">
-          <span class="material-symbols-outlined icon-sm" style="animation: pulse 1.5s infinite;">volume_up</span>
-          Asistente hablando...
-        </span>
-        <button type="button" class="btn btn-sm" id="btn-chat-stop-tts"
-          style="color: var(--m3-error); background: transparent; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 11px; padding: 2px 8px; font-weight: 600; border-radius: 9999px;">
-          ⏹️ Detener voz
-        </button>
-      </div>
-    </section>
-
-    <!-- VIEW 6: SETTINGS -->
+    <!-- VIEW 6: SETTINGS (US-73: Two-Tier Architecture — Preferencias Culinarias + Avanzado) -->
     <section class="view-panel" id="view-settings">
       <div class="section-header">
         <div>
           <h2 class="section-title">Ajustes</h2>
-          <p class="section-subtitle">Configuración general y personalización.</p>
+          <p class="section-subtitle">Mis preferencias culinarias y configuración.</p>
         </div>
       </div>
 
+      <!-- TIER 1: MIS PREFERENCIAS CULINARIAS (USO FRECUENTE) -->
       <!-- 1: USER ACCOUNT & CLOUD -->
       <div class="card">
         <h3
@@ -361,7 +277,7 @@
           <span class="material-symbols-outlined" style="color: var(--m3-primary);">palette</span> Aspecto
         </h3>
         <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;">
-          Elige cómo prefieres ver Food Assistant en tu dispositivo.
+          Elige cómo prefieres ver Savory en tu dispositivo.
         </p>
         <div class="m3-segmented-button" id="theme-segmented-group">
           <button class="segmented-btn" data-theme-val="system">
@@ -379,99 +295,7 @@
         </div>
       </div>
 
-      <!-- 3: AI MOTOR & BYOK SETTINGS -->
-      <div class="card" id="card-ai-settings">
-        <h3
-          style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-          <span class="material-symbols-outlined" style="color: var(--m3-primary);">smart_toy</span> Motor de
-          Inteligencia Artificial (BYOK Opcional)
-        </h3>
-        <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 10px;">
-          El Asistente incluye un motor inteligente integrado sin coste. Si lo deseas, puedes vincular tu propia clave
-          (Bring Your Own Key) para conectar con Google Gemini, OpenAI o Claude y consumir de tu plan personal.
-        </p>
-        <div style="margin-bottom: 8px;">
-          <label for="select-ai-provider"
-            style="font-size: 12px; font-weight: 500; display: block; margin-bottom: 4px; color: var(--m3-on-surface-variant);">Proveedor
-            de Inteligencia Artificial:</label>
-          <select class="form-input" id="select-ai-provider"
-            style="padding: 6px 10px; font-size: 13px; margin-bottom: 6px;">
-            <option value="gemini">Google Gemini (Gratuito hasta 1.500 req/día)</option>
-            <option value="openai">OpenAI ChatGPT (GPT-4o mini / GPT-4o)</option>
-            <option value="claude">Anthropic Claude (Claude 3.5 Sonnet / Haiku)</option>
-          </select>
-        </div>
-        <div id="wrapper-gemini-model" style="display: none;">
-          <label for="select-gemini-model"
-            style="font-size: 12px; font-weight: 500; display: block; margin-bottom: 4px; color: var(--m3-on-surface-variant);">Modelo
-            de Google Gemini:</label>
-          <select class="form-input" id="select-gemini-model"
-            style="padding: 6px 10px; font-size: 13px; margin-bottom: 6px;">
-            <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite (Recomendado Google - Nuevos y existentes)
-            </option>
-            <option value="gemini-3.8-flash">Gemini 3.8 Flash (Razonamiento Avanzado)</option>
-            <option value="gemini-2.5-pro">Gemini 2.5 Pro (Cuentas con facturación / Pro)</option>
-            <option value="gemini-2.5-flash">Gemini 2.5 Flash (Proyectos antiguos autorizados)</option>
-          </select>
-        </div>
-        <div
-          style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding: 6px 0; border-top: 1px solid var(--m3-outline-variant, rgba(0,0,0,0.08));">
-          <div>
-            <label for="switch-tts-voice"
-              style="font-size: 13px; font-weight: 500; display: block; color: var(--m3-on-surface);">Voz del Asistente
-              (TTS)</label>
-            <span style="font-size: 11px; color: var(--m3-on-surface-variant);">Leer respuestas en voz alta de forma
-              ágil y concisa</span>
-          </div>
-          <label class="switch"
-            style="position: relative; display: inline-block; width: 44px; height: 24px; margin: 0;">
-            <input type="checkbox" id="switch-tts-voice" checked>
-            <span class="slider round"></span>
-          </label>
-        </div>
-        <div style="display: flex; gap: 8px; margin-bottom: 6px;">
-          <input type="password" class="form-input" id="input-gemini-key" placeholder="AIzaSy... o sk-...">
-          <button class="btn btn-primary btn-sm" id="btn-save-gemini-key">Guardar</button>
-        </div>
-        <div id="gemini-key-status" style="font-size: 11px;"></div>
-      </div>
-
-      <!-- 3.1: CONTROL EXTERNO POR VOZ / IA / MCP (US-69) -->
-      <div class="card" id="card-external-agent">
-        <h3
-          style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-          <span class="material-symbols-outlined" style="color: var(--m3-primary);">record_voice_over</span> Control
-          Externo por Voz e IA (sin abrir la app)
-        </h3>
-        <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 10px;">
-          Conecta Claude, ChatGPT, Gemini o un atajo de voz de tu móvil para crear recetas, planificar y llenar la
-          compra directamente en tu cuenta.
-        </p>
-        <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 8px;">
-          <input type="checkbox" id="toggle-external-agent" disabled> Permitir acceso a asistentes externos
-        </label>
-        <div id="external-agent-status" style="font-size: 12px; margin-bottom: 8px;"></div>
-        <div id="external-agent-token-reveal" style="display: none; margin-bottom: 8px;">
-          <p style="font-size: 11px; color: var(--m3-on-surface-variant); margin-bottom: 4px;">Copia este token ahora:
-            no volverá a mostrarse completo.</p>
-          <div style="display: flex; gap: 8px;">
-            <input type="text" class="form-input" id="external-agent-token" readonly>
-            <button class="btn btn-primary btn-sm" id="btn-copy-agent-token">Copiar</button>
-          </div>
-        </div>
-        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
-          <button class="btn btn-primary btn-sm" id="btn-generate-agent-token">Generar / Regenerar token</button>
-          <button class="btn btn-sm" id="btn-revoke-agent-token">Revocar</button>
-        </div>
-        <details>
-          <summary style="font-size: 12px; cursor: pointer;">Guía rápida de conexión</summary>
-          <pre id="external-agent-guide"
-            style="font-size: 11px; white-space: pre-wrap; word-break: break-all; margin: 8px 0;"></pre>
-          <button class="btn btn-sm" id="btn-copy-agent-guide">Copiar guía</button>
-        </details>
-      </div>
-
-      <!-- 4: PREFERENCIAS DIETÉTICAS (US-02) -->
+      <!-- 3: PREFERENCIAS DIETÉTICAS (US-02) -->
       <div class="card" id="card-dietary-preferences">
         <h3
           style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
@@ -486,8 +310,7 @@
         </div>
       </div>
 
-      <!-- 4.1: OBJETIVOS NUTRICIONALES DIARIOS (US-03) -->
-      <!-- 4.1: OBJETIVOS NUTRICIONALES DIARIOS (US-03) -->
+      <!-- 4: OBJETIVOS NUTRICIONALES DIARIOS (US-03) -->
       <div class="card" id="card-nutrition-goals">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
           <div style="display: flex; gap: 10px; align-items: center;">
@@ -580,27 +403,6 @@
         </div>
       </div>
 
-      <!-- 4.1: ANÁLISIS Y ETIQUETADO AUTOMÁTICO DE RECETAS -->
-      <div class="card" id="card-auto-tag-recipes">
-        <h3
-          style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-          <span class="material-symbols-outlined" style="color: var(--m3-primary);">label</span> Análisis y
-          Auto-etiquetado de Recetas
-        </h3>
-        <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;">
-          Analiza todas tus recetas guardadas para detectar automáticamente sus etiquetas dietéticas (Vegano,
-          Vegetariano, Sin Gluten, etc.) y prácticas (Rápida, Horno, Tupper, etc.) según sus ingredientes y pasos.
-        </p>
-        <div style="display: flex; flex-direction: column; gap: 10px;">
-          <button class="btn btn-secondary btn-sm" id="btn-auto-tag-recipes" style="align-self: flex-start; gap: 8px;">
-            <span class="material-symbols-outlined icon-sm">auto_fix_high</span>
-            <span>Analizar y etiquetar recetas ahora</span>
-          </button>
-          <div id="auto-tag-result-msg" style="font-size: 12px; color: var(--m3-on-surface-variant); display: none;">
-          </div>
-        </div>
-      </div>
-
       <!-- 5: SERVINGS -->
       <div class="card">
         <h3
@@ -616,49 +418,180 @@
         </select>
       </div>
 
-      <!-- 5: BACKUP -->
-      <div class="card">
-        <h3
-          style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-          <span class="material-symbols-outlined" style="color: var(--m3-primary);">save</span> Copia de Seguridad Local
-        </h3>
-        <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;">
-          Exporta o restaura tus recetas y planes en un archivo JSON local.
-        </p>
-        <div style="display: flex; gap: 8px;">
-          <button class="btn btn-secondary btn-sm" id="btn-export-backup">
-            <span class="material-symbols-outlined icon-sm">download</span> Exportar
-          </button>
-          <label class="btn btn-secondary btn-sm" style="cursor: pointer; margin: 0;">
-            <span class="material-symbols-outlined icon-sm">upload</span> Importar
-            <input type="file" id="input-import-backup" accept=".json" style="display: none;">
-          </label>
-          <button class="btn btn-ghost btn-sm" id="btn-reset-demo" style="color: var(--m3-error); margin-left: auto;">
-            <span class="material-symbols-outlined icon-sm">restart_alt</span> Restablecer
-          </button>
+      <!-- TIER 2: CONFIGURACIÓN AVANZADA Y SISTEMA (COLLAPSIBLE ACCORDION) -->
+      <details class="settings-advanced-accordion" id="settings-advanced-accordion">
+        <summary class="settings-advanced-summary">
+          <div class="settings-advanced-summary-title">
+            <span class="material-symbols-outlined icon-sm">tune</span>
+            <span>Configuración avanzada y sistema</span>
+          </div>
+          <span class="material-symbols-outlined icon-sm settings-advanced-chevron">expand_more</span>
+        </summary>
+        <div class="settings-advanced-body">
+          <!-- BACKUP -->
+          <div class="card">
+            <h3
+              style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <span class="material-symbols-outlined" style="color: var(--m3-primary);">save</span> Copia de Seguridad
+              Local
+            </h3>
+            <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;">
+              Exporta o restaura tus recetas y planes en un archivo JSON local.
+            </p>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-secondary btn-sm" id="btn-export-backup">
+                <span class="material-symbols-outlined icon-sm">download</span> Exportar
+              </button>
+              <label class="btn btn-secondary btn-sm" style="cursor: pointer; margin: 0;">
+                <span class="material-symbols-outlined icon-sm">upload</span> Importar
+                <input type="file" id="input-import-backup" accept=".json" style="display: none;">
+              </label>
+              <button class="btn btn-ghost btn-sm" id="btn-reset-demo"
+                style="color: var(--m3-error); margin-left: auto;">
+                <span class="material-symbols-outlined icon-sm">restart_alt</span> Restablecer
+              </button>
+            </div>
+          </div>
+
+          <!-- ANÁLISIS Y ETIQUETADO AUTOMÁTICO DE RECETAS -->
+          <div class="card" id="card-auto-tag-recipes">
+            <h3
+              style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <span class="material-symbols-outlined" style="color: var(--m3-primary);">label</span> Análisis y
+              Auto-etiquetado de Recetas
+            </h3>
+            <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;">
+              Analiza todas tus recetas guardadas para detectar automáticamente sus etiquetas dietéticas (Vegano,
+              Vegetariano, Sin Gluten, etc.) y prácticas (Rápida, Horno, Tupper, etc.) según sus ingredientes y pasos.
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <button class="btn btn-secondary btn-sm" id="btn-auto-tag-recipes"
+                style="align-self: flex-start; gap: 8px;">
+                <span class="material-symbols-outlined icon-sm">auto_fix_high</span>
+                <span>Analizar y etiquetar recetas ahora</span>
+              </button>
+              <div id="auto-tag-result-msg" style="font-size: 12px; color: var(--m3-on-surface-variant); display: none;">
+              </div>
+            </div>
+          </div>
+
+          <!-- AI MOTOR & BYOK SETTINGS -->
+          <div class="card" id="card-ai-settings">
+            <h3
+              style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <span class="material-symbols-outlined" style="color: var(--m3-primary);">smart_toy</span> Motor de
+              Inteligencia Artificial (BYOK Opcional)
+            </h3>
+            <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 10px;">
+              El Asistente incluye un motor inteligente integrado sin coste. Si lo deseas, puedes vincular tu propia
+              clave (Bring Your Own Key) para conectar con Google Gemini, OpenAI o Claude y consumir de tu plan
+              personal.
+            </p>
+            <div style="margin-bottom: 8px;">
+              <label for="select-ai-provider"
+                style="font-size: 12px; font-weight: 500; display: block; margin-bottom: 4px; color: var(--m3-on-surface-variant);">Proveedor
+                de Inteligencia Artificial:</label>
+              <select class="form-input" id="select-ai-provider"
+                style="padding: 6px 10px; font-size: 13px; margin-bottom: 6px;">
+                <option value="gemini">Google Gemini (Gratuito hasta 1.500 req/día)</option>
+                <option value="openai">OpenAI ChatGPT (GPT-4o mini / GPT-4o)</option>
+                <option value="claude">Anthropic Claude (Claude 3.5 Sonnet / Haiku)</option>
+              </select>
+            </div>
+            <div id="wrapper-gemini-model" style="display: none;">
+              <label for="select-gemini-model"
+                style="font-size: 12px; font-weight: 500; display: block; margin-bottom: 4px; color: var(--m3-on-surface-variant);">Modelo
+                de Google Gemini:</label>
+              <select class="form-input" id="select-gemini-model"
+                style="padding: 6px 10px; font-size: 13px; margin-bottom: 6px;">
+                <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite (Recomendado Google - Nuevos y existentes)
+                </option>
+                <option value="gemini-3.8-flash">Gemini 3.8 Flash (Razonamiento Avanzado)</option>
+                <option value="gemini-2.5-pro">Gemini 2.5 Pro (Cuentas con facturación / Pro)</option>
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash (Proyectos antiguos autorizados)</option>
+              </select>
+            </div>
+            <div
+              style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding: 6px 0; border-top: 1px solid var(--m3-outline-variant, rgba(0,0,0,0.08));">
+              <div>
+                <label for="switch-tts-voice"
+                  style="font-size: 13px; font-weight: 500; display: block; color: var(--m3-on-surface);">Voz del
+                  Asistente (TTS)</label>
+                <span style="font-size: 11px; color: var(--m3-on-surface-variant);">Leer respuestas en voz alta de forma
+                  ágil y concisa</span>
+              </div>
+              <label class="switch"
+                style="position: relative; display: inline-block; width: 44px; height: 24px; margin: 0;">
+                <input type="checkbox" id="switch-tts-voice" checked>
+                <span class="slider round"></span>
+              </label>
+            </div>
+            <div style="display: flex; gap: 8px; margin-bottom: 6px;">
+              <input type="password" class="form-input" id="input-gemini-key" placeholder="AIzaSy... o sk-...">
+              <button class="btn btn-primary btn-sm" id="btn-save-gemini-key">Guardar</button>
+            </div>
+            <div id="gemini-key-status" style="font-size: 11px;"></div>
+          </div>
+
+          <!-- CONTROL EXTERNO POR VOZ / IA / MCP (US-69) -->
+          <div class="card" id="card-external-agent">
+            <h3
+              style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <span class="material-symbols-outlined" style="color: var(--m3-primary);">record_voice_over</span> Control
+              Externo por Voz e IA (sin abrir la app)
+            </h3>
+            <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 10px;">
+              Conecta Claude, ChatGPT, Gemini o un atajo de voz de tu móvil para crear recetas, planificar y llenar la
+              compra directamente en tu cuenta.
+            </p>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 8px;">
+              <input type="checkbox" id="toggle-external-agent" disabled> Permitir acceso a asistentes externos
+            </label>
+            <div id="external-agent-status" style="font-size: 12px; margin-bottom: 8px;"></div>
+            <div id="external-agent-token-reveal" style="display: none; margin-bottom: 8px;">
+              <p style="font-size: 11px; color: var(--m3-on-surface-variant); margin-bottom: 4px;">Copia este token
+                ahora: no volverá a mostrarse completo.</p>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" class="form-input" id="external-agent-token" readonly>
+                <button class="btn btn-primary btn-sm" id="btn-copy-agent-token">Copiar</button>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
+              <button class="btn btn-primary btn-sm" id="btn-generate-agent-token">Generar / Regenerar token</button>
+              <button class="btn btn-sm" id="btn-revoke-agent-token">Revocar</button>
+            </div>
+            <details>
+              <summary style="font-size: 12px; cursor: pointer;">Guía rápida de conexión</summary>
+              <pre id="external-agent-guide"
+                style="font-size: 11px; white-space: pre-wrap; word-break: break-all; margin: 8px 0;"></pre>
+              <button class="btn btn-sm" id="btn-copy-agent-guide">Copiar guía</button>
+            </details>
+          </div>
+
+          <!-- APP VERSION & CACHE MANAGEMENT -->
+          <div class="card" id="card-app-version">
+            <h3
+              style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <span class="material-symbols-outlined" style="color: var(--m3-primary);">system_update</span> Versión y
+              Actualizaciones
+            </h3>
+            <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+              Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.18</strong>
+              <span class="app-version-badge" id="app-version-badge">v1.18</span>
+            </p>
+            <div
+              style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
+              Si acabas de desplegar o notas que algún cambio no aparece, pulsa el botón para limpiar la caché del
+              Service Worker y cargar el código más reciente.
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-primary btn-sm" id="btn-force-cache-update">
+                <span class="material-symbols-outlined icon-sm">sync</span> Forzar Actualización y Limpiar Caché
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-      <!-- 6: APP VERSION & CACHE MANAGEMENT -->
-      <div class="card" id="card-app-version">
-        <h3
-          style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-          <span class="material-symbols-outlined" style="color: var(--m3-primary);">system_update</span> Versión y
-          Actualizaciones
-        </h3>
-        <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px;">
-          Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.17</strong>
-        </p>
-        <div
-          style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
-          Si acabas de desplegar o notas que algún cambio no aparece, pulsa el botón para limpiar la caché del Service
-          Worker y cargar el código más reciente.
-        </div>
-        <div style="display: flex; gap: 8px;">
-          <button class="btn btn-primary btn-sm" id="btn-force-cache-update">
-            <span class="material-symbols-outlined icon-sm">sync</span> Forzar Actualización y Limpiar Caché
-          </button>
-        </div>
-      </div>
+      </details>
     </section>
 
     <!-- M3 Bottom Navigation Bar with Pill Indicators and Central Assistant Invocation Button -->
@@ -681,9 +614,9 @@
           <svg class="gemini-sparkle-icon" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="geminiGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#10b981" />
-                <stop offset="50%" stop-color="#06b6d4" />
-                <stop offset="100%" stop-color="#3b82f6" />
+                <stop offset="0%" stop-color="#C85A32" />
+                <stop offset="50%" stop-color="#E07A5F" />
+                <stop offset="100%" stop-color="#2D6A4F" />
               </linearGradient>
             </defs>
             <path
@@ -718,9 +651,9 @@
           <svg class="gemini-sparkle-svg" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="geminiSheetGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#10b981" />
-                <stop offset="50%" stop-color="#06b6d4" />
-                <stop offset="100%" stop-color="#3b82f6" />
+                <stop offset="0%" stop-color="#C85A32" />
+                <stop offset="50%" stop-color="#E07A5F" />
+                <stop offset="100%" stop-color="#2D6A4F" />
               </linearGradient>
             </defs>
             <path
@@ -2023,8 +1956,8 @@
     </div>
   </div>
 
-  <script src="config.js?v=1.17"></script>
-  <script src="app.js?v=1.17"></script>
+  <script src="config.js?v=1.18"></script>
+  <script src="app.js?v=1.18"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

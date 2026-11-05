@@ -3680,7 +3680,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.17';
+  window.APP_VERSION = 'v1.18';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -3717,8 +3717,10 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.17';
+    this.appVersion = window.APP_VERSION || 'v1.18';
     this.activeView = 'view-today';
+    this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
+    this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
     this.aiChatHistory = [];
     this.activeRecipe = null;
     this.activeServings = 2;
@@ -5317,9 +5319,12 @@ class FoodAssistantApp {
           break;
         case 'navigateWeek': {
           const dir = parseInt(target.dataset.dir || target.dataset.delta || '0', 10);
-          if (dir !== 0) this.navigateWeek(dir);
+          this.navigateWeek(dir);
           break;
         }
+        case 'toggleAllPlannerDays':
+          this.toggleAllPlannerDays();
+          break;
         case 'copyShoppingList':
           this.copyShoppingList();
           break;
@@ -6190,32 +6195,51 @@ class FoodAssistantApp {
         }
 
         nutritionContainer.innerHTML = `
-          <div class="today-nutrition-header">
-            <div class="today-nutrition-title">
-              <span class="material-symbols-outlined icon-sm icon-primary">local_fire_department</span> Resumen Nutricional Diario
+          <div class="today-nutrition-pill-bar" id="today-nutrition-pill-bar" onclick="app.toggleTodayNutritionDetails()" role="button" tabindex="0" aria-expanded="${!!this.todayNutritionExpanded}">
+            <div class="today-nutrition-pill-main">
+              <span class="material-symbols-outlined icon-16 icon-primary">local_fire_department</span>
+              <span class="today-nutrition-pill-kcal">${todayNutrition.totalCalories} kcal</span>
+              <span class="today-nutrition-pill-sep">·</span>
+              <span class="today-nutrition-pill-macro">${Math.round(todayNutrition.totalProtein)}g Prot</span>
+              <span class="today-nutrition-pill-sep">·</span>
+              <span class="today-nutrition-pill-macro">${Math.round(todayNutrition.totalCarbs)}g Carb</span>
+              <span class="today-nutrition-pill-sep">·</span>
+              <span class="today-nutrition-pill-macro">${Math.round(todayNutrition.totalFat)}g Gras</span>
             </div>
-            <div class="u-flex-row-center-gap-6">
-              ${headerGoalsBtn}
-              <span class="today-nutrition-meta">${todayNutrition.mealCount} ${todayNutrition.mealCount === 1 ? 'comida' : 'comidas'}</span>
+            <div class="today-nutrition-pill-right">
+              <span class="today-nutrition-pill-meals">${todayNutrition.mealCount} ${todayNutrition.mealCount === 1 ? 'comida' : 'comidas'}</span>
+              <span class="material-symbols-outlined icon-16 today-nutrition-pill-chevron">expand_more</span>
             </div>
           </div>
-          <div class="today-macros-grid ${goalsEnabled ? 'has-goals' : ''}">
-            ${formatChipWithGoal('cal', 'Calorías', todayNutrition.totalCalories, 'kcal', goals.calories)}
-            ${formatChipWithGoal('prot', 'Proteínas', todayNutrition.totalProtein, 'g', goals.protein, true)}
-            ${formatChipWithGoal('carbs', 'Carbos', todayNutrition.totalCarbs, 'g', goals.carbs)}
-            ${formatChipWithGoal('fat', 'Grasas', todayNutrition.totalFat, 'g', goals.fat)}
-          </div>
-          <div class="macro-ratio-bar" title="Distribución: ${protPercent}% P / ${carbsPercent}% C / ${fatPercent}% G">
-            <div class="ratio-segment ratio-prot" style="--seg-pct: ${protPercent}%;" title="Proteína: ${protPercent}%"></div>
-            <div class="ratio-segment ratio-carbs" style="--seg-pct: ${carbsPercent}%;" title="Carbohidratos: ${carbsPercent}%"></div>
-            <div class="ratio-segment ratio-fat" style="--seg-pct: ${fatPercent}%;" title="Grasa: ${fatPercent}%"></div>
-          </div>
-          ${goalBannerHtml}
-          <div class="nutrition-estimation-disclaimer" id="today-nutrition-disclaimer">
-            <span class="material-symbols-outlined">info</span>
-            <span>Valores orientativos calculados a partir de recetas creadas a mano o importadas; úsalos solo como una estimación aproximada.</span>
+          <div class="today-nutrition-details-body" id="today-nutrition-details-body">
+            <div class="today-nutrition-header">
+              <div class="today-nutrition-title">
+                <span class="material-symbols-outlined icon-sm icon-primary">local_fire_department</span> Resumen Nutricional Diario
+              </div>
+              <div class="u-flex-row-center-gap-6">
+                ${headerGoalsBtn}
+                <span class="today-nutrition-meta">${todayNutrition.mealCount} ${todayNutrition.mealCount === 1 ? 'comida' : 'comidas'}</span>
+              </div>
+            </div>
+            <div class="today-macros-grid ${goalsEnabled ? 'has-goals' : ''}">
+              ${formatChipWithGoal('cal', 'Calorías', todayNutrition.totalCalories, 'kcal', goals.calories)}
+              ${formatChipWithGoal('prot', 'Proteínas', todayNutrition.totalProtein, 'g', goals.protein, true)}
+              ${formatChipWithGoal('carbs', 'Carbos', todayNutrition.totalCarbs, 'g', goals.carbs)}
+              ${formatChipWithGoal('fat', 'Grasas', todayNutrition.totalFat, 'g', goals.fat)}
+            </div>
+            <div class="macro-ratio-bar" title="Distribución: ${protPercent}% P / ${carbsPercent}% C / ${fatPercent}% G">
+              <div class="ratio-segment ratio-prot" style="--seg-pct: ${protPercent}%;" title="Proteína: ${protPercent}%"></div>
+              <div class="ratio-segment ratio-carbs" style="--seg-pct: ${carbsPercent}%;" title="Carbohidratos: ${carbsPercent}%"></div>
+              <div class="ratio-segment ratio-fat" style="--seg-pct: ${fatPercent}%;" title="Grasa: ${fatPercent}%"></div>
+            </div>
+            ${goalBannerHtml}
+            <div class="nutrition-estimation-disclaimer" id="today-nutrition-disclaimer">
+              <span class="material-symbols-outlined">info</span>
+              <span>Valores orientativos calculados a partir de recetas creadas a mano o importadas; úsalos solo como una estimación aproximada.</span>
+            </div>
           </div>
         `;
+        nutritionContainer.classList.toggle('is-expanded', !!this.todayNutritionExpanded);
       }
     }
 
@@ -6303,6 +6327,16 @@ class FoodAssistantApp {
     `;
 
     container.innerHTML = standardHtml + customHtml + addExtraHtml;
+  }
+
+  toggleTodayNutritionDetails() {
+    this.todayNutritionExpanded = !this.todayNutritionExpanded;
+    const card = document.getElementById('today-nutrition-card');
+    if (card) {
+      card.classList.toggle('is-expanded', this.todayNutritionExpanded);
+      const pill = document.getElementById('today-nutrition-pill-bar');
+      if (pill) pill.setAttribute('aria-expanded', String(this.todayNutritionExpanded));
+    }
   }
 
   getSortedRecipes(recipesList = state.recipes) {
@@ -6511,15 +6545,22 @@ class FoodAssistantApp {
     this.recipesScrollObserver.observe(sentinel);
   }
 
-  // US-02: Filtro múltiple combinado con el buscador de recetas
+  // US-02 & US-73: Filtro múltiple combinado con el buscador de recetas + Chip de Mi Nevera
   initRecipeTagFilters() {
     const container = document.getElementById('recipes-tag-filters');
     if (!container) return;
 
     const availableTags = state.getAllTags ? state.getAllTags() : ALL_PREDEFINED_TAGS;
     const isAllActive = this.selectedRecipeTags.size === 0;
+    const fridgePanel = document.getElementById('fridge-reverse-search-panel');
+    const isFridgeActive = (this.fridgeIngredients && this.fridgeIngredients.length > 0) || (fridgePanel && fridgePanel.style.display === 'block');
 
     let html = `
+      <button type="button" class="m3-filter-chip m3-filter-chip-fridge ${isFridgeActive ? 'active' : ''}" id="btn-toggle-fridge-panel"
+        title="Buscar recetas según lo que tienes en la nevera">
+        <span class="material-symbols-outlined icon-15">kitchen</span>
+        <span>Mi Nevera${this.fridgeIngredients && this.fridgeIngredients.length > 0 ? ` (${this.fridgeIngredients.length})` : ''}</span>
+      </button>
       <button type="button" class="m3-filter-chip ${isAllActive ? 'active' : ''}" data-tag="all">
         ${isAllActive ? '<span class="material-symbols-outlined icon-15">done</span>' : ''}
         Todas
@@ -6540,7 +6581,12 @@ class FoodAssistantApp {
 
     container.innerHTML = html;
 
-    container.querySelectorAll('.m3-filter-chip').forEach(chip => {
+    container.querySelector('#btn-toggle-fridge-panel')?.addEventListener('click', () => {
+      this.toggleFridgePanel();
+      this.initRecipeTagFilters();
+    });
+
+    container.querySelectorAll('.m3-filter-chip[data-tag]').forEach(chip => {
       chip.addEventListener('click', () => {
         const tag = chip.dataset.tag;
         if (tag === 'all') {
@@ -6658,11 +6704,20 @@ class FoodAssistantApp {
       return;
     }
     const ingredientsList = this.fridgeIngredients.join(', ');
-    this.switchView('view-ai');
-    const input = document.getElementById('ai-chat-input');
-    if (input) {
-      input.value = `Tengo en la nevera: ${ingredientsList}. Inventa y crea una receta deliciosa, equilibrada y saludable aprovechando estos ingredientes y guárdala en mi recetario.`;
+    const promptText = `Tengo en la nevera: ${ingredientsList}. Inventa y crea una receta deliciosa, equilibrada y saludable aprovechando estos ingredientes y guárdala en mi recetario.`;
+    const legacyAiPanel = document.getElementById('view-ai');
+    const legacyInput = document.getElementById('ai-chat-input');
+    if (legacyAiPanel && legacyInput) {
+      this.switchView('view-ai');
+      legacyInput.value = promptText;
       this.handleAiChatSubmit();
+      return;
+    }
+    this.openGeminiInvokeModal(false);
+    const invokeInput = document.getElementById('gemini-invoke-input');
+    if (invokeInput) {
+      invokeInput.value = promptText;
+      this.handleGeminiInvokeSubmit();
     }
   }
 
@@ -8119,7 +8174,104 @@ class FoodAssistantApp {
     } else {
       this.plannerWeekOffset += direction;
     }
+    this.plannerExpandedDays = null;
     this.renderPlanner();
+  }
+
+  getDefaultExpandedPlannerDays(weekDays) {
+    const expanded = new Set();
+    if (!Array.isArray(weekDays) || weekDays.length === 0) return expanded;
+    const todayKey = toLocalDateKey(new Date());
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowKey = toLocalDateKey(tomorrow);
+
+    weekDays.forEach(w => {
+      if (w.dateKey === todayKey || w.dateKey === tomorrowKey) {
+        expanded.add(w.dateKey);
+      }
+    });
+
+    if (expanded.size === 0) {
+      expanded.add(weekDays[0].dateKey);
+      if (weekDays[1]) expanded.add(weekDays[1].dateKey);
+    }
+    return expanded;
+  }
+
+  togglePlannerDayAccordion(dateStr, event) {
+    if (event) {
+      const interactive = event.target.closest('button, a, input, select');
+      if (interactive && !interactive.classList.contains('day-accordion-toggle')) return;
+    }
+    const weekDays = this.getPlannerWeekDates();
+    if (!(this.plannerExpandedDays instanceof Set)) {
+      this.plannerExpandedDays = this.getDefaultExpandedPlannerDays(weekDays);
+    }
+    if (this.plannerExpandedDays.has(dateStr)) {
+      this.plannerExpandedDays.delete(dateStr);
+    } else {
+      this.plannerExpandedDays.add(dateStr);
+    }
+    const card = document.querySelector(`.day-card[data-date="${dateStr}"]`);
+    if (card) {
+      const isExp = this.plannerExpandedDays.has(dateStr);
+      card.classList.toggle('is-expanded', isExp);
+      card.classList.toggle('is-collapsed', !isExp);
+    } else {
+      this.renderPlanner();
+    }
+    this.updateToggleAllPlannerButtonLabel(weekDays);
+  }
+
+  toggleAllPlannerDays() {
+    const weekDays = this.getPlannerWeekDates();
+    if (!(this.plannerExpandedDays instanceof Set)) {
+      this.plannerExpandedDays = this.getDefaultExpandedPlannerDays(weekDays);
+    }
+    const allExpanded = weekDays.every(w => this.plannerExpandedDays.has(w.dateKey));
+    if (allExpanded) {
+      this.plannerExpandedDays = this.getDefaultExpandedPlannerDays(weekDays);
+    } else {
+      this.plannerExpandedDays = new Set(weekDays.map(w => w.dateKey));
+    }
+    this.renderPlanner();
+  }
+
+  updateToggleAllPlannerButtonLabel(weekDays) {
+    const labelEl = document.getElementById('btn-toggle-all-planner-days-label');
+    if (!labelEl || !Array.isArray(weekDays)) return;
+    const allExpanded = this.plannerExpandedDays instanceof Set && weekDays.every(w => this.plannerExpandedDays.has(w.dateKey));
+    labelEl.textContent = allExpanded ? 'Plegar semana' : 'Expandir semana';
+  }
+
+  buildDayCompactSummaryHtml(dayData) {
+    const slotIcons = { breakfast: '🍳', lunch: '🥗', snack: '🍎', dinner: '🍲' };
+    const pills = [];
+    STANDARD_SLOTS.forEach(s => {
+      const recId = dayData[s.key];
+      if (recId) {
+        const rec = state.recipes.find(r => r.id === recId);
+        if (rec) {
+          const shortTitle = rec.title.length > 22 ? rec.title.slice(0, 20) + '…' : rec.title;
+          pills.push(`<span class="day-compact-meal-pill">${slotIcons[s.key] || '🍽️'} ${escapeHtml(shortTitle)}</span>`);
+        }
+      }
+    });
+    const customSlots = Array.isArray(dayData.customSlots) ? dayData.customSlots : [];
+    customSlots.forEach(cs => {
+      if (cs.recipeId) {
+        const rec = state.recipes.find(r => r.id === cs.recipeId);
+        if (rec) {
+          const shortTitle = rec.title.length > 22 ? rec.title.slice(0, 20) + '…' : rec.title;
+          pills.push(`<span class="day-compact-meal-pill">🍽️ ${escapeHtml(shortTitle)}</span>`);
+        }
+      }
+    });
+    if (pills.length === 0) {
+      return `<span class="day-compact-empty">Sin comidas asignadas · toca para planificar</span>`;
+    }
+    return pills.join('<span class="day-compact-sep">·</span>');
   }
 
   updatePlannerWeekLabel(weekDays) {
@@ -8146,35 +8298,52 @@ class FoodAssistantApp {
     const weekDays = this.getPlannerWeekDates();
     this.updatePlannerWeekLabel(weekDays);
 
+    if (!(this.plannerExpandedDays instanceof Set)) {
+      this.plannerExpandedDays = this.getDefaultExpandedPlannerDays(weekDays);
+    } else {
+      const hasAnyInWeek = weekDays.some(w => this.plannerExpandedDays.has(w.dateKey));
+      if (!hasAnyInWeek) {
+        this.plannerExpandedDays = this.getDefaultExpandedPlannerDays(weekDays);
+      }
+    }
+    this.updateToggleAllPlannerButtonLabel(weekDays);
+
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowKey = toLocalDateKey(tomorrow);
+
     container.innerHTML = weekDays.map((wDay) => {
       const dateStr = wDay.dateKey;
       const dayData = state.getDayPlan(dateStr, wDay.dayName);
       const isToday = toLocalDateKey() === dateStr;
+      const isTomorrow = tomorrowKey === dateStr;
+      const isExpanded = this.plannerExpandedDays.has(dateStr);
       const customSlots = Array.isArray(dayData.customSlots) ? dayData.customSlots : [];
       const dayDateFormatted = `${wDay.date.getDate()} ${MONTHS_SHORT_ES[wDay.date.getMonth()]}`;
+      const compactSummaryHtml = this.buildDayCompactSummaryHtml(dayData);
 
       return `
-        <div class="day-card ${isToday ? 'day-card-today' : ''}">
-          <div class="day-header">
+        <div class="day-card ${isToday ? 'day-card-today' : ''} ${isExpanded ? 'is-expanded' : 'is-collapsed'}" data-date="${dateStr}">
+          <div class="day-header" onclick="app.togglePlannerDayAccordion('${dateStr}', event)">
             <div class="day-name">
               <span class="day-title">${wDay.dayName}</span>
               <span class="day-date-label">${dayDateFormatted}</span>
-              ${isToday ? `<span class="day-badge-today">HOY</span>` : ''}
+              ${isToday ? `<span class="day-badge-today">HOY</span>` : (isTomorrow ? `<span class="day-badge-tomorrow">MAÑANA</span>` : '')}
             </div>
-            <button type="button" class="btn btn-ghost btn-sm btn-add-custom-slot-header" onclick="app.openAddCustomSlotModal('${dateStr}')" title="Añadir momento de comida">
-              <span class="material-symbols-outlined icon-sm">add</span> Añadir Comida
-            </button>
+            <div class="day-compact-summary">${compactSummaryHtml}</div>
+            <div class="day-header-actions">
+              <button type="button" class="btn btn-ghost btn-sm btn-add-custom-slot-header" onclick="event.stopPropagation(); app.openAddCustomSlotModal('${dateStr}')" title="Añadir momento de comida">
+                <span class="material-symbols-outlined icon-sm">add</span> Añadir Comida
+              </button>
+              <button type="button" class="btn-icon day-accordion-toggle" aria-label="Expandir o plegar día" title="Expandir o plegar día">
+                <span class="material-symbols-outlined icon-sm">expand_more</span>
+              </button>
+            </div>
           </div>
 
           <div class="slots-grid">
             ${STANDARD_SLOTS.map(slot => this.renderSlotCard(dateStr, slot.key, slot.label, slot.icon, dayData[slot.key])).join('')}
             ${customSlots.map(cs => this.renderCustomSlotCard(dateStr, cs)).join('')}
-          </div>
-
-          <div class="planner-day-footer">
-            <button type="button" class="btn btn-ghost btn-sm btn-add-custom-slot-footer" onclick="app.openAddCustomSlotModal('${dateStr}')">
-              <span class="material-symbols-outlined icon-sm">add_circle</span> Añadir momento (snack, merienda, batido...)
-            </button>
           </div>
         </div>
       `;

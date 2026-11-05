@@ -1,10 +1,10 @@
-const CACHE_NAME = 'food-assistant-v1.17';
+const CACHE_NAME = 'food-assistant-v1.18';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './styles.css?v=1.17',
-  './config.js?v=1.17',
-  './app.js?v=1.17',
+  './styles.css?v=1.18',
+  './config.js?v=1.18',
+  './app.js?v=1.18',
   './manifest.json',
   'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
