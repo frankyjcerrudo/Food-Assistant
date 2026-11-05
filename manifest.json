@@ -1,11 +1,11 @@
 {
-  "name": "Food Assistant - Planificador de Comidas & IA",
-  "short_name": "FoodAssistant",
-  "description": "Tu asistente de cocina inteligente: organiza tus recetas, planifica tu menú semanal con Gemini y compra por pasillos sin esfuerzo.",
+  "name": "Sabory — Planificador Culinario & IA",
+  "short_name": "Sabory",
+  "description": "Tu compañero de cocina inteligente: organiza tus recetas, planifica tu menú semanal con IA y haz la compra por pasillos sin esfuerzo.",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#fafaf9",
-  "theme_color": "#c2410c",
+  "background_color": "#FAF7F2",
+  "theme_color": "#C85A32",
   "orientation": "portrait-primary",
   "icons": [
     {

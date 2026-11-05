@@ -14,7 +14,7 @@ new Function(appCode)();
 
 const { FoodAssistantApp, state, SEED_RECIPES } = window;
 
-describe('US-73: Auditoría Integral de UX, Arquitectura de Información e Identidad "Savory"', () => {
+describe('US-73: Auditoría Integral de UX, Arquitectura de Información e Identidad "Sabory" (v1.19)', () => {
   let appInstance;
 
   beforeEach(() => {
@@ -26,22 +26,30 @@ describe('US-73: Auditoría Integral de UX, Arquitectura de Información e Ident
     window.app = appInstance;
   });
 
-  it('1. Identidad Editorial Culinaria "Savory": Branding, tipografía serif y paleta cálida terracota/crema', () => {
-    expect(htmlContent).toContain('<title>Savory</title>');
+  it('1. Identidad Editorial Culinaria "Sabory": Branding, isotipo Cocotte, Gorro de Chef y modo oscuro cálido suavizado', () => {
+    expect(htmlContent).toContain('<title>Sabory</title>');
     const brandName = document.querySelector('.app-header .brand-name');
     expect(brandName).not.toBeNull();
-    expect(brandName.textContent.trim()).toBe('Savory');
+    expect(brandName.textContent.trim()).toBe('Sabory');
 
-    // Tipografía serif editorial y fuente geométrica en styles.css
+    // Isotipo SVG de Cocotte en cabecera y Gorro de Chef (Toque) en el Asistente
+    expect(document.querySelector('.app-header .brand-cocotte-svg')).not.toBeNull();
+    expect(document.querySelector('#btn-central-gemini-invoke .chef-toque-icon')).not.toBeNull();
+
+    // Tipografía serif editorial, fuente geométrica heredada en botones y paleta cálida
     expect(cssContent).toContain('Playfair+Display');
     expect(cssContent).toContain('--font-serif:');
     expect(cssContent).toContain('--m3-surface-canvas: #FAF7F2');
     expect(cssContent).toContain('--m3-primary: #C85A32');
     expect(cssContent).toContain('--color-brand: #2D6A4F');
 
-    // Modo oscuro cálido Espresso Obsidian
-    expect(cssContent).toContain('--m3-surface-canvas: #141210');
+    // Modo oscuro cálido suavizado "Piedra Cálida / Warm Dusk"
+    expect(cssContent).toContain('--m3-surface-canvas: #26221E');
     expect(cssContent).toContain('--m3-primary: #E57A52');
+
+    // Dock en isla cápsula flotante y botones circulares estilizados para quitar (✕)
+    expect(cssContent).toContain('max-width: 440px');
+    expect(cssContent).toContain('.btn-remove-circle');
   });
 
   it('2. Cabecera minimalista (Top Bar): sin badge de versión ni botón de tema en header', () => {
@@ -58,21 +66,19 @@ describe('US-73: Auditoría Integral de UX, Arquitectura de Información e Ident
     expect(settingsVersionCard.querySelector('#app-version-badge')).not.toBeNull();
   });
 
-  it('3. Vista "Hoy": Comidas planificadas primero, sin botón "Semana →" y píldora nutricional desplegable', () => {
+  it('3. Vista "Hoy": Widget de macros discreto a la derecha de la cabecera y comidas planificadas justo debajo', () => {
     const todayView = document.getElementById('view-today');
     expect(todayView).not.toBeNull();
 
     // Sin botón redundante "Semana →"
     expect(todayView.querySelector('#btn-goto-planner')).toBeNull();
 
-    // #today-slots-container aparece ANTES que #today-nutrition-card en el DOM
-    const childrenIds = Array.from(todayView.children).map(el => el.id).filter(Boolean);
-    const slotsIdx = childrenIds.indexOf('today-slots-container');
-    const nutritionIdx = childrenIds.indexOf('today-nutrition-card');
-    expect(slotsIdx).toBeGreaterThanOrEqual(0);
-    expect(nutritionIdx).toBeGreaterThan(slotsIdx);
+    // #today-nutrition-card vive dentro de .today-header a la derecha del título
+    const todayHeader = todayView.querySelector('.today-header');
+    expect(todayHeader).not.toBeNull();
+    expect(todayHeader.querySelector('#today-nutrition-card')).not.toBeNull();
 
-    // Activar objetivos nutricionales y verificar la píldora compacta desplegable
+    // Activar objetivos nutricionales y verificar el widget compacto desplegable y el botón circular ✕
     state.settings.nutritionGoals = {
       enabled: true,
       calories: 2000,
@@ -94,9 +100,13 @@ describe('US-73: Auditoría Integral de UX, Arquitectura de Información e Ident
     const nutritionCard = document.getElementById('today-nutrition-card');
     const pillBar = document.getElementById('today-nutrition-pill-bar');
     expect(pillBar).not.toBeNull();
+    expect(pillBar.querySelector('.today-header-macro-pills-row')).not.toBeNull();
     expect(nutritionCard.classList.contains('is-expanded')).toBe(false);
 
-    // Al pulsar la píldora se despliega el detalle nutricional
+    // Botón de quitar receta del slot usa .btn-remove-circle
+    expect(todayView.querySelector('.btn-slot-clear.btn-remove-circle')).not.toBeNull();
+
+    // Al pulsar el widget se despliega el detalle nutricional
     appInstance.toggleTodayNutritionDetails();
     expect(nutritionCard.classList.contains('is-expanded')).toBe(true);
   });

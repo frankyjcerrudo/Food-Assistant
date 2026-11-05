@@ -3680,7 +3680,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.18';
+  window.APP_VERSION = 'v1.19';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -3717,7 +3717,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.18';
+    this.appVersion = window.APP_VERSION || 'v1.19';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -6012,27 +6012,22 @@ class FoodAssistantApp {
 
       if (!goalsEnabled) {
         nutritionContainer.innerHTML = `
-          <div class="today-nutrition-header today-nutrition-header-Flush">
-            <div class="today-nutrition-title today-nutrition-title-zen">
-              <span class="material-symbols-outlined icon-sm icon-muted icon-16">local_fire_department</span>
-              <span>Seguimiento nutricional desactivado</span>
-            </div>
+          <div class="today-header-macros-zen">
+            <span class="today-header-macros-zen-label">Seguimiento nutricional desactivado</span>
             ${headerGoalsBtn}
           </div>
         `;
       } else if (todayNutrition.mealCount === 0) {
         nutritionContainer.innerHTML = `
-          <div class="today-nutrition-header">
-            <div class="today-nutrition-title">
-              <span class="material-symbols-outlined icon-sm icon-primary">local_fire_department</span> Resumen Nutricional Diario
-            </div>
-            <div class="u-flex-row-center-gap-6">
-              ${headerGoalsBtn}
+          <div class="today-header-macros-empty">
+            <div class="today-header-macros-top">
+              <span class="today-nutrition-pill-kcal"><span class="material-symbols-outlined icon-14 icon-primary">local_fire_department</span> 0 kcal</span>
               <span class="today-nutrition-meta">0 comidas</span>
+              ${headerGoalsBtn}
             </div>
-          </div>
-          <div class="today-nutrition-empty">
-            <span class="today-zen-cal-strong">0 kcal</span> · ${goalsEnabled ? `Asigna platos a tu día para avanzar hacia tus metas (${goals.calories || 2000} kcal).` : 'Asigna platos a tu día para ver calorías y macronutrientes.'}
+            <div class="today-nutrition-empty">
+              <span class="today-zen-cal-strong">0 kcal</span> · ${goalsEnabled ? `Meta: ${goals.calories || 2000} kcal` : 'Asigna platos para ver macros.'}
+            </div>
           </div>
         `;
       } else {
@@ -6194,21 +6189,27 @@ class FoodAssistantApp {
           }
         }
 
+        const calGoalNum = Number(goals.calories) || 0;
+        const calProgressPct = calGoalNum > 0 ? Math.min(100, Math.round((todayNutrition.totalCalories / calGoalNum) * 100)) : 0;
+
         nutritionContainer.innerHTML = `
-          <div class="today-nutrition-pill-bar" id="today-nutrition-pill-bar" onclick="app.toggleTodayNutritionDetails()" role="button" tabindex="0" aria-expanded="${!!this.todayNutritionExpanded}">
-            <div class="today-nutrition-pill-main">
-              <span class="material-symbols-outlined icon-16 icon-primary">local_fire_department</span>
-              <span class="today-nutrition-pill-kcal">${todayNutrition.totalCalories} kcal</span>
-              <span class="today-nutrition-pill-sep">·</span>
-              <span class="today-nutrition-pill-macro">${Math.round(todayNutrition.totalProtein)}g Prot</span>
-              <span class="today-nutrition-pill-sep">·</span>
-              <span class="today-nutrition-pill-macro">${Math.round(todayNutrition.totalCarbs)}g Carb</span>
-              <span class="today-nutrition-pill-sep">·</span>
-              <span class="today-nutrition-pill-macro">${Math.round(todayNutrition.totalFat)}g Gras</span>
-            </div>
-            <div class="today-nutrition-pill-right">
-              <span class="today-nutrition-pill-meals">${todayNutrition.mealCount} ${todayNutrition.mealCount === 1 ? 'comida' : 'comidas'}</span>
+          <div class="today-nutrition-pill-bar" id="today-nutrition-pill-bar" onclick="app.toggleTodayNutritionDetails()" role="button" tabindex="0" aria-expanded="${!!this.todayNutritionExpanded}" title="Ver desglose nutricional diario">
+            <div class="today-header-macro-top-row">
+              <span class="today-nutrition-pill-kcal">
+                <span class="material-symbols-outlined icon-15 icon-primary">local_fire_department</span>
+                <strong>${todayNutrition.totalCalories}</strong>${calGoalNum > 0 ? `<span class="today-header-cal-goal">/${calGoalNum}</span>` : ''} <span class="today-header-cal-unit">kcal</span>
+              </span>
               <span class="material-symbols-outlined icon-16 today-nutrition-pill-chevron">expand_more</span>
+            </div>
+            ${calGoalNum > 0 ? `
+              <div class="today-header-mini-bar" aria-hidden="true">
+                <div class="today-header-mini-bar-fill" style="--progress: ${calProgressPct}%;"></div>
+              </div>
+            ` : ''}
+            <div class="today-header-macro-pills-row">
+              <span class="today-header-macro-badge macro-badge-prot"><em>P</em> ${Math.round(todayNutrition.totalProtein)}g</span>
+              <span class="today-header-macro-badge macro-badge-carbs"><em>C</em> ${Math.round(todayNutrition.totalCarbs)}g</span>
+              <span class="today-header-macro-badge macro-badge-fat"><em>G</em> ${Math.round(todayNutrition.totalFat)}g</span>
             </div>
           </div>
           <div class="today-nutrition-details-body" id="today-nutrition-details-body">
@@ -6271,7 +6272,7 @@ class FoodAssistantApp {
                     <span class="material-symbols-outlined icon-12">takeout_dining</span> Sobras
                   </span>
                 ` : ''}
-                <button class="btn-ghost btn-sm btn-slot-clear" onclick="event.stopPropagation(); app.clearSlot('${todayStr}', '${s.key}')" title="Quitar plato">
+                <button type="button" class="btn btn-ghost btn-sm btn-slot-clear btn-remove-circle" onclick="event.stopPropagation(); app.clearSlot('${todayStr}', '${s.key}')" title="Quitar plato">
                   <span class="material-symbols-outlined icon-sm">close</span>
                 </button>
               </div>
@@ -8375,7 +8376,7 @@ class FoodAssistantApp {
                   <span class="material-symbols-outlined icon-12">takeout_dining</span> Sobras
                 </span>
               ` : ''}
-              <button class="btn-ghost btn-sm btn-slot-clear" onclick="event.stopPropagation(); app.clearSlot('${dateStr}', '${slotType}')" title="Quitar receta">
+              <button type="button" class="btn btn-ghost btn-sm btn-slot-clear btn-remove-circle" onclick="event.stopPropagation(); app.clearSlot('${dateStr}', '${slotType}')" title="Quitar receta">
                 <span class="material-symbols-outlined icon-sm">close</span>
               </button>
             </div>
@@ -8429,10 +8430,10 @@ class FoodAssistantApp {
               <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
             </span>
             <div class="u-flex-gap-2">
-              <button class="btn-ghost btn-sm btn-slot-clear" onclick="event.stopPropagation(); app.clearCustomSlotRecipe('${dateStr}', '${customSlot.id}')" title="Quitar receta">
-                <span class="material-symbols-outlined icon-sm">remove_circle_outline</span>
+              <button type="button" class="btn btn-ghost btn-sm btn-slot-clear btn-remove-circle" onclick="event.stopPropagation(); app.clearCustomSlotRecipe('${dateStr}', '${customSlot.id}')" title="Quitar receta">
+                <span class="material-symbols-outlined icon-sm">close</span>
               </button>
-              <button class="btn-ghost btn-sm btn-slot-delete" onclick="event.stopPropagation(); app.deleteCustomSlot('${dateStr}', '${customSlot.id}')" title="Eliminar este momento">
+              <button type="button" class="btn btn-ghost btn-sm btn-slot-delete btn-remove-circle" onclick="event.stopPropagation(); app.deleteCustomSlot('${dateStr}', '${customSlot.id}')" title="Eliminar este momento">
                 <span class="material-symbols-outlined icon-sm">delete</span>
               </button>
             </div>
@@ -8459,7 +8460,7 @@ class FoodAssistantApp {
             <span class="slot-label slot-label-custom">
               <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
             </span>
-            <button class="btn-ghost btn-sm btn-slot-delete" onclick="event.stopPropagation(); app.deleteCustomSlot('${dateStr}', '${customSlot.id}')" title="Eliminar este momento">
+            <button type="button" class="btn btn-ghost btn-sm btn-slot-delete btn-remove-circle" onclick="event.stopPropagation(); app.deleteCustomSlot('${dateStr}', '${customSlot.id}')" title="Eliminar este momento">
               <span class="material-symbols-outlined icon-sm">delete</span>
             </button>
           </div>
@@ -9468,7 +9469,7 @@ class FoodAssistantApp {
                 </div>
                 <div class="u-flex-center-gap-8-shrink">
                   ${item.amount ? `<span class="grocery-amount">${item.amount} ${item.unit || ''}</span>` : ''}
-                  <button class="btn-ghost btn-sm" onclick="app.deleteGroceryItem(${item.originalIndex})" title="Eliminar">
+                  <button type="button" class="btn btn-ghost btn-sm btn-grocery-remove btn-remove-circle" onclick="app.deleteGroceryItem(${item.originalIndex})" title="Eliminar artículo">
                     <span class="material-symbols-outlined icon-sm">close</span>
                   </button>
                 </div>
