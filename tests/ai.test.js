@@ -847,6 +847,47 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     }
   });
 
+  it('v1.27: extractRecipeWithGemini se recupera ante error 503 (high demand) creando borrador asistido con foto adjunta', async () => {
+    state.settings.geminiApiKey = 'test-key-503';
+    state.settings.geminiModel = 'gemini-3.8-flash';
+    const origFetch = globalThis.fetch;
+    const calledEndpoints = [];
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
+      calledEndpoints.push(url);
+      return {
+        ok: false,
+        status: 503,
+        json: async () => ({
+          error: {
+            code: 503,
+            message: 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.'
+          }
+        })
+      };
+    });
+
+    try {
+      const fakeBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+      const res = await appInstance.extractRecipeWithGemini({
+        text: 'Pollo al horno con patatas',
+        imageBase64: fakeBase64,
+        mimeType: 'image/png'
+      });
+
+      expect(res).toBeTruthy();
+      expect(res._isHighDemandFallback).toBe(true);
+      expect(res.imageUrl).toContain('data:image/png;base64');
+      expect(res.title).toBeTruthy();
+      expect(res.ingredients.length).toBeGreaterThan(0);
+      expect(calledEndpoints.length).toBeGreaterThanOrEqual(2);
+      expect(calledEndpoints[0]).toContain('gemini-3.8-flash');
+      expect(calledEndpoints[1]).toContain('gemini-3.5-flash-lite');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
   it('v0.84: callGeminiAgent recupera automáticamente ante error 429 (Quota exceeded limit 20) activando fallback sin romper la UI', async () => {
     state.settings.geminiApiKey = 'AIzaSyQuotaTestKey';
     state.settings.aiProvider = 'gemini';

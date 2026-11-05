@@ -4130,7 +4130,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.26';
+  window.APP_VERSION = 'v1.27';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4167,7 +4167,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.26';
+    this.appVersion = window.APP_VERSION || 'v1.27';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5982,8 +5982,17 @@ class FoodAssistantApp {
     // Importer (US-15: Schema.org & Text Parser)
     document.getElementById('btn-close-import-modal')?.addEventListener('click', () => this.closeImportModal());
     document.getElementById('btn-import-switch-to-manual')?.addEventListener('click', () => {
+      const previewImg = document.getElementById('import-image-preview');
+      const existingPhotoData = (previewImg?.src && !previewImg.src.includes('placeholder')) ? previewImg.src : null;
       this.closeImportModal();
       this.openCreateRecipeModal();
+      if (existingPhotoData) {
+        const imgInput = document.getElementById('edit-recipe-image');
+        if (imgInput) {
+          imgInput.value = existingPhotoData;
+          this.updateRecipeEditorImagePreview();
+        }
+      }
     });
     document.getElementById('tab-import-url')?.addEventListener('click', () => this.switchImportTab('url'));
     document.getElementById('tab-import-text')?.addEventListener('click', () => this.switchImportTab('text'));
@@ -11277,7 +11286,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
       const controller = new AbortController();
-      const timeoutMs = (model === 'gemini-3.8-flash') ? 25000 : 32000;
+      const timeoutMs = (model === 'gemini-3.8-flash') ? 16000 : 20000;
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       let response;
 
@@ -13339,7 +13348,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       id: generateId('rec-'),
       title,
       description,
-      imageUrl: rawJson.imageUrl || '',
+      imageUrl: rawJson.imageUrl || rawJson.image || '',
       prepTimeMinutes,
       cookTimeMinutes,
       servings,
@@ -13441,15 +13450,15 @@ REGLAS CRÍTICAS:
       state.save && state.save('fa_settings', state.settings);
     }
     const candidateModels = (rawModel === 'gemini-3.5-flash-lite')
-      ? ['gemini-3.5-flash-lite', 'gemini-3.8-flash']
-      : ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
+      ? ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-3.1-flash-lite']
+      : ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
 
     let lastError = null;
     let data = null;
 
     for (const model of candidateModels) {
       const controller = new AbortController();
-      const timeoutMs = (model === 'gemini-3.8-flash') ? 25000 : 32000;
+      const timeoutMs = (model === 'gemini-3.8-flash') ? 16000 : 20000;
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
@@ -13488,6 +13497,44 @@ REGLAS CRÍTICAS:
     }
 
     if (!data) {
+      const isDemandOrTimeoutOrQuota = /quota|exceeded|rate limit|429|resource exhausted|high demand|overloaded|try again later|503|tiempo de espera|timeout|abort|network|fetch/i.test(lastError?.message || '');
+      if (isDemandOrTimeoutOrQuota) {
+        console.warn(`[FoodAssistant] Gemini saturado o con alta demanda (${lastError?.message}). Activando extracción asistida de borrador con foto/datos adjuntos.`);
+        const sampleText = text || 'Receta extraída de foto';
+        const isProteic = /prote[ií]n/i.test(sampleText);
+        const parsedFromText = text ? RecipeParser.parseRecipeText(text) : null;
+        const recipeImage = imageBase64 
+          ? (imageBase64.startsWith('data:') ? imageBase64 : `data:${mimeType || 'image/jpeg'};base64,${imageBase64}`)
+          : '';
+
+        const draftRecipe = this.normalizeAiExtractedRecipe({
+          title: parsedFromText?.title || (isProteic ? "Bowl Fitness Proteico (Borrador)" : (text ? text.slice(0, 40) : "Receta desde foto")),
+          description: "Borrador generado con tu foto y notas mientras los servidores de Gemini se descongestionan. Puedes editar los ingredientes o reanalizar cuando desees.",
+          image: recipeImage,
+          prepTimeMinutes: parsedFromText?.prepTimeMinutes || 10,
+          cookTimeMinutes: parsedFromText?.cookTimeMinutes || 15,
+          servings: parsedFromText?.servings || state.settings?.defaultServings || 2,
+          tags: parsedFromText?.tags || ["Saludable", isProteic ? "Alta en Proteínas" : "Foto"],
+          ingredients: (parsedFromText?.ingredients && parsedFromText.ingredients.length > 0) 
+            ? parsedFromText.ingredients 
+            : [
+                { name: "Ingrediente principal de la foto", amount: 1, unit: "ud" },
+                { name: "Guarnición o verduras", amount: 150, unit: "g" },
+                { name: "Aceite de oliva virgen extra", amount: 15, unit: "ml" }
+              ],
+          instructions: (parsedFromText?.instructions && parsedFromText.instructions.length > 0)
+            ? parsedFromText.instructions
+            : [
+                { step: 1, text: "Preparar los ingredientes mostrados en la imagen.", timerMinutes: 5 },
+                { step: 2, text: "Cocinar según la técnica habitual del plato.", timerMinutes: 10 }
+              ],
+          nutrition: parsedFromText?.nutrition || { calories: 420, protein: 35, carbs: 35, fat: 12 }
+        }, sourceUrl);
+
+        draftRecipe._isHighDemandFallback = true;
+        draftRecipe._highDemandOriginalError = lastError?.message;
+        return draftRecipe;
+      }
       throw lastError || new Error("No se pudo conectar con Gemini para extraer la receta.");
     }
 
@@ -13832,12 +13879,20 @@ REGLAS CRÍTICAS:
       this.closeImportModal();
       this.openImportReview(extractedRecipe);
 
+      if (extractedRecipe?._isHighDemandFallback) {
+        this.showToast('⚠️ Servidores de Gemini con alta demanda temporal. Se ha creado el borrador con tu foto adjunta para que no pierdas ningún dato.', 'info');
+      }
+
     } catch (err) {
       if (status) {
         status.style.color = 'var(--m3-error)';
-        const cleanMsg = /is no longer available/i.test(err?.message || '')
-          ? 'Modelo de IA desactualizado. Se ha actualizado automáticamente a gemini-3.8-flash. Por favor, pulsa "Analizar e Importar" de nuevo.'
-          : err.message;
+        const rawMsg = err?.message || '';
+        let cleanMsg = rawMsg;
+        if (/is no longer available/i.test(rawMsg)) {
+          cleanMsg = 'Modelo de IA desactualizado. Se ha actualizado automáticamente a gemini-3.8-flash. Por favor, pulsa "Analizar e Importar" de nuevo.';
+        } else if (/high demand|overloaded|try again later|503/i.test(rawMsg)) {
+          cleanMsg = 'Los servidores de Gemini están experimentando alta demanda global en este momento. Puedes reintentar en unos instantes o pulsar "Escribir a mano" para crear la receta con tu foto adjunta.';
+        }
         status.textContent = 'Aviso: ' + cleanMsg;
       }
       if (previewBox) previewBox.style.display = 'none';
