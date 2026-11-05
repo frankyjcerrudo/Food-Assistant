@@ -4130,7 +4130,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.23';
+  window.APP_VERSION = 'v1.24';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4167,7 +4167,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.23';
+    this.appVersion = window.APP_VERSION || 'v1.24';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -6284,26 +6284,6 @@ class FoodAssistantApp {
 
     // Gemini Quick Invoke Sheet Events
     document.getElementById('btn-close-gemini-invoke')?.addEventListener('click', () => this.closeGeminiInvokeModal());
-    document.getElementById('btn-gemini-invoke-new-chat')?.addEventListener('click', () => {
-      this.stopSpeech();
-      this.aiChatHistory = [];
-      const threadBox = document.getElementById('gemini-invoke-thread');
-      if (threadBox) {
-        threadBox.style.display = 'none';
-        threadBox.innerHTML = '';
-      }
-      const resultBox = document.getElementById('gemini-invoke-result');
-      if (resultBox) resultBox.style.display = 'none';
-      const input = document.getElementById('gemini-invoke-input');
-      if (input) {
-        input.value = '';
-        input.focus();
-      }
-      const transcription = document.getElementById('gemini-invoke-transcription');
-      if (transcription) transcription.innerHTML = '<em>Nueva consulta iniciada. Pregunta algo o pulsa el micro...</em>';
-      const newChatBtn = document.getElementById('btn-gemini-invoke-new-chat');
-      if (newChatBtn) newChatBtn.style.display = 'none';
-    });
     document.getElementById('btn-gemini-invoke-new-chat')?.addEventListener('click', () => {
       this.stopSpeech();
       this.aiChatHistory = [];

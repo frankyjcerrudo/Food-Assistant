@@ -165,8 +165,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
   });
 
   it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-    expect(window.APP_VERSION).toBe('v1.23');
-    expect(appInstance.appVersion).toBe('v1.23');
+    expect(window.APP_VERSION).toBe('v1.24');
+    expect(appInstance.appVersion).toBe('v1.24');
 
     const badge = document.createElement('span');
     badge.id = 'app-version-badge';
@@ -176,8 +176,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     document.body.appendChild(settingsVer);
 
     appInstance.initVersion();
-    expect(badge.textContent).toBe('v1.23');
-    expect(settingsVer.textContent).toBe('v1.23');
+    expect(badge.textContent).toBe('v1.24');
+    expect(settingsVer.textContent).toBe('v1.24');
 
     document.body.removeChild(badge);
     document.body.removeChild(settingsVer);
@@ -397,6 +397,21 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     document.body.removeChild(secUrl);
     document.body.removeChild(secText);
     document.body.removeChild(secAi);
+  });
+
+  it('v1.24: modal-gemini-invoke header desacopla acciones del título para prevenir compresión en pantallas estrechas', () => {
+    const cssContent = fs.readFileSync(path.resolve(process.cwd(), 'styles.css'), 'utf-8');
+    expect(cssContent).toContain('.gemini-invoke-header-top');
+    expect(cssContent).toContain('.gemini-invoke-header-actions');
+    expect(cssContent).toContain('.btn-stop-tts');
+    expect(cssContent).toContain('.btn-new-chat');
+
+    const htmlContent = fs.readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf-8');
+    expect(htmlContent).toContain('class="gemini-invoke-header-top"');
+    expect(htmlContent).toContain('class="gemini-invoke-header-actions"');
+    expect(htmlContent).toContain('id="btn-header-stop-tts"');
+    expect(htmlContent).toContain('id="btn-gemini-invoke-new-chat"');
+    expect(htmlContent).toContain('id="btn-close-gemini-invoke"');
   });
 });
 
