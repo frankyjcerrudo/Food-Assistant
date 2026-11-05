@@ -9,15 +9,15 @@
   <meta name="application-name" content="Sabory">
   <meta name="apple-mobile-web-app-title" content="Sabory">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <link rel="manifest" href="manifest.json?v=1.20">
+  <link rel="manifest" href="manifest.json?v=1.21">
   <meta name="theme-color" content="#FAF7F2">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=1.20">
-  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.20">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.20">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.20">
+  <link rel="stylesheet" href="styles.css?v=1.21">
+  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.21">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.21">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.21">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -225,6 +225,20 @@
         </div>
       </div>
 
+      <!-- US-33: Shopping View Mode Selector (Por Pasillos vs Por Receta) -->
+      <div class="shopping-view-toolbar" id="shopping-view-toggle" role="group" aria-label="Modo de agrupación de la lista de la compra">
+        <button type="button" class="shopping-view-btn active" id="btn-shopping-view-aisle"
+          data-action="setShoppingViewMode" data-mode="aisle" aria-pressed="true">
+          <span class="material-symbols-outlined icon-sm">storefront</span>
+          <span>Por Pasillos</span>
+        </button>
+        <button type="button" class="shopping-view-btn" id="btn-shopping-view-recipe"
+          data-action="setShoppingViewMode" data-mode="recipe" aria-pressed="false">
+          <span class="material-symbols-outlined icon-sm">menu_book</span>
+          <span>Por Receta</span>
+        </button>
+      </div>
+
       <!-- Quick Add Input (US-20: Autocompletado inteligente) -->
       <div style="display: flex; gap: 8px; margin-bottom: 16px; position: relative;">
         <div style="flex: 1; position: relative;">
@@ -251,6 +265,11 @@
           <h2 class="section-title">Ajustes</h2>
           <p class="section-subtitle">Mis preferencias culinarias y configuración.</p>
         </div>
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-relaunch-onboarding"
+          data-action="openOnboardingModal" title="Abrir asistente de bienvenida paso a paso">
+          <span class="material-symbols-outlined icon-sm">waving_hand</span>
+          <span>Guía inicial</span>
+        </button>
       </div>
 
       <!-- TIER 1: MIS PREFERENCIAS CULINARIAS (USO FRECUENTE) -->
@@ -593,8 +612,8 @@
               Actualizaciones
             </h3>
             <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-              Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.20</strong>
-              <span class="app-version-badge" id="app-version-badge">v1.20</span>
+              Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.21</strong>
+              <span class="app-version-badge" id="app-version-badge">v1.21</span>
             </p>
             <div
               style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
@@ -862,6 +881,11 @@
       <div class="modal-header-bar">
         <!-- Normal Mode Actions (saved recipe) -->
         <div id="recipe-detail-normal-actions" style="display: flex; align-items: center; gap: 8px;">
+          <button type="button" class="btn btn-ghost btn-icon btn-favorite-detail" id="btn-detail-favorite-recipe"
+            data-action="toggleActiveRecipeFavorite" aria-pressed="false" aria-label="Marcar como favorita"
+            title="Marcar o desmarcar como favorita">
+            <span class="material-symbols-outlined icon-sm" id="detail-favorite-icon">favorite</span>
+          </button>
           <button class="btn btn-secondary btn-sm" id="btn-detail-plan-recipe" data-action="openPlanRecipeModal"
             title="Planificar esta receta en el calendario">
             <span class="material-symbols-outlined icon-sm">calendar_month</span> Planificar
@@ -872,6 +896,10 @@
           <button class="btn btn-ghost btn-sm" id="btn-detail-delete-recipe" style="color: var(--m3-error);">
             <span class="material-symbols-outlined icon-sm">delete</span> Eliminar
           </button>
+          <span class="wake-lock-badge is-hidden" id="recipe-wake-lock-badge" title="La pantalla permanecerá encendida mientras consultas la receta">
+            <span class="material-symbols-outlined icon-14">light_mode</span>
+            <span>Pantalla activa</span>
+          </span>
         </div>
 
         <!-- Import Review Mode Actions (draft under review) -->
@@ -1918,6 +1946,212 @@
     </div>
   </dialog>
 
+  <!-- MODAL: ONBOARDING WIZARD FOR NEW USERS (US-68) -->
+  <dialog class="modal-overlay" id="modal-onboarding" closedby="closerequest" aria-labelledby="onboarding-modal-title">
+    <div class="modal-content onboarding-modal-card">
+      <div class="onboarding-header">
+        <div class="onboarding-step-dots" id="onboarding-step-dots" aria-label="Progreso de configuración">
+          <span class="onboarding-dot active" data-step="1"></span>
+          <span class="onboarding-dot" data-step="2"></span>
+          <span class="onboarding-dot" data-step="3"></span>
+          <span class="onboarding-dot" data-step="4"></span>
+          <span class="onboarding-dot" data-step="5"></span>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-onboarding-skip" data-action="skipOnboarding">
+          Omitir por ahora
+        </button>
+      </div>
+
+      <!-- STEP 1: BIENVENIDA Y CUENTA -->
+      <div class="onboarding-step-panel active" id="onboarding-step-1" data-onboarding-step="1">
+        <div class="onboarding-hero-badge">
+          <span class="material-symbols-outlined">skillet</span>
+        </div>
+        <h3 class="onboarding-title" id="onboarding-modal-title">¡Te damos la bienvenida a Sabory!</h3>
+        <p class="onboarding-subtitle">
+          Tu recetario editorial, planificador semanal y asistente de cocina inteligente. Configura Sabory a tu medida en menos de un minuto.
+        </p>
+
+        <div class="onboarding-feature-list">
+          <div class="onboarding-feature-item">
+            <span class="material-symbols-outlined icon-sm icon-primary">menu_book</span>
+            <div>
+              <strong>Recetario y Modo Cocina</strong>
+              <span>Importa recetas de webs, redes o fotos y cocina con pantalla siempre activa.</span>
+            </div>
+          </div>
+          <div class="onboarding-feature-item">
+            <span class="material-symbols-outlined icon-sm icon-primary">calendar_month</span>
+            <div>
+              <strong>Planificación y Compra Inteligente</strong>
+              <span>Organiza tu semana y genera la lista agrupada por pasillos o por receta.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="onboarding-account-promo">
+          <div class="onboarding-account-promo-text">
+            <span class="material-symbols-outlined icon-sm icon-primary">cloud_sync</span>
+            <span id="onboarding-account-status-text">¿Tienes cuenta o quieres sincronizar entre dispositivos?</span>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-onboarding-connect-account" data-action="openAuthFromOnboarding">
+            <span class="material-symbols-outlined icon-sm">account_circle</span>
+            <span>Conectar cuenta</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 2: PREFERENCIAS DIETÉTICAS -->
+      <div class="onboarding-step-panel is-hidden" id="onboarding-step-2" data-onboarding-step="2">
+        <div class="onboarding-step-kicker">Paso 2 de 5 · Alimentación</div>
+        <h3 class="onboarding-title">¿Sigues alguna preferencia dietética?</h3>
+        <p class="onboarding-subtitle">
+          Selecciona las etiquetas que se adapten a ti. El Asistente IA y el Planificador las respetarán siempre. Puedes dejarlo en blanco si comes de todo.
+        </p>
+        <div class="chips-wrap onboarding-chips-grid" id="onboarding-dietary-chips">
+          <!-- Rendered dynamically via JS -->
+        </div>
+      </div>
+
+      <!-- STEP 3: OBJETIVOS NUTRICIONALES -->
+      <div class="onboarding-step-panel is-hidden" id="onboarding-step-3" data-onboarding-step="3">
+        <div class="onboarding-step-kicker">Paso 3 de 5 · Nutrición</div>
+        <h3 class="onboarding-title">Objetivos nutricionales diarios</h3>
+        <p class="onboarding-subtitle">
+          Activa el seguimiento si quieres ver tus calorías y macronutrientes diarios en la pantalla Hoy.
+        </p>
+
+        <div class="goals-switch-card onboarding-switch-card">
+          <div class="goals-switch-info">
+            <span class="goals-switch-label">Mostrar calorías y macros</span>
+            <span class="goals-switch-desc">Anillo de calorías y barras de proteína, carbos y grasas</span>
+          </div>
+          <label class="m3-switch" for="onboarding-goals-enabled">
+            <input type="checkbox" id="onboarding-goals-enabled" checked>
+            <span class="m3-switch-track">
+              <span class="m3-switch-thumb"></span>
+            </span>
+          </label>
+        </div>
+
+        <div class="onboarding-presets-row" id="onboarding-goal-presets">
+          <button type="button" class="btn btn-secondary btn-sm onboarding-preset-btn" data-action="applyOnboardingGoalPreset" data-preset="deficit">
+            🔥 Definición (1700 kcal)
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm onboarding-preset-btn active" data-action="applyOnboardingGoalPreset" data-preset="balanced">
+            ⚖️ Equilibrado (2000 kcal)
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm onboarding-preset-btn" data-action="applyOnboardingGoalPreset" data-preset="protein">
+            💪 Alto Proteína (2400 kcal)
+          </button>
+        </div>
+
+        <div class="nutrient-input-grid" id="onboarding-goals-inputs-wrap">
+          <div class="nutrient-input-card nutrient-cal">
+            <div class="nutrient-input-header">
+              <span class="material-symbols-outlined nutrient-icon icon-cal">local_fire_department</span>
+              <span class="nutrient-name">Calorías</span>
+            </div>
+            <div class="nutrient-input-field-wrap">
+              <input type="number" min="800" max="6000" step="50" class="nutrient-input" id="onboarding-goal-calories" value="2000">
+              <span class="nutrient-unit">kcal</span>
+            </div>
+          </div>
+          <div class="nutrient-input-card nutrient-prot">
+            <div class="nutrient-input-header">
+              <span class="material-symbols-outlined nutrient-icon icon-prot">fitness_center</span>
+              <span class="nutrient-name">Proteínas</span>
+            </div>
+            <div class="nutrient-input-field-wrap">
+              <input type="number" min="20" max="400" step="5" class="nutrient-input" id="onboarding-goal-protein" value="140">
+              <span class="nutrient-unit">g</span>
+            </div>
+          </div>
+          <div class="nutrient-input-card nutrient-carbs">
+            <div class="nutrient-input-header">
+              <span class="material-symbols-outlined nutrient-icon icon-carbs">grain</span>
+              <span class="nutrient-name">Carbohidratos</span>
+            </div>
+            <div class="nutrient-input-field-wrap">
+              <input type="number" min="20" max="600" step="5" class="nutrient-input" id="onboarding-goal-carbs" value="200">
+              <span class="nutrient-unit">g</span>
+            </div>
+          </div>
+          <div class="nutrient-input-card nutrient-fat">
+            <div class="nutrient-input-header">
+              <span class="material-symbols-outlined nutrient-icon icon-fat">water_drop</span>
+              <span class="nutrient-name">Grasas</span>
+            </div>
+            <div class="nutrient-input-field-wrap">
+              <input type="number" min="15" max="250" step="5" class="nutrient-input" id="onboarding-goal-fat" value="65">
+              <span class="nutrient-unit">g</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4: COMENSALES / RACIONES POR DEFECTO -->
+      <div class="onboarding-step-panel is-hidden" id="onboarding-step-4" data-onboarding-step="4">
+        <div class="onboarding-step-kicker">Paso 4 de 5 · Hogar</div>
+        <h3 class="onboarding-title">¿Para cuántas personas sueles cocinar?</h3>
+        <p class="onboarding-subtitle">
+          Ajustaremos automáticamente las cantidades de tus recetas y de tu lista de la compra a estas raciones por defecto.
+        </p>
+        <div class="onboarding-servings-grid" id="onboarding-servings-grid">
+          <button type="button" class="onboarding-serving-card" data-action="selectOnboardingServings" data-servings="1">
+            <span class="onboarding-serving-num">1</span>
+            <span class="onboarding-serving-label">Persona</span>
+          </button>
+          <button type="button" class="onboarding-serving-card active" data-action="selectOnboardingServings" data-servings="2">
+            <span class="onboarding-serving-num">2</span>
+            <span class="onboarding-serving-label">Personas</span>
+          </button>
+          <button type="button" class="onboarding-serving-card" data-action="selectOnboardingServings" data-servings="3">
+            <span class="onboarding-serving-num">3</span>
+            <span class="onboarding-serving-label">Personas</span>
+          </button>
+          <button type="button" class="onboarding-serving-card" data-action="selectOnboardingServings" data-servings="4">
+            <span class="onboarding-serving-num">4</span>
+            <span class="onboarding-serving-label">Personas</span>
+          </button>
+          <button type="button" class="onboarding-serving-card" data-action="selectOnboardingServings" data-servings="6">
+            <span class="onboarding-serving-num">6</span>
+            <span class="onboarding-serving-label">Personas</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 5: RESUMEN FINAL -->
+      <div class="onboarding-step-panel is-hidden" id="onboarding-step-5" data-onboarding-step="5">
+        <div class="onboarding-hero-badge onboarding-hero-success">
+          <span class="material-symbols-outlined">check_circle</span>
+        </div>
+        <h3 class="onboarding-title">¡Todo listo para empezar!</h3>
+        <p class="onboarding-subtitle">
+          Hemos preparado Sabory con tus preferencias. Puedes modificar cualquiera de estos ajustes en cualquier momento desde el icono de engranaje.
+        </p>
+        <div class="onboarding-summary-box" id="onboarding-summary-box">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+
+      <div class="onboarding-footer">
+        <button type="button" class="btn btn-secondary is-hidden" id="btn-onboarding-prev" data-action="prevOnboardingStep">
+          <span class="material-symbols-outlined icon-sm">arrow_back</span>
+          <span>Anterior</span>
+        </button>
+        <button type="button" class="btn btn-primary onboarding-next-btn" id="btn-onboarding-next" data-action="nextOnboardingStep">
+          <span>Siguiente</span>
+          <span class="material-symbols-outlined icon-sm">arrow_forward</span>
+        </button>
+        <button type="button" class="btn btn-primary onboarding-next-btn is-hidden" id="btn-onboarding-finish" data-action="completeOnboarding">
+          <span class="material-symbols-outlined icon-sm">restaurant</span>
+          <span>¡Empezar a cocinar!</span>
+        </button>
+      </div>
+    </div>
+  </dialog>
+
   <!-- TOAST / SNACKBAR CONTAINER (Material 3 non-blocking notifications) -->
   <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 
@@ -1925,8 +2159,14 @@
   <div class="cook-mode-overlay" id="cook-mode-overlay">
     <div style="display: flex; justify-content: space-between; align-items: center;">
       <div>
-        <span style="font-size: 11px; font-weight: 700; color: var(--m3-primary); text-transform: uppercase;">Modo
-          Cocina</span>
+        <div class="cook-mode-header-kicker">
+          <span style="font-size: 11px; font-weight: 700; color: var(--m3-primary); text-transform: uppercase;">Modo
+            Cocina</span>
+          <span class="wake-lock-badge is-hidden" id="cook-wake-lock-badge" title="La pantalla permanecerá encendida mientras cocinas">
+            <span class="material-symbols-outlined icon-14">light_mode</span>
+            <span>Pantalla activa</span>
+          </span>
+        </div>
         <h3 style="font-size: 17px; font-weight: 500;" id="cook-recipe-title">Receta</h3>
       </div>
       <button class="btn btn-secondary btn-sm" id="btn-exit-cook-mode">
@@ -1960,8 +2200,8 @@
     </div>
   </div>
 
-  <script src="config.js?v=1.20"></script>
-  <script src="app.js?v=1.20"></script>
+  <script src="config.js?v=1.21"></script>
+  <script src="app.js?v=1.21"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

@@ -787,6 +787,280 @@ function matchFridgeIngredient(ingName, fridgeItem) {
   });
 }
 
+// ==========================================================================
+// SHOPPING LIST NORMALIZATION, UNIT CONVERSION & SMART MERGE (US-33)
+// ==========================================================================
+function singularizeSpanishToken(token) {
+  if (!token || token.length <= 2) return token;
+  if (/^(cuscus|humus|hummus|anis|compas)$/.test(token)) return token;
+  if (token.endsWith('ces') && token.length > 4) {
+    return token.slice(0, -3) + 'z';
+  }
+  if (/^(limon|champinon|macarron|jamon|salmon|atun|mejillon|boqueron|pinon|calabacin|freson|pan|yogur|calamar|coliflor|licor|frijol|chipiron|codorniz|alcuzcuz)es$/.test(token)) {
+    return token.slice(0, -2);
+  }
+  if (token.endsWith('ales') && token.length > 5) {
+    return token.slice(0, -2);
+  }
+  if (token.endsWith('s')) {
+    return token.slice(0, -1);
+  }
+  return token;
+}
+
+function getCanonicalIngredientKey(name) {
+  if (!name) return '';
+  const norm = normalizeIngredientText(name)
+    .replace(/[,;+._\-\/()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!norm) return '';
+  return norm
+    .split(' ')
+    .filter(Boolean)
+    .map(singularizeSpanishToken)
+    .join(' ');
+}
+
+function normalizeAndConvertUnit(amount, unit) {
+  const rawUnit = (unit === null || unit === undefined) ? '' : String(unit).trim();
+  const cleanUnit = normalizeIngredientText(rawUnit).replace(/\.+$/g, '').trim();
+  const hasNumericAmount = amount !== null && amount !== undefined && amount !== '' && !isNaN(Number(amount));
+  const numAmount = hasNumericAmount ? Number(amount) : null;
+
+  let dimension = 'custom';
+  let canonicalUnit = cleanUnit;
+  let factorToBase = 1;
+  let baseUnit = cleanUnit;
+
+  if (!cleanUnit || /^(ud|uds|u|unidad|unidades|pieza|piezas)$/.test(cleanUnit)) {
+    dimension = 'count';
+    canonicalUnit = cleanUnit ? 'ud' : '';
+    baseUnit = 'ud';
+    factorToBase = 1;
+  } else if (/^(mg|miligramo|miligramos)$/.test(cleanUnit)) {
+    dimension = 'mass';
+    canonicalUnit = 'mg';
+    baseUnit = 'g';
+    factorToBase = 0.001;
+  } else if (/^(g|gr|grs|gramo|gramos)$/.test(cleanUnit)) {
+    dimension = 'mass';
+    canonicalUnit = 'g';
+    baseUnit = 'g';
+    factorToBase = 1;
+  } else if (/^(kg|kilo|kilos|kilogramo|kilogramos)$/.test(cleanUnit)) {
+    dimension = 'mass';
+    canonicalUnit = 'kg';
+    baseUnit = 'g';
+    factorToBase = 1000;
+  } else if (/^(ml|mililitro|mililitros|cc)$/.test(cleanUnit)) {
+    dimension = 'volume';
+    canonicalUnit = 'ml';
+    baseUnit = 'ml';
+    factorToBase = 1;
+  } else if (/^(cl|centilitro|centilitros)$/.test(cleanUnit)) {
+    dimension = 'volume';
+    canonicalUnit = 'cl';
+    baseUnit = 'ml';
+    factorToBase = 10;
+  } else if (/^(dl|decilitro|decilitros)$/.test(cleanUnit)) {
+    dimension = 'volume';
+    canonicalUnit = 'dl';
+    baseUnit = 'ml';
+    factorToBase = 100;
+  } else if (/^(l|lt|lts|litro|litros)$/.test(cleanUnit)) {
+    dimension = 'volume';
+    canonicalUnit = 'l';
+    baseUnit = 'ml';
+    factorToBase = 1000;
+  } else if (/^(cda|cdas|cucharada|cucharadas|cucharada sopera|cucharadas soperas)$/.test(cleanUnit)) {
+    canonicalUnit = 'cda';
+  } else if (/^(cdta|cdtas|cucharadita|cucharaditas|cucharadita de postre)$/.test(cleanUnit)) {
+    canonicalUnit = 'cdta';
+  } else if (/^(diente|dientes)$/.test(cleanUnit)) {
+    canonicalUnit = 'diente';
+  } else if (/^(lata|latas)$/.test(cleanUnit)) {
+    canonicalUnit = 'lata';
+  } else if (/^(bote|botes)$/.test(cleanUnit)) {
+    canonicalUnit = 'bote';
+  } else if (/^(paquete|paquetes)$/.test(cleanUnit)) {
+    canonicalUnit = 'paquete';
+  } else if (/^(sobre|sobres)$/.test(cleanUnit)) {
+    canonicalUnit = 'sobre';
+  } else if (/^(rama|ramas)$/.test(cleanUnit)) {
+    canonicalUnit = 'rama';
+  } else if (/^(hoja|hojas)$/.test(cleanUnit)) {
+    canonicalUnit = 'hoja';
+  } else if (/^(loncha|lonchas)$/.test(cleanUnit)) {
+    canonicalUnit = 'loncha';
+  } else if (/^(rebanada|rebanadas)$/.test(cleanUnit)) {
+    canonicalUnit = 'rebanada';
+  } else if (/^(pizca|pizcas)$/.test(cleanUnit)) {
+    canonicalUnit = 'pizca';
+  } else if (/^(taza|tazas)$/.test(cleanUnit)) {
+    canonicalUnit = 'taza';
+  } else if (/^(vaso|vasos)$/.test(cleanUnit)) {
+    canonicalUnit = 'vaso';
+  } else if (/^(placa|placas)$/.test(cleanUnit)) {
+    canonicalUnit = 'placa';
+  } else if (/^(filete|filetes)$/.test(cleanUnit)) {
+    canonicalUnit = 'filete';
+  } else if (/^(manojo|manojos)$/.test(cleanUnit)) {
+    canonicalUnit = 'manojo';
+  }
+
+  if (numAmount === null) {
+    return {
+      amount: null,
+      unit: canonicalUnit || rawUnit,
+      baseAmount: null,
+      baseUnit,
+      dimension,
+      canonicalUnit,
+      rawUnit
+    };
+  }
+
+  const baseAmount = numAmount * factorToBase;
+  let displayAmount = Math.round(numAmount * 100) / 100;
+  let displayUnit = canonicalUnit;
+
+  if (dimension === 'mass') {
+    if (baseAmount >= 1000) {
+      displayAmount = Math.round((baseAmount / 1000) * 100) / 100;
+      displayUnit = 'kg';
+    } else {
+      displayAmount = Math.round(baseAmount * 100) / 100;
+      displayUnit = 'g';
+    }
+  } else if (dimension === 'volume') {
+    if (baseAmount >= 1000) {
+      displayAmount = Math.round((baseAmount / 1000) * 100) / 100;
+      displayUnit = 'l';
+    } else {
+      displayAmount = Math.round(baseAmount * 100) / 100;
+      displayUnit = 'ml';
+    }
+  }
+
+  return {
+    amount: displayAmount,
+    unit: displayUnit,
+    baseAmount,
+    baseUnit,
+    dimension,
+    canonicalUnit,
+    rawUnit
+  };
+}
+
+function mergeShoppingQuantities(amountA, unitA, amountB, unitB) {
+  const normA = normalizeAndConvertUnit(amountA, unitA);
+  const normB = normalizeAndConvertUnit(amountB, unitB);
+
+  if (normA.baseAmount !== null && normB.baseAmount !== null) {
+    if (normA.dimension === 'mass' && normB.dimension === 'mass') {
+      const totalGrams = normA.baseAmount + normB.baseAmount;
+      if (totalGrams >= 1000) {
+        return { compatible: true, amount: Math.round((totalGrams / 1000) * 100) / 100, unit: 'kg' };
+      }
+      return { compatible: true, amount: Math.round(totalGrams * 100) / 100, unit: 'g' };
+    }
+
+    if (normA.dimension === 'volume' && normB.dimension === 'volume') {
+      const totalMl = normA.baseAmount + normB.baseAmount;
+      if (totalMl >= 1000) {
+        return { compatible: true, amount: Math.round((totalMl / 1000) * 100) / 100, unit: 'l' };
+      }
+      return { compatible: true, amount: Math.round(totalMl * 100) / 100, unit: 'ml' };
+    }
+
+    if (normA.dimension === 'count' && normB.dimension === 'count') {
+      const totalCount = Math.round((normA.baseAmount + normB.baseAmount) * 100) / 100;
+      const resolvedUnit = (normA.canonicalUnit || normB.canonicalUnit) ? 'ud' : '';
+      return { compatible: true, amount: totalCount, unit: resolvedUnit };
+    }
+
+    if (normA.dimension === 'custom' && normB.dimension === 'custom' && normA.canonicalUnit === normB.canonicalUnit) {
+      const totalCustom = Math.round((normA.baseAmount + normB.baseAmount) * 100) / 100;
+      return { compatible: true, amount: totalCustom, unit: normA.canonicalUnit };
+    }
+
+    return { compatible: false };
+  }
+
+  if (normA.baseAmount === null && normB.baseAmount === null) {
+    if (normA.canonicalUnit === normB.canonicalUnit || !normA.canonicalUnit || !normB.canonicalUnit) {
+      return { compatible: true, amount: null, unit: normA.canonicalUnit || normB.canonicalUnit || '' };
+    }
+    return { compatible: false };
+  }
+
+  if (normA.baseAmount === null && !normA.canonicalUnit) {
+    return { compatible: true, amount: normB.amount, unit: normB.unit };
+  }
+  if (normB.baseAmount === null && !normB.canonicalUnit) {
+    return { compatible: true, amount: normA.amount, unit: normA.unit };
+  }
+
+  return { compatible: false };
+}
+
+function mergeOrAddShoppingItem(shoppingList, newItem) {
+  if (!Array.isArray(shoppingList) || !newItem || !newItem.name) return null;
+  const targetKey = getCanonicalIngredientKey(newItem.name);
+  if (!targetKey) return null;
+
+  const normNew = normalizeAndConvertUnit(newItem.amount, newItem.unit);
+  const nowIso = new Date().toISOString();
+
+  for (let i = 0; i < shoppingList.length; i++) {
+    const existing = shoppingList[i];
+    if (!existing || existing.isChecked || existing.checked) continue;
+    const existingKey = getCanonicalIngredientKey(existing.name);
+    if (existingKey !== targetKey) continue;
+
+    const mergedQty = mergeShoppingQuantities(existing.amount, existing.unit, newItem.amount, newItem.unit);
+    if (!mergedQty.compatible) continue;
+
+    existing.amount = mergedQty.amount;
+    existing.unit = mergedQty.unit;
+    if ((!existing.aisle || existing.aisle === 'other') && newItem.aisle && newItem.aisle !== 'other') {
+      existing.aisle = newItem.aisle;
+    }
+
+    if (newItem.recipeOrigin) {
+      const incomingOrigins = String(newItem.recipeOrigin).split(',').map(s => s.trim()).filter(Boolean);
+      const currentOrigins = existing.recipeOrigin
+        ? String(existing.recipeOrigin).split(',').map(s => s.trim()).filter(Boolean)
+        : [];
+      incomingOrigins.forEach(orig => {
+        if (!currentOrigins.includes(orig)) {
+          currentOrigins.push(orig);
+        }
+      });
+      existing.recipeOrigin = currentOrigins.join(', ');
+    }
+
+    existing.updatedAt = nowIso;
+    return existing;
+  }
+
+  const isItemChecked = Boolean(newItem.isChecked || newItem.checked);
+  const created = {
+    id: newItem.id || generateId('shop-'),
+    name: String(newItem.name).trim(),
+    amount: normNew.amount,
+    unit: normNew.unit,
+    aisle: newItem.aisle || categorizeIngredientAisle(newItem.name),
+    isChecked: isItemChecked,
+    recipeOrigin: newItem.recipeOrigin ? String(newItem.recipeOrigin).trim() : '',
+    updatedAt: newItem.updatedAt || nowIso
+  };
+  shoppingList.push(created);
+  return created;
+}
+
 function categorizeIngredientAisle(ingredientName) {
   const text = normalizeIngredientText(ingredientName);
   if (!text) return 'other';
@@ -3680,7 +3954,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.20';
+  window.APP_VERSION = 'v1.21';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -3717,7 +3991,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.20';
+    this.appVersion = window.APP_VERSION || 'v1.21';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -3731,6 +4005,12 @@ class FoodAssistantApp {
     this.selectedRecipeTags = new Set();
     this.editorSelectedTags = new Set();
     this.pickerOnlyDietary = false;
+    this.shoppingViewMode = (typeof localStorage !== 'undefined' && localStorage.getItem('fa_shopping_view_mode') === 'recipe') ? 'recipe' : 'aisle'; // US-33: 'aisle' | 'recipe'
+    this.wakeLockSentinel = null; // US-60: Screen Wake Lock Sentinel
+    this.isWakeLockActive = false; // US-60: Active flag for Wake Lock badge
+    this.onboardingStep = 1; // US-68: Onboarding Wizard current step (1..5)
+    this.onboardingDietary = new Set(Array.isArray(state.dietaryPreferences) ? state.dietaryPreferences : []);
+    this.onboardingServings = state.defaultServings || 2;
     
     // US-34: Fridge Reverse Search state
     this.fridgeIngredients = [];
@@ -3865,6 +4145,7 @@ class FoodAssistantApp {
     this.modalConfirmDialog = document.getElementById('modal-confirm-dialog');
     this.modalGeminiInvoke = document.getElementById('modal-gemini-invoke');
     this.modalPlanRecipe = document.getElementById('modal-plan-recipe');
+    this.modalOnboarding = document.getElementById('modal-onboarding');
     this.cookModeOverlay = document.getElementById('cook-mode-overlay');
     this._confirmDialogResolver = null;
     this._confirmDialogMode = 'confirm';
@@ -4266,6 +4547,9 @@ class FoodAssistantApp {
         if (document.visibilityState === 'hidden') {
           this.flushSync();
         } else if (document.visibilityState === 'visible') {
+          if (this.shouldKeepScreenAwake()) {
+            this.requestScreenWakeLock();
+          }
           this.sanitizeRecipeProteinTags();
           this.render();
           if (this.supabaseClient && state.cloudUser?.id) {
@@ -4606,11 +4890,16 @@ class FoodAssistantApp {
           }
 
           // Limpiar el fallback interno de instructions para no ensuciar los pasos en la UI
+          const remoteFavorite = remoteRow.is_favorite !== undefined
+            ? !!remoteRow.is_favorite
+            : !!remoteRow.instructions?.[0]?._isFavorite;
+
           const cleanInstructions = Array.isArray(remoteRow.instructions)
             ? remoteRow.instructions.map((inst, idx) => {
-                if (idx === 0 && inst && typeof inst === 'object' && '_nutrition' in inst) {
+                if (idx === 0 && inst && typeof inst === 'object' && ('_nutrition' in inst || '_isFavorite' in inst)) {
                   const copy = { ...inst };
                   delete copy._nutrition;
+                  delete copy._isFavorite;
                   return copy;
                 }
                 return inst;
@@ -4631,7 +4920,7 @@ class FoodAssistantApp {
             ingredients: Array.isArray(remoteRow.ingredients) ? remoteRow.ingredients : [],
             instructions: cleanInstructions.length > 0 ? cleanInstructions : (Array.isArray(remoteRow.instructions) ? remoteRow.instructions : []),
             nutrition: remoteNutrition,
-            isFavorite: !!remoteRow.is_favorite,
+            isFavorite: remoteFavorite,
             createdAt: remoteRow.created_at || remoteRow.updated_at || null,
             updatedAt: remoteRow.updated_at
           };
@@ -5105,12 +5394,16 @@ class FoodAssistantApp {
               })
             : [];
 
-          // Adjuntar _nutrition como metadato seguro en instructions[0] para persistencia ante fallbacks de esquema
-          if (recipe.nutrition) {
-            if (instructionsCopy.length > 0) {
+          // Adjuntar _nutrition e _isFavorite como metadato seguro en instructions[0] para persistencia ante fallbacks de esquema
+          if (recipe.nutrition || recipe.isFavorite !== undefined) {
+            if (instructionsCopy.length === 0) {
+              instructionsCopy.push({ text: '' });
+            }
+            if (recipe.nutrition) {
               instructionsCopy[0]._nutrition = recipe.nutrition;
-            } else {
-              instructionsCopy.push({ text: '', _nutrition: recipe.nutrition });
+            }
+            if (recipe.isFavorite !== undefined) {
+              instructionsCopy[0]._isFavorite = !!recipe.isFavorite;
             }
           }
 
@@ -5406,6 +5699,44 @@ class FoodAssistantApp {
           break;
         case 'cancelImportReview':
           this.cancelImportReview();
+          break;
+        case 'toggleRecipeFavorite':
+          if (target.dataset.recipeId) {
+            this.toggleRecipeFavorite(target.dataset.recipeId);
+          }
+          break;
+        case 'toggleActiveRecipeFavorite':
+          this.toggleActiveRecipeFavorite();
+          break;
+        case 'setShoppingViewMode':
+          this.setShoppingViewMode(target.dataset.mode);
+          break;
+        case 'openOnboardingModal':
+          this.openOnboardingModal(1);
+          break;
+        case 'skipOnboarding':
+          this.skipOnboarding();
+          break;
+        case 'nextOnboardingStep':
+          this.nextOnboardingStep();
+          break;
+        case 'prevOnboardingStep':
+          this.prevOnboardingStep();
+          break;
+        case 'completeOnboarding':
+          this.completeOnboarding();
+          break;
+        case 'toggleOnboardingDietaryTag':
+          this.toggleOnboardingDietaryTag(target.dataset.tag);
+          break;
+        case 'applyOnboardingGoalPreset':
+          this.applyOnboardingGoalPreset(target.dataset.preset);
+          break;
+        case 'selectOnboardingServings':
+          this.selectOnboardingServings(target.dataset.servings);
+          break;
+        case 'openAuthFromOnboarding':
+          this.openAuthFromOnboarding();
           break;
         default:
           if (typeof this[action] === 'function') {
@@ -6375,6 +6706,14 @@ class FoodAssistantApp {
           <div class="recipe-time-badge">
             <span class="material-symbols-outlined icon-sm">schedule</span> ${rec.prepTimeMinutes + rec.cookTimeMinutes} min
           </div>
+          <button type="button" class="recipe-fav-btn ${rec.isFavorite ? 'active' : ''}"
+            onclick="event.stopPropagation(); app.toggleRecipeFavorite('${rec.id}')"
+            data-action="toggleRecipeFavorite" data-recipe-id="${rec.id}"
+            aria-pressed="${rec.isFavorite ? 'true' : 'false'}"
+            aria-label="${rec.isFavorite ? 'Quitar de favoritas' : 'Marcar como favorita'}"
+            title="${rec.isFavorite ? 'Quitar de favoritas' : 'Marcar como favorita'}">
+            <span class="material-symbols-outlined icon-18">favorite</span>
+          </button>
           ${fridgeMatch && fridgeMatch.matchCount > 0 ? `
             <div class="fridge-match-overlay-badge">
               <span class="material-symbols-outlined icon-13">check_circle</span>
@@ -6553,6 +6892,8 @@ class FoodAssistantApp {
 
     const availableTags = state.getAllTags ? state.getAllTags() : ALL_PREDEFINED_TAGS;
     const isAllActive = this.selectedRecipeTags.size === 0;
+    const isFavSelected = this.selectedRecipeTags.has('Favoritas');
+    const favCount = Array.isArray(state.recipes) ? state.recipes.filter(r => r && r.isFavorite).length : 0;
     const fridgePanel = document.getElementById('fridge-reverse-search-panel');
     const isFridgeActive = (this.fridgeIngredients && this.fridgeIngredients.length > 0) || (fridgePanel && fridgePanel.style.display === 'block');
 
@@ -6565,6 +6906,10 @@ class FoodAssistantApp {
       <button type="button" class="m3-filter-chip ${isAllActive ? 'active' : ''}" data-tag="all">
         ${isAllActive ? '<span class="material-symbols-outlined icon-15">done</span>' : ''}
         Todas
+      </button>
+      <button type="button" class="m3-filter-chip m3-filter-chip-fav ${isFavSelected ? 'active' : ''}" id="btn-filter-favorites" data-tag="Favoritas" aria-pressed="${isFavSelected ? 'true' : 'false'}">
+        <span class="material-symbols-outlined icon-15">favorite</span>
+        <span>Favoritas${favCount > 0 ? ` (${favCount})` : ''}</span>
       </button>
     `;
 
@@ -6727,11 +7072,17 @@ class FoodAssistantApp {
     const term = (overrideTerm !== undefined ? overrideTerm : (searchInput?.value || '')).trim();
 
     const filtered = state.recipes.filter(r => {
-      // 1. Tag multi-selection (AND logic: debe contener todas las etiquetas seleccionadas)
+      // 1. Tag multi-selection (AND logic: debe contener todas las etiquetas seleccionadas + chip Favoritas US-70)
       if (this.selectedRecipeTags.size > 0) {
         const rTagsNorm = (r.tags || []).map(t => typeof normalizeIngredientText === 'function' ? normalizeIngredientText(String(t)) : String(t).toLowerCase().trim());
         for (const selTag of this.selectedRecipeTags) {
           const selTagNorm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(selTag) : selTag.toLowerCase().trim();
+          if (selTagNorm === 'favoritas' || selTagNorm === 'favorita') {
+            if (!r.isFavorite && !rTagsNorm.includes('favoritas')) {
+              return false;
+            }
+            continue;
+          }
           if (!rTagsNorm.includes(selTagNorm)) {
             return false;
           }
@@ -6821,8 +7172,10 @@ class FoodAssistantApp {
     this.activeRecipe = recipe;
     this.activeServings = recipe.servings;
     this.updateRecipeDetailActionBars();
+    this.updateDetailFavoriteButton();
     this.renderRecipeModalContent();
     this.openDialogModal(this.modalRecipeDetail);
+    this.requestScreenWakeLock();
   }
 
   openImportReview(recipe) {
@@ -6832,8 +7185,123 @@ class FoodAssistantApp {
     this.activeRecipe = recipe;
     this.activeServings = recipe.servings || 2;
     this.updateRecipeDetailActionBars();
+    this.updateDetailFavoriteButton();
     this.renderRecipeModalContent();
     this.openDialogModal(this.modalRecipeDetail);
+    this.requestScreenWakeLock();
+  }
+
+  // US-70: FAVORITE RECIPES MANAGEMENT
+  toggleRecipeFavorite(recipeId) {
+    const targetId = typeof recipeId === 'object' && recipeId !== null ? recipeId.recipeId : recipeId;
+    if (!targetId) return;
+    const recipe = state.recipes.find(r => r.id === targetId);
+    if (!recipe) return;
+
+    recipe.isFavorite = !recipe.isFavorite;
+    recipe.updatedAt = new Date().toISOString();
+    state.save('fa_recipes', state.recipes);
+
+    if (this.activeRecipe && this.activeRecipe.id === recipe.id) {
+      this.activeRecipe.isFavorite = recipe.isFavorite;
+      this.updateDetailFavoriteButton();
+    }
+
+    this.initRecipeTagFilters();
+    this.applyRecipeFilters();
+    this.scheduleSyncWithCloud();
+    this.showToast(
+      recipe.isFavorite ? `❤️ "${recipe.title}" añadida a Favoritas` : `"${recipe.title}" quitada de Favoritas`,
+      'info',
+      2200
+    );
+  }
+
+  toggleActiveRecipeFavorite() {
+    if (!this.activeRecipe || !this.activeRecipe.id) return;
+    this.toggleRecipeFavorite(this.activeRecipe.id);
+  }
+
+  updateDetailFavoriteButton() {
+    const btn = document.getElementById('btn-detail-favorite-recipe');
+    if (!btn) return;
+    const isFav = !!(this.activeRecipe && this.activeRecipe.isFavorite);
+    btn.classList.toggle('active', isFav);
+    btn.setAttribute('aria-pressed', isFav ? 'true' : 'false');
+    btn.setAttribute('aria-label', isFav ? 'Quitar de favoritas' : 'Marcar como favorita');
+    btn.title = isFav ? 'Quitar de favoritas' : 'Marcar como favorita';
+  }
+
+  // US-60: SCREEN WAKE LOCK API (RECETA ABIERTA + MODO COCINA)
+  shouldKeepScreenAwake() {
+    const isCookActive = !!(this.cookModeOverlay && this.cookModeOverlay.classList.contains('active'));
+    const isDetailActive = !!(this.modalRecipeDetail && this.modalRecipeDetail.classList.contains('active'));
+    return isCookActive || isDetailActive;
+  }
+
+  updateWakeLockBadges() {
+    const recipeBadge = document.getElementById('recipe-wake-lock-badge');
+    const cookBadge = document.getElementById('cook-wake-lock-badge');
+    const show = !!this.isWakeLockActive && this.shouldKeepScreenAwake();
+    if (recipeBadge) recipeBadge.classList.toggle('is-hidden', !show);
+    if (cookBadge) cookBadge.classList.toggle('is-hidden', !show);
+  }
+
+  async requestScreenWakeLock() {
+    if (!this.shouldKeepScreenAwake()) return null;
+    if (this.wakeLockSentinel && !this.wakeLockSentinel.released) {
+      this.isWakeLockActive = true;
+      this.updateWakeLockBadges();
+      return this.wakeLockSentinel;
+    }
+    if (typeof navigator === 'undefined' || !('wakeLock' in navigator) || typeof navigator.wakeLock?.request !== 'function') {
+      this.isWakeLockActive = false;
+      this.updateWakeLockBadges();
+      return null;
+    }
+    try {
+      const sentinel = await navigator.wakeLock.request('screen');
+      // Si la receta / Modo Cocina se cerró mientras la petición estaba en vuelo, liberar inmediatamente
+      if (!this.shouldKeepScreenAwake()) {
+        if (sentinel && typeof sentinel.release === 'function') {
+          try { await sentinel.release(); } catch (e) {}
+        }
+        this.isWakeLockActive = false;
+        this.updateWakeLockBadges();
+        return null;
+      }
+      this.wakeLockSentinel = sentinel;
+      this.isWakeLockActive = true;
+      if (sentinel && typeof sentinel.addEventListener === 'function') {
+        sentinel.addEventListener('release', () => {
+          if (this.wakeLockSentinel === sentinel) {
+            this.wakeLockSentinel = null;
+            this.isWakeLockActive = false;
+            this.updateWakeLockBadges();
+          }
+        });
+      }
+      this.updateWakeLockBadges();
+      return sentinel;
+    } catch (err) {
+      this.isWakeLockActive = false;
+      this.updateWakeLockBadges();
+      return null;
+    }
+  }
+
+  async releaseScreenWakeLock() {
+    const sentinel = this.wakeLockSentinel;
+    this.wakeLockSentinel = null;
+    this.isWakeLockActive = false;
+    this.updateWakeLockBadges();
+    if (sentinel && typeof sentinel.release === 'function') {
+      try {
+        await sentinel.release();
+      } catch (e) {
+        // Ignorar errores al liberar Wake Lock
+      }
+    }
   }
 
   updateRecipeDetailActionBars() {
@@ -6854,12 +7322,18 @@ class FoodAssistantApp {
     this.activeRecipe = null;
     this.closeDialogModal(this.modalRecipeDetail);
     this.updateRecipeDetailActionBars();
+    if (!this.shouldKeepScreenAwake()) {
+      this.releaseScreenWakeLock();
+    }
   }
 
   editImportReview() {
     const draft = this.pendingImportRecipe || this.activeRecipe;
     if (!draft) return;
     this.closeDialogModal(this.modalRecipeDetail);
+    if (!this.shouldKeepScreenAwake()) {
+      this.releaseScreenWakeLock();
+    }
     this.openEditRecipeModal(draft);
   }
 
@@ -6869,6 +7343,9 @@ class FoodAssistantApp {
       this.isReviewingImport = false;
       this.pendingImportRecipe = null;
       this.updateRecipeDetailActionBars();
+    }
+    if (!this.shouldKeepScreenAwake()) {
+      this.releaseScreenWakeLock();
     }
   }
 
@@ -6913,6 +7390,9 @@ class FoodAssistantApp {
         break;
       case 'modal-plan-recipe':
         this.closePlanRecipeModal();
+        break;
+      case 'modal-onboarding':
+        this.closeOnboardingModal();
         break;
       default:
         this.closeDialogModal(overlay);
@@ -8042,16 +8522,20 @@ class FoodAssistantApp {
       this.showToast("Esta receta no tiene pasos de preparación para el Modo Cocina.", 'warning');
       return;
     }
-    this.closeRecipeModal();
     this.cookStepIndex = 0;
     this.cookModeOverlay.classList.add('active');
+    this.closeRecipeModal();
     this.renderCookStep();
+    this.requestScreenWakeLock();
   }
 
   exitCookMode() {
     clearInterval(this.timerInterval);
     this.timerInterval = null;
     this.cookModeOverlay.classList.remove('active');
+    if (!this.shouldKeepScreenAwake()) {
+      this.releaseScreenWakeLock();
+    }
   }
 
   nextCookStep() {
@@ -9408,14 +9892,40 @@ class FoodAssistantApp {
     }
   }
 
-  // SHOPPING LIST
+  // SHOPPING LIST (US-33: Vista Por Pasillos vs Por Receta + Fusión y Conversión Inteligente)
+  setShoppingViewMode(modeOrDataset) {
+    const rawMode = typeof modeOrDataset === 'object' && modeOrDataset !== null ? modeOrDataset.mode : modeOrDataset;
+    const mode = rawMode === 'recipe' ? 'recipe' : 'aisle';
+    this.shoppingViewMode = mode;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('fa_shopping_view_mode', mode);
+      } catch (e) {}
+    }
+    this.renderShoppingList();
+  }
+
   renderShoppingList() {
     const container = document.getElementById('shopping-aisles-container');
     if (!container) return;
 
+    const btnAisle = document.getElementById('btn-shopping-view-aisle');
+    const btnRecipe = document.getElementById('btn-shopping-view-recipe');
+    const isRecipeView = this.shoppingViewMode === 'recipe';
+    if (btnAisle) {
+      btnAisle.classList.toggle('active', !isRecipeView);
+      btnAisle.setAttribute('aria-pressed', !isRecipeView ? 'true' : 'false');
+    }
+    if (btnRecipe) {
+      btnRecipe.classList.toggle('active', isRecipeView);
+      btnRecipe.setAttribute('aria-pressed', isRecipeView ? 'true' : 'false');
+    }
+
     const pendingCount = state.shoppingList.filter(i => !i.isChecked).length;
-    document.getElementById('shopping-summary-text').textContent = 
-      `${pendingCount} art\u00EDculo${pendingCount === 1 ? '' : 's'} pendiente${pendingCount === 1 ? '' : 's'}`;
+    const summaryEl = document.getElementById('shopping-summary-text');
+    if (summaryEl) {
+      summaryEl.textContent = `${pendingCount} art\u00EDculo${pendingCount === 1 ? '' : 's'} pendiente${pendingCount === 1 ? '' : 's'}`;
+    }
 
     if (!state.shoppingList.length) {
       container.innerHTML = `
@@ -9430,6 +9940,65 @@ class FoodAssistantApp {
           </button>
         </div>
       `;
+      return;
+    }
+
+    if (isRecipeView) {
+      const groupedByRecipe = {};
+      state.shoppingList.forEach((item, index) => {
+        const rawOrigin = item.recipeOrigin ? String(item.recipeOrigin).trim() : '';
+        const origins = rawOrigin
+          ? rawOrigin.split(',').map(s => s.trim()).filter(Boolean)
+          : ['Añadido manualmente'];
+        origins.forEach(originLabel => {
+          if (!groupedByRecipe[originLabel]) groupedByRecipe[originLabel] = [];
+          groupedByRecipe[originLabel].push({ ...item, originalIndex: index });
+        });
+      });
+
+      container.innerHTML = Object.entries(groupedByRecipe).map(([recipeLabel, items]) => {
+        const pendingInRecipe = items.filter(i => !i.isChecked).length;
+        const isManualGroup = /manualmente|otros|asistente/i.test(recipeLabel);
+        const headerIcon = isManualGroup ? 'shopping_bag' : 'menu_book';
+
+        return `
+          <div class="aisle-card recipe-shopping-card" data-recipe-group="${escapeHtml(recipeLabel)}">
+            <div class="aisle-header">
+              <div class="u-flex-row-center-gap-8">
+                <span class="material-symbols-outlined icon-sm">${headerIcon}</span>
+                <span>${escapeHtml(recipeLabel)}</span>
+              </div>
+              <span class="aisle-pending-count">${pendingInRecipe} pendientes</span>
+            </div>
+
+            <div>
+              ${items.map(item => {
+                const aisleMeta = AISLE_METADATA[item.aisle || 'other'] || AISLE_METADATA.other;
+                return `
+                  <div class="grocery-item-row ${item.isChecked ? 'checked' : ''}">
+                    <div class="grocery-left" onclick="app.toggleGroceryCheck(${item.originalIndex})">
+                      <input type="checkbox" class="grocery-checkbox" ${item.isChecked ? 'checked' : ''} onclick="event.stopPropagation(); app.toggleGroceryCheck(${item.originalIndex})">
+                      <div class="grocery-item-icon-badge" title="${escapeHtml(item.name)}">
+                        <span class="material-symbols-outlined icon-sm">${getIngredientIcon(item.name, item.aisle)}</span>
+                      </div>
+                      <div class="u-flex-1-truncate">
+                        <div class="grocery-name">${escapeHtml(item.name)}</div>
+                        <div class="grocery-origin-sub">${escapeHtml(aisleMeta.label)}</div>
+                      </div>
+                    </div>
+                    <div class="u-flex-center-gap-8-shrink">
+                      ${item.amount ? `<span class="grocery-amount">${item.amount} ${item.unit || ''}</span>` : ''}
+                      <button type="button" class="btn btn-ghost btn-sm btn-grocery-remove btn-remove-circle" onclick="app.deleteGroceryItem(${item.originalIndex})" title="Eliminar artículo">
+                        <span class="material-symbols-outlined icon-sm">close</span>
+                      </button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
       return;
     }
 
@@ -9606,7 +10175,7 @@ class FoodAssistantApp {
       name = text.charAt(0).toUpperCase() + text.slice(1);
     }
 
-    state.shoppingList.push({
+    mergeOrAddShoppingItem(state.shoppingList, {
       id: generateId('shop-'),
       name: name,
       amount: amount,
@@ -9965,27 +10534,16 @@ class FoodAssistantApp {
 
     let addedCount = 0;
     selectedItems.forEach(item => {
-      const key = `${item.name.toLowerCase().trim()}_${(item.unit || '').toLowerCase().trim()}`;
-      const existing = state.shoppingList.find(i => `${i.name.toLowerCase().trim()}_${(i.unit || '').toLowerCase().trim()}` === key && !i.isChecked);
-
-      if (existing && existing.amount !== null && item.amount !== null) {
-        existing.amount = Math.round((existing.amount + item.amount) * 10) / 10;
-        existing.updatedAt = new Date().toISOString();
-        if (item.recipeOrigin && !existing.recipeOrigin.includes(item.recipeOrigin)) {
-          existing.recipeOrigin += `, ${item.recipeOrigin}`;
-        }
-      } else {
-        state.shoppingList.push({
-          id: item.id || generateId('shop-'),
-          name: item.name,
-          amount: item.amount,
-          unit: item.unit || '',
-          aisle: item.aisle || 'other',
-          isChecked: false,
-          recipeOrigin: item.recipeOrigin || '',
-          updatedAt: new Date().toISOString()
-        });
-      }
+      mergeOrAddShoppingItem(state.shoppingList, {
+        id: item.id || generateId('shop-'),
+        name: item.name,
+        amount: item.amount,
+        unit: item.unit || '',
+        aisle: item.aisle || 'other',
+        isChecked: false,
+        recipeOrigin: item.recipeOrigin || '',
+        updatedAt: new Date().toISOString()
+      });
       addedCount++;
     });
 
@@ -10208,7 +10766,7 @@ class FoodAssistantApp {
       const isBreakfastOrSnack = tags.some(t => t.includes('desayuno') || t.includes('merienda')) ||
         /avena|porridge|yogur|chia|smoothie|batido|pancake|torta|tosta|fruta|bowl/i.test(titleLower);
 
-      let isMatch = directMentionIds.has(r.id);
+      let isMatch = directMentionIds.has(r.id) || !!r.isFavorite;
       if (!isMatch) {
         for (const c of criteria) {
           if (c.type === 'macro' && c.key === 'protein') {
@@ -10272,7 +10830,7 @@ class FoodAssistantApp {
         .filter(Boolean)
         .slice(0, 10)
         .join(', ');
-      return `- ID: "${r.id}" | "${cleanTitle}" | Ingredientes: [${cleanIngredients}] | Tags: [${cleanTags}] | Macros: ${nut.calories}kcal, P:${nut.protein}g, C:${nut.carbs}g, G:${nut.fat}g`;
+      return `- ID: "${r.id}" | "${cleanTitle}" | Ingredientes: [${cleanIngredients}] | Tags: [${cleanTags}] | Macros: ${nut.calories}kcal, P:${nut.protein}g, C:${nut.carbs}g, G:${nut.fat}g${r.isFavorite ? ' | ❤️ FAVORITA: Sí' : ''}`;
     }).join('\n');
 
     const currentPlanSummary = weekDays.map(d => {
@@ -10330,6 +10888,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 - REGLA ESTRICTA DE VARIEDAD Y ROTACIÓN DE PROTEÍNAS (ANTI-MONOTONÍA):
   * NUNCA repitas la misma receta en la misma semana (excepto si Franky solicita expresamente modo sobras o Batch Cooking).
   * NUNCA repitas la misma fuente de proteína principal (ej. pollo) en días seguidos ni dos veces en el mismo día. Alterna obligatoriamente fuentes proteicas: pescados (blanco o azul), legumbres, aves (pollo/pavo), huevos, ternera magra y opciones vegetales/tofu.
+  * PONDERACIÓN INTELIGENTE DE RECETAS FAVORITAS (US-70): Otorga una ligera prioridad de selección a las recetas marcadas con "❤️ FAVORITA: Sí" cuando encajen con el momento de comida y las preferencias dietéticas de Franky, integrándolas de forma natural en el menú semanal o sugerencias sin monopolizar la semana ni romper la rotación de proteínas y variedad.
   * Si Franky pide un enfoque nutricional (ej. "enfoque en proteínas", "bajo en calorías"), selecciona preferentemente recetas del catálogo con altos valores de ese macro y explica brevemente en tu mensaje tu razonamiento y cómo se distribuyen los nutrientes a lo largo de los días planificados.
 - RAZONAMIENTO, TRANSPARENCIA Y PREGUNTAS:
   * Si en el catálogo de recetas no hay suficientes platos para cubrir los días solicitados sin repetir o sin incumplir las preferencias, RAZONA con total honestidad: explica a Franky qué días has planificado y pregúntale si quiere que le inventes y guardes recetas nuevas para completar los huecos restantes.
@@ -11432,7 +11991,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
             const rec = recId ? state.recipes.find(r => r.id === recId) : null;
             if (rec && Array.isArray(rec.ingredients)) {
               rec.ingredients.forEach(ing => {
-                state.shoppingList.push({
+                mergeOrAddShoppingItem(state.shoppingList, {
                   id: generateId('shop-'),
                   name: ing.name,
                   amount: Number(ing.amount) || 1,
@@ -11452,7 +12011,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
           if (!item || !item.name) return;
           const cleanName = String(item.name).trim();
           if (!cleanName) return;
-          state.shoppingList.push({
+          mergeOrAddShoppingItem(state.shoppingList, {
             id: generateId('shop-'),
             name: cleanName,
             amount: Number(item.amount) || 1,
@@ -13828,6 +14387,275 @@ Autenticación: API Key → Bearer → ${tk}`;
     }
     return false;
   }
+
+  // ==========================================================================
+  // US-68: ONBOARDING WIZARD FOR NEW USERS
+  // ==========================================================================
+  checkAndLaunchOnboarding() {
+    if (typeof localStorage === 'undefined') return false;
+    const completed = localStorage.getItem('fa_onboarding_completed') === 'true';
+    if (completed) return false;
+    const modal = this.modalOnboarding || document.getElementById('modal-onboarding');
+    if (!modal) return false;
+    this.openOnboardingModal(1);
+    return true;
+  }
+
+  openOnboardingModal(step = 1) {
+    const modal = this.modalOnboarding || document.getElementById('modal-onboarding');
+    if (!modal) return;
+    this.modalOnboarding = modal;
+
+    const targetStep = (typeof step === 'number' && step >= 1 && step <= 5) ? step : 1;
+    this.onboardingStep = targetStep;
+    this.onboardingDietary = new Set(Array.isArray(state.dietaryPreferences) ? state.dietaryPreferences : []);
+    this.onboardingServings = Number(state.defaultServings || state.settings?.defaultServings || 2);
+
+    const goals = state.settings?.nutritionGoals || state.nutritionGoals || {
+      enabled: true,
+      calories: 2000,
+      protein: 140,
+      carbs: 200,
+      fat: 65
+    };
+    const enabledToggle = document.getElementById('onboarding-goals-enabled');
+    const calInput = document.getElementById('onboarding-goal-calories');
+    const protInput = document.getElementById('onboarding-goal-protein');
+    const carbsInput = document.getElementById('onboarding-goal-carbs');
+    const fatInput = document.getElementById('onboarding-goal-fat');
+
+    if (enabledToggle) enabledToggle.checked = goals.enabled !== false;
+    if (calInput) calInput.value = goals.calories || 2000;
+    if (protInput) protInput.value = goals.protein || 140;
+    if (carbsInput) carbsInput.value = goals.carbs || 200;
+    if (fatInput) fatInput.value = goals.fat || 65;
+
+    this.renderOnboardingStep();
+    this.openDialogModal(modal);
+  }
+
+  closeOnboardingModal() {
+    const modal = this.modalOnboarding || document.getElementById('modal-onboarding');
+    if (modal) {
+      this.closeDialogModal(modal);
+    }
+  }
+
+  skipOnboarding() {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('fa_onboarding_completed', 'true');
+      } catch (e) {}
+    }
+    this.closeOnboardingModal();
+    this.showToast('Puedes abrir la Guía inicial cuando quieras desde Ajustes.', 'info');
+  }
+
+  nextOnboardingStep() {
+    if (this.onboardingStep < 5) {
+      this.onboardingStep++;
+      this.renderOnboardingStep();
+    } else {
+      this.completeOnboarding();
+    }
+  }
+
+  prevOnboardingStep() {
+    if (this.onboardingStep > 1) {
+      this.onboardingStep--;
+      this.renderOnboardingStep();
+    }
+  }
+
+  toggleOnboardingDietaryTag(tagOrDataset) {
+    const tag = typeof tagOrDataset === 'object' && tagOrDataset !== null ? tagOrDataset.tag : tagOrDataset;
+    if (!tag) return;
+    if (this.onboardingDietary.has(tag)) {
+      this.onboardingDietary.delete(tag);
+    } else {
+      this.onboardingDietary.add(tag);
+    }
+    this.renderOnboardingDietaryChips();
+  }
+
+  renderOnboardingDietaryChips() {
+    const container = document.getElementById('onboarding-dietary-chips');
+    if (!container) return;
+    container.innerHTML = PREDEFINED_DIETARY_TAGS.map(tag => {
+      const isSelected = this.onboardingDietary.has(tag);
+      const emoji = getDietaryTagEmoji(tag);
+      return `
+        <button type="button" class="m3-filter-chip dietary-chip ${isSelected ? 'active' : ''}"
+          data-action="toggleOnboardingDietaryTag" data-tag="${escapeHtml(tag)}"
+          aria-pressed="${isSelected ? 'true' : 'false'}">
+          <span class="dietary-emoji">${emoji}</span>
+          <span>${escapeHtml(tag)}</span>
+        </button>
+      `;
+    }).join('');
+  }
+
+  applyOnboardingGoalPreset(presetOrDataset) {
+    const preset = typeof presetOrDataset === 'object' && presetOrDataset !== null ? presetOrDataset.preset : presetOrDataset;
+    const presets = {
+      deficit: { calories: 1700, protein: 145, carbs: 150, fat: 55 },
+      balanced: { calories: 2000, protein: 140, carbs: 200, fat: 65 },
+      protein: { calories: 2400, protein: 180, carbs: 240, fat: 75 }
+    };
+    const chosen = presets[preset] || presets.balanced;
+
+    const enabledToggle = document.getElementById('onboarding-goals-enabled');
+    const calInput = document.getElementById('onboarding-goal-calories');
+    const protInput = document.getElementById('onboarding-goal-protein');
+    const carbsInput = document.getElementById('onboarding-goal-carbs');
+    const fatInput = document.getElementById('onboarding-goal-fat');
+
+    if (enabledToggle) enabledToggle.checked = true;
+    if (calInput) calInput.value = chosen.calories;
+    if (protInput) protInput.value = chosen.protein;
+    if (carbsInput) carbsInput.value = chosen.carbs;
+    if (fatInput) fatInput.value = chosen.fat;
+
+    document.querySelectorAll('#onboarding-goal-presets .onboarding-preset-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.preset === preset);
+    });
+  }
+
+  selectOnboardingServings(servingsOrDataset) {
+    const rawVal = typeof servingsOrDataset === 'object' && servingsOrDataset !== null ? servingsOrDataset.servings : servingsOrDataset;
+    const num = parseInt(rawVal, 10);
+    if (!isNaN(num) && num > 0) {
+      this.onboardingServings = num;
+    }
+    document.querySelectorAll('#onboarding-servings-grid .onboarding-serving-card').forEach(btn => {
+      const btnVal = parseInt(btn.dataset.servings, 10);
+      btn.classList.toggle('active', btnVal === this.onboardingServings);
+    });
+  }
+
+  openAuthFromOnboarding() {
+    this.openAuthModal();
+  }
+
+  renderOnboardingStep() {
+    const step = this.onboardingStep || 1;
+
+    document.querySelectorAll('#onboarding-step-dots .onboarding-dot').forEach(dot => {
+      const dotStep = parseInt(dot.dataset.step, 10);
+      dot.classList.toggle('active', dotStep === step);
+      dot.classList.toggle('completed', dotStep < step);
+    });
+
+    for (let i = 1; i <= 5; i++) {
+      const panel = document.getElementById(`onboarding-step-${i}`);
+      if (panel) {
+        panel.classList.toggle('active', i === step);
+        panel.classList.toggle('is-hidden', i !== step);
+      }
+    }
+
+    const prevBtn = document.getElementById('btn-onboarding-prev');
+    const nextBtn = document.getElementById('btn-onboarding-next');
+    const finishBtn = document.getElementById('btn-onboarding-finish');
+
+    if (prevBtn) prevBtn.classList.toggle('is-hidden', step === 1);
+    if (nextBtn) nextBtn.classList.toggle('is-hidden', step === 5);
+    if (finishBtn) finishBtn.classList.toggle('is-hidden', step !== 5);
+
+    if (step === 1) {
+      const statusText = document.getElementById('onboarding-account-status-text');
+      const connectBtn = document.getElementById('btn-onboarding-connect-account');
+      if (state.cloudUser?.email) {
+        if (statusText) statusText.textContent = `Conectado como ${state.cloudUser.email}`;
+        if (connectBtn) connectBtn.textContent = 'Cuenta conectada';
+      } else {
+        if (statusText) statusText.textContent = '¿Tienes cuenta o quieres sincronizar entre dispositivos?';
+      }
+    } else if (step === 2) {
+      this.renderOnboardingDietaryChips();
+    } else if (step === 4) {
+      this.selectOnboardingServings(this.onboardingServings);
+    } else if (step === 5) {
+      const summaryBox = document.getElementById('onboarding-summary-box');
+      if (summaryBox) {
+        const dietList = Array.from(this.onboardingDietary);
+        const dietText = dietList.length > 0 ? dietList.join(', ') : 'Omnívoro / Sin restricciones';
+        const goalsEnabled = document.getElementById('onboarding-goals-enabled')?.checked !== false;
+        const cal = parseInt(document.getElementById('onboarding-goal-calories')?.value, 10) || 2000;
+        const prot = parseInt(document.getElementById('onboarding-goal-protein')?.value, 10) || 140;
+        const carbs = parseInt(document.getElementById('onboarding-goal-carbs')?.value, 10) || 200;
+        const fat = parseInt(document.getElementById('onboarding-goal-fat')?.value, 10) || 65;
+        const goalsText = goalsEnabled
+          ? `${cal} kcal · ${prot}g P · ${carbs}g C · ${fat}g G`
+          : 'Seguimiento desactivado';
+
+        summaryBox.innerHTML = `
+          <div class="onboarding-summary-item">
+            <span class="material-symbols-outlined icon-sm icon-primary">eco</span>
+            <div>
+              <div class="onboarding-summary-label">Preferencias dietéticas</div>
+              <div class="onboarding-summary-value">${escapeHtml(dietText)}</div>
+            </div>
+          </div>
+          <div class="onboarding-summary-item">
+            <span class="material-symbols-outlined icon-sm icon-primary">flag</span>
+            <div>
+              <div class="onboarding-summary-label">Objetivos nutricionales diarios</div>
+              <div class="onboarding-summary-value">${escapeHtml(goalsText)}</div>
+            </div>
+          </div>
+          <div class="onboarding-summary-item">
+            <span class="material-symbols-outlined icon-sm icon-primary">group</span>
+            <div>
+              <div class="onboarding-summary-label">Porciones por defecto</div>
+              <div class="onboarding-summary-value">${this.onboardingServings} ${this.onboardingServings === 1 ? 'persona' : 'personas'}</div>
+            </div>
+          </div>
+        `;
+      }
+    }
+  }
+
+  completeOnboarding() {
+    // 1. Preferencias dietéticas
+    state.dietaryPreferences = Array.from(this.onboardingDietary || []);
+    state.save('fa_dietary_prefs', state.dietaryPreferences);
+
+    // 2. Objetivos nutricionales diarios
+    const goalsEnabled = document.getElementById('onboarding-goals-enabled')?.checked !== false;
+    const cal = Math.max(500, parseInt(document.getElementById('onboarding-goal-calories')?.value, 10) || 2000);
+    const prot = Math.max(10, parseInt(document.getElementById('onboarding-goal-protein')?.value, 10) || 140);
+    const carbs = Math.max(10, parseInt(document.getElementById('onboarding-goal-carbs')?.value, 10) || 200);
+    const fat = Math.max(10, parseInt(document.getElementById('onboarding-goal-fat')?.value, 10) || 65);
+
+    const updatedGoals = {
+      enabled: goalsEnabled,
+      calories: cal,
+      protein: prot,
+      carbs: carbs,
+      fat: fat
+    };
+    state.nutritionGoals = updatedGoals;
+    if (!state.settings) state.settings = {};
+    state.settings.nutritionGoals = updatedGoals;
+    state.save('fa_nutrition_goals', updatedGoals);
+
+    // 3. Porciones por defecto
+    const servings = Number(this.onboardingServings) || 2;
+    state.defaultServings = servings;
+    state.settings.defaultServings = servings;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('fa_servings', String(servings));
+        localStorage.setItem('fa_onboarding_completed', 'true');
+      } catch (e) {}
+    }
+
+    this.closeOnboardingModal();
+    this.render();
+    this.scheduleSyncWithCloud();
+    this.showToast('¡Configuración inicial guardada! Disfruta de Sabory.', 'success');
+  }
 }
 
 // ==========================================================================
@@ -13980,6 +14808,7 @@ function bootstrapApp() {
   if (typeof window !== 'undefined' && !window.app) {
     app = new FoodAssistantApp();
     window.app = app;
+    app.checkAndLaunchOnboarding();
   }
 }
 
@@ -13999,6 +14828,11 @@ if (typeof window !== 'undefined') {
   window.getRecipeSearchText = getRecipeSearchText;
   window.matchRecipeSearch = matchRecipeSearch;
   window.matchFridgeIngredient = matchFridgeIngredient;
+  window.singularizeSpanishToken = singularizeSpanishToken;
+  window.getCanonicalIngredientKey = getCanonicalIngredientKey;
+  window.normalizeAndConvertUnit = normalizeAndConvertUnit;
+  window.mergeShoppingQuantities = mergeShoppingQuantities;
+  window.mergeOrAddShoppingItem = mergeOrAddShoppingItem;
   window.categorizeIngredientAisle = categorizeIngredientAisle;
   window.resolveAisleOnline = resolveAisleOnline;
   window.getCachedAisle = getCachedAisle;
@@ -14035,6 +14869,11 @@ if (typeof module !== 'undefined' && module.exports) {
     getRecipeSearchText,
     matchRecipeSearch,
     matchFridgeIngredient,
+    singularizeSpanishToken,
+    getCanonicalIngredientKey,
+    normalizeAndConvertUnit,
+    mergeShoppingQuantities,
+    mergeOrAddShoppingItem,
     categorizeIngredientAisle,
     resolveAisleOnline,
     getCachedAisle,

@@ -221,6 +221,284 @@ function matchFridgeIngredient(ingName, fridgeItem) {
   });
 }
 
+// ==========================================================================
+// SHOPPING LIST NORMALIZATION, UNIT CONVERSION & SMART MERGE (US-33)
+// ==========================================================================
+function singularizeSpanishToken(token) {
+  if (!token || token.length <= 2) return token;
+  if (/^(cuscus|humus|hummus|anis|compas)$/.test(token)) return token;
+  if (token.endsWith('ces') && token.length > 4) {
+    return token.slice(0, -3) + 'z';
+  }
+  if (/^(limon|champinon|macarron|jamon|salmon|atun|mejillon|boqueron|pinon|calabacin|freson|pan|yogur|calamar|coliflor|licor|frijol|chipiron|codorniz|alcuzcuz)es$/.test(token)) {
+    return token.slice(0, -2);
+  }
+  if (token.endsWith('ales') && token.length > 5) {
+    return token.slice(0, -2);
+  }
+  if (token.endsWith('s')) {
+    return token.slice(0, -1);
+  }
+  return token;
+}
+
+function getCanonicalIngredientKey(name) {
+  if (!name) return '';
+  const norm = normalizeIngredientText(name)
+    .replace(/[,;+._\-\/()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!norm) return '';
+  return norm
+    .split(' ')
+    .filter(Boolean)
+    .map(singularizeSpanishToken)
+    .join(' ');
+}
+
+function normalizeAndConvertUnit(amount, unit) {
+  const rawUnit = (unit === null || unit === undefined) ? '' : String(unit).trim();
+  const cleanUnit = normalizeIngredientText(rawUnit).replace(/\.+$/g, '').trim();
+  const hasNumericAmount = amount !== null && amount !== undefined && amount !== '' && !isNaN(Number(amount));
+  const numAmount = hasNumericAmount ? Number(amount) : null;
+
+  let dimension = 'custom';
+  let canonicalUnit = cleanUnit;
+  let factorToBase = 1;
+  let baseUnit = cleanUnit;
+
+  if (!cleanUnit || /^(ud|uds|u|unidad|unidades|pieza|piezas)$/.test(cleanUnit)) {
+    dimension = 'count';
+    canonicalUnit = cleanUnit ? 'ud' : '';
+    baseUnit = 'ud';
+    factorToBase = 1;
+  } else if (/^(mg|miligramo|miligramos)$/.test(cleanUnit)) {
+    dimension = 'mass';
+    canonicalUnit = 'mg';
+    baseUnit = 'g';
+    factorToBase = 0.001;
+  } else if (/^(g|gr|grs|gramo|gramos)$/.test(cleanUnit)) {
+    dimension = 'mass';
+    canonicalUnit = 'g';
+    baseUnit = 'g';
+    factorToBase = 1;
+  } else if (/^(kg|kilo|kilos|kilogramo|kilogramos)$/.test(cleanUnit)) {
+    dimension = 'mass';
+    canonicalUnit = 'kg';
+    baseUnit = 'g';
+    factorToBase = 1000;
+  } else if (/^(ml|mililitro|mililitros|cc)$/.test(cleanUnit)) {
+    dimension = 'volume';
+    canonicalUnit = 'ml';
+    baseUnit = 'ml';
+    factorToBase = 1;
+  } else if (/^(cl|centilitro|centilitros)$/.test(cleanUnit)) {
+    dimension = 'volume';
+    canonicalUnit = 'cl';
+    baseUnit = 'ml';
+    factorToBase = 10;
+  } else if (/^(dl|decilitro|decilitros)$/.test(cleanUnit)) {
+    dimension = 'volume';
+    canonicalUnit = 'dl';
+    baseUnit = 'ml';
+    factorToBase = 100;
+  } else if (/^(l|lt|lts|litro|litros)$/.test(cleanUnit)) {
+    dimension = 'volume';
+    canonicalUnit = 'l';
+    baseUnit = 'ml';
+    factorToBase = 1000;
+  } else if (/^(cda|cdas|cucharada|cucharadas|cucharada sopera|cucharadas soperas)$/.test(cleanUnit)) {
+    canonicalUnit = 'cda';
+  } else if (/^(cdta|cdtas|cucharadita|cucharaditas|cucharadita de postre)$/.test(cleanUnit)) {
+    canonicalUnit = 'cdta';
+  } else if (/^(diente|dientes)$/.test(cleanUnit)) {
+    canonicalUnit = 'diente';
+  } else if (/^(lata|latas)$/.test(cleanUnit)) {
+    canonicalUnit = 'lata';
+  } else if (/^(bote|botes)$/.test(cleanUnit)) {
+    canonicalUnit = 'bote';
+  } else if (/^(paquete|paquetes)$/.test(cleanUnit)) {
+    canonicalUnit = 'paquete';
+  } else if (/^(sobre|sobres)$/.test(cleanUnit)) {
+    canonicalUnit = 'sobre';
+  } else if (/^(rama|ramas)$/.test(cleanUnit)) {
+    canonicalUnit = 'rama';
+  } else if (/^(hoja|hojas)$/.test(cleanUnit)) {
+    canonicalUnit = 'hoja';
+  } else if (/^(loncha|lonchas)$/.test(cleanUnit)) {
+    canonicalUnit = 'loncha';
+  } else if (/^(rebanada|rebanadas)$/.test(cleanUnit)) {
+    canonicalUnit = 'rebanada';
+  } else if (/^(pizca|pizcas)$/.test(cleanUnit)) {
+    canonicalUnit = 'pizca';
+  } else if (/^(taza|tazas)$/.test(cleanUnit)) {
+    canonicalUnit = 'taza';
+  } else if (/^(vaso|vasos)$/.test(cleanUnit)) {
+    canonicalUnit = 'vaso';
+  } else if (/^(placa|placas)$/.test(cleanUnit)) {
+    canonicalUnit = 'placa';
+  } else if (/^(filete|filetes)$/.test(cleanUnit)) {
+    canonicalUnit = 'filete';
+  } else if (/^(manojo|manojos)$/.test(cleanUnit)) {
+    canonicalUnit = 'manojo';
+  }
+
+  if (numAmount === null) {
+    return {
+      amount: null,
+      unit: canonicalUnit || rawUnit,
+      baseAmount: null,
+      baseUnit,
+      dimension,
+      canonicalUnit,
+      rawUnit
+    };
+  }
+
+  const baseAmount = numAmount * factorToBase;
+  let displayAmount = Math.round(numAmount * 100) / 100;
+  let displayUnit = canonicalUnit;
+
+  if (dimension === 'mass') {
+    if (baseAmount >= 1000) {
+      displayAmount = Math.round((baseAmount / 1000) * 100) / 100;
+      displayUnit = 'kg';
+    } else {
+      displayAmount = Math.round(baseAmount * 100) / 100;
+      displayUnit = 'g';
+    }
+  } else if (dimension === 'volume') {
+    if (baseAmount >= 1000) {
+      displayAmount = Math.round((baseAmount / 1000) * 100) / 100;
+      displayUnit = 'l';
+    } else if (canonicalUnit === 'cl' || canonicalUnit === 'dl') {
+      displayAmount = Math.round(baseAmount * 100) / 100;
+      displayUnit = 'ml';
+    } else {
+      displayAmount = Math.round(baseAmount * 100) / 100;
+      displayUnit = 'ml';
+    }
+  }
+
+  return {
+    amount: displayAmount,
+    unit: displayUnit,
+    baseAmount,
+    baseUnit,
+    dimension,
+    canonicalUnit,
+    rawUnit
+  };
+}
+
+function mergeShoppingQuantities(amountA, unitA, amountB, unitB) {
+  const normA = normalizeAndConvertUnit(amountA, unitA);
+  const normB = normalizeAndConvertUnit(amountB, unitB);
+
+  if (normA.baseAmount !== null && normB.baseAmount !== null) {
+    if (normA.dimension === 'mass' && normB.dimension === 'mass') {
+      const totalGrams = normA.baseAmount + normB.baseAmount;
+      if (totalGrams >= 1000) {
+        return { compatible: true, amount: Math.round((totalGrams / 1000) * 100) / 100, unit: 'kg' };
+      }
+      return { compatible: true, amount: Math.round(totalGrams * 100) / 100, unit: 'g' };
+    }
+
+    if (normA.dimension === 'volume' && normB.dimension === 'volume') {
+      const totalMl = normA.baseAmount + normB.baseAmount;
+      if (totalMl >= 1000) {
+        return { compatible: true, amount: Math.round((totalMl / 1000) * 100) / 100, unit: 'l' };
+      }
+      return { compatible: true, amount: Math.round(totalMl * 100) / 100, unit: 'ml' };
+    }
+
+    if (normA.dimension === 'count' && normB.dimension === 'count') {
+      const totalCount = Math.round((normA.baseAmount + normB.baseAmount) * 100) / 100;
+      const resolvedUnit = (normA.canonicalUnit || normB.canonicalUnit) ? 'ud' : '';
+      return { compatible: true, amount: totalCount, unit: resolvedUnit };
+    }
+
+    if (normA.dimension === 'custom' && normB.dimension === 'custom' && normA.canonicalUnit === normB.canonicalUnit) {
+      const totalCustom = Math.round((normA.baseAmount + normB.baseAmount) * 100) / 100;
+      return { compatible: true, amount: totalCustom, unit: normA.canonicalUnit };
+    }
+
+    return { compatible: false };
+  }
+
+  if (normA.baseAmount === null && normB.baseAmount === null) {
+    if (normA.canonicalUnit === normB.canonicalUnit || !normA.canonicalUnit || !normB.canonicalUnit) {
+      return { compatible: true, amount: null, unit: normA.canonicalUnit || normB.canonicalUnit || '' };
+    }
+    return { compatible: false };
+  }
+
+  // Uno tiene cantidad numérica y el otro no tiene cantidad ni unidad incompatible
+  if (normA.baseAmount === null && !normA.canonicalUnit) {
+    return { compatible: true, amount: normB.amount, unit: normB.unit };
+  }
+  if (normB.baseAmount === null && !normB.canonicalUnit) {
+    return { compatible: true, amount: normA.amount, unit: normA.unit };
+  }
+
+  return { compatible: false };
+}
+
+function mergeOrAddShoppingItem(shoppingList, newItem) {
+  if (!Array.isArray(shoppingList) || !newItem || !newItem.name) return null;
+  const targetKey = getCanonicalIngredientKey(newItem.name);
+  if (!targetKey) return null;
+
+  const normNew = normalizeAndConvertUnit(newItem.amount, newItem.unit);
+  const nowIso = new Date().toISOString();
+
+  for (let i = 0; i < shoppingList.length; i++) {
+    const existing = shoppingList[i];
+    if (!existing || existing.isChecked || existing.checked) continue;
+    const existingKey = getCanonicalIngredientKey(existing.name);
+    if (existingKey !== targetKey) continue;
+
+    const mergedQty = mergeShoppingQuantities(existing.amount, existing.unit, newItem.amount, newItem.unit);
+    if (!mergedQty.compatible) continue;
+
+    existing.amount = mergedQty.amount;
+    existing.unit = mergedQty.unit;
+    if ((!existing.aisle || existing.aisle === 'other') && newItem.aisle && newItem.aisle !== 'other') {
+      existing.aisle = newItem.aisle;
+    }
+
+    if (newItem.recipeOrigin) {
+      const incomingOrigins = String(newItem.recipeOrigin).split(',').map(s => s.trim()).filter(Boolean);
+      const currentOrigins = existing.recipeOrigin
+        ? String(existing.recipeOrigin).split(',').map(s => s.trim()).filter(Boolean)
+        : [];
+      incomingOrigins.forEach(orig => {
+        if (!currentOrigins.includes(orig)) {
+          currentOrigins.push(orig);
+        }
+      });
+      existing.recipeOrigin = currentOrigins.join(', ');
+    }
+
+    existing.updatedAt = nowIso;
+    return existing;
+  }
+
+  const isItemChecked = Boolean(newItem.isChecked || newItem.checked);
+  const created = {
+    id: newItem.id || generateId('shop-'),
+    name: String(newItem.name).trim(),
+    amount: normNew.amount,
+    unit: normNew.unit,
+    aisle: newItem.aisle || categorizeIngredientAisle(newItem.name),
+    isChecked: isItemChecked,
+    recipeOrigin: newItem.recipeOrigin ? String(newItem.recipeOrigin).trim() : '',
+    updatedAt: newItem.updatedAt || nowIso
+  };
+  shoppingList.push(created);
+  return created;
+}
+
 function categorizeIngredientAisle(ingredientName) {
   const text = normalizeIngredientText(ingredientName);
   if (!text) return 'other';
@@ -845,6 +1123,11 @@ export {
   getRecipeSearchText,
   matchRecipeSearch,
   matchFridgeIngredient,
+  singularizeSpanishToken,
+  getCanonicalIngredientKey,
+  normalizeAndConvertUnit,
+  mergeShoppingQuantities,
+  mergeOrAddShoppingItem,
   resolveAisleOnline,
   getCachedAisle,
   setCachedAisle,
