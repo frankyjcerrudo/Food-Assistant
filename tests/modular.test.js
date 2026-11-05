@@ -20,8 +20,14 @@ import {
   RecipeParser
 } from '../src/index.js';
 
-// Also test direct ES Module import from app.js
-import { FoodAssistantApp } from '../app.js';
+import fs from 'fs';
+import path from 'path';
+
+// Evaluate app.js for full DOM/Event integration tests
+const appPath = path.resolve(process.cwd(), 'app.js');
+const appCode = fs.readFileSync(appPath, 'utf-8');
+new Function(appCode)();
+const { FoodAssistantApp } = window;
 
 describe('Fase 3: Arquitectura Modular, Delegación de Eventos y Tests (US-42, US-43, US-50)', () => {
   describe('US-42: Importación Nativa de Módulos ES (src/)', () => {

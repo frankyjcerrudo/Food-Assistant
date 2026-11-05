@@ -1396,8 +1396,137 @@ function generateId(prefix = '') {
 }
 
 // Application State Store (Local First + Cloud Sync)
+
+// ==========================================================================
+// US-46: ALMACENAMIENTO ASÍNCRONO INDEXEDDB CON MIGRACIÓN Y FALLBACK
+// ==========================================================================
+
+const FA_IDB_NAME = 'food_assistant_db';
+const FA_IDB_VERSION = 1;
+const FA_IDB_STORE = 'keyval';
+
+class IndexedDbStorage {
+  constructor() {
+    this.dbPromise = null;
+    this.isSupported = typeof window !== 'undefined' && 'indexedDB' in window;
+  }
+
+  getDb() {
+    if (!this.isSupported) return Promise.resolve(null);
+    if (!this.dbPromise) {
+      this.dbPromise = new Promise((resolve) => {
+        try {
+          const req = window.indexedDB.open(FA_IDB_NAME, FA_IDB_VERSION);
+          req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(FA_IDB_STORE)) {
+              db.createObjectStore(FA_IDB_STORE);
+            }
+          };
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => {
+            console.warn('[Storage] IndexedDB no disponible, usando fallback localStorage.');
+            resolve(null);
+          };
+        } catch {
+          resolve(null);
+        }
+      });
+    }
+    return this.dbPromise;
+  }
+
+  async get(key) {
+    const db = await this.getDb();
+    if (!db) {
+      try {
+        const item = localStorage.getItem(key);
+        return item ? JSON.parse(item) : null;
+      } catch { return null; }
+    }
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(FA_IDB_STORE, 'readonly');
+        const store = tx.objectStore(FA_IDB_STORE);
+        const req = store.get(key);
+        req.onsuccess = () => resolve(req.result !== undefined ? req.result : null);
+        req.onerror = () => resolve(null);
+      } catch {
+        resolve(null);
+      }
+    });
+  }
+
+  async set(key, value) {
+    const db = await this.getDb();
+    if (db) {
+      new Promise((resolve) => {
+        try {
+          const tx = db.transaction(FA_IDB_STORE, 'readwrite');
+          const store = tx.objectStore(FA_IDB_STORE);
+          store.put(value, key);
+          tx.oncomplete = () => resolve(true);
+          tx.onerror = () => resolve(false);
+        } catch {
+          resolve(false);
+        }
+      });
+    }
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+      // Ignorar QuotaExceededError en localStorage
+    }
+  }
+
+  async delete(key) {
+    const db = await this.getDb();
+    if (db) {
+      try {
+        const tx = db.transaction(FA_IDB_STORE, 'readwrite');
+        tx.objectStore(FA_IDB_STORE).delete(key);
+      } catch {}
+    }
+    try { localStorage.removeItem(key); } catch {}
+  }
+
+  async migrateFromLocalStorage() {
+    const alreadyMigrated = await this.get('fa_idb_migrated');
+    if (alreadyMigrated) return true;
+
+    try {
+      const keysToMigrate = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('fa_')) {
+          keysToMigrate.push(k);
+        }
+      }
+      for (const k of keysToMigrate) {
+        try {
+          const raw = localStorage.getItem(k);
+          if (raw !== null) {
+            const val = JSON.parse(raw);
+            await this.set(k, val);
+          }
+        } catch {}
+      }
+      await this.set('fa_idb_migrated', new Date().toISOString());
+      console.log(`[Storage] Migración exitosa de ${keysToMigrate.length} claves fa_* a IndexedDB.`);
+      return true;
+    } catch (err) {
+      console.warn('[Storage] Error durante la migración a IndexedDB:', err);
+      return false;
+    }
+  }
+}
+
 class StateStore {
   constructor() {
+    this.idb = new IndexedDbStorage();
+    if (typeof window !== 'undefined') {
+      setTimeout(() => this.idb.migrateFromLocalStorage(), 50);
+    }
     // Registro de borrados para propagación a Supabase (BUG-23)
     this.deletedRecords = this.load('fa_deleted_records', {
       recipes: [],
@@ -1648,6 +1777,7 @@ const state = new StateStore();
 // US-16: GESTIÓN FLEXIBLE DE IMÁGENES Y AVATARES GRÁFICOS ELEGANTES
 // ==========================================================================
 
+
 function isSafeUrl(url) {
   if (!url || typeof url !== 'string') return false;
   const trimmed = url.trim();
@@ -1700,7 +1830,7 @@ function cleanRecipeImageUrl(url) {
     parsed.hash = '';
     return parsed.toString();
   } catch (e) {
-    return '';
+    return cleaned;
   }
 }
 
@@ -2721,7 +2851,7 @@ const RecipeParser = {
       id: generateId('rec-'),
       title: schema.name ? String(schema.name).trim() : 'Receta Web',
       description: schema.description ? String(schema.description).trim() : '',
-      imageUrl: cleanRecipeImageUrl(imageUrl),
+      imageUrl: imageUrl,
       prepTimeMinutes: prepMinutes,
       cookTimeMinutes: cookMinutes,
       servings: parsedServings,
@@ -2733,7 +2863,7 @@ const RecipeParser = {
       tags: tags.slice(0, 4),
       ingredients: ingredients,
       instructions: instructions,
-      sourceUrl: sanitizeUrl(resolvedSourceUrl),
+      sourceUrl: resolvedSourceUrl,
       sourceDomain: resolvedDomain
     };
     this.detectRobotFeatures(recipe);
@@ -3074,7 +3204,7 @@ const RecipeParser = {
       id: generateId('rec-'),
       title: title || 'Receta de Notas',
       description: 'Receta importada desde texto estructurado.',
-      imageUrl: cleanRecipeImageUrl(candidateImage || ''),
+      imageUrl: candidateImage || '',
       prepTimeMinutes: prepTimeMinutes,
       cookTimeMinutes: cookTimeMinutes,
       servings: servings,
@@ -3082,7 +3212,7 @@ const RecipeParser = {
       tags: [],
       ingredients: ingredients,
       instructions: instructions,
-      sourceUrl: sanitizeUrl(sourceUrl || ''),
+      sourceUrl: sourceUrl || '',
       sourceDomain: resolvedDomain
     };
     this.detectRobotFeatures(recipe);
@@ -3100,7 +3230,6 @@ const RecipeParser = {
         throw new Error('El archivo no contiene un formato JSON válido.');
       }
     }
-
     if (!data || typeof data !== 'object') {
       throw new Error('Estructura de copia de seguridad no válida (se esperaba un objeto o lista JSON).');
     }
@@ -3193,6 +3322,8 @@ const RecipeParser = {
       if (cand['@type'] === 'Recipe' || cand.recipeIngredient) {
         const parsedSchema = this.parseSchemaRecipe(cand, cand.url || cand['@id'] || '');
         if (parsedSchema) {
+          parsedSchema.imageUrl = isSafeUrl(parsedSchema.imageUrl) ? parsedSchema.imageUrl : '';
+          parsedSchema.sourceUrl = isSafeUrl(parsedSchema.sourceUrl) ? parsedSchema.sourceUrl : '';
           if (cand._collection && !parsedSchema.tags.includes(cand._collection)) {
             parsedSchema.tags.push(cand._collection);
           }
@@ -3221,7 +3352,6 @@ const RecipeParser = {
       } else if (Array.isArray(cand.images) && cand.images.length > 0) {
         imageUrl = typeof cand.images[0] === 'string' ? cand.images[0] : (cand.images[0]?.url || '');
       }
-      imageUrl = cleanRecipeImageUrl(imageUrl);
 
       // Servings
       let servings = 2;
@@ -3247,9 +3377,8 @@ const RecipeParser = {
       const prepTimeMinutes = parseAnyDuration(cand.prepTimeMinutes || cand.prep_time || cand.prepTime) || 15;
       const cookTimeMinutes = parseAnyDuration(cand.cookTimeMinutes || cand.cook_time || cand.cookTime) || 20;
 
-      // Source URL & Domain preservation (bloquea protocolos javascript:)
-      let rawSource = cand.sourceUrl || cand.source_url || cand.source?.url || cand.url || '';
-      let sourceUrl = sanitizeUrl(rawSource);
+      // Source URL & Domain preservation
+      let sourceUrl = cand.sourceUrl || cand.source_url || cand.source?.url || cand.url || '';
       let sourceDomain = cand.sourceDomain || cand.source_domain || '';
       if (sourceUrl && !sourceDomain) {
         sourceDomain = this.getDomain(sourceUrl) || cand.source?.name || '';
@@ -3404,7 +3533,7 @@ const RecipeParser = {
         id: cand.id || generateId('rec-'),
         title: title,
         description: description,
-        imageUrl: imageUrl,
+        imageUrl: isSafeUrl(imageUrl) ? imageUrl : '',
         prepTimeMinutes: prepTimeMinutes,
         cookTimeMinutes: cookTimeMinutes,
         servings: servings,
@@ -3412,7 +3541,7 @@ const RecipeParser = {
         tags: tags,
         ingredients: ingredients,
         instructions: instructions,
-        sourceUrl: sourceUrl,
+        sourceUrl: isSafeUrl(sourceUrl) ? sourceUrl : '',
         sourceDomain: sourceDomain,
         createdAt: cand.createdAt || new Date().toISOString(),
         updatedAt: cand.updatedAt || new Date().toISOString()
@@ -3563,8 +3692,6 @@ if (typeof window !== 'undefined') {
   window.formatWeekRange = formatWeekRange;
   window.DAYS_OF_WEEK_ES = DAYS_OF_WEEK_ES;
   window.escapeHtml = escapeHtml;
-  window.isSafeUrl = isSafeUrl;
-  window.sanitizeUrl = sanitizeUrl;
   window.normalizeIngredientText = normalizeIngredientText;
   window.categorizeIngredientAisle = categorizeIngredientAisle;
   window.getIngredientIcon = getIngredientIcon;
@@ -4204,12 +4331,15 @@ class FoodAssistantApp {
       }
       if (pillIcon) pillIcon.textContent = 'cloud_done';
       const firstName = user.name ? user.name.trim().split(' ')[0] : user.email.split('@')[0];
-      if (pillText) pillText.textContent = firstName;
+      const isDemoSession = user.isDemo || !this.supabaseClient;
+      if (pillText) pillText.textContent = isDemoSession ? `${firstName} (Demo)` : firstName;
 
-      if (settingsIcon) settingsIcon.textContent = 'cloud_done';
+      if (settingsIcon) settingsIcon.textContent = isDemoSession ? 'account_circle' : 'cloud_done';
       if (settingsName) settingsName.textContent = user.name || user.email.split('@')[0];
       if (settingsStatus) {
-        settingsStatus.textContent = user.email;
+        settingsStatus.textContent = !this.supabaseClient 
+          ? 'Perfil local (Demo) - Supabase no configurado'
+          : `Sincronizado con Supabase (${user.provider || 'email'})`;
       }
       if (settingsAuthBtn) settingsAuthBtn.textContent = 'Ver Cuenta';
       if (syncNowBtn) syncNowBtn.style.display = 'inline-flex';
@@ -4363,31 +4493,7 @@ class FoodAssistantApp {
         this.showToast("Error al conectar con Google OAuth: " + err.message, 'error');
       }
     } else {
-      // Local/Simulated Google OAuth sign-in flow using native Material 3 dialog
-      const typedEmail = document.getElementById('auth-email')?.value.trim();
-      const demoEmail = typedEmail || await this.showPromptDialog({
-        title: 'Acceso con Google',
-        message: 'Introduce tu correo de Google para continuar en modo local:',
-        defaultValue: 'usuario@gmail.com',
-        placeholder: 'usuario@gmail.com',
-        confirmText: 'Continuar',
-        cancelText: 'Cancelar',
-        icon: 'account_circle'
-      });
-      if (!demoEmail) return;
-
-      const userName = demoEmail.split('@')[0];
-      state.cloudUser = {
-        email: demoEmail,
-        name: userName.charAt(0).toUpperCase() + userName.slice(1),
-        id: generateId('usr_g_'),
-        provider: 'google'
-      };
-      state.save('fa_cloud_user', state.cloudUser);
-      this.updateUserAccountUI();
-      this.closeAuthModal();
-      this.syncDataWithCloud(true);
-      this.showToast(`¡Sesión iniciada con Google (${state.cloudUser.email})!`, 'success');
+      this.showToast("La autenticación con Google requiere configurar Supabase en config.js", 'info');
     }
   }
 
@@ -5187,7 +5293,125 @@ class FoodAssistantApp {
   // ==========================================================================
   // EVENT LISTENERS & NAVIGATION
   // ==========================================================================
+  
+  // ==========================================================================
+  // US-43: DELEGACIÓN CENTRALIZADA DE EVENTOS (data-action)
+  // ==========================================================================
+  initEventDelegation() {
+    if (this._eventDelegationInitialized) return;
+    this._eventDelegationInitialized = true;
+
+    document.addEventListener('click', (e) => {
+      const target = e.target.closest('[data-action]');
+      if (!target) return;
+
+      const action = target.dataset.action;
+      if (!action) return;
+
+      switch (action) {
+        case 'openRecipeDetail':
+          if (target.dataset.recipeId) {
+            this.openRecipeDetail(target.dataset.recipeId);
+          }
+          break;
+        case 'navigateWeek': {
+          const dir = parseInt(target.dataset.dir || target.dataset.delta || '0', 10);
+          if (dir !== 0) this.navigateWeek(dir);
+          break;
+        }
+        case 'copyShoppingList':
+          this.copyShoppingList();
+          break;
+        case 'adjustServings': {
+          const delta = parseInt(target.dataset.delta || '0', 10);
+          if (delta !== 0) this.adjustServings(delta);
+          break;
+        }
+        case 'openPickerModal':
+          this.openPickerModal(target.dataset.date, target.dataset.slot);
+          break;
+        case 'closePlanRecipeModal':
+          this.closePlanRecipeModal();
+          break;
+        case 'confirmPlanRecipe':
+          this.confirmPlanRecipe();
+          break;
+        case 'openPlanRecipeModal':
+          this.openPlanRecipeModal(target.dataset.recipeId);
+          break;
+        case 'openCopyWeekModal':
+          this.openCopyWeekModal();
+          break;
+        case 'closeCopyWeekModal':
+          this.closeCopyWeekModal();
+          break;
+        case 'confirmCopyWeekPlan':
+          this.confirmCopyWeekPlan();
+          break;
+        case 'setCopyWeekMode':
+          this.setCopyWeekMode(target.dataset.mode);
+          break;
+        case 'openAddCustomSlotModal':
+          this.openAddCustomSlotModal(target.dataset.date);
+          break;
+        case 'closeAddCustomSlotModal':
+          this.closeAddCustomSlotModal();
+          break;
+        case 'confirmAddCustomSlot':
+          this.confirmAddCustomSlot();
+          break;
+        case 'selectCustomSlotPreset':
+          this.selectCustomSlotPreset(target.dataset.name, target.dataset.icon);
+          break;
+        case 'closeShoppingPreviewModal':
+          this.closeShoppingPreviewModal();
+          break;
+        case 'confirmShoppingPreviewAdd':
+          this.confirmShoppingPreviewAdd();
+          break;
+        case 'toggleAllShoppingPreview':
+          this.toggleAllShoppingPreview(target.checked);
+          break;
+        case 'stepShoppingPreviewServings': {
+          const d = parseInt(target.dataset.delta || '0', 10);
+          if (d !== 0) this.stepShoppingPreviewServings(d);
+          break;
+        }
+        case 'openNutritionGoalsModal':
+          this.openNutritionGoalsModal();
+          break;
+        case 'closeNutritionGoalsModal':
+          this.closeNutritionGoalsModal();
+          break;
+        case 'saveNutritionGoalsFromModal':
+          this.saveNutritionGoalsFromModal();
+          break;
+        case 'recalculateEditorNutrition':
+          this.recalculateEditorNutrition();
+          break;
+        case 'clearCompletedGroceries':
+          this.clearCompletedGroceries();
+          break;
+        case 'confirmSaveImportRecipe':
+          this.confirmSaveImportRecipe();
+          break;
+        case 'editImportReview':
+          this.editImportReview();
+          break;
+        case 'cancelImportReview':
+          this.cancelImportReview();
+          break;
+        default:
+          if (typeof this[action] === 'function') {
+            this[action](target.dataset);
+          }
+          break;
+      }
+    });
+  }
+
   initEvents() {
+    this.initEventDelegation();
     // Navigation
     this.navItems.forEach(item => {
       item.addEventListener('click', () => {
@@ -6036,7 +6260,7 @@ class FoodAssistantApp {
                 </div>
               `}
               <div style="flex: 1; min-width: 0; overflow: hidden;">
-                <div class="slot-recipe-name" title="${escapeHtml(recipe.title)}">${escapeHtml(recipe.title)}</div>
+                <div class="slot-recipe-name" title="${recipe.title}">${recipe.title}</div>
                 ${warningBadgeHtml}
                 <div style="font-size: 11px; color: var(--m3-on-surface-variant); margin-top: 3px; display: flex; align-items: center; gap: 8px;">
                   <span style="display: inline-flex; align-items: center; gap: 3px;">
@@ -6105,9 +6329,9 @@ class FoodAssistantApp {
       : null;
 
     return `
-      <article class="recipe-card" onclick="app.openRecipeDetail('${rec.id}')">
+      <article class="recipe-card" onclick="app.openRecipeDetail('${rec.id}')" data-action="openRecipeDetail" data-recipe-id="${rec.id}">
         <div class="recipe-image-wrap">
-          ${rec.imageUrl ? `
+          ${isSafeUrl(rec.imageUrl) ? `
             <img class="recipe-img" src="${sanitizeUrl(rec.imageUrl)}" alt="${escapeHtml(rec.title)}" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML=app.getRecipePlaceholderHtml('${rec.id}', 'card');">
           ` : `
             ${this.getRecipePlaceholderHtml(rec, 'card')}
@@ -6150,8 +6374,8 @@ class FoodAssistantApp {
 
           <div class="recipe-tags">
             ${rec.sourceDomain ? `
-              <span class="tag-chip" style="background: var(--m3-surface-container-high); color: var(--m3-primary); font-weight: 500; display: inline-flex; align-items: center; gap: 3px;" title="Fuente: ${escapeHtml(rec.sourceDomain)}">
-                <span class="material-symbols-outlined" style="font-size: 13px;">link</span> ${escapeHtml(rec.sourceDomain)}
+              <span class="tag-chip" style="background: var(--m3-surface-container-high); color: var(--m3-primary); font-weight: 500; display: inline-flex; align-items: center; gap: 3px;" title="Fuente: ${rec.sourceDomain}">
+                <span class="material-symbols-outlined" style="font-size: 13px;">link</span> ${rec.sourceDomain}
               </span>
             ` : ''}
             ${(rec.tags || []).map(t => {
@@ -6655,7 +6879,7 @@ class FoodAssistantApp {
     body.innerHTML = `
       ${r.imageUrl ? `
       <div style="position: relative; height: 220px; background: var(--m3-surface-container); overflow: hidden;">
-        <img src="${sanitizeUrl(r.imageUrl)}" alt="${escapeHtml(r.title)}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.onerror=null; this.parentElement.innerHTML=app.getRecipePlaceholderHtml('${r.id}', 'detail');">
+        <img src="${r.imageUrl}" alt="${r.title}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.onerror=null; this.parentElement.innerHTML=app.getRecipePlaceholderHtml('${r.id}', 'detail');">
       </div>
       ` : `
       <div style="position: relative; height: 180px; overflow: hidden;">
@@ -6678,7 +6902,7 @@ class FoodAssistantApp {
         ` : ''}
 
         <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center;">
-          ${r.sourceUrl ? `
+          ${isSafeUrl(r.sourceUrl) ? `
             <a href="${sanitizeUrl(r.sourceUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="tag-chip" style="background: var(--m3-secondary-container); color: var(--m3-on-secondary-container); font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: var(--radius-full);" title="Abrir enlace original en nueva pestaña">
               <span class="material-symbols-outlined" style="font-size: 14px;">open_in_new</span>
               Fuente: ${escapeHtml(r.sourceDomain || 'Web Original')}
@@ -6761,7 +6985,7 @@ class FoodAssistantApp {
               return `
                 <li style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--m3-surface-container-low); border: 1px solid var(--m3-outline-variant); border-radius: var(--radius-sm); font-size: 13px;">
                   <span>${escapeHtml(ing.name)}</span>
-                  <strong style="color: var(--m3-primary);">${adjustedAmount !== null ? `${adjustedAmount} ${escapeHtml(ing.unit || '')}` : ''}</strong>
+                  <strong style="color: var(--m3-primary);">${adjustedAmount !== null ? `${adjustedAmount} ${ing.unit || ''}` : ''}</strong>
                 </li>
               `;
             }).join('')}
@@ -7995,7 +8219,7 @@ class FoodAssistantApp {
               </div>
             `}
             <div style="flex: 1; min-width: 0; overflow: hidden;">
-              <div class="slot-recipe-name" title="${escapeHtml(recipe.title)}">${escapeHtml(recipe.title)}</div>
+              <div class="slot-recipe-name" title="${recipe.title}">${recipe.title}</div>
               ${warningHtml}
             </div>
           </div>
@@ -8052,7 +8276,7 @@ class FoodAssistantApp {
               </div>
             `}
             <div style="flex: 1; min-width: 0; overflow: hidden;">
-              <div class="slot-recipe-name" title="${escapeHtml(recipe.title)}">${escapeHtml(recipe.title)}</div>
+              <div class="slot-recipe-name" title="${recipe.title}">${recipe.title}</div>
               ${warningHtml}
             </div>
           </div>
@@ -8702,14 +8926,14 @@ class FoodAssistantApp {
              onclick="app.selectRecipeForSlot('${r.id}')">
           <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; padding-right: 8px;">
             ${r.imageUrl ? `
-              <img src="${sanitizeUrl(r.imageUrl)}" alt="" style="width: 42px; height: 42px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.onerror=null; this.src=app.getRecipePlaceholderSvg('${(typeof escapeHtml === 'function' ? escapeHtml(r.title) : r.title).replace(/'/g, "\\'")}', 'thumb');">
+              <img src="${r.imageUrl}" alt="" style="width: 42px; height: 42px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.onerror=null; this.src=app.getRecipePlaceholderSvg('${(typeof escapeHtml === 'function' ? escapeHtml(r.title) : r.title).replace(/'/g, "\\'")}', 'thumb');">
             ` : `
               <div style="width: 42px; height: 42px; border-radius: 6px; overflow: hidden; flex-shrink: 0;">
                 <img src="${this.getRecipePlaceholderSvg(r.title, 'thumb')}" alt="" style="width: 100%; height: 100%; object-fit: cover;">
               </div>
             `}
             <div style="min-width: 0;">
-              <strong style="font-size: 13px; color: var(--m3-on-surface); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(r.title)}</strong>
+              <strong style="font-size: 13px; color: var(--m3-on-surface); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${r.title}</strong>
               <div style="font-size: 11px; color: var(--m3-on-surface-variant); display: flex; align-items: center; gap: 6px; margin-top: 2px;">
                 <span class="material-symbols-outlined icon-sm">schedule</span> ${r.prepTimeMinutes + r.cookTimeMinutes} min
               </div>
@@ -9064,16 +9288,16 @@ class FoodAssistantApp {
               <div class="grocery-item-row ${item.isChecked ? 'checked' : ''}">
                 <div class="grocery-left" onclick="app.toggleGroceryCheck(${item.originalIndex})">
                   <input type="checkbox" class="grocery-checkbox" ${item.isChecked ? 'checked' : ''} onclick="event.stopPropagation(); app.toggleGroceryCheck(${item.originalIndex})">
-                  <div class="grocery-item-icon-badge" title="${escapeHtml(item.name)}">
+                  <div class="grocery-item-icon-badge" title="${item.name}">
                     <span class="material-symbols-outlined icon-sm">${getIngredientIcon(item.name, item.aisle)}</span>
                   </div>
                   <div style="flex: 1; min-width: 0; overflow: hidden;">
-                    <div class="grocery-name">${escapeHtml(item.name)}</div>
-                    ${item.recipeOrigin ? `<div style="font-size: 11px; color: var(--m3-on-surface-variant); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Para: ${escapeHtml(item.recipeOrigin)}</div>` : ''}
+                    <div class="grocery-name">${item.name}</div>
+                    ${item.recipeOrigin ? `<div style="font-size: 11px; color: var(--m3-on-surface-variant); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Para: ${item.recipeOrigin}</div>` : ''}
                   </div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-                  ${item.amount ? `<span class="grocery-amount">${escapeHtml(item.amount)} ${escapeHtml(item.unit || '')}</span>` : ''}
+                  ${item.amount ? `<span class="grocery-amount">${item.amount} ${item.unit || ''}</span>` : ''}
                   <button class="btn-ghost btn-sm" onclick="app.deleteGroceryItem(${item.originalIndex})" title="Eliminar">
                     <span class="material-symbols-outlined icon-sm">close</span>
                   </button>
@@ -11389,5 +11613,2279 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
           if (chatInput) {
             chatInput.value = recognizedText;
           }
-          const invokeInput = document.getElementById('gemini-invoke-inp
-... [truncated for diff preview]
+          const invokeInput = document.getElementById('gemini-invoke-input');
+          if (invokeInput) {
+            invokeInput.value = recognizedText;
+          }
+          const invokeTranscription = document.getElementById('gemini-invoke-transcription');
+          if (invokeTranscription && recognizedText) {
+            invokeTranscription.textContent = `"${recognizedText}"`;
+          }
+        };
+
+        this.recognition.onerror = (event) => {
+          console.warn("[Voice] Error en reconocimiento de voz:", event.error);
+          this.isListeningVoice = false;
+          this.updateVoiceUI(false);
+          if (event.error === 'not-allowed') {
+            this.showToast("Permiso de micrófono no concedido en el navegador.", "warning");
+          }
+        };
+
+        this.recognition.onend = () => {
+          this.isListeningVoice = false;
+          this.updateVoiceUI(false);
+          const invokeModal = document.getElementById('modal-gemini-invoke');
+          if (invokeModal && (invokeModal.classList.contains('active') || invokeModal.open)) {
+            const invokeInput = document.getElementById('gemini-invoke-input');
+            const text = invokeInput?.value?.trim();
+            if (text) {
+              this.handleGeminiInvokeSubmit(true);
+            }
+          } else {
+            const chatInput = document.getElementById('ai-chat-input');
+            const text = chatInput?.value?.trim();
+            if (text) {
+              this.handleAiChatSubmit(true);
+            }
+          }
+        };
+      } catch (e) {
+        console.warn("Could not init SpeechRecognition:", e);
+      }
+    }
+  }
+
+  toggleVoiceRecognition(isInvokeModal = false) {
+    if (!this.speechRecognitionSupported) {
+      this.showToast("Tu navegador no soporta reconocimiento de voz nativo.", "info");
+      return;
+    }
+    if (this.isListeningVoice) {
+      try { this.recognition.stop(); } catch (e) {}
+      this.isListeningVoice = false;
+      this.updateVoiceUI(false);
+    } else {
+      if (!isInvokeModal) {
+        this.switchView('view-ai');
+        const chatInput = document.getElementById('ai-chat-input');
+        if (chatInput) chatInput.value = '';
+      } else {
+        const invokeInput = document.getElementById('gemini-invoke-input');
+        if (invokeInput) invokeInput.value = '';
+        const invokeTranscription = document.getElementById('gemini-invoke-transcription');
+        if (invokeTranscription) invokeTranscription.textContent = 'Escuchando a Franky...';
+      }
+      try {
+        this.recognition.start();
+      } catch (e) {
+        console.warn("Recognition start error:", e);
+      }
+    }
+  }
+
+  updateVoiceUI(isListening) {
+    const micBtn = document.getElementById('btn-mic-ai-chat');
+    const headerVoiceBtn = document.getElementById('btn-header-voice');
+    const badge = document.getElementById('voice-listening-indicator');
+    const centralGeminiBtn = document.getElementById('btn-central-gemini-invoke');
+    const invokeMicBtn = document.getElementById('btn-gemini-invoke-mic');
+    const invokePulse = document.getElementById('gemini-invoke-pulse');
+
+    if (micBtn) {
+      micBtn.classList.toggle('listening', isListening);
+      micBtn.innerHTML = isListening
+        ? '<span class="material-symbols-outlined icon-sm" style="animation: pulse 1s infinite; color: var(--m3-error, #ba1a1a);">mic</span>'
+        : '<span class="material-symbols-outlined icon-sm">mic</span>';
+      micBtn.title = isListening ? 'Escuchando... pulsa para parar' : 'Hablar por micrófono';
+    }
+    if (headerVoiceBtn) {
+      headerVoiceBtn.classList.toggle('listening', isListening);
+      const icon = headerVoiceBtn.querySelector('.material-symbols-outlined');
+      if (icon) {
+        icon.style.color = isListening ? 'var(--m3-error, #ba1a1a)' : '';
+        icon.style.animation = isListening ? 'pulse 1s infinite' : '';
+      }
+    }
+    if (centralGeminiBtn) {
+      centralGeminiBtn.classList.toggle('listening', isListening);
+    }
+    if (invokeMicBtn) {
+      invokeMicBtn.classList.toggle('listening', isListening);
+    }
+    if (invokePulse) {
+      invokePulse.style.display = isListening ? 'flex' : 'none';
+    }
+    if (badge) {
+      badge.style.display = isListening ? 'flex' : 'none';
+    }
+  }
+
+  openGeminiInvokeModal(startVoice = false) {
+    this.stopSpeech();
+    const modal = document.getElementById('modal-gemini-invoke');
+    if (!modal) return;
+    this.openDialogModal(modal);
+
+    const input = document.getElementById('gemini-invoke-input');
+    const resultBox = document.getElementById('gemini-invoke-result');
+    const transcription = document.getElementById('gemini-invoke-transcription');
+    if (input) input.value = '';
+    if (resultBox) {
+      resultBox.style.display = 'none';
+      const actions = document.getElementById('gemini-invoke-result-actions');
+      if (actions) actions.innerHTML = '';
+    }
+    if (transcription) {
+      transcription.innerHTML = '<em>Pulsa el micro o escribe tu petición</em>';
+    }
+
+    if (startVoice && this.speechRecognitionSupported) {
+      this.toggleVoiceRecognition(true);
+    } else if (input) {
+      setTimeout(() => input.focus(), 150);
+    }
+  }
+
+  closeGeminiInvokeModal() {
+    this.stopSpeech();
+    const modal = document.getElementById('modal-gemini-invoke');
+    if (this.isListeningVoice) {
+      try { this.recognition.stop(); } catch (e) {}
+      this.isListeningVoice = false;
+      this.updateVoiceUI(false);
+    }
+    // Franky: limpiar memoria conversacional al cerrar la ventana para comenzar limpio en la siguiente apertura
+    this.aiChatHistory = [];
+    const threadBox = document.getElementById('gemini-invoke-thread');
+    if (threadBox) {
+      threadBox.style.display = 'none';
+      threadBox.innerHTML = '';
+    }
+    const newChatBtn = document.getElementById('btn-gemini-invoke-new-chat');
+    if (newChatBtn) newChatBtn.style.display = 'none';
+    if (modal) this.closeDialogModal(modal);
+  }
+
+  async handleGeminiInvokeSubmit(isVoice = false) {
+    this.stopSpeech();
+    const input = document.getElementById('gemini-invoke-input');
+    const prompt = input?.value?.trim();
+    if (!prompt) return;
+    if (input) input.value = '';
+
+    if (this.isListeningVoice) {
+      try { this.recognition.stop(); } catch (e) {}
+      this.isListeningVoice = false;
+      this.updateVoiceUI(false);
+    }
+
+    const transcription = document.getElementById('gemini-invoke-transcription');
+    const resultBox = document.getElementById('gemini-invoke-result');
+    const resultText = document.getElementById('gemini-invoke-result-text');
+    const resultActions = document.getElementById('gemini-invoke-result-actions');
+    const sendBtn = document.getElementById('btn-gemini-invoke-send');
+
+    const isFullCatalog = (state.recipes && state.recipes.length > 120 && this.detectPromptCriteria(prompt).length === 0);
+    const noticeHtml = isFullCatalog
+      ? `<div style="font-size:11px; margin-top:4px; opacity:0.85; color:var(--m3-on-surface-variant);">Analizando tu recetario completo (${state.recipes.length} recetas)... Esto puede tardar unos segundos.</div>`
+      : '';
+    if (transcription) {
+      transcription.innerHTML = `<span style="display:inline-flex; align-items:center; gap:6px; color:var(--m3-primary); font-weight:500;">
+        <span class="material-symbols-outlined icon-sm" style="animation: spin 1s linear infinite;">sync</span>
+        El Asistente está pensando...
+      </span>${noticeHtml}`;
+    }
+    if (sendBtn) sendBtn.disabled = true;
+
+    try {
+      const systemPrompt = this.buildAiSystemInstruction(prompt);
+      const response = await this.callGeminiAgent(prompt, systemPrompt, true);
+      let executedToolsCount = 0;
+      let primaryActionTarget = null; // 'view-shopping' | 'view-planner' | 'view-recipes'
+      const createdRecipes = [];
+
+      if (Array.isArray(response.toolCalls) && response.toolCalls.length > 0) {
+        response.toolCalls.forEach(call => {
+          const res = this.executeAiToolCall(call);
+          if (res) {
+            executedToolsCount++;
+            if (call.name === 'manage_shopping_list' || call.name === 'add_shopping_items') primaryActionTarget = 'view-shopping';
+            else if (call.name === 'set_weekly_plan' || call.name === 'set_day_plan') primaryActionTarget = 'view-planner';
+            else if (call.name === 'create_and_save_recipe') {
+              primaryActionTarget = 'view-recipes';
+              if (res.recipeId) createdRecipes.push(res);
+            }
+          }
+        });
+      }
+
+      this.render();
+
+      const cleanText = response.text || 'Acción completada con éxito.';
+      if (transcription) {
+        transcription.textContent = `"${prompt}"`;
+      }
+
+      // Mantener memoria multi-turno en el Asistente para permitir diálogos continuos ("recomiéndame..." -> "guárdalas")
+      if (!Array.isArray(this.aiChatHistory)) this.aiChatHistory = [];
+      this.aiChatHistory.push({ role: 'user', text: prompt });
+      this.aiChatHistory.push({ role: 'model', text: cleanText });
+
+      // Botón "Nuevo tema" visible si hay conversación activa
+      const newChatBtn = document.getElementById('btn-gemini-invoke-new-chat');
+      if (newChatBtn) newChatBtn.style.display = 'inline-flex';
+
+      // Mostrar hilo anterior mientras la ventana está abierta para memoria conversacional visual
+      const threadBox = document.getElementById('gemini-invoke-thread');
+      if (threadBox) {
+        const previousTurns = this.aiChatHistory.slice(0, -2);
+        if (previousTurns.length > 0) {
+          threadBox.style.display = 'flex';
+          threadBox.innerHTML = previousTurns.map(t => {
+            const isU = t.role === 'user';
+            const bg = isU ? 'var(--m3-surface-container-high, #f1f3f4)' : 'var(--m3-surface, #fff)';
+            const border = isU ? 'transparent' : 'var(--m3-outline-variant, rgba(0,0,0,0.08))';
+            const escaped = typeof escapeHtml === 'function' ? escapeHtml(t.text) : String(t.text).replace(/</g, '&lt;');
+            return `<div style="background: ${bg}; border: 1px solid ${border}; border-radius: 8px; padding: 6px 10px; font-size: 12px; line-height: 1.4;">
+              <strong style="color: ${isU ? 'var(--m3-primary)' : 'var(--color-brand)'};">${isU ? 'Tú' : 'Asistente'}:</strong> ${escaped.slice(0, 160)}${escaped.length > 160 ? '...' : ''}
+            </div>`;
+          }).join('');
+        } else {
+          threadBox.style.display = 'none';
+          threadBox.innerHTML = '';
+        }
+      }
+
+      if (resultBox && resultText) {
+        resultBox.style.display = 'flex';
+        let fallbackBanner = '';
+        if (response && response.isSimulatedFallback) {
+          fallbackBanner = `<div style="display:flex; align-items:flex-start; gap:8px; background: rgba(234, 67, 53, 0.08); border: 1px solid rgba(234, 67, 53, 0.25); color: #c5221f; border-radius: 8px; padding: 8px 10px; font-size: 11px; margin-bottom: 10px; line-height: 1.4;">
+            <span class="material-symbols-outlined" style="font-size:18px; line-height:1; flex-shrink:0;">cloud_off</span>
+            <span><strong>Aviso de conexión:</strong> No se pudo contactar con Gemini en la nube (${response.originalError || 'tiempo de espera agotado'}). Se ha activado la simulación local provisional de emergencia.</span>
+          </div>`;
+        }
+        resultText.innerHTML = fallbackBanner + formatSafeAiMarkdown(cleanText);
+
+        if (resultActions) {
+          resultActions.innerHTML = '';
+
+          // Si se crearon recetas nuevas, añadir botón directo para abrir cada una
+          if (createdRecipes.length > 0) {
+            createdRecipes.forEach(cr => {
+              const btnRecipe = document.createElement('button');
+              btnRecipe.type = 'button';
+              btnRecipe.className = 'btn btn-primary btn-sm';
+              btnRecipe.innerHTML = `<span class="material-symbols-outlined icon-sm">restaurant_menu</span> Ver "${cr.title}"`;
+              btnRecipe.addEventListener('click', () => {
+                this.closeGeminiInvokeModal();
+                this.switchView('view-recipes');
+                this.openRecipeDetail(cr.recipeId);
+              });
+              resultActions.appendChild(btnRecipe);
+            });
+            this.showToast(`✓ ${createdRecipes.length === 1 ? `Receta "${createdRecipes[0].title}" guardada en tu catálogo.` : `${createdRecipes.length} recetas guardadas en tu catálogo.`}`, 'success');
+          } else if (primaryActionTarget) {
+            const btnTarget = document.createElement('button');
+            btnTarget.className = 'btn btn-primary btn-sm';
+            btnTarget.textContent = primaryActionTarget === 'view-shopping'
+              ? 'Ver Lista de la Compra'
+              : (primaryActionTarget === 'view-planner' ? 'Ver Planificador' : 'Ver Recetas');
+            btnTarget.addEventListener('click', () => {
+              this.closeGeminiInvokeModal();
+              this.switchView(primaryActionTarget);
+            });
+            resultActions.appendChild(btnTarget);
+          } else if (/\b(Lunes|Martes|Miércoles|Miercoles|Jueves|Viernes|Sábado|Sabado|Domingo)\b.*?[:\-]/i.test(cleanText)) {
+            // Si el Asistente propuso un menú semanal en texto, ofrecer botón directo para aplicarlo al planificador
+            const btnApplyPlan = document.createElement('button');
+            btnApplyPlan.type = 'button';
+            btnApplyPlan.className = 'btn btn-primary btn-sm';
+            btnApplyPlan.innerHTML = `<span class="material-symbols-outlined icon-sm">calendar_month</span> Aplicar al Planificador`;
+            btnApplyPlan.addEventListener('click', () => {
+              const input = document.getElementById('gemini-invoke-input');
+              if (input) {
+                input.value = 'Aplica este menú semanal en mi Planificador con los IDs de mi catálogo';
+                this.handleGeminiInvokeSubmit(isVoice);
+              }
+            });
+            resultActions.appendChild(btnApplyPlan);
+          } else if (/receta|plato|ingrediente|1\.|2\./i.test(cleanText)) {
+            // Si el Asistente propuso recetas sueltas en texto que no existen, ofrecer guardarlas
+            const btnSaveRecipes = document.createElement('button');
+            btnSaveRecipes.type = 'button';
+            btnSaveRecipes.className = 'btn btn-tonal btn-sm';
+            btnSaveRecipes.innerHTML = `<span class="material-symbols-outlined icon-sm">bookmark_add</span> Guardar en mis recetas`;
+            btnSaveRecipes.addEventListener('click', () => {
+              const input = document.getElementById('gemini-invoke-input');
+              if (input) {
+                input.value = 'Guarda las recetas recomendadas en mi catálogo';
+                this.handleGeminiInvokeSubmit(isVoice);
+              }
+            });
+            resultActions.appendChild(btnSaveRecipes);
+          }
+
+          const btnClose = document.createElement('button');
+          btnClose.className = 'btn btn-secondary btn-sm';
+          btnClose.textContent = 'Listo';
+          btnClose.addEventListener('click', () => this.closeGeminiInvokeModal());
+          resultActions.appendChild(btnClose);
+        }
+      }
+
+      if (isVoice) {
+        this.speakAiResponse(cleanText);
+      }
+      this.showToast('✓ Tu Asistente respondió.', 'success');
+    } catch (err) {
+      if (transcription) {
+        transcription.innerHTML = `<span style="color:var(--m3-error); font-weight:500;">Error: ${err.message}</span>`;
+      }
+      this.showToast(`Error del Asistente: ${err.message}`, 'error');
+    } finally {
+      if (sendBtn) sendBtn.disabled = false;
+    }
+  }
+
+  speakAiResponse(text) {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    if (state.settings?.ttsEnabled === false) return;
+    try {
+      this.stopSpeech();
+      const clean = String(text || '')
+        .replace(/[*#_`]/g, '')
+        .replace(/https?:\/\/\S+/g, '')
+        .replace(/\n+/g, '. ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!clean) return;
+
+      // Locución ágil y concisa (máximo 2 oraciones o ~240 caracteres)
+      // para evitar que el sintetizador recite párrafos interminables.
+      const sentences = clean.match(/[^.!?]+[.!?]+/g);
+      let spokenText = clean;
+      if (sentences && sentences.length > 2) {
+        spokenText = sentences.slice(0, 2).join(' ').trim();
+      }
+      if (spokenText.length > 240) {
+        const truncated = spokenText.slice(0, 240);
+        const lastSpace = truncated.lastIndexOf(' ');
+        spokenText = (lastSpace > 80 ? truncated.slice(0, lastSpace) : truncated) + '.';
+      }
+
+      const utterance = new SpeechSynthesisUtterance(spokenText);
+      utterance.lang = 'es-ES';
+      utterance.rate = 1.05;
+      utterance.onstart = () => this.updateTtsPlayingUI(true);
+      utterance.onend = () => this.updateTtsPlayingUI(false);
+      utterance.onerror = () => this.updateTtsPlayingUI(false);
+
+      this.currentUtterance = utterance;
+      window.speechSynthesis.speak(utterance);
+      this.updateTtsPlayingUI(true);
+    } catch (e) {
+      console.warn("SpeechSynthesis error:", e);
+      this.updateTtsPlayingUI(false);
+    }
+  }
+
+  stopSpeech() {
+    this.currentUtterance = null;
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch (e) {}
+    }
+    this.updateTtsPlayingUI(false);
+  }
+
+  updateTtsPlayingUI(isPlaying) {
+    const headerBtn = document.getElementById('btn-header-stop-tts');
+    if (headerBtn) headerBtn.style.display = isPlaying ? 'inline-flex' : 'none';
+
+    const ttsBar = document.getElementById('gemini-invoke-tts-bar');
+    if (ttsBar) ttsBar.style.display = isPlaying ? 'flex' : 'none';
+
+    const chatTtsBar = document.getElementById('ai-chat-speaking-indicator');
+    if (chatTtsBar) chatTtsBar.style.display = isPlaying ? 'flex' : 'none';
+
+    const resultText = document.getElementById('gemini-invoke-result-text');
+    if (resultText) {
+      if (isPlaying) {
+        resultText.style.cursor = 'pointer';
+        resultText.title = 'Haz clic para detener la voz del Asistente';
+      } else {
+        resultText.style.cursor = 'default';
+        resultText.removeAttribute('title');
+      }
+    }
+  }
+
+  applySampleAiPlan(planOverride = null) {
+    const targetPlan = planOverride || this.lastAiProposedPlan || this.buildSimulatedWeeklyPlanArgs('replace', false, typeof prompt !== 'undefined' ? prompt : '');
+    this.executeAiToolCall({
+      name: 'set_weekly_plan',
+      args: targetPlan
+    });
+    this.showToast("¡Menú semanal organizado con éxito en tu calendario!", 'success');
+    this.switchView('view-planner');
+  }
+
+  triggerGeminiAutoPlan() {
+    this.switchView('view-ai');
+    const input = document.getElementById('ai-chat-input');
+    if (input) {
+      input.value = "Planifica mi menú semanal equilibrado de lunes a domingo con mis recetas guardadas.";
+      this.handleAiChatSubmit();
+    }
+  }
+
+  triggerCreateMissingSlotRecipes(gaps = null) {
+    const activeGaps = Array.isArray(gaps) && gaps.length > 0 ? gaps : this.getDietarySlotGaps();
+    const gapTags = activeGaps.length > 0 ? activeGaps.map(g => g.tag).join(' y ') : 'Desayuno y Merienda';
+    const prefs = (state.dietaryPreferences || []).join(', ') || 'saludables';
+    this.switchView('view-ai');
+    const input = document.getElementById('ai-chat-input');
+    if (input) {
+      input.value = `Crea recetas nuevas de ${gapTags} que cumplan con ${prefs} y asígnalas en mi Plan semanal.`;
+      this.handleAiChatSubmit();
+    }
+  }
+
+// ==========================================================================
+  // US-30: MULTIMODAL AI RECIPE IMPORTER & GENERATOR (SCHEMA + IMAGE COMPRESSION + GEMINI)
+  // ==========================================================================
+  async compressImageToBase64(file, maxWidth = 1024, maxHeight = 1024, quality = 0.8) {
+    if (!file) return null;
+
+    // Capa 1: createImageBitmap (Moderno, nativo, decodifica JPEG/PNG/WebP/HEIC/AVIF sin fallos de FileReader)
+    if (typeof createImageBitmap === 'function') {
+      try {
+        const bitmap = await createImageBitmap(file);
+        let width = bitmap.width || 800;
+        let height = bitmap.height || 600;
+        if (width > maxWidth || height > maxHeight) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, width);
+        canvas.height = Math.max(1, height);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        if (typeof bitmap.close === 'function') bitmap.close();
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        const base64Data = (dataUrl.split(',')[1] || '').trim();
+        if (base64Data && base64Data.length > 50) {
+          return { dataUrl, base64Data, mimeType: 'image/jpeg' };
+        }
+      } catch (bmErr) {
+        console.warn("[FoodAssistant] createImageBitmap no disponible o falló:", bmErr);
+      }
+    }
+
+    // Capa 2: Si el preview del modal ya cargó la imagen en el DOM, extraer directamente desde el elemento <img>
+    const previewImg = document.getElementById('import-image-preview');
+    if (previewImg && (previewImg.naturalWidth > 0 || previewImg.width > 0)) {
+      try {
+        let width = previewImg.naturalWidth || previewImg.width || 800;
+        let height = previewImg.naturalHeight || previewImg.height || 600;
+        if (width > maxWidth || height > maxHeight) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, width);
+        canvas.height = Math.max(1, height);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(previewImg, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        const base64Data = (dataUrl.split(',')[1] || '').trim();
+        if (base64Data && base64Data.length > 50) {
+          return { dataUrl, base64Data, mimeType: 'image/jpeg' };
+        }
+      } catch (prevErr) {
+        console.warn("[FoodAssistant] Render desde previewImg falló:", prevErr);
+      }
+    }
+
+    // Capa 3: Lectura binaria directa con file.arrayBuffer() (instantáneo, sin dependencias de DOM ni timers)
+    if (typeof file.arrayBuffer === 'function') {
+      try {
+        const buffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        const len = bytes.byteLength;
+        const chunkSize = 8192;
+        for (let i = 0; i < len; i += chunkSize) {
+          binary += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + chunkSize, len)));
+        }
+        const base64Data = (typeof btoa === 'function' ? btoa(binary) : Buffer.from(binary, 'binary').toString('base64')).trim();
+        if (base64Data && base64Data.length > 0) {
+          const mimeType = (file.type && file.type.startsWith('image/')) ? file.type : 'image/jpeg';
+          return {
+            dataUrl: `data:${mimeType};base64,${base64Data}`,
+            base64Data,
+            mimeType
+          };
+        }
+      } catch (bufErr) {
+        console.warn("[FoodAssistant] file.arrayBuffer falló:", bufErr);
+      }
+    }
+
+    // Capa 4: URL.createObjectURL + HTMLImageElement (evita bloqueos de permisos en FileReader de móviles)
+    if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function' && typeof file === 'object') {
+      try {
+        const objectUrl = URL.createObjectURL(file);
+        const res = await new Promise((resolve, reject) => {
+          const img = new Image();
+          const tId = setTimeout(() => {
+            try { URL.revokeObjectURL(objectUrl); } catch (e) {}
+            reject(new Error("Timeout cargando imagen"));
+          }, 2500);
+          img.onload = () => {
+            clearTimeout(tId);
+            try {
+              let width = img.naturalWidth || img.width || 800;
+              let height = img.naturalHeight || img.height || 600;
+              if (width > maxWidth || height > maxHeight) {
+                if (width > height) {
+                  height = Math.round((height * maxWidth) / width);
+                  width = maxWidth;
+                } else {
+                  width = Math.round((width * maxHeight) / height);
+                  height = maxHeight;
+                }
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = Math.max(1, width);
+              canvas.height = Math.max(1, height);
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              try { URL.revokeObjectURL(objectUrl); } catch (e) {}
+              const dataUrl = canvas.toDataURL('image/jpeg', quality);
+              const base64Data = (dataUrl.split(',')[1] || '').trim();
+              resolve({ dataUrl, base64Data, mimeType: 'image/jpeg' });
+            } catch (err) {
+              try { URL.revokeObjectURL(objectUrl); } catch (e) {}
+              reject(err);
+            }
+          };
+          img.onerror = (err) => {
+            clearTimeout(tId);
+            try { URL.revokeObjectURL(objectUrl); } catch (e) {}
+            reject(err);
+          };
+          img.src = objectUrl;
+        });
+        if (res && res.base64Data && res.base64Data.length > 0) {
+          return res;
+        }
+      } catch (objErr) {
+        console.warn("[FoodAssistant] URL.createObjectURL falló:", objErr);
+      }
+    }
+
+    // Capa 5: FileReader clásico
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      const timeoutId = setTimeout(() => reject(new Error("Tiempo de procesamiento de imagen agotado")), 8000);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          clearTimeout(timeoutId);
+          try {
+            let width = img.naturalWidth || img.width || 800;
+            let height = img.naturalHeight || img.height || 600;
+            if (width > maxWidth || height > maxHeight) {
+              if (width > height) {
+                height = Math.round((height * maxWidth) / width);
+                width = maxWidth;
+              } else {
+                width = Math.round((width * maxHeight) / height);
+                height = maxHeight;
+              }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, width);
+            canvas.height = Math.max(1, height);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+            const base64Data = (dataUrl.split(',')[1] || '').trim();
+            resolve({ dataUrl, base64Data, mimeType: 'image/jpeg' });
+          } catch (cErr) {
+            reject(cErr);
+          }
+        };
+        img.onerror = () => {
+          clearTimeout(timeoutId);
+          reject(new Error("El archivo no es una imagen compatible o legible."));
+        };
+        img.src = e.target.result;
+      };
+      reader.onerror = () => {
+        clearTimeout(timeoutId);
+        reject(new Error("No se pudo leer el archivo de imagen."));
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  normalizeAiExtractedRecipe(rawJson, sourceUrl = '') {
+    if (!rawJson || typeof rawJson !== 'object') {
+      throw new Error("Respuesta inválida recibida de la IA.");
+    }
+    const title = String(rawJson.title || 'Receta Importada con IA').trim();
+    const description = String(rawJson.description || 'Receta extraída y adaptada mediante Gemini IA.').trim();
+    const prepTimeMinutes = Math.max(0, parseInt(rawJson.prepTimeMinutes, 10) || 10);
+    const cookTimeMinutes = Math.max(0, parseInt(rawJson.cookTimeMinutes, 10) || 15);
+    const servings = Math.max(1, parseInt(rawJson.servings, 10) || state.settings?.defaultServings || 2);
+
+    const rawIngs = Array.isArray(rawJson.ingredients) ? rawJson.ingredients : [];
+    const ingredients = rawIngs.map((ing, idx) => {
+      const name = String(ing?.name || `Ingrediente ${idx + 1}`).trim();
+      const unit = RecipeParser.normalizeUnit(ing?.unit || 'ud');
+      return {
+        id: generateId('ing-'),
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        amount: ing?.amount !== null && ing?.amount !== undefined && !isNaN(ing.amount) ? Number(ing.amount) : 1,
+        unit: unit,
+        aisle: ing?.aisle || categorizeIngredientAisle(name)
+      };
+    }).filter(i => i.name);
+
+    const rawSteps = Array.isArray(rawJson.instructions) ? rawJson.instructions : [];
+    let stepNum = 1;
+    const instructions = rawSteps.map(step => {
+      const text = typeof step === 'string' ? step : String(step?.text || '').trim();
+      if (!text) return null;
+      const detectedTimer = RecipeParser.extractTimerMinutes(text);
+      return {
+        step: stepNum++,
+        text,
+        timerMinutes: typeof step?.timerMinutes === 'number' ? step.timerMinutes : (detectedTimer || 0)
+      };
+    }).filter(Boolean);
+
+    let nutrition = null;
+    if (rawJson.nutrition && typeof rawJson.nutrition === 'object') {
+      nutrition = {
+        calories: Number(rawJson.nutrition.calories) || 0,
+        protein: Number(rawJson.nutrition.protein) || 0,
+        carbs: Number(rawJson.nutrition.carbs) || 0,
+        fat: Number(rawJson.nutrition.fat) || 0
+      };
+    } else {
+      nutrition = estimateRecipeNutrition({ title, ingredients, servings });
+    }
+
+    const tags = Array.isArray(rawJson.tags) ? [...rawJson.tags] : [];
+
+    const recipe = {
+      id: generateId('rec-'),
+      title,
+      description,
+      imageUrl: rawJson.imageUrl || '',
+      prepTimeMinutes,
+      cookTimeMinutes,
+      servings,
+      tags,
+      nutrition,
+      ingredients,
+      instructions,
+      sourceUrl: sourceUrl || '',
+      sourceDomain: sourceUrl ? RecipeParser.getDomain(sourceUrl) : 'Gemini IA',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    if (typeof analyzeAndInferRecipeTags === 'function') {
+      const inferred = analyzeAndInferRecipeTags(recipe);
+      const lowerSet = new Set(recipe.tags.map(t => String(t).toLowerCase().trim()));
+      inferred.forEach(t => {
+        const l = t.toLowerCase().trim();
+        if (!lowerSet.has(l) && l !== 'general') {
+          recipe.tags.push(t);
+          lowerSet.add(l);
+          state.addCustomTag && state.addCustomTag(t);
+        }
+      });
+    }
+
+    return recipe;
+  }
+
+  async extractRecipeWithGemini({ text = '', imageBase64 = null, mimeType = 'image/jpeg', sourceUrl = '' } = {}) {
+    const apiKey = state.settings.geminiApiKey?.trim();
+    if (!apiKey) {
+      // Fallback simulado cuando el usuario no tiene clave
+      const sampleText = text || 'Receta extraída de foto';
+      const isProteic = /prote[ií]n/i.test(sampleText);
+      return this.normalizeAiExtractedRecipe({
+        title: isProteic ? "Bowl Fitness Proteico Multimodal" : "Plato Casero Tradicional Multimodal",
+        description: "Receta procesada e interpretada automáticamente a partir del contenido multimedia proporcionado.",
+        prepTimeMinutes: 10,
+        cookTimeMinutes: 15,
+        servings: state.settings?.defaultServings || 2,
+        tags: ["Saludable", isProteic ? "Alta en Proteínas" : "Almuerzo"],
+        ingredients: [
+          { name: "Pechuga de pollo o tofu", amount: 250, unit: "g" },
+          { name: "Verduras variadas salteadas", amount: 200, unit: "g" },
+          { name: "Aceite de oliva virgen extra", amount: 15, unit: "ml" },
+          { name: "Arroz integral o quinoa", amount: 150, unit: "g" }
+        ],
+        instructions: [
+          { step: 1, text: "Cocina el arroz o base de cereal según indicaciones del paquete.", timerMinutes: 12 },
+          { step: 2, text: "Saltea el pollo o tofu en dados en una sartén caliente con aceite de oliva.", timerMinutes: 6 },
+          { step: 3, text: "Añade las verduras troceadas, salpimenta al gusto y combina todos los ingredientes en un plato o bowl.", timerMinutes: 4 }
+        ],
+        nutrition: { calories: 430, protein: 42, carbs: 38, fat: 12 }
+      }, sourceUrl);
+    }
+
+    const parts = [];
+    if (imageBase64) {
+      parts.push({
+        inlineData: {
+          mimeType: mimeType || 'image/jpeg',
+          data: imageBase64
+        }
+      });
+    }
+    const promptText = `Eres un asistente culinario experto. Analiza este texto o imagen de receta y extrae de forma limpia todos los campos estructurados en formato JSON estricto.
+Texto o contexto: ${text || '(Sin texto adicional, analiza la imagen adjunta)'}
+
+REGLAS CRÍTICAS:
+- Devuelve SOLAMENTE un bloque JSON válido, sin texto adicional antes ni después ni bloques \`\`\`json.
+- Estructura requerida:
+{
+  "title": "string con el nombre del plato",
+  "description": "string breve de 1-2 frases descriptivas",
+  "prepTimeMinutes": número entero,
+  "cookTimeMinutes": número entero,
+  "servings": número entero de raciones,
+  "tags": ["array", "de", "etiquetas"],
+  "ingredients": [
+    { "name": "nombre limpio", "amount": número, "unit": "g|ml|ud|cda|cdta|pizca..." }
+  ],
+  "instructions": [
+    { "step": 1, "text": "descripción del paso", "timerMinutes": 0 }
+  ],
+  "nutrition": {
+    "calories": número entero kcal por ración,
+    "protein": gramos,
+    "carbs": gramos,
+    "fat": gramos
+  }
+}`;
+    parts.push({ text: promptText });
+
+    let rawModel = state.settings.geminiModel || 'gemini-3.8-flash';
+    if (rawModel === 'gemini-2.5-flash-lite' || rawModel === 'gemini-1.5-flash' || rawModel === 'gemini-2.5-flash') {
+      rawModel = 'gemini-3.8-flash';
+      state.settings.geminiModel = 'gemini-3.8-flash';
+      state.save && state.save('fa_settings', state.settings);
+    }
+    const candidateModels = (rawModel === 'gemini-3.5-flash-lite')
+      ? ['gemini-3.5-flash-lite', 'gemini-3.8-flash']
+      : ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
+
+    let lastError = null;
+    let data = null;
+
+    for (const model of candidateModels) {
+      const controller = new AbortController();
+      const timeoutMs = (model === 'gemini-3.8-flash') ? 25000 : 32000;
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+        const resp = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey
+          },
+          body: JSON.stringify({
+            contents: [{ parts }]
+          }),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (resp.ok) {
+          data = await resp.json();
+          break;
+        }
+        const errJson = await resp.json().catch(() => ({}));
+        const errMsg = errJson.error?.message || `HTTP ${resp.status}`;
+        lastError = new Error(errMsg);
+
+        if (/api key not valid|invalid api key/i.test(errMsg)) {
+          break;
+        }
+
+        if (resp.status === 503 || resp.status === 429) {
+          await new Promise(r => setTimeout(r, 300));
+        }
+      } catch (e) {
+        clearTimeout(timeoutId);
+        lastError = e.name === 'AbortError' ? new Error(`Tiempo de espera agotado al analizar con Gemini (${model})`) : e;
+      }
+    }
+
+    if (!data) {
+      throw lastError || new Error("No se pudo conectar con Gemini para extraer la receta.");
+    }
+
+    const rawResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    // Extracción limpia y tolerante a bloques markdown o introducciones de texto
+    const jsonMatch = rawResponseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("No se detectó un formato JSON válido en la receta analizada.");
+    }
+
+    const parsedJson = JSON.parse(jsonMatch[0]);
+    return this.normalizeAiExtractedRecipe(parsedJson, sourceUrl);
+  }
+
+  // ==========================================================================
+  // UNIVERSAL RECIPE IMPORTER (US-15: SCHEMA.ORG JSON-LD & TEXT PARSER)
+  // ==========================================================================
+  openImportModal(defaultTab = 'url') {
+    if (this.modalRecipeImport) {
+      this.openDialogModal(this.modalRecipeImport);
+    }
+    const urlInput = document.getElementById('import-url-input');
+    if (urlInput) urlInput.value = '';
+    const textInput = document.getElementById('import-text-input');
+    if (textInput) textInput.value = '';
+    const status = document.getElementById('import-status-indicator');
+    if (status) status.style.display = 'none';
+    const previewBox = document.getElementById('import-preview-box');
+    if (previewBox) previewBox.style.display = 'none';
+    const corsBanner = document.getElementById('import-cors-banner');
+    if (corsBanner) corsBanner.style.display = 'none';
+    const btnExecute = document.getElementById('btn-execute-import');
+    if (btnExecute) btnExecute.style.display = 'inline-flex';
+    const btnConfirm = document.getElementById('btn-confirm-save-import');
+    if (btnConfirm) btnConfirm.style.display = 'none';
+    this.pendingImportRecipe = null;
+    this.switchImportTab(defaultTab || 'url');
+  }
+
+  fillAndTestSampleRecipe() {
+    const urlInput = document.getElementById('import-url-input');
+    if (urlInput) {
+      urlInput.value = 'https://www.directoalpaladar.com/recetas-vegetarianas/bolitas-garbanzos-brocoli-al-horno-receta-facil-para-cena-saludable';
+    }
+    const corsBanner = document.getElementById('import-cors-banner');
+    if (corsBanner) corsBanner.style.display = 'none';
+    const status = document.getElementById('import-status-indicator');
+    if (status) status.style.display = 'none';
+    this.handleRecipeImport();
+  }
+
+  closeImportModal() {
+    this.closeDialogModal(this.modalRecipeImport);
+    this.pendingImportRecipe = null;
+  }
+
+  switchImportTab(tab) {
+    const tabUrl = document.getElementById('tab-import-url');
+    const tabText = document.getElementById('tab-import-text');
+    const tabAi = document.getElementById('tab-import-ai');
+    const secUrl = document.getElementById('section-import-url');
+    const secText = document.getElementById('section-import-text');
+    const secAi = document.getElementById('section-import-ai');
+    const status = document.getElementById('import-status-indicator');
+    if (status) status.style.display = 'none';
+    const corsBanner = document.getElementById('import-cors-banner');
+    if (corsBanner) corsBanner.style.display = 'none';
+
+    // Reset styles
+    [tabUrl, tabText, tabAi].forEach(t => {
+      if (t) {
+        t.style.background = 'transparent';
+        t.style.color = 'var(--m3-on-surface-variant)';
+        t.style.boxShadow = 'none';
+        t.classList.remove('active');
+      }
+    });
+    [secUrl, secText, secAi].forEach(s => {
+      if (s) s.style.display = 'none';
+    });
+
+    if (tab === 'url') {
+      if (tabUrl) {
+        tabUrl.style.background = 'var(--m3-surface)';
+        tabUrl.style.color = 'var(--m3-on-surface)';
+        tabUrl.style.boxShadow = 'var(--elevation-1)';
+        tabUrl.classList.add('active');
+      }
+      if (secUrl) secUrl.style.display = 'block';
+    } else if (tab === 'text') {
+      if (tabText) {
+        tabText.style.background = 'var(--m3-surface)';
+        tabText.style.color = 'var(--m3-on-surface)';
+        tabText.style.boxShadow = 'var(--elevation-1)';
+        tabText.classList.add('active');
+      }
+      if (secText) secText.style.display = 'block';
+    } else if (tab === 'ai') {
+      if (tabAi) {
+        tabAi.style.background = 'var(--m3-surface)';
+        tabAi.style.color = 'var(--m3-on-surface)';
+        tabAi.style.boxShadow = 'var(--elevation-1)';
+        tabAi.classList.add('active');
+      }
+      if (secAi) secAi.style.display = 'block';
+    }
+  }
+
+  async handleClipboardPaste() {
+    const textarea = document.getElementById('import-text-input');
+    const status = document.getElementById('import-status-indicator');
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text && text.trim()) {
+          if (textarea) {
+            textarea.value = text.trim();
+            this.handleRecipeImport();
+          }
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("Acceso directo a portapapeles no disponible:", e);
+    }
+    if (textarea) {
+      textarea.focus();
+      textarea.select();
+      if (status) {
+        status.style.display = 'block';
+        status.style.color = 'var(--m3-on-surface-variant)';
+        status.innerHTML = '<span class="material-symbols-outlined icon-sm" style="vertical-align: middle;">help</span> Para pegar, pulsa <strong>Ctrl + V</strong> (o mantén pulsado el área de texto en móvil).';
+      }
+    }
+  }
+
+  async handleRecipeImport() {
+    let url = document.getElementById('import-url-input')?.value.trim() || '';
+    const text = document.getElementById('import-text-input')?.value.trim() || '';
+    const aiPrompt = document.getElementById('import-ai-prompt-input')?.value.trim() || '';
+    const imageInput = document.getElementById('import-image-input');
+    const imageFile = imageInput?.files?.[0] || this.selectedImportImageFile || null;
+
+    const status = document.getElementById('import-status-indicator');
+    const previewBox = document.getElementById('import-preview-box');
+    const corsBanner = document.getElementById('import-cors-banner');
+    const btnExecute = document.getElementById('btn-execute-import');
+    const btnConfirm = document.getElementById('btn-confirm-save-import');
+
+    const isUrlActive = document.getElementById('section-import-url')?.style.display !== 'none';
+    const isAiActive = document.getElementById('section-import-ai')?.style.display !== 'none';
+    const isTextActive = !isUrlActive && !isAiActive;
+
+    if (isUrlActive && !url) {
+      this.highlightInputError(document.getElementById('import-url-input'), "Por favor, introduce una URL de receta.");
+      return;
+    }
+    if (isTextActive && !text) {
+      this.highlightInputError(document.getElementById('import-text-input'), "Por favor, pega el texto de la receta.");
+      return;
+    }
+    if (isAiActive && !aiPrompt && !imageFile) {
+      this.highlightInputError(document.getElementById('import-ai-prompt-input'), "Sube una foto o describe la receta que deseas.");
+      return;
+    }
+
+    if (corsBanner) corsBanner.style.display = 'none';
+    if (status) {
+      status.style.display = 'block';
+      status.style.color = 'var(--m3-primary)';
+      status.innerHTML = '<span class="material-symbols-outlined icon-sm" style="animation: spin 1s linear infinite; vertical-align: middle;">sync</span> Analizando receta con IA y extrayendo ingredientes...';
+    }
+
+    try {
+      let extractedRecipe = null;
+
+      if (isAiActive) {
+        // Mode 3: Multimodal AI (Photo / Social / Prompt)
+        let imageBase64 = null;
+        let mimeType = 'image/jpeg';
+        if (imageFile) {
+          const compressed = await this.compressImageToBase64(imageFile);
+          imageBase64 = compressed?.base64Data || null;
+          mimeType = compressed?.mimeType || 'image/jpeg';
+        }
+        extractedRecipe = await this.extractRecipeWithGemini({
+          text: aiPrompt,
+          imageBase64,
+          mimeType
+        });
+      } else if (isUrlActive) {
+        // Mode 1: URL or Raw JSON-LD in URL field
+        if (url.startsWith('{') || url.includes('<script')) {
+          const jsonLd = RecipeParser.extractJsonLdFromHtml(url) || JSON.parse(url);
+          extractedRecipe = RecipeParser.parseSchemaRecipe(jsonLd);
+        } else {
+          // Normalize URL
+          let cleanUrl = url.trim();
+          if (!/^https?:\/\//i.test(cleanUrl)) {
+            cleanUrl = 'https://' + cleanUrl;
+          }
+
+          let html = null;
+          let fetchSuccess = false;
+          let is404OrEmpty = false;
+
+          // Priority proxy endpoints
+          // US-52: Proxy propio con Supabase Edge Function
+          const proxyEndpoints = [];
+          const sbUrl = (state.supabaseConfig?.url || '').trim().replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+          if (sbUrl) {
+            proxyEndpoints.push(`${sbUrl}/functions/v1/import-recipe?url=${encodeURIComponent(cleanUrl)}`);
+          }
+          proxyEndpoints.push(`https://r.jina.ai/${cleanUrl}`);
+          proxyEndpoints.push(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(cleanUrl)}`);
+          proxyEndpoints.push(`https://corsproxy.io/?url=${encodeURIComponent(cleanUrl)}`);
+
+          if (window.location.protocol === 'http:' || window.location.hostname === 'localhost') {
+            proxyEndpoints.unshift(`/api/fetch?url=${encodeURIComponent(cleanUrl)}`);
+          }
+
+          for (const proxyUrl of proxyEndpoints) {
+            try {
+              console.log("[FoodAssistant] Intentando descargar receta vía proxy:", proxyUrl);
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 11000);
+              const fetchHeaders = {};
+              if (proxyUrl.includes('r.jina.ai')) {
+                fetchHeaders['X-Return-Format'] = 'html';
+                fetchHeaders['Accept'] = 'text/html';
+              }
+              const resp = await fetch(proxyUrl, { 
+                signal: controller.signal,
+                headers: fetchHeaders
+              });
+              clearTimeout(timeoutId);
+              if (resp.ok) {
+                const textResp = await resp.text();
+                if (textResp && textResp.length > 80) {
+                  // Detect Cloudflare Turnstile / Managed challenge anti-bot
+                  if (/<title>.*?(?:Just a moment|Cloudflare|Security Check).*?<\/title>|cf-turnstile|__cf_chl/i.test(textResp.substring(0, 2000))) {
+                    if (corsBanner) corsBanner.style.display = 'block';
+                    throw new Error("Esta web cuenta con protección activa anti-scraping (Cloudflare). Puedes importar la receta al instante copiando y pegando su texto en la pestaña 'Texto / Notas'.");
+                  }
+                  // Detect true 404 / missing pages in response header or title (including DAP & SPA Next.js 404s)
+                  if (/^404\s+not\s+found|<title>.*?(?:404|not\s+found|no\s+encontrada|no\s+se\s+ha\s+encontrado).*?<\/title>|^Title:\s*404|"(?:page|statusCode)":\s*"(?:\/error-pages\/not-found|404)"/i.test(textResp.substring(0, 3000))) {
+                    is404OrEmpty = true;
+                    fetchSuccess = true;
+                    break;
+                  }
+                  html = textResp;
+                  fetchSuccess = true;
+                  console.log("[FoodAssistant] Descarga exitosa (" + textResp.length + " bytes)");
+                  break;
+                }
+              }
+            } catch (proxyErr) {
+              console.warn("[FoodAssistant] Proxy falló o timeout:", proxyUrl, proxyErr);
+            }
+          }
+
+          if (html && !is404OrEmpty) {
+            const schemaObj = RecipeParser.extractJsonLdFromHtml(html) || RecipeParser.extractMicrodataRecipe(html);
+            if (schemaObj) {
+              extractedRecipe = RecipeParser.parseSchemaRecipe(schemaObj, cleanUrl);
+            }
+            // If schema parsing yielded no recipe, or 0 ingredients, or 0 instructions, try text parser to complement or replace
+            if (!extractedRecipe || extractedRecipe.ingredients.length === 0 || extractedRecipe.instructions.length === 0) {
+              const extractedText = RecipeParser.htmlToText(html);
+              if (extractedText) {
+                const textRecipe = RecipeParser.parseRecipeText(extractedText, cleanUrl);
+                if (textRecipe) {
+                  if (!extractedRecipe) {
+                    extractedRecipe = textRecipe;
+                  } else {
+                    if (extractedRecipe.ingredients.length === 0 && textRecipe.ingredients.length > 0) {
+                      extractedRecipe.ingredients = textRecipe.ingredients;
+                    }
+                    if (extractedRecipe.instructions.length === 0 && textRecipe.instructions.length > 0) {
+                      extractedRecipe.instructions = textRecipe.instructions;
+                    }
+                  }
+                }
+              }
+            }
+            if (extractedRecipe && (!extractedRecipe.imageUrl || extractedRecipe.imageUrl.includes('unsplash'))) {
+              const detectedImg = RecipeParser.extractImageFromHtml(html);
+              if (detectedImg) {
+                extractedRecipe.imageUrl = detectedImg;
+              } else {
+                const imgMatch = html.match(/!\[.*?\]\((https?:\/\/[^\s\)]+)\)/i);
+                if (imgMatch && imgMatch[1] && !RecipeParser.isBadImage(imgMatch[1])) {
+                  extractedRecipe.imageUrl = imgMatch[1];
+                }
+              }
+            }
+          }
+
+          if (is404OrEmpty) {
+            if (corsBanner) corsBanner.style.display = 'none';
+            throw new Error(`La página web parece no existir o devolver error 404 ("${cleanUrl}"). Asegúrate de copiar la URL completa de una receta.`);
+          }
+
+          // US-30: Fallback con IA si la extracción clásica de la URL descargada no obtuvo ingredientes reconocibles
+          if ((!extractedRecipe || !extractedRecipe.ingredients || extractedRecipe.ingredients.length === 0) && html && fetchSuccess) {
+            try {
+              const plainText = RecipeParser.htmlToText(html).substring(0, 4000);
+              extractedRecipe = await this.extractRecipeWithGemini({
+                text: `Página web de receta: ${cleanUrl}\n\nTexto extraído de la página:\n${plainText}`,
+                sourceUrl: cleanUrl
+              });
+            } catch (aiUrlErr) {
+              console.warn("Fallo en fallback IA para URL:", aiUrlErr);
+            }
+          }
+
+          if (!extractedRecipe || !extractedRecipe.ingredients || extractedRecipe.ingredients.length === 0) {
+            if (fetchSuccess) {
+              if (corsBanner) corsBanner.style.display = 'none';
+              throw new Error("La página web se ha descargado correctamente pero no contiene una receta con ingredientes reconocibles (puede ser un buscador, portada o listado general). Copia el enlace de una receta concreta o pega su texto en 'Texto / Notas'.");
+            }
+            if (corsBanner) corsBanner.style.display = 'block';
+            throw new Error("Esta web no permite la descarga directa automática. Puedes pegarla desde 'Texto / Notas' en 1 clic.");
+          }
+        }
+      } else {
+        // Mode 2: Text / Raw Paste
+        extractedRecipe = RecipeParser.parseRecipeText(text);
+        // US-30: Fallback con IA si el texto pegado no tiene formato de receta convencional (ej. texto social de Instagram)
+        if (!extractedRecipe || !extractedRecipe.ingredients || extractedRecipe.ingredients.length === 0) {
+          try {
+            extractedRecipe = await this.extractRecipeWithGemini({ text });
+          } catch (aiTextErr) {
+            console.warn("Fallo en fallback IA para texto pegado:", aiTextErr);
+          }
+        }
+      }
+
+      if (!extractedRecipe || !extractedRecipe.title || !extractedRecipe.ingredients || extractedRecipe.ingredients.length === 0) {
+        throw new Error("No se pudieron detectar ingredientes válidos en el contenido introducido. Comprueba que contenga la lista de ingredientes o prueba en la pestaña 'Foto / IA'.");
+      }
+
+      // Store in memory for confirmation
+      this.pendingImportRecipe = extractedRecipe;
+
+      // Close the import modal directly and open the full recipe detail screen in review mode
+      this.closeImportModal();
+      this.openImportReview(extractedRecipe);
+
+    } catch (err) {
+      if (status) {
+        status.style.color = 'var(--m3-error)';
+        const cleanMsg = /is no longer available/i.test(err?.message || '')
+          ? 'Modelo de IA desactualizado. Se ha actualizado automáticamente a gemini-3.8-flash. Por favor, pulsa "Analizar e Importar" de nuevo.'
+          : err.message;
+        status.textContent = 'Aviso: ' + cleanMsg;
+      }
+      if (previewBox) previewBox.style.display = 'none';
+      if (btnExecute) btnExecute.style.display = 'inline-flex';
+      if (btnConfirm) btnConfirm.style.display = 'none';
+    }
+  }
+  async confirmSaveImportRecipe(skipUrlDuplicateCheck = false) {
+    const newRecipe = this.pendingImportRecipe || this.activeRecipe;
+    if (!newRecipe) return;
+
+    // BUG-16: Detectar sourceUrl existente y ofrecer "Abrir existente" o "Guardar copia"
+    if (!skipUrlDuplicateCheck && newRecipe.sourceUrl && (!newRecipe.id || !state.recipes.some(r => r.id === newRecipe.id))) {
+      const cleanSourceUrl = newRecipe.sourceUrl.trim().replace(/\/+$/, '').toLowerCase();
+      const existingUrlRecipe = state.recipes.find(r => 
+        r.id !== newRecipe.id && 
+        r.sourceUrl && 
+        r.sourceUrl.trim().replace(/\/+$/, '').toLowerCase() === cleanSourceUrl
+      );
+
+      if (existingUrlRecipe) {
+        const openExisting = await this.showConfirmDialog({
+          title: 'Receta ya importada',
+          message: `Esta receta ya existe en tu recetario como "${existingUrlRecipe.title}".\n\n¿Deseas abrir la receta existente en lugar de duplicarla?`,
+          confirmText: 'Abrir existente',
+          cancelText: 'Guardar copia',
+          icon: 'content_copy'
+        });
+
+        if (openExisting) {
+          this.isReviewingImport = false;
+          this.pendingImportRecipe = null;
+          this.closeImportModal();
+          this.closeRecipeModal();
+          this.render();
+          this.switchView('view-recipes');
+          this.openRecipeDetail(existingUrlRecipe.id);
+          this.showToast(`Mostrando receta existente: "${existingUrlRecipe.title}".`, 'info');
+          return existingUrlRecipe;
+        }
+        newRecipe.id = generateId('rec-');
+      }
+    }
+
+    if (!newRecipe.id) {
+      newRecipe.id = generateId('rec-');
+    }
+    const existingIdx = state.recipes.findIndex(r => r.id === newRecipe.id);
+    const existing = existingIdx >= 0 ? state.recipes[existingIdx] : null;
+
+    if (!Array.isArray(newRecipe.tags)) newRecipe.tags = [];
+    if (typeof analyzeAndInferRecipeTags === 'function') {
+      const inferred = analyzeAndInferRecipeTags(newRecipe);
+      const existingLower = new Set(newRecipe.tags.map(t => String(t).toLowerCase().trim()));
+      inferred.forEach(tag => {
+        const lower = tag.toLowerCase().trim();
+        if (!existingLower.has(lower) && lower !== 'general' && lower !== 'importada') {
+          newRecipe.tags.push(tag);
+          existingLower.add(lower);
+          state.addCustomTag && state.addCustomTag(tag);
+        }
+      });
+    }
+
+    newRecipe.createdAt = newRecipe.createdAt || existing?.createdAt || existing?.updatedAt || new Date().toISOString();
+    newRecipe.updatedAt = new Date().toISOString();
+
+    if (existingIdx >= 0) {
+      state.recipes[existingIdx] = newRecipe;
+    } else {
+      state.recipes.unshift(newRecipe);
+    }
+
+    state.save('fa_recipes', state.recipes);
+    this.scheduleSyncWithCloud();
+    this.isReviewingImport = false;
+    this.pendingImportRecipe = null;
+    this.closeImportModal();
+    this.render();
+    this.switchView('view-recipes');
+    this.openRecipeDetail(newRecipe.id);
+  }
+
+  // SETTINGS
+  renderSettings() {
+    const selectProvider = document.getElementById('select-ai-provider');
+    const inputKey = document.getElementById('input-gemini-key');
+    const status = document.getElementById('gemini-key-status');
+
+    if (selectProvider) {
+      selectProvider.value = state.settings.aiProvider || 'gemini';
+      selectProvider.onchange = (e) => {
+        state.settings.aiProvider = e.target.value;
+        state.save && state.save('fa_settings', state.settings);
+        this.renderSettings();
+      };
+    }
+
+    const currentProvider = state.settings.aiProvider || 'gemini';
+    const modelWrapper = document.getElementById('wrapper-gemini-model');
+    const selectModel = document.getElementById('select-gemini-model');
+    if (modelWrapper) {
+      modelWrapper.style.display = 'none';
+    }
+    if (selectModel) {
+      selectModel.value = state.settings.geminiModel || 'gemini-3.5-flash-lite';
+      selectModel.onchange = (e) => {
+        state.settings.geminiModel = e.target.value;
+        state.save && state.save('fa_settings', state.settings);
+        this.renderSettings();
+      };
+    }
+
+    const switchTts = document.getElementById('switch-tts-voice');
+    if (switchTts) {
+      switchTts.checked = state.settings.ttsEnabled !== false;
+      switchTts.onchange = (e) => {
+        state.settings.ttsEnabled = e.target.checked;
+        state.save && state.save('fa_settings', state.settings);
+        if (!e.target.checked) {
+          this.stopSpeech();
+        }
+      };
+    }
+
+    if (inputKey) {
+      inputKey.value = state.settings.geminiApiKey || '';
+      if (currentProvider === 'openai') {
+        inputKey.placeholder = 'sk-proj-... (Clave de OpenAI)';
+      } else if (currentProvider === 'claude') {
+        inputKey.placeholder = 'sk-ant-... (Clave de Anthropic Claude)';
+      } else {
+        inputKey.placeholder = 'AIzaSy... (Clave de Google Gemini)';
+      }
+    }
+
+    if (status) {
+      if (state.settings.geminiApiKey) {
+        const provName = currentProvider === 'openai' ? 'OpenAI ChatGPT' : (currentProvider === 'claude' ? 'Anthropic Claude' : 'Google Gemini');
+        status.innerHTML = `<span style="color: var(--color-brand); font-weight: 500;">✓ Clave configurada (${provName} activo)</span>`;
+      } else {
+        status.innerHTML = '<span style="color: var(--m3-on-surface-variant);">Modo Asistente Integrado activo (sin coste ni clave requerida)</span>';
+      }
+    }
+
+    const selectServings = document.getElementById('select-default-servings');
+    if (selectServings) {
+      selectServings.value = String(state.settings.defaultServings || 2);
+      selectServings.onchange = (e) => {
+        state.settings.defaultServings = parseInt(e.target.value, 10);
+        state.save('fa_settings', state.settings);
+      };
+    }
+
+    this.renderDietaryPreferencesSettings();
+    this.renderNutritionGoalsSettings();
+    this.renderExternalAgentSettings();
+  }
+
+  // ==========================================================================
+  // US-69 (Fase 3): Control externo por voz / IA / MCP sin abrir la app
+  // ==========================================================================
+  getExternalAgentEndpoint() {
+    const base = (window.APP_CONFIG?.supabaseUrl || localStorage.getItem('fa_sb_url') || '').replace(/\/+$/, '');
+    return base ? `${base}/functions/v1/food-assistant-agent` : '';
+  }
+
+  async hashAgentToken(token) {
+    const bytes = new TextEncoder().encode(String(token));
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async generateExternalAgentToken() {
+    if (!state.cloudUser?.id) {
+      this.showToast('Inicia sesión en tu cuenta para activar el control externo.', 'warning');
+      return null;
+    }
+    const uuid = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}${Math.random()}`).replace(/-/g, '');
+    const token = `fa_live_${uuid}`;
+    state.settings.agentTokenHash = await this.hashAgentToken(token);
+    state.settings.agentTokenHint = token.slice(-4);
+    state.settings.agentEnabled = true;
+    state.save('fa_settings', state.settings);
+    this.renderExternalAgentSettings(token);
+    this.scheduleSyncWithCloud();
+    return token;
+  }
+
+  revokeExternalAgentToken() {
+    state.settings.agentTokenHash = '';
+    state.settings.agentTokenHint = '';
+    state.settings.agentEnabled = false;
+    state.save('fa_settings', state.settings);
+    this.renderExternalAgentSettings();
+    this.scheduleSyncWithCloud();
+    this.showToast('Token revocado. Los asistentes externos ya no tienen acceso.', 'success');
+  }
+
+  toggleExternalAgentEnabled(enabled) {
+    if (!state.settings.agentTokenHash) return;
+    state.settings.agentEnabled = !!enabled;
+    state.save('fa_settings', state.settings);
+    this.renderExternalAgentSettings();
+    this.scheduleSyncWithCloud();
+  }
+
+  async copyExternalAgentText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      this.showToast('Copiado al portapapeles.', 'success');
+    } catch (e) {
+      this.showToast('No se pudo copiar automáticamente.', 'warning');
+    }
+  }
+
+  // `freshToken` solo existe justo tras generarlo: es la única vez que se muestra completo.
+  renderExternalAgentSettings(freshToken = null) {
+    const statusEl = document.getElementById('external-agent-status');
+    if (!statusEl) return;
+    const hasToken = !!state.settings?.agentTokenHash;
+    const enabled = hasToken && !!state.settings.agentEnabled;
+
+    const toggle = document.getElementById('toggle-external-agent');
+    if (toggle) {
+      toggle.checked = enabled;
+      toggle.disabled = !hasToken;
+      toggle.onchange = (e) => this.toggleExternalAgentEnabled(e.target.checked);
+    }
+
+    const endpoint = this.getExternalAgentEndpoint();
+    statusEl.innerHTML = hasToken
+      ? `<span style="color: ${enabled ? 'var(--color-brand)' : 'var(--m3-on-surface-variant)'}; font-weight: 500;">${enabled ? '✓ Acceso externo activo' : 'Acceso externo en pausa'} · token fa_live_••••${state.settings.agentTokenHint || ''}</span>`
+      : '<span style="color: var(--m3-on-surface-variant);">Sin token. Genera uno para conectar asistentes externos.</span>';
+
+    const reveal = document.getElementById('external-agent-token-reveal');
+    const tokenInput = document.getElementById('external-agent-token');
+    if (reveal && tokenInput) {
+      reveal.style.display = freshToken ? 'block' : 'none';
+      tokenInput.value = freshToken || '';
+    }
+
+    const guide = document.getElementById('external-agent-guide');
+    if (guide) {
+      const tk = freshToken || 'fa_live_TU_TOKEN';
+      guide.textContent =
+`# 1) Comando en lenguaje natural (Atajos de voz / HTTP Shortcuts / Telegram)
+POST ${endpoint}/command
+Authorization: Bearer ${tk}
+Content-Type: application/json
+{"command": "Añade leche y aguacates a la compra"}
+→ responde {"ok":true,"speech":"..."}  (lee "speech" en voz alta)
+
+# 2) Claude / clientes MCP  (servidor MCP remoto)
+URL:  ${endpoint}/mcp
+Header: Authorization: Bearer ${tk}
+
+# 3) ChatGPT (Custom GPT → Actions)
+Importar esquema desde: ${endpoint}/openapi.json
+Autenticación: API Key → Bearer → ${tk}`;
+    }
+  }
+
+  // US-02: Preferencias dietéticas activas en Ajustes
+  renderDietaryPreferencesSettings() {
+    const container = document.getElementById('settings-dietary-chips');
+    if (!container) return;
+
+    container.innerHTML = PREDEFINED_DIETARY_TAGS.map(pref => {
+      const isSelected = (state.dietaryPreferences || []).includes(pref);
+      return `
+        <button type="button" class="m3-filter-chip dietary-chip ${isSelected ? 'active' : ''}" onclick="app.toggleDietaryPreference('${pref}')">
+          ${isSelected ? '<span class="material-symbols-outlined" style="font-size: 14px;">check_circle</span>' : `<span class="dietary-emoji">${getDietaryTagEmoji(pref)}</span>`}
+          <span>${pref}</span>
+        </button>
+      `;
+    }).join('');
+  }
+
+  toggleDietaryPreference(pref) {
+    if (!pref) return;
+    let prefs = [...(state.dietaryPreferences || [])];
+    if (prefs.includes(pref)) {
+      prefs = prefs.filter(p => p !== pref);
+    } else {
+      prefs.push(pref);
+    }
+    state.saveDietaryPreferences(prefs);
+    this.renderDietaryPreferencesSettings();
+    this.renderPlanner();
+    this.renderTodayView();
+    this.scheduleSyncWithCloud();
+  }
+
+  // US-03: Objetivos nutricionales diarios en Ajustes
+  renderNutritionGoalsSettings() {
+    const goals = state.settings?.nutritionGoals || { enabled: false, calories: 2000, protein: 140, carbs: 200, fat: 65 };
+    const toggleEnabled = document.getElementById('toggle-nutrition-goals-enabled');
+    const inputCal = document.getElementById('input-goal-calories');
+    const inputProt = document.getElementById('input-goal-protein');
+    const inputCarbs = document.getElementById('input-goal-carbs');
+    const inputFat = document.getElementById('input-goal-fat');
+
+    if (toggleEnabled) toggleEnabled.checked = !!goals.enabled;
+    if (inputCal) inputCal.value = goals.calories || '';
+    if (inputProt) inputProt.value = goals.protein || '';
+    if (inputCarbs) inputCarbs.value = goals.carbs || '';
+    if (inputFat) inputFat.value = goals.fat || '';
+  }
+
+  saveNutritionGoalsFromSettings() {
+    const toggleEnabled = document.getElementById('toggle-nutrition-goals-enabled');
+    const inputCal = document.getElementById('input-goal-calories');
+    const inputProt = document.getElementById('input-goal-protein');
+    const inputCarbs = document.getElementById('input-goal-carbs');
+    const inputFat = document.getElementById('input-goal-fat');
+    const statusMsg = document.getElementById('nutrition-goals-status-msg');
+
+    const newGoals = {
+      enabled: toggleEnabled ? toggleEnabled.checked : true,
+      calories: inputCal ? Number(inputCal.value) : 2000,
+      protein: inputProt ? Number(inputProt.value) : 140,
+      carbs: inputCarbs ? Number(inputCarbs.value) : 200,
+      fat: inputFat ? Number(inputFat.value) : 65
+    };
+
+    state.saveNutritionGoals(newGoals);
+    this.renderTodayView();
+    this.applyRecipeFilters();
+    this.scheduleSyncWithCloud();
+
+    if (statusMsg) {
+      statusMsg.style.display = 'inline';
+      setTimeout(() => { statusMsg.style.display = 'none'; }, 2500);
+    }
+  }
+
+  // Modal rápido de objetivos (US-03)
+  openNutritionGoalsModal() {
+    const modal = document.getElementById('modal-nutrition-goals');
+    if (!modal) return;
+    const goals = state.settings?.nutritionGoals || { enabled: false, calories: 2000, protein: 140, carbs: 200, fat: 65 };
+
+    const toggle = document.getElementById('toggle-modal-goal-enabled');
+    const inputCal = document.getElementById('input-modal-goal-calories');
+    const inputProt = document.getElementById('input-modal-goal-protein');
+    const inputCarbs = document.getElementById('input-modal-goal-carbs');
+    const inputFat = document.getElementById('input-modal-goal-fat');
+
+    if (toggle) toggle.checked = !!goals.enabled;
+    if (inputCal) inputCal.value = goals.calories || '';
+    if (inputProt) inputProt.value = goals.protein || '';
+    if (inputCarbs) inputCarbs.value = goals.carbs || '';
+    if (inputFat) inputFat.value = goals.fat || '';
+
+    this.openDialogModal(modal);
+  }
+
+  closeNutritionGoalsModal() {
+    const modal = document.getElementById('modal-nutrition-goals');
+    if (modal) this.closeDialogModal(modal);
+  }
+
+  saveNutritionGoalsFromModal() {
+    const toggle = document.getElementById('toggle-modal-goal-enabled');
+    const inputCal = document.getElementById('input-modal-goal-calories');
+    const inputProt = document.getElementById('input-modal-goal-protein');
+    const inputCarbs = document.getElementById('input-modal-goal-carbs');
+    const inputFat = document.getElementById('input-modal-goal-fat');
+
+    const newGoals = {
+      enabled: toggle ? toggle.checked : true,
+      calories: inputCal ? Number(inputCal.value) : 2000,
+      protein: inputProt ? Number(inputProt.value) : 140,
+      carbs: inputCarbs ? Number(inputCarbs.value) : 200,
+      fat: inputFat ? Number(inputFat.value) : 65
+    };
+
+    state.saveNutritionGoals(newGoals);
+    this.renderNutritionGoalsSettings();
+    this.renderTodayView();
+    this.applyRecipeFilters();
+    this.scheduleSyncWithCloud();
+    this.closeNutritionGoalsModal();
+  }
+
+  // US-02: Auto-análisis inteligente y etiquetado masivo de recetas guardadas
+  async autoAnalyzeAndTagAllRecipes() {
+    const recipes = state.recipes || [];
+    let updatedCount = 0;
+    let totalTagsAdded = 0;
+    const nowIso = new Date().toISOString();
+
+    recipes.forEach(recipe => {
+      // 1. Limpiar la etiqueta obsoleta "General" si existe
+      if (Array.isArray(recipe.tags) && recipe.tags.some(t => t && String(t).trim().toLowerCase() === 'general')) {
+        recipe.tags = recipe.tags.filter(t => t && String(t).trim().toLowerCase() !== 'general');
+      }
+
+      const existingTags = Array.isArray(recipe.tags) ? recipe.tags : [];
+      const inferredTags = analyzeAndInferRecipeTags(recipe);
+
+      // Limpiar 'Alta en Proteínas' si ya no califica según el análisis nutricional actual
+      let tagsUpdated = false;
+      let currentTags = [...existingTags];
+      if (currentTags.includes('Alta en Proteínas') && !inferredTags.includes('Alta en Proteínas')) {
+        currentTags = currentTags.filter(t => t !== 'Alta en Proteínas');
+        tagsUpdated = true;
+      }
+
+      const currentLower = new Set(currentTags.map(t => String(t).toLowerCase().trim()));
+      const newTagsToAdd = [];
+      inferredTags.forEach(tag => {
+        if (!currentLower.has(tag.toLowerCase().trim()) && tag.toLowerCase().trim() !== 'general') {
+          newTagsToAdd.push(tag);
+          state.addCustomTag && state.addCustomTag(tag);
+        }
+      });
+
+      if (newTagsToAdd.length > 0 || tagsUpdated) {
+        recipe.tags = [...currentTags, ...newTagsToAdd];
+        recipe.updatedAt = nowIso;
+        updatedCount++;
+        totalTagsAdded += newTagsToAdd.length;
+      }
+    });
+
+    if (updatedCount > 0) {
+      state.save('fa_recipes', state.recipes);
+      this.initRecipeTagFilters();
+      this.render();
+      if (this.supabaseClient && state.cloudUser?.id) {
+        await this.pushToCloud(true);
+      }
+    }
+
+    const resultMsg = document.getElementById('auto-tag-result-msg');
+    if (resultMsg) {
+      resultMsg.style.display = 'block';
+      if (updatedCount > 0) {
+        resultMsg.innerHTML = `<span style="color: var(--color-brand); font-weight: 500;">✓ ¡Análisis completado! Se actualizaron ${updatedCount} ${updatedCount === 1 ? 'receta' : 'recetas'} con ${totalTagsAdded} nuevas ${totalTagsAdded === 1 ? 'etiqueta' : 'etiquetas'}.</span>`;
+      } else {
+        resultMsg.innerHTML = `<span style="color: var(--m3-on-surface-variant); font-weight: 500;">✓ Todas tus recetas ya cuentan con las etiquetas correspondientes.</span>`;
+      }
+    }
+
+    return { updatedCount, totalTagsAdded };
+  }
+
+  saveGeminiKey() {
+    const key = document.getElementById('input-gemini-key').value.trim();
+    state.settings.geminiApiKey = key;
+    const provider = document.getElementById('select-ai-provider')?.value || 'gemini';
+    state.settings.aiProvider = provider;
+    const model = 'gemini-3.8-flash';
+    state.settings.geminiModel = model;
+    state.save('fa_settings', state.settings);
+    this.renderSettings();
+    this.scheduleSyncWithCloud();
+    this.showToast("Configuración de Inteligencia Artificial guardada.", 'success');
+  }
+
+  exportBackup() {
+    const data = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      recipes: state.recipes,
+      mealPlan: state.mealPlan,
+      shoppingList: state.shoppingList
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `food-assistant-backup-${toLocalDateKey()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  handleFileInputForBulkImport(e) {
+    const file = e.target?.files?.[0];
+    if (!file) return;
+
+    const inputEl = e.target;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const rawContent = event.target.result;
+        this.openBulkImportModal(rawContent);
+      } catch (err) {
+        this.showToast('Error al leer el archivo JSON: ' + (err.message || 'formato inválido'), 'error');
+      } finally {
+        if (inputEl) inputEl.value = '';
+      }
+    };
+    reader.onerror = () => {
+      this.showToast('Error de lectura del archivo.', 'error');
+      if (inputEl) inputEl.value = '';
+    };
+    reader.readAsText(file);
+  }
+
+  importBackup(e) {
+    this.handleFileInputForBulkImport(e);
+  }
+
+  // ==========================================================================
+  // US-67: BULK RECIPES & COLLECTIONS IMPORTER (Samsung Food / Whisk / Backup)
+  // ==========================================================================
+
+  openBulkImportModal(dataOrJsonString) {
+    let parsed = null;
+    try {
+      parsed = RecipeParser.parseBulkCollection(dataOrJsonString);
+    } catch (err) {
+      this.showToast(err.message || 'Error al procesar el archivo JSON.', 'error');
+      return;
+    }
+
+    const { candidates, extraData } = parsed;
+    if (!candidates || candidates.length === 0) {
+      this.showToast('No se encontraron recetas válidas en el archivo seleccionado.', 'warning');
+      return;
+    }
+
+    RecipeParser.detectDuplicatesAndWarnings(candidates, state.recipes);
+
+    this.pendingBulkImport = {
+      candidates,
+      extraData
+    };
+    this.bulkImportFilter = 'all';
+
+    // Show extra backup notice if mealPlan / shoppingList is present
+    const extraNotice = document.getElementById('bulk-import-extra-notice');
+    if (extraNotice) {
+      if (extraData && (extraData.hasMealPlan || extraData.hasShoppingList)) {
+        extraNotice.style.display = 'block';
+        const parts = [];
+        if (extraData.hasMealPlan) parts.push('Plan Semanal');
+        if (extraData.hasShoppingList) parts.push('Lista de la Compra');
+        extraNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size: 16px; vertical-align: text-bottom; color: var(--m3-primary);">inventory_2</span> Esta copia también incluye datos de <strong>${parts.join(' y ')}</strong> que se sincronizarán al importar.`;
+      } else {
+        extraNotice.style.display = 'none';
+      }
+    }
+
+    // Reset progress UI and unlock buttons
+    const progressSec = document.getElementById('bulk-progress-section');
+    if (progressSec) progressSec.style.display = 'none';
+    const btnConfirm = document.getElementById('btn-confirm-bulk-import');
+    if (btnConfirm) btnConfirm.disabled = false;
+    const btnCancel = document.getElementById('btn-cancel-bulk-import');
+    if (btnCancel) btnCancel.disabled = false;
+
+    // Reset active chip
+    document.querySelectorAll('.bulk-filter-chips .chip').forEach(c => {
+      c.classList.toggle('active', c.getAttribute('data-filter') === 'all');
+    });
+
+    this.renderBulkImportStats();
+    this.renderBulkImportList();
+    this.updateBulkImportFooterAction();
+
+    this.openDialogModal(this.modalBulkImport);
+  }
+
+  closeBulkImportModal() {
+    this.closeDialogModal(this.modalBulkImport);
+    this.pendingBulkImport = null;
+  }
+
+  renderBulkImportStats() {
+    if (!this.pendingBulkImport) return;
+    const { candidates } = this.pendingBulkImport;
+
+    const total = candidates.length;
+    const newCount = candidates.filter(c => !c.isDuplicate).length;
+    const dupCount = candidates.filter(c => c.isDuplicate).length;
+    const warnCount = candidates.filter(c => c.warnings && c.warnings.length > 0).length;
+
+    // Update stats header container
+    const statsContainer = document.getElementById('bulk-import-stats');
+    if (statsContainer) {
+      statsContainer.innerHTML = `
+        <div class="bulk-stat-card">
+          <span class="bulk-stat-number">${total}</span>
+          <span class="bulk-stat-label">Encontradas</span>
+        </div>
+        <div class="bulk-stat-card bulk-stat-new">
+          <span class="bulk-stat-number">${newCount}</span>
+          <span class="bulk-stat-label">Nuevas</span>
+        </div>
+        <div class="bulk-stat-card bulk-stat-dup">
+          <span class="bulk-stat-number">${dupCount}</span>
+          <span class="bulk-stat-label">Duplicadas</span>
+        </div>
+        <div class="bulk-stat-card bulk-stat-warn">
+          <span class="bulk-stat-number">${warnCount}</span>
+          <span class="bulk-stat-label">Con avisos</span>
+        </div>
+      `;
+    }
+
+    // Update filter counts
+    const countAll = document.getElementById('count-filter-all');
+    const countNew = document.getElementById('count-filter-new');
+    const countDup = document.getElementById('count-filter-dup');
+    const countWarn = document.getElementById('count-filter-warn');
+    if (countAll) countAll.textContent = total;
+    if (countNew) countNew.textContent = newCount;
+    if (countDup) countDup.textContent = dupCount;
+    if (countWarn) countWarn.textContent = warnCount;
+
+    // Toggle duplicate overwrite option
+    const dupOptionCard = document.getElementById('bulk-duplicate-option-card');
+    if (dupOptionCard) {
+      dupOptionCard.style.display = dupCount > 0 ? 'block' : 'none';
+    }
+  }
+
+  renderBulkImportList() {
+    if (!this.pendingBulkImport) return;
+    const { candidates } = this.pendingBulkImport;
+    const listContainer = document.getElementById('bulk-import-list');
+    if (!listContainer) return;
+
+    let filtered = candidates;
+    if (this.bulkImportFilter === 'new') {
+      filtered = candidates.filter(c => !c.isDuplicate);
+    } else if (this.bulkImportFilter === 'duplicates') {
+      filtered = candidates.filter(c => c.isDuplicate);
+    } else if (this.bulkImportFilter === 'warnings') {
+      filtered = candidates.filter(c => c.warnings && c.warnings.length > 0);
+    }
+
+    if (filtered.length === 0) {
+      listContainer.innerHTML = `
+        <div style="text-align: center; padding: 24px; color: var(--m3-on-surface-variant); font-size: 13px;">
+          No hay recetas en esta categoría.
+        </div>
+      `;
+      return;
+    }
+
+    listContainer.innerHTML = filtered.map((c) => {
+      const originalIdx = candidates.indexOf(c);
+      const thumbHtml = c.imageUrl
+        ? `<div class="bulk-item-thumb"><img src="${c.imageUrl}" alt="" onerror="this.parentElement.innerHTML='<span class=\\'material-symbols-outlined\\'>restaurant</span>'"></div>`
+        : `<div class="bulk-item-thumb"><span class="material-symbols-outlined">restaurant</span></div>`;
+
+      const dupBadge = c.isDuplicate
+        ? `<span class="bulk-badge bulk-badge-dup"><span class="material-symbols-outlined" style="font-size: 12px;">sync_problem</span> ${c.duplicateReason || 'Ya existe'}</span>`
+        : `<span class="bulk-badge bulk-badge-new"><span class="material-symbols-outlined" style="font-size: 12px;">auto_awesome</span> Nueva</span>`;
+
+      const domainBadge = c.sourceDomain
+        ? `<span class="bulk-badge bulk-badge-domain"><span class="material-symbols-outlined" style="font-size: 12px;">public</span> ${c.sourceDomain}</span>`
+        : '';
+
+      const warningsBadges = (c.warnings || []).map(w => 
+        `<span class="bulk-badge bulk-badge-warn"><span class="material-symbols-outlined" style="font-size: 12px;">warning</span> ${w}</span>`
+      ).join('');
+
+      const totalTime = (c.prepTimeMinutes || 0) + (c.cookTimeMinutes || 0);
+      const timeStr = totalTime > 0 ? `<span>• ${totalTime} min</span>` : '';
+
+      return `
+        <div class="bulk-import-item ${c.selected ? '' : 'is-excluded'}" data-cand-idx="${originalIdx}">
+          <input type="checkbox" class="bulk-item-check" data-idx="${originalIdx}" ${c.selected ? 'checked' : ''} aria-label="Seleccionar receta ${c.title}">
+          ${thumbHtml}
+          <div class="bulk-item-info">
+            <div class="bulk-item-title-row">
+              <span class="bulk-item-title" title="${c.title}">${c.title}</span>
+              ${dupBadge}
+              ${domainBadge}
+              ${warningsBadges}
+            </div>
+            <div class="bulk-item-meta">
+              <span>${c.ingredients?.length || 0} ingredientes</span>
+              <span>• ${c.instructions?.length || 0} pasos</span>
+              <span>• ${c.servings || 2} raciones</span>
+              ${timeStr}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Attach click events on items and checkboxes
+    listContainer.querySelectorAll('.bulk-import-item').forEach(itemEl => {
+      const idx = parseInt(itemEl.getAttribute('data-cand-idx'), 10);
+      const checkEl = itemEl.querySelector('.bulk-item-check');
+
+      checkEl.addEventListener('change', (e) => {
+        candidates[idx].selected = e.target.checked;
+        itemEl.classList.toggle('is-excluded', !e.target.checked);
+        this.updateBulkImportFooterAction();
+      });
+
+      itemEl.addEventListener('click', (e) => {
+        if (e.target === checkEl || e.target.tagName === 'INPUT') return;
+        checkEl.checked = !checkEl.checked;
+        candidates[idx].selected = checkEl.checked;
+        itemEl.classList.toggle('is-excluded', !checkEl.checked);
+        this.updateBulkImportFooterAction();
+      });
+    });
+  }
+
+  setBulkImportSelection(mode) {
+    if (!this.pendingBulkImport) return;
+    const { candidates } = this.pendingBulkImport;
+
+    candidates.forEach(c => {
+      if (mode === 'all') c.selected = true;
+      else if (mode === 'new') c.selected = !c.isDuplicate;
+      else if (mode === 'none') c.selected = false;
+    });
+
+    this.renderBulkImportList();
+    this.updateBulkImportFooterAction();
+  }
+
+  updateBulkImportFooterAction() {
+    if (!this.pendingBulkImport) return;
+    const { candidates } = this.pendingBulkImport;
+    const selectedCount = candidates.filter(c => c.selected).length;
+    const totalCount = candidates.length;
+
+    const btnText = document.getElementById('btn-confirm-bulk-import-text');
+    const btnConfirm = document.getElementById('btn-confirm-bulk-import');
+    if (btnText) {
+      btnText.textContent = selectedCount > 0 
+        ? `Importar ${selectedCount} de ${totalCount} recetas`
+        : 'Selecciona al menos 1 receta';
+    }
+    if (btnConfirm) {
+      btnConfirm.disabled = (selectedCount === 0);
+    }
+  }
+
+  async executeBulkImport() {
+    if (!this.pendingBulkImport) return;
+    const { candidates, extraData } = this.pendingBulkImport;
+    const selected = candidates.filter(c => c.selected);
+    if (selected.length === 0) {
+      this.showToast('Selecciona al menos una receta para importar.', 'warning');
+      return;
+    }
+
+    const overwrite = document.getElementById('check-bulk-overwrite-duplicates')?.checked || false;
+
+    // Show progress UI and lock buttons
+    const progressSec = document.getElementById('bulk-progress-section');
+    const fillEl = document.getElementById('bulk-progress-fill');
+    const titleEl = document.getElementById('bulk-progress-title');
+    const percentEl = document.getElementById('bulk-progress-percent');
+    const detailEl = document.getElementById('bulk-progress-detail');
+    const btnConfirm = document.getElementById('btn-confirm-bulk-import');
+    const btnCancel = document.getElementById('btn-cancel-bulk-import');
+
+    if (progressSec) progressSec.style.display = 'flex';
+    if (btnConfirm) btnConfirm.disabled = true;
+    if (btnCancel) btnCancel.disabled = true;
+
+    let processedCount = 0;
+    const total = selected.length;
+
+    for (let i = 0; i < total; i++) {
+      const cand = selected[i];
+      const percent = Math.round(((i + 1) / total) * 100);
+
+      // Smooth unblocked tick: yield every 5 items on large batches or every item on small batches
+      if (total <= 50 || i % 5 === 0 || i === total - 1) {
+        if (fillEl) fillEl.style.width = `${percent}%`;
+        if (percentEl) percentEl.textContent = `${percent}%`;
+        if (titleEl) titleEl.textContent = `Procesando receta ${i + 1} de ${total}`;
+        if (detailEl) detailEl.textContent = `Normalizando ingredientes y pasillos: ${cand.title}...`;
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+
+      const finalRecipe = RecipeParser.finalizeImportRecipe(cand);
+
+      const importTimestamp = new Date().toISOString();
+      finalRecipe.createdAt = cand.createdAt || importTimestamp;
+      finalRecipe.updatedAt = importTimestamp;
+      finalRecipe._isLocalDraft = true;
+
+      if (cand.isDuplicate && overwrite && cand.duplicateOf) {
+        const idx = state.recipes.findIndex(r => r.id === cand.duplicateOf.id);
+        if (idx >= 0) {
+          finalRecipe.id = cand.duplicateOf.id;
+          finalRecipe.createdAt = cand.duplicateOf.createdAt || finalRecipe.createdAt;
+          finalRecipe.updatedAt = importTimestamp;
+          state.recipes[idx] = finalRecipe;
+        } else {
+          state.recipes.unshift(finalRecipe);
+        }
+      } else {
+        finalRecipe.id = generateId('rec-');
+        state.recipes.unshift(finalRecipe);
+      }
+
+      processedCount++;
+    }
+
+    // Extra data restoration if present in backup
+    if (extraData && extraData.mealPlan) {
+      state.mealPlan = extraData.mealPlan;
+      state.save('fa_mealplan', state.mealPlan);
+    }
+    if (extraData && extraData.shoppingList) {
+      state.shoppingList = extraData.shoppingList;
+      state.save('fa_shopping', state.shoppingList);
+    }
+
+    state.save('fa_recipes', state.recipes);
+    this.scheduleSyncWithCloud();
+
+    this.closeBulkImportModal();
+    this.render();
+    this.switchView('view-recipes');
+
+    this.showToast(`¡${processedCount} recetas importadas con éxito!`, 'success');
+  }
+
+  async resetDemoData(skipConfirm = false) {
+    const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
+      title: 'Restablecer datos de demostración',
+      message: "¿Restablecer todas las recetas y el plan a los valores iniciales de demostración? Se perderán los cambios locales no exportados.",
+      confirmText: 'Restablecer datos',
+      cancelText: 'Cancelar',
+      danger: true,
+      icon: 'restart_alt'
+    });
+    if (confirmed) {
+      localStorage.removeItem('fa_recipes');
+      localStorage.removeItem('fa_mealplan');
+      localStorage.removeItem('fa_shopping');
+      localStorage.removeItem('fa_deleted_records');
+      state.deletedRecords = { recipes: [], mealPlans: [], shoppingItems: [] };
+      state.recipes = typeof structuredClone === 'function' ? structuredClone(SEED_RECIPES) : JSON.parse(JSON.stringify(SEED_RECIPES));
+      state.mealPlan = state.generateInitialMealPlan();
+      state.shoppingList = [];
+      state.save('fa_recipes', state.recipes);
+      state.save('fa_mealplan', state.mealPlan);
+      state.save('fa_shopping', state.shoppingList);
+      state.save('fa_deleted_records', state.deletedRecords);
+      try { localStorage.setItem('fa_recipes_seeded', 'v8'); } catch (e) {}
+      this.syncDataWithCloud(true);
+      this.render();
+      this.showToast("Datos restablecidos a los valores iniciales.", 'info');
+      return true;
+    }
+    return false;
+  }
+}
+
+// ==========================================================================
+// US-17, US-37 & BUG-15: AI AGENT TOOLS DECLARATIONS & SAFE MARKDOWN FORMATTER
+// ==========================================================================
+function formatSafeAiMarkdown(rawText) {
+  if (!rawText || typeof rawText !== 'string') return '';
+  // Limpiar cualquier identificador interno rec-... que el modelo haya podido filtrar en el texto visible
+  const cleaned = rawText
+    .replace(/\s*\([\s*`'"]*rec-[a-zA-Z0-9_-]+[\s*`'"]*\)/gi, '')
+    .replace(/\s*\[[\s*`'"]*rec-[a-zA-Z0-9_-]+[\s*`'"]*\]/gi, '')
+    .replace(/[*`'"]*\brec-[a-zA-Z0-9_-]+\b[*`'"]*/gi, '');
+
+  const escaped = cleaned
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+  return escaped
+    .replace(/^[ \t]*[\-\*•][ \t]+(.*)$/gm, '• $1')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
+    .replace(/`([^`\n]+)`/g, '<em>$1</em>')
+    .replace(/\n/g, '<br>');
+}
+
+const AI_TOOLS_DECLARATIONS = [
+  {
+    name: "create_and_save_recipe",
+    description: "Crea y guarda una nueva receta completa en el catálogo del usuario cuando no tiene una receta adecuada o pide inventar una receta nueva. NUNCA uses esta herramienta si la receta ya existe en su catálogo o si el usuario pide asignar una receta a las comidas o meriendas de la semana.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        id: { type: "STRING", description: "ID opcional sugerido para la receta" },
+        title: { type: "STRING", description: "Título de la receta" },
+        description: { type: "STRING", description: "Descripción breve del plato" },
+        prepTimeMinutes: { type: "INTEGER", description: "Minutos de preparación" },
+        cookTimeMinutes: { type: "INTEGER", description: "Minutos de cocción" },
+        servings: { type: "INTEGER", description: "Número de raciones" },
+        tags: { type: "ARRAY", items: { type: "STRING" }, description: "Etiquetas de la receta (ej. Cena, Rápida, Sin Gluten, Alta en Proteínas)" },
+        ingredients: {
+          type: "ARRAY",
+          items: {
+            type: "OBJECT",
+            properties: {
+              name: { type: "STRING" },
+              amount: { type: "NUMBER" },
+              unit: { type: "STRING" }
+            },
+            required: ["name", "amount", "unit"]
+          }
+        },
+        instructions: {
+          type: "ARRAY",
+          items: {
+            type: "OBJECT",
+            properties: {
+              step: { type: "INTEGER" },
+              text: { type: "STRING" },
+              timerMinutes: { type: "INTEGER" }
+            },
+            required: ["step", "text"]
+          }
+        },
+        nutrition: {
+          type: "OBJECT",
+          properties: {
+            calories: { type: "INTEGER" },
+            protein: { type: "INTEGER" },
+            carbs: { type: "INTEGER" },
+            fat: { type: "INTEGER" }
+          }
+        }
+      },
+      required: ["title", "ingredients", "instructions"]
+    }
+  },
+  {
+    name: "set_day_plan",
+    description: "Asigna o actualiza las comidas de un día concreto en el Planificador (ej. hoy, mañana o una fecha específica) usando IDs reales de recetas.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        dateKey: { type: "STRING", description: "Fecha ISO local YYYY-MM-DD del día a planificar (ej. 2026-10-29)" },
+        dayName: { type: "STRING", description: "Nombre del día (ej. Lunes, Martes...)" },
+        breakfast: { type: "STRING", description: "ID de la receta para desayuno (opcional)" },
+        lunch: { type: "STRING", description: "ID de la receta para almuerzo (opcional)" },
+        snack: { type: "STRING", description: "ID de la receta para merienda (opcional)" },
+        dinner: { type: "STRING", description: "ID de la receta para cena (opcional)" }
+      },
+      required: ["dateKey"]
+    }
+  },
+  {
+    name: "set_weekly_plan",
+    description: "Asigna o actualiza el menú semanal en el Planificador. Puede aplicarse a la semana completa (con las 4 comidas: breakfast, lunch, snack y dinner) o a un momento de comida específico para toda la semana (ej. asignar una receta a todas las meriendas, desayunos o cenas de los 7 días) usando los IDs reales de las recetas.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        mode: { type: "STRING", description: "'replace' para aplicar los slots indicados o 'merge' para rellenar solo los huecos vacíos" },
+        days: {
+          type: "ARRAY",
+          items: {
+            type: "OBJECT",
+            properties: {
+              dateKey: { type: "STRING", description: "Fecha ISO local YYYY-MM-DD" },
+              dayName: { type: "STRING", description: "Nombre del día (Lunes..Domingo)" },
+              breakfast: { type: "STRING", description: "ID de la receta de Desayuno (opcional si solo actualizas otro momento)" },
+              lunch: { type: "STRING", description: "ID de la receta de Almuerzo (opcional si solo actualizas otro momento)" },
+              snack: { type: "STRING", description: "ID de la receta de Merienda (opcional si solo actualizas otro momento)" },
+              dinner: { type: "STRING", description: "ID de la receta de Cena (opcional si solo actualizas otro momento)" },
+              isLeftoverLunch: { type: "BOOLEAN", description: "true si este almuerzo es tupper de la cena anterior (Batch Cooking)" }
+            },
+            required: ["dateKey"]
+          }
+        }
+      },
+      required: ["days"]
+    }
+  },
+  {
+    name: "manage_shopping_list",
+    description: "Gestiona la lista de la compra. Para añadir artículos sueltos que pida el usuario usa SIEMPRE action: 'add' y la lista en 'items'. NUNCA uses 'add_from_current_plan' para artículos individuales. NUNCA uses esta herramienta si el usuario pide asignar o poner un plato en una comida, merienda o día del planificador.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        action: { type: "STRING", description: "'add' (artículos sueltos pedidos por Franky) | 'check' (marcar comprados) | 'remove' (borrar) | 'add_from_current_plan' (SOLO si Franky pide explícitamente volcar todo el menú semanal a la lista)" },
+        items: {
+          type: "ARRAY",
+          items: {
+            type: "OBJECT",
+            properties: {
+              name: { type: "STRING", description: "Nombre del producto" },
+              amount: { type: "NUMBER", description: "Cantidad numérica" },
+              unit: { type: "STRING", description: "Unidad (ej. g, ml, ud, l, kg)" }
+            },
+            required: ["name"]
+          }
+        }
+      },
+      required: ["action"]
+    }
+  }
+];
+
+// Global App Instance
+let app;
+function bootstrapApp() {
+  if (typeof window !== 'undefined' && !window.app) {
+    app = new FoodAssistantApp();
+    window.app = app;
+  }
+}
+
+if (typeof window !== 'undefined') {
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', bootstrapApp);
+  } else {
+    bootstrapApp();
+  }
+  window.SEED_RECIPES = SEED_RECIPES;
+  window.STANDARD_SLOTS = STANDARD_SLOTS;
+  window.AISLE_METADATA = AISLE_METADATA;
+  window.COMMON_INGREDIENTS = COMMON_INGREDIENTS;
+  window.normalizeIngredientText = normalizeIngredientText;
+  window.normalizeSearchText = normalizeSearchText;
+  window.getSearchWordVariants = getSearchWordVariants;
+  window.getRecipeSearchText = getRecipeSearchText;
+  window.matchRecipeSearch = matchRecipeSearch;
+  window.matchFridgeIngredient = matchFridgeIngredient;
+  window.categorizeIngredientAisle = categorizeIngredientAisle;
+  window.resolveAisleOnline = resolveAisleOnline;
+  window.getCachedAisle = getCachedAisle;
+  window.setCachedAisle = setCachedAisle;
+  window.getIngredientIcon = getIngredientIcon;
+  window.getIngredientSuggestions = getIngredientSuggestions;
+  window.extractTimerFromStepText = extractTimerFromStepText;
+  window.StateStore = StateStore;
+  window.IndexedDbStorage = IndexedDbStorage;
+  window.state = state;
+  window.isSafeUrl = isSafeUrl;
+  window.sanitizeUrl = sanitizeUrl;
+  window.cleanRecipeImageUrl = cleanRecipeImageUrl;
+  window.FoodAssistantApp = FoodAssistantApp;
+  window.generateId = generateId;
+  window.analyzeAndInferRecipeTags = analyzeAndInferRecipeTags;
+  window.estimateRecipeNutrition = estimateRecipeNutrition;
+  window.getRecipeNutrition = getRecipeNutrition;
+  window.formatSafeAiMarkdown = formatSafeAiMarkdown;
+  window.AI_TOOLS_DECLARATIONS = AI_TOOLS_DECLARATIONS;
+  window.checkDietaryCompliance = checkDietaryCompliance;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    SEED_RECIPES,
+    STANDARD_SLOTS,
+    AISLE_METADATA,
+    COMMON_INGREDIENTS,
+    escapeHtml,
+    normalizeIngredientText,
+    normalizeSearchText,
+    getSearchWordVariants,
+    getRecipeSearchText,
+    matchRecipeSearch,
+    matchFridgeIngredient,
+    categorizeIngredientAisle,
+    resolveAisleOnline,
+    getCachedAisle,
+    setCachedAisle,
+    getIngredientIcon,
+    getIngredientSuggestions,
+    extractTimerFromStepText,
+    StateStore,
+    IndexedDbStorage,
+    FoodAssistantApp,
+    isSafeUrl,
+    sanitizeUrl,
+    cleanRecipeImageUrl,
+    generateId,
+    analyzeAndInferRecipeTags,
+    estimateRecipeNutrition,
+    getRecipeNutrition,
+    formatSafeAiMarkdown,
+    AI_TOOLS_DECLARATIONS,
+    checkDietaryCompliance
+  };
+}
