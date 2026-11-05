@@ -1195,11 +1195,17 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     expect(day.snack).toBeNull();
   });
 
-  it('v0.98: detectPromptCriteria y selectRelevantRecipesForPrompt pre-seleccionan recetas relevantes cuando hay criterios y devuelven 100% si no los hay', () => {
+  it('v1.25: detectPromptCriteria y selectRelevantRecipesForPrompt priorizan preferencias y limitan el catálogo para evitar timeouts', () => {
     const promptWithProtein = "Crea un plan semanal rico en proteinas, equilibrado y saludable. No incluyas fin de semana ni meriendas";
     const criteria = appInstance.detectPromptCriteria(promptWithProtein);
     expect(criteria.length).toBeGreaterThan(0);
     expect(criteria.some(c => c.key === 'protein')).toBe(true);
+
+    // Criterios detectados ante peticiones de gimnasio / entreno / cena
+    const gymDinnerPrompt = "elige una buena cena para hoy y para después del gimnasio";
+    const gymCriteria = appInstance.detectPromptCriteria(gymDinnerPrompt);
+    expect(gymCriteria.some(c => c.key === 'protein')).toBe(true);
+    expect(gymCriteria.some(c => c.slot === 'dinner')).toBe(true);
 
     const emptyCriteria = appInstance.detectPromptCriteria("Organiza mi semana");
     expect(emptyCriteria.length).toBe(0);
@@ -1210,17 +1216,24 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
       title: i % 2 === 0 ? `Salmón al horno ${i}` : `Postre dulce ${i}`,
       tags: i % 2 === 0 ? ['Cena', 'Pescado'] : ['Postre'],
       ingredients: i % 2 === 0 ? [{ name: 'salmón' }, { name: 'espárragos' }] : [{ name: 'azúcar' }],
-      nutrition: { protein: i % 2 === 0 ? 35 : 2, calories: 300, carbs: 10, fat: 5 }
+      nutrition: { protein: i % 2 === 0 ? 35 : 2, calories: 300, carbs: 10, fat: 5 },
+      isFavorite: i === 0
     }));
 
     // Con criterios: pre-selecciona subconjunto amplio
     const filtered = appInstance.selectRelevantRecipesForPrompt(fakeCatalog, promptWithProtein);
-    expect(filtered.length).toBeLessThan(200);
+    expect(filtered.length).toBeLessThanOrEqual(90);
     expect(filtered.length).toBeGreaterThanOrEqual(35);
 
-    // Sin criterios: no hace recortes aleatorios, devuelve todas las 200
+    // Ante petición de cena tras el gimnasio: acota a ~50 recetas y prioriza cenas altas en proteínas
+    const dinnerGymFiltered = appInstance.selectRelevantRecipesForPrompt(fakeCatalog, gymDinnerPrompt);
+    expect(dinnerGymFiltered.length).toBeLessThanOrEqual(50);
+    expect(dinnerGymFiltered[0].nutrition.protein).toBeGreaterThanOrEqual(25);
+
+    // Sin criterios específicos de prompt: aplica prioridades del usuario y nunca envía las 200 para evitar timeout
     const all = appInstance.selectRelevantRecipesForPrompt(fakeCatalog, "Organiza mi semana");
-    expect(all.length).toBe(200);
+    expect(all.length).toBeLessThanOrEqual(90);
+    expect(all.length).toBeGreaterThanOrEqual(35);
   });
 
   it('v1.00: resolveRecipeIdForAgent resuelve recetas ignorando preposiciones/conectores y con coincidencia difusa', () => {

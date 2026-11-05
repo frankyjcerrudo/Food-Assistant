@@ -4130,7 +4130,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.24';
+  window.APP_VERSION = 'v1.25';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4167,7 +4167,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.24';
+    this.appVersion = window.APP_VERSION || 'v1.25';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -10904,17 +10904,26 @@ class FoodAssistantApp {
     const lower = prompt.toLowerCase();
     const criteria = [];
 
-    // Metas de macros y dietas
-    if (/prote[ií]n/i.test(lower)) criteria.push({ type: 'macro', key: 'protein', min: 20 });
-    if (/calor[ií]a|baja\s+en\s+calor/i.test(lower)) criteria.push({ type: 'tag', tag: 'Baja en Calorías' });
+    // Metas de macros y fitness / gym / deporte (US-68, US-70, v1.25)
+    if (/prote[ií]n|gimnasio|gym|entreno|entrenar|pesas|m[uú]sculo|fitness|post-?entreno|pre-?entreno|deporte|recuperaci[oó]n/i.test(lower)) {
+      criteria.push({ type: 'macro', key: 'protein', min: 25 });
+      criteria.push({ type: 'tag', tag: 'Alta en Proteínas' });
+    }
+    if (/calor[ií]a|baja\s+en\s+calor|ligera|ligero|livian/i.test(lower)) {
+      criteria.push({ type: 'tag', tag: 'Baja en Calorías' });
+      criteria.push({ type: 'tag', tag: 'Saludable' });
+    }
     if (/carbohidrato|baja\s+en\s+carbo|low\s*carb/i.test(lower)) criteria.push({ type: 'tag', tag: 'Baja en Carbohidratos' });
     if (/keto|cetog[eé]nic/i.test(lower)) criteria.push({ type: 'tag', tag: 'Keto' });
     if (/vegan/i.test(lower)) criteria.push({ type: 'tag', tag: 'Vegano' });
     if (/vegetar/i.test(lower)) criteria.push({ type: 'tag', tag: 'Vegetariano' });
     if (/gluten|cel[ií]ac/i.test(lower)) criteria.push({ type: 'tag', tag: 'Sin Gluten' });
     if (/lactosa/i.test(lower)) criteria.push({ type: 'tag', tag: 'Sin Lactosa' });
-    if (/r[aá]pida|express|f[aá]cil/i.test(lower)) criteria.push({ type: 'tag', tag: 'Rápida' });
+    if (/r[aá]pida|express|f[aá]cil|pocos?\s+ingredientes/i.test(lower)) criteria.push({ type: 'tag', tag: 'Rápida' });
     if (/merienda|metiendas?/i.test(lower)) criteria.push({ type: 'tag', tag: 'Merienda' });
+    if (/cena|cenar|noche/i.test(lower)) criteria.push({ type: 'slot', slot: 'dinner' });
+    if (/almuerzo|comida|comer|mediod[ií]a/i.test(lower)) criteria.push({ type: 'slot', slot: 'lunch' });
+    if (/desayuno|desayunar|ma[ñn]ana/i.test(lower)) criteria.push({ type: 'slot', slot: 'breakfast' });
 
     // Ingredientes o familias clave
     if (/pescado|marisco|at[uú]n|salm[oó]n|merluza|bacalao|gamba/i.test(lower)) {
@@ -10940,9 +10949,13 @@ class FoodAssistantApp {
   }
 
   selectRelevantRecipesForPrompt(recipes, prompt = '') {
-    if (!Array.isArray(recipes) || recipes.length <= 120) return recipes || [];
+    if (!Array.isArray(recipes) || recipes.length === 0) return [];
+    if (recipes.length <= 80) return recipes;
 
-    // Priorizar recetas nombradas directamente en la petición del usuario, ignorando preposiciones y conectores
+    const lowerPrompt = (prompt || '').toLowerCase();
+    const criteria = this.detectPromptCriteria(prompt);
+
+    // Priorizar recetas nombradas directamente en la petición del usuario
     const promptStopWordsRegex = /\b(de|del|la|las|el|los|un|una|unos|unas|con|al|a|en|y|para|sin|por|pon|mete|asigna|a[ñn]ade|todas?|toda|semana|esta|las|los|receta|metiendas?|meriendas?|desayunos?|almuerzos?|cenas?)\b/gi;
     const promptKeywords = (prompt || '')
       .toLowerCase()
@@ -10966,67 +10979,149 @@ class FoodAssistantApp {
       });
     }
 
-    const criteria = this.detectPromptCriteria(prompt);
-    if (criteria.length === 0 && directMentionRecipes.length === 0) {
-      // Sin criterios específicos de filtro en el prompt: devolver 100% de recetas completas sin recortes
-      return recipes;
-    }
+    // Prioridades configuradas del usuario (US-68, US-70)
+    const userPrefs = Array.isArray(state?.dietaryPreferences) ? state.dietaryPreferences : [];
+    const userGoals = state?.settings?.nutritionGoals;
+    const isGoalActive = !!userGoals?.enabled;
+    const targetProtein = isGoalActive ? (userGoals.protein || 0) : 0;
+    const isHighProteinGoal = targetProtein >= 120 || userPrefs.some(p => /prote/i.test(p));
 
-    const matchedIds = new Set(directMentionIds);
-    const breakfastOrSnacks = [];
-    const mainDishes = [];
+    // Detección de momento específico en el prompt
+    const isDinnerQuery = /\b(cena|cenar|cenas|noche)\b/i.test(lowerPrompt);
+    const isLunchQuery = /\b(almuerzo|almuerzos|comida|comidas|comer|mediod[ií]a)\b/i.test(lowerPrompt);
+    const isBreakfastQuery = /\b(desayuno|desayunos|desayunar|ma[ñn]ana)\b/i.test(lowerPrompt);
+    const isSnackQuery = /\b(merienda|meriendas|snack|snacks|picoteo)\b/i.test(lowerPrompt);
+    const isSingleSlotQuery = isDinnerQuery || isLunchQuery || isBreakfastQuery || isSnackQuery;
 
-    recipes.forEach(r => {
-      const nut = getRecipeNutrition(r);
-      const tags = (r.tags || []).map(t => String(t).toLowerCase());
-      const ingText = (r.ingredients || []).map(i => typeof i === 'string' ? i : (i.name || '')).join(' ').toLowerCase();
+    // Detección de intención deportiva / gimnasio / recuperación
+    const isFitnessIntent = /\b(gimnasio|gym|entreno|entrenar|pesas|m[uú]sculo|musculo|fitness|post-?entreno|pre-?entreno|deporte|recuperaci[oó]n)\b/i.test(lowerPrompt);
+
+    // Sistema de puntuación y ranking inteligente
+    const scored = recipes.map(r => {
+      let score = 0;
+      const rId = r.id;
       const titleLower = String(r.title || '').toLowerCase();
+      const tags = (r.tags || []).map(t => String(t).toLowerCase());
+      const nut = getRecipeNutrition(r);
+      const ingText = (r.ingredients || []).map(i => typeof i === 'string' ? i : (i.name || '')).join(' ').toLowerCase();
+
       const isBreakfastOrSnack = tags.some(t => t.includes('desayuno') || t.includes('merienda')) ||
         /avena|porridge|yogur|chia|smoothie|batido|pancake|torta|tosta|fruta|bowl/i.test(titleLower);
 
-      let isMatch = directMentionIds.has(r.id) || !!r.isFavorite;
-      if (!isMatch) {
-        for (const c of criteria) {
-          if (c.type === 'macro' && c.key === 'protein') {
-            if ((nut.protein || 0) >= c.min || tags.some(t => t.includes('prote')) || /pollo|pavo|ternera|atun|atún|salm[oó]n|huevo|lenteja|garbanzo/i.test(titleLower + ' ' + ingText)) {
-              isMatch = true;
-              break;
-            }
-          } else if (c.type === 'tag') {
-            if (tags.some(t => t.includes(c.tag.toLowerCase()))) {
-              isMatch = true;
-              break;
-            }
-          } else if (c.type === 'ingredient') {
-            if (c.regex.test(titleLower) || c.regex.test(ingText)) {
-              isMatch = true;
-              break;
-            }
-          }
+      // 1. Mención directa en la petición
+      if (directMentionIds.has(rId)) {
+        score += 150;
+      }
+
+      // 2. Recetas Favoritas (❤️): Máxima prioridad del usuario (US-70)
+      if (r.isFavorite) {
+        score += 60;
+      }
+
+      // 3. Preferencias dietéticas configuradas del usuario
+      if (userPrefs.length > 0) {
+        const comp = checkDietaryCompliance(r, userPrefs);
+        if (comp.compliant) {
+          score += 45;
+        } else {
+          score -= 40;
         }
       }
 
-      if (isMatch) {
-        matchedIds.add(r.id);
-        if (isBreakfastOrSnack) {
-          breakfastOrSnacks.push(r);
-        } else {
-          mainDishes.push(r);
-        }
-      } else if (isBreakfastOrSnack) {
-        breakfastOrSnacks.push(r);
+      // 4. Objetivos nutricionales o intención de gimnasio/proteínas
+      if (isFitnessIntent || isHighProteinGoal) {
+        if ((nut.protein || 0) >= 30) score += 40;
+        else if ((nut.protein || 0) >= 20) score += 20;
+        if (tags.some(t => t.includes('prote') || t.includes('fitness'))) score += 25;
       }
+
+      // 5. Coherencia con el momento del día
+      if (isDinnerQuery) {
+        if (tags.some(t => t.includes('cena')) || (!isBreakfastOrSnack && /cena|saludable|ligera/i.test(tags.join(' ')))) {
+          score += 45;
+        } else if (isBreakfastOrSnack) {
+          score -= 70; // No sugerir desayunos para cenar
+        } else {
+          score += 15;
+        }
+      } else if (isLunchQuery) {
+        if (!isBreakfastOrSnack) score += 35;
+        else score -= 50;
+      } else if (isBreakfastQuery) {
+        if (tags.some(t => t.includes('desayuno')) || isBreakfastOrSnack) score += 55;
+        else score -= 60;
+      } else if (isSnackQuery) {
+        if (tags.some(t => t.includes('merienda') || t.includes('snack')) || isBreakfastOrSnack) score += 55;
+        else score -= 60;
+      }
+
+      // 6. Criterios adicionales del prompt
+      for (const c of criteria) {
+        if (c.type === 'macro' && c.key === 'protein') {
+          if ((nut.protein || 0) >= c.min) score += 30;
+        } else if (c.type === 'tag') {
+          if (tags.some(t => t.includes(c.tag.toLowerCase()))) score += 30;
+        } else if (c.type === 'ingredient') {
+          if (c.regex.test(titleLower) || c.regex.test(ingText)) score += 40;
+        }
+      }
+
+      // 7. Completitud y calidad de la ficha
+      if (r.image && !r.image.includes('placeholder')) score += 5;
+      if (Array.isArray(r.instructions) && r.instructions.length > 0) score += 5;
+
+      // Variedad determinista entre llamadas
+      let hash = 0;
+      for (let j = 0; j < rId.length; j++) hash = (hash * 31 + rId.charCodeAt(j)) % 17;
+      score += (hash % 7);
+
+      return { recipe: r, score, isBreakfastOrSnack };
     });
 
-    const pool = [
-      ...directMentionRecipes,
-      ...mainDishes.filter(r => matchedIds.has(r.id) && !directMentionIds.has(r.id)),
-      ...breakfastOrSnacks.filter(r => !directMentionIds.has(r.id))
-    ];
-    if (pool.length >= 35) {
-      return pool.slice(0, 140);
+    // Ordenar de mayor a menor puntuación de relevancia
+    scored.sort((a, b) => b.score - a.score);
+
+    // Límite seguro para Gemini: 50 recetas para momentos individuales (cena/almuerzo),
+    // o 90 recetas para planificación semanal completa (con balance de slots).
+    // NUNCA enviar el catálogo masivo completo (ej. 887 recetas) para evitar timeouts.
+    const targetLimit = isSingleSlotQuery ? 50 : 90;
+
+    if (isSingleSlotQuery) {
+      return scored.slice(0, targetLimit).map(s => s.recipe);
     }
-    return recipes;
+
+    // Para menú semanal o peticiones genéricas: garantizar variedad entre desayunos, meriendas y platos principales
+    const selected = [];
+    const selectedIds = new Set();
+
+    const bAndS = scored.filter(s => s.isBreakfastOrSnack);
+    const mains = scored.filter(s => !s.isBreakfastOrSnack);
+
+    // Reservar ~20 desayunos y meriendas
+    for (const item of bAndS.slice(0, 20)) {
+      selected.push(item.recipe);
+      selectedIds.add(item.recipe.id);
+    }
+
+    // Rellenar con los mejores platos principales (almuerzos y cenas)
+    for (const item of mains) {
+      if (selected.length >= targetLimit) break;
+      if (!selectedIds.has(item.recipe.id)) {
+        selected.push(item.recipe);
+        selectedIds.add(item.recipe.id);
+      }
+    }
+
+    // Si aún queda hueco, completar con los mejores puntuados restantes
+    for (const item of scored) {
+      if (selected.length >= targetLimit) break;
+      if (!selectedIds.has(item.recipe.id)) {
+        selected.push(item.recipe);
+        selectedIds.add(item.recipe.id);
+      }
+    }
+
+    return selected;
   }
 
   buildAiSystemInstruction(prompt = '') {
@@ -12311,7 +12406,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
     const aiBubble = document.createElement('div');
     aiBubble.className = 'ai-assistant-bubble';
-    const isFullCatalog = (state.recipes && state.recipes.length > 120 && this.detectPromptCriteria(text).length === 0);
+    const isFullCatalog = false;
     const waitNotice = isFullCatalog ? `<div class="ai-wait-notice">Analizando recetario completo (${state.recipes.length} recetas)... unos segundos.</div>` : '';
     aiBubble.innerHTML = `<em>Consultando al Asistente...</em>${waitNotice}`;
     history.appendChild(aiBubble);
@@ -12733,7 +12828,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     const resultActions = document.getElementById('gemini-invoke-result-actions');
     const sendBtn = document.getElementById('btn-gemini-invoke-send');
 
-    const isFullCatalog = (state.recipes && state.recipes.length > 120 && this.detectPromptCriteria(prompt).length === 0);
+    const isFullCatalog = false;
     const noticeHtml = isFullCatalog
       ? `<div class="ai-wait-notice">Analizando tu recetario completo (${state.recipes.length} recetas)... Esto puede tardar unos segundos.</div>`
       : '';
