@@ -40,9 +40,26 @@
   --m3-error-container: #ffdad6;
   --m3-on-error: #ffffff;
 
-  /* Typography */
+  /* Typography & Editorial Scale (2.5x Ratio - US-23 / US-24) */
   --font-family: 'Google Sans', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  
+  --text-xs: 0.75rem;      /* 12px */
+  --text-sm: 0.875rem;     /* 14px */
+  --text-base: 1rem;       /* 16px (1x base) */
+  --text-lg: 1.25rem;      /* 20px */
+  --text-xl: 1.5rem;       /* 24px */
+  --text-display: 2.5rem;  /* 40px (2.5x ratio) */
+  --tracking-editorial: -0.02em;
+
+  /* Strict 8pt Spatial Grid (US-23 / US-24) */
+  --space-0-5: 4px;
+  --space-1: 8px;
+  --space-1-5: 12px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 40px;
+  --space-6: 48px;
+
   /* Radii */
   --radius-xs: 4px;
   --radius-sm: 8px;
@@ -51,10 +68,26 @@
   --radius-xl: 24px;
   --radius-full: 9999px;
 
-  /* Shadows - Minimal M3 Elevation */
-  --elevation-1: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --elevation-2: 0 3px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
-  --elevation-3: 0 8px 16px rgba(0, 0, 0, 0.12);
+  /* Motion & Custom Cubic-Bezier Curves (Emil Kowalski - US-23) */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 220ms;
+  --duration-modal: 260ms;
+  --transition-fast: 150ms cubic-bezier(0.23, 1, 0.32, 1);
+
+  /* Translucent Alpha Borders & Highlights (Light Mode - US-24) */
+  --border-subtle: 1px solid rgba(15, 23, 42, 0.08);
+  --border-strong: 1px solid rgba(15, 23, 42, 0.14);
+  --border-alpha-color: rgba(15, 23, 42, 0.08);
+  --surface-glass-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
+
+  /* Multi-Layer Composite Shadows (Ambient + Direct Key Light - US-24) */
+  --elevation-1: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.06);
+  --elevation-2: 0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.08);
+  --elevation-3: 0 4px 8px rgba(15, 23, 42, 0.06), 0 16px 36px rgba(15, 23, 42, 0.12);
 }
 
 /* DARK THEME (Explicit data-theme="dark") */
@@ -80,7 +113,7 @@
   --m3-on-surface: #e3e3e3;
   --m3-on-surface-variant: #c4c7c5;
   --m3-outline: #8e918f;
-  --m3-outline-variant: #444746;
+  --m3-outline-variant: rgba(255, 255, 255, 0.08);
 
   --color-brand: #6dd58c;
   --color-brand-container: #0f5223;
@@ -90,9 +123,14 @@
   --m3-error-container: #93000a;
   --m3-on-error: #690005;
 
-  --elevation-1: 0 1px 3px rgba(0, 0, 0, 0.35);
-  --elevation-2: 0 3px 8px rgba(0, 0, 0, 0.45);
-  --elevation-3: 0 8px 20px rgba(0, 0, 0, 0.55);
+  --border-subtle: 1px solid rgba(255, 255, 255, 0.08);
+  --border-strong: 1px solid rgba(255, 255, 255, 0.14);
+  --border-alpha-color: rgba(255, 255, 255, 0.08);
+  --surface-glass-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+
+  --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --elevation-2: 0 2px 6px rgba(0, 0, 0, 0.55), 0 10px 24px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --elevation-3: 0 6px 12px rgba(0, 0, 0, 0.65), 0 20px 44px rgba(0, 0, 0, 0.60), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 /* SYSTEM THEME (Follows system when data-theme is system or not set to light) */
@@ -123,7 +161,7 @@
     --m3-on-surface: #e3e3e3;
     --m3-on-surface-variant: #c4c7c5;
     --m3-outline: #8e918f;
-    --m3-outline-variant: #444746;
+    --m3-outline-variant: rgba(255, 255, 255, 0.08);
 
     --color-brand: #6dd58c;
     --color-brand-container: #0f5223;
@@ -133,9 +171,14 @@
     --m3-error-container: #93000a;
     --m3-on-error: #690005;
 
-    --elevation-1: 0 1px 3px rgba(0, 0, 0, 0.35);
-    --elevation-2: 0 3px 8px rgba(0, 0, 0, 0.45);
-    --elevation-3: 0 8px 20px rgba(0, 0, 0, 0.55);
+    --border-subtle: 1px solid rgba(255, 255, 255, 0.08);
+    --border-strong: 1px solid rgba(255, 255, 255, 0.14);
+    --border-alpha-color: rgba(255, 255, 255, 0.08);
+    --surface-glass-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+
+    --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    --elevation-2: 0 2px 6px rgba(0, 0, 0, 0.55), 0 10px 24px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    --elevation-3: 0 6px 12px rgba(0, 0, 0, 0.65), 0 20px 44px rgba(0, 0, 0, 0.60), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
 }
 
@@ -293,7 +336,7 @@ body {
   font-weight: 500;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out), background-color var(--duration-normal) ease, border-color var(--duration-normal) ease, color var(--duration-normal) ease, box-shadow var(--duration-normal) var(--ease-out);
   max-width: 140px;
   flex-shrink: 0;
 }
@@ -417,7 +460,7 @@ body {
   padding: 10px 20px;
   border: none;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out), background-color var(--duration-fast) ease, border-color var(--duration-fast) ease, color var(--duration-fast) ease, box-shadow var(--duration-fast) var(--ease-out);
   user-select: none;
   white-space: nowrap;
 }
@@ -502,7 +545,7 @@ body {
   background: transparent;
   color: var(--m3-on-surface-variant);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out), background-color var(--duration-normal) ease, border-color var(--duration-normal) ease, color var(--duration-normal) ease, box-shadow var(--duration-normal) var(--ease-out);
   user-select: none;
 }
 
@@ -618,7 +661,7 @@ body {
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.15s ease;
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out), background-color var(--duration-fast) ease, border-color var(--duration-fast) ease, color var(--duration-fast) ease, box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .m3-filter-chip:hover {
@@ -895,7 +938,7 @@ body {
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out), background-color var(--duration-fast) ease, border-color var(--duration-fast) ease, color var(--duration-fast) ease, box-shadow var(--duration-fast) var(--ease-out);
   flex-shrink: 0;
 }
 
@@ -940,7 +983,7 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out), background-color var(--duration-normal) ease, border-color var(--duration-normal) ease, color var(--duration-normal) ease, box-shadow var(--duration-normal) var(--ease-out);
 }
 
 .btn-gemini-mic.listening {
@@ -1097,7 +1140,7 @@ body {
   font-weight: 600;
   border: 1px solid var(--m3-outline-variant);
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out), background-color var(--duration-normal) var(--ease-out), border-color var(--duration-normal) var(--ease-out), color var(--duration-normal) var(--ease-out), box-shadow var(--duration-normal) var(--ease-out);
   box-shadow: var(--elevation-1);
   white-space: nowrap;
 }
@@ -1133,7 +1176,7 @@ body {
   border-radius: var(--radius-lg);
   padding: 12px 14px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out), background-color var(--duration-normal) ease, border-color var(--duration-normal) ease, color var(--duration-normal) ease, box-shadow var(--duration-normal) var(--ease-out);
   min-width: 0;
   width: 100%;
   overflow: hidden;
@@ -1543,7 +1586,7 @@ body {
   padding-bottom: 48px;
 }
 
-/* Modals (Native <dialog> Top-Layer + Material 3 - US-18 / US-55) */
+/* Modals (Native <dialog> Top-Layer + Material 3 + Emil Kowalski Motion - US-18 / US-23 / US-55) */
 .modal-overlay {
   display: none;
   position: fixed;
@@ -1559,10 +1602,15 @@ body {
   backdrop-filter: blur(3px);
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: var(--space-2);
   cursor: pointer;
   box-sizing: border-box;
   overscroll-behavior: contain;
+  opacity: 0;
+  transition-property: opacity, display, overlay;
+  transition-duration: var(--duration-modal);
+  transition-timing-function: var(--ease-out);
+  transition-behavior: allow-discrete;
 }
 
 dialog.modal-overlay:modal {
@@ -1572,15 +1620,33 @@ dialog.modal-overlay:modal {
 }
 
 dialog.modal-overlay::backdrop {
-  background-color: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(3px);
+  background-color: rgba(0, 0, 0, 0);
+  backdrop-filter: blur(0px);
   overflow: hidden;
   overscroll-behavior: contain;
+  transition-property: background-color, backdrop-filter, display, overlay;
+  transition-duration: var(--duration-modal);
+  transition-timing-function: var(--ease-out);
+  transition-behavior: allow-discrete;
 }
 
-.modal-overlay[open],
-.modal-overlay.active {
+:is(.modal-overlay[open], .modal-overlay.active):where(:not([data-closing])) {
   display: flex;
+  opacity: 1;
+
+  @starting-style {
+    opacity: 0;
+  }
+}
+
+dialog.modal-overlay:is([open], .active):where(:not([data-closing]))::backdrop {
+  background-color: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(3px);
+
+  @starting-style {
+    background-color: rgba(0, 0, 0, 0);
+    backdrop-filter: blur(0px);
+  }
 }
 
 .modal-content {
@@ -1591,14 +1657,39 @@ dialog.modal-overlay::backdrop {
   max-height: 88vh;
   overflow-y: auto;
   box-shadow: var(--elevation-3);
-  border: 1px solid var(--m3-outline-variant);
-  animation: modalPop 0.2s cubic-bezier(0.1, 0.9, 0.2, 1);
+  border: var(--border-subtle);
+  opacity: 0;
+  transform: scale(0.95) translateY(6px);
+  transition-property: opacity, transform;
+  transition-duration: var(--duration-modal);
+  transition-timing-function: var(--ease-out);
+  animation: modalPop var(--duration-modal) var(--ease-out);
   cursor: default;
 }
 
+:is(.modal-overlay[open], .modal-overlay.active):where(:not([data-closing])) .modal-content {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+
+  @starting-style {
+    opacity: 0;
+    transform: scale(0.95) translateY(6px);
+  }
+}
+
 @keyframes modalPop {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: scale(0.95) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-overlay,
+  dialog.modal-overlay::backdrop,
+  .modal-content {
+    transform: none !important;
+    animation: none !important;
+    transition-duration: 0.1s !important;
+  }
 }
 
 .modal-header-bar {
@@ -1669,7 +1760,7 @@ dialog.modal-overlay::backdrop {
   border: none;
   border-bottom: 2px solid transparent;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out), background-color var(--duration-normal) ease, border-color var(--duration-normal) ease, color var(--duration-normal) ease, box-shadow var(--duration-normal) var(--ease-out);
 }
 
 .auth-tab.active {
@@ -1687,7 +1778,7 @@ dialog.modal-overlay::backdrop {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  transition: all 0.2s ease;
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out), background-color var(--duration-normal) ease, border-color var(--duration-normal) ease, color var(--duration-normal) ease, box-shadow var(--duration-normal) var(--ease-out);
 }
 
 .cloud-account-main {
@@ -1749,7 +1840,7 @@ dialog.modal-overlay::backdrop {
   width: fit-content;
   max-width: 100%;
   margin-top: 4px;
-  transition: all 0.2s ease;
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out), background-color var(--duration-normal) ease, border-color var(--duration-normal) ease, color var(--duration-normal) ease, box-shadow var(--duration-normal) var(--ease-out);
 }
 
 .cloud-sync-pill:empty {
@@ -1889,7 +1980,7 @@ dialog.modal-overlay::backdrop {
   border-radius: var(--radius-lg);
   cursor: pointer;
   text-align: left;
-  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out), background-color var(--duration-normal) var(--ease-out), border-color var(--duration-normal) var(--ease-out), color var(--duration-normal) var(--ease-out), box-shadow var(--duration-normal) var(--ease-out);
   color: var(--m3-on-surface);
   box-shadow: none;
 }
@@ -2121,7 +2212,7 @@ dialog.modal-overlay::backdrop {
   border-radius: var(--radius-full);
   font-size: 12px;
   font-weight: 600;
-  transition: all 0.15s ease;
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out), background-color var(--duration-fast) ease, border-color var(--duration-fast) ease, color var(--duration-fast) ease, box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .step-timer-auto-tag {
@@ -2145,7 +2236,7 @@ dialog.modal-overlay::backdrop {
   font-size: 12px;
   color: var(--m3-on-surface-variant);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out), background-color var(--duration-fast) ease, border-color var(--duration-fast) ease, color var(--duration-fast) ease, box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .btn-step-timer-prompt:hover {
@@ -2291,7 +2382,7 @@ dialog.modal-overlay::backdrop {
   font-size: 12px;
   cursor: pointer;
   user-select: none;
-  transition: all 0.15s ease;
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out), background-color var(--duration-fast) ease, border-color var(--duration-fast) ease, color var(--duration-fast) ease, box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .editor-suggested-chip:hover {
@@ -2616,7 +2707,7 @@ dialog.modal-overlay::backdrop {
   background: var(--m3-surface-container-highest);
   border: 1.5px solid var(--m3-outline);
   position: relative;
-  transition: all 0.22s cubic-bezier(0.2, 0, 0, 1);
+  transition: transform var(--duration-normal) var(--ease-out), background-color var(--duration-normal) var(--ease-out), border-color var(--duration-normal) var(--ease-out), box-shadow var(--duration-normal) var(--ease-out);
   box-sizing: border-box;
 }
 
@@ -2628,7 +2719,7 @@ dialog.modal-overlay::backdrop {
   height: 16px;
   border-radius: 50%;
   background: var(--m3-outline);
-  transition: all 0.22s cubic-bezier(0.2, 0, 0, 1);
+  transition: transform var(--duration-normal) var(--ease-out), background-color var(--duration-normal) var(--ease-out), border-color var(--duration-normal) var(--ease-out), box-shadow var(--duration-normal) var(--ease-out);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 
@@ -2804,7 +2895,7 @@ dialog.modal-overlay::backdrop {
   background: var(--m3-surface-container);
   color: var(--m3-on-surface);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out), background-color var(--duration-fast) ease, border-color var(--duration-fast) ease, color var(--duration-fast) ease;
 }
 
 .btn-today-goals-trigger:hover {
@@ -3263,7 +3354,7 @@ dialog.modal-overlay::backdrop {
   color: var(--m3-on-surface);
   cursor: pointer;
   text-align: left;
-  transition: all 0.15s ease;
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out), background-color var(--duration-fast) ease, border-color var(--duration-fast) ease, color var(--duration-fast) ease, box-shadow var(--duration-fast) var(--ease-out);
   font-family: inherit;
 }
 
@@ -3411,7 +3502,7 @@ dialog.modal-overlay::backdrop {
   cursor: pointer;
   text-align: left;
   font-family: inherit;
-  transition: all 0.15s ease;
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out), background-color var(--duration-fast) ease, border-color var(--duration-fast) ease, color var(--duration-fast) ease, box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .copy-mode-card:hover {
@@ -3728,5 +3819,1217 @@ dialog.modal-overlay::backdrop {
   color: var(--m3-on-surface-variant);
   margin: 0;
 }
+
+/* ==========================================================================
+   US-23, US-24 & US-49: MODERN DESIGN SYSTEM, TACTILE MOTION & SEMANTIC CLASSES
+   ========================================================================== */
+
+/* 1. Editorial Typography (2.5x Scale, -0.02em Tracking & Tabular Numerals) */
+h1,
+h2,
+.view-title,
+.modal-title,
+.section-title,
+.recipe-detail-title,
+.cook-step-text,
+.confirm-dialog-title {
+  letter-spacing: var(--tracking-editorial, -0.02em);
+}
+
+.macro-chip-val,
+.today-nutrition-cal-val,
+.grocery-amount,
+.cook-timer-display,
+.bulk-stat-number,
+.u-tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 2. Precision Surfaces & Translucent Alpha Borders (US-24) */
+.card,
+.recipe-card,
+.today-meal-card,
+.today-nutrition-card,
+.meal-slot.has-meal,
+.aisle-group-card,
+.settings-group {
+  border: var(--border-subtle);
+  box-shadow: var(--elevation-1);
+}
+
+/* 3. Emil Kowalski Tactile Feedback (:active scale(0.97)) & Motion (US-23) */
+:is(
+  .btn,
+  .btn-icon,
+  .btn-ghost,
+  .chip,
+  .m3-filter-chip,
+  .dietary-chip,
+  .tag-chip,
+  .recipe-card,
+  .meal-slot,
+  .today-meal-card,
+  .nav-item,
+  .user-pill,
+  .segmented-btn,
+  .picker-recipe-row,
+  .plan-slot-card-choice,
+  .copy-mode-card,
+  .bulk-import-item
+) {
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    opacity var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+:is(
+  .btn,
+  .btn-icon,
+  .btn-ghost,
+  .chip,
+  .m3-filter-chip,
+  .dietary-chip,
+  .tag-chip,
+  .recipe-card,
+  .meal-slot,
+  .today-meal-card,
+  .nav-item,
+  .user-pill,
+  .segmented-btn,
+  .picker-recipe-row,
+  .plan-slot-card-choice,
+  .copy-mode-card,
+  .bulk-import-item
+):active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(
+    .btn,
+    .btn-icon,
+    .btn-ghost,
+    .chip,
+    .m3-filter-chip,
+    .dietary-chip,
+    .tag-chip,
+    .recipe-card,
+    .meal-slot,
+    .today-meal-card,
+    .nav-item,
+    .user-pill,
+    .segmented-btn,
+    .picker-recipe-row,
+    .plan-slot-card-choice,
+    .copy-mode-card,
+    .bulk-import-item
+  ):active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* 4. Semantic Component & Utility Classes (US-49 Inline Style Migration) */
+.is-hidden {
+  display: none;
+}
+
+.icon-12 { font-size: 12px !important; }
+.icon-13 { font-size: 13px !important; }
+.icon-14 { font-size: 14px !important; }
+.icon-15 { font-size: 15px !important; }
+.icon-16 { font-size: 16px !important; }
+.icon-18 { font-size: 18px !important; }
+.icon-22 { font-size: 22px !important; }
+.icon-28 { font-size: 28px !important; }
+.icon-32 { font-size: 32px !important; }
+.icon-36 { font-size: 36px !important; }
+.icon-40 { font-size: 40px !important; }
+
+.icon-primary { color: var(--m3-primary); }
+.icon-brand { color: var(--color-brand); }
+.icon-muted { color: var(--m3-on-surface-variant); }
+.icon-error { color: var(--m3-error, #ba1a1a); }
+.icon-warning { color: #f59e0b; }
+.icon-Flame { color: #d9480f; }
+.icon-spin { animation: spin 1s linear infinite; }
+.icon-spin-slow { animation: spin 1.2s linear infinite; }
+.icon-pulse { animation: pulse 1s infinite; }
+.icon-pulse-slow { animation: pulse 1.5s infinite; }
+.icon-valign-middle { vertical-align: middle; }
+.icon-valign-bottom { vertical-align: text-bottom; }
+
+/* Dynamic CSS custom properties for runtime values (US-49) */
+.recipe-placeholder-art {
+  background: var(--placeholder-gradient, var(--m3-surface-container));
+}
+
+.recipe-placeholder-avatar {
+  background: var(--avatar-bg, var(--m3-surface-container-high));
+  color: var(--avatar-color, var(--m3-primary));
+}
+
+.goal-progress-fill {
+  width: var(--bar-pct, 0%);
+}
+
+.ratio-segment {
+  width: var(--seg-pct, 0%);
+}
+
+/* Confirm dialog input wrapper */
+.confirm-dialog-input-wrap {
+  display: none;
+  margin-bottom: var(--space-2);
+}
+
+/* Today Nutrition & Meal Cards */
+.today-nutrition-header-Flush {
+  margin-bottom: 0;
+}
+
+.today-nutrition-title-zen {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--m3-on-surface-variant);
+}
+
+.today-zen-cal-strong {
+  font-weight: 700;
+  color: var(--m3-on-surface);
+}
+
+.u-flex-row-center-gap-6 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.u-flex-row-center-gap-4 {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.u-flex-row-center-gap-8 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.u-flex-between-center {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.macro-chip-expanded {
+  align-items: stretch;
+  text-align: left;
+  padding: 10px 12px;
+}
+
+.macro-chip-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  gap: 4px;
+}
+
+.macro-chip-label-compact {
+  margin-bottom: 0;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.macro-chip-val-expanded {
+  text-align: left;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.leftover-pill-badge {
+  background: var(--m3-secondary-container);
+  color: var(--m3-on-secondary-container);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.btn-slot-clear {
+  padding: 2px 4px;
+  color: var(--m3-on-surface-variant);
+}
+
+.btn-slot-delete {
+  padding: 2px 4px;
+  color: var(--m3-error);
+}
+
+.today-meal-body-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  min-width: 0;
+}
+
+.today-meal-thumb-img {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.today-meal-thumb-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.img-cover-full {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.u-flex-1-truncate {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.u-min-w-0 {
+  min-width: 0;
+}
+
+.today-meal-meta-row {
+  font-size: 11px;
+  color: var(--m3-on-surface-variant);
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.u-inline-flex-gap-3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* Recipes Grid & Fridge Match */
+.fridge-match-overlay-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #81c995;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  backdrop-filter: blur(4px);
+}
+
+.tag-chip-source {
+  background: var(--m3-surface-container-high);
+  color: var(--m3-primary);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.tag-chip-dietary {
+  border: 1px solid var(--color-brand);
+  color: var(--color-brand);
+  font-weight: 600;
+}
+
+.recipes-empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: var(--space-6) var(--space-2);
+  color: var(--m3-on-surface-variant);
+}
+
+.recipes-empty-icon {
+  font-size: 40px;
+  margin-bottom: var(--space-1);
+}
+
+.recipes-load-more-sentinel {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: var(--space-3) var(--space-2);
+}
+
+.fridge-empty-hint {
+  font-size: 11px;
+  color: var(--m3-on-surface-variant);
+  font-style: italic;
+}
+
+.fridge-active-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--m3-primary-container);
+  color: var(--m3-on-primary-container);
+}
+
+.fridge-chip-remove-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  color: inherit;
+}
+
+/* Recipe Detail Modal */
+.recipe-detail-hero-photo {
+  position: relative;
+  height: 220px;
+  background: var(--m3-surface-container);
+  overflow: hidden;
+}
+
+.recipe-detail-hero-placeholder {
+  position: relative;
+  height: 180px;
+  overflow: hidden;
+}
+
+.recipe-detail-body {
+  padding: 18px;
+}
+
+.import-review-banner {
+  background: var(--color-brand-container);
+  color: var(--color-brand-on-container);
+  border: 1px solid var(--color-brand);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.import-review-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.import-review-subtitle {
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+.import-review-badge {
+  background: var(--color-brand);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+}
+
+.recipe-detail-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.tag-chip-external-link {
+  background: var(--m3-secondary-container);
+  color: var(--m3-on-secondary-container);
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+}
+
+.tag-chip-primary {
+  background: var(--m3-primary-container);
+  color: var(--m3-on-primary-container);
+  font-weight: 700;
+}
+
+.recipe-detail-title {
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.3;
+  margin-bottom: 6px;
+}
+
+.recipe-detail-desc {
+  font-size: 13px;
+  color: var(--m3-on-surface-variant);
+  line-height: 1.45;
+  margin-bottom: var(--space-2);
+}
+
+.recipe-detail-stats-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--m3-surface-container);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-2);
+}
+
+.recipe-stat-upper-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--m3-on-surface-variant);
+}
+
+.recipe-stat-time-val {
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.recipe-stat-servings-val {
+  font-weight: 500;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.u-text-right {
+  text-align: right;
+}
+
+.btn-servings-step {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+
+.recipe-detail-section {
+  margin-bottom: 18px;
+}
+
+.recipe-detail-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.recipe-detail-section-title {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.recipe-detail-section-title-mb {
+  font-size: 15px;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.recipe-ingredients-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recipe-ingredient-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--m3-surface-container-low);
+  border: var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.recipe-ingredient-amount {
+  color: var(--m3-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.recipe-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.recipe-step-row {
+  display: flex;
+  gap: 10px;
+}
+
+.recipe-step-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--m3-primary);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.recipe-step-text {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.recipe-step-timer-pill {
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--m3-primary);
+  background: var(--m3-primary-container);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.import-review-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: var(--border-subtle);
+}
+
+.btn-save-import-full {
+  width: 100%;
+  padding: 12px;
+  font-weight: 700;
+  background-color: var(--color-brand);
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.btn-import-subaction {
+  flex: 1;
+  padding: 10px;
+  font-size: 13px;
+}
+
+.btn-import-cancel {
+  flex: 1;
+  padding: 10px;
+  font-size: 13px;
+  color: var(--m3-error);
+}
+
+.recipe-detail-bottom-actions {
+  display: flex;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.btn-detail-plan {
+  flex: 1;
+  padding: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn-detail-cook {
+  flex: 1.5;
+  padding: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* Recipe Editor Image Preview & Step Timers */
+.editor-image-preview-box {
+  position: relative;
+  width: 100%;
+  height: 140px;
+  background: #000000;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+
+.editor-image-placeholder-box {
+  width: 100%;
+  height: 140px;
+  position: relative;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.editor-ai-generating-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 140px;
+  gap: var(--space-1);
+  color: var(--m3-primary);
+}
+
+.editor-ai-generating-label {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.btn-inline-icon-only {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 2px;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+}
+
+.timer-unit-label {
+  font-size: 12px;
+  color: var(--m3-on-surface-variant);
+}
+
+.btn-save-inline-timer-compact {
+  padding: 2px 8px;
+  font-size: 11px;
+  height: 24px;
+}
+
+/* Weekly Planner Slots & Picker */
+.btn-add-custom-slot-header {
+  font-size: 11px;
+  padding: 4px 8px;
+  color: var(--m3-primary);
+}
+
+.planner-day-footer {
+  margin-top: var(--space-1);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-add-custom-slot-footer {
+  font-size: 12px;
+  color: var(--m3-primary);
+  gap: 4px;
+}
+
+.planner-slot-body-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: 4px;
+  min-width: 0;
+}
+
+.planner-slot-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.planner-slot-thumb-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.meal-slot-custom {
+  border-left: 3px solid var(--m3-primary);
+}
+
+.slot-label-custom {
+  color: var(--m3-primary);
+  font-weight: 700;
+}
+
+.u-flex-gap-2 {
+  display: flex;
+  gap: 2px;
+}
+
+.copy-week-empty-state {
+  text-align: center;
+  padding: 14px 8px;
+  color: var(--m3-on-surface-variant);
+  font-size: 12px;
+}
+
+.copy-week-empty-icon {
+  font-size: 22px;
+  display: block;
+  margin-bottom: 4px;
+  opacity: 0.7;
+}
+
+.copy-preview-empty-em {
+  opacity: 0.6;
+}
+
+.picker-empty-state {
+  text-align: center;
+  padding: 28px 16px;
+  color: var(--m3-on-surface-variant);
+  font-size: 13px;
+}
+
+.picker-empty-icon {
+  font-size: 32px;
+  display: block;
+  margin-bottom: 6px;
+  color: var(--m3-primary);
+}
+
+.u-mt-10 {
+  margin-top: 10px;
+}
+
+.picker-recipe-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--m3-surface-container-low);
+  border: var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.picker-recipe-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+  padding-right: 8px;
+}
+
+.picker-recipe-thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.picker-recipe-thumb-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.picker-recipe-title {
+  font-size: 13px;
+  color: var(--m3-on-surface);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-recipe-meta {
+  font-size: 11px;
+  color: var(--m3-on-surface-variant);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.u-mt-3 {
+  margin-top: 3px;
+}
+
+.u-shrink-0 {
+  flex-shrink: 0;
+}
+
+.u-cursor-pointer {
+  cursor: pointer;
+}
+
+/* Plan Recipe Modal Slot Choices */
+.plan-slot-card-choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--m3-surface-container-low);
+  color: var(--m3-on-surface);
+  border: 1.5px solid var(--m3-outline-variant);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.plan-slot-card-choice.selected {
+  background: var(--m3-primary-container);
+  color: var(--m3-on-primary-container);
+  border-color: var(--m3-primary);
+}
+
+.plan-slot-card-choice .plan-slot-choice-icon {
+  color: var(--m3-on-surface-variant);
+}
+
+.plan-slot-card-choice.selected .plan-slot-choice-icon {
+  color: var(--m3-primary);
+}
+
+.plan-overwrite-row {
+  display: flex;
+  gap: var(--space-1);
+  align-items: flex-start;
+}
+
+.plan-overwrite-icon {
+  color: #f59e0b;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.plan-overwrite-sub {
+  font-size: 11px;
+  margin-top: 3px;
+  color: var(--m3-on-surface-variant);
+}
+
+/* Shopping List & Preview */
+.shopping-empty-card {
+  text-align: center;
+  padding: var(--space-5) var(--space-2);
+  color: var(--m3-on-surface-variant);
+}
+
+.shopping-empty-icon {
+  font-size: 40px;
+  margin-bottom: 6px;
+  color: var(--m3-primary);
+}
+
+.shopping-empty-title {
+  color: var(--m3-on-surface);
+  font-size: 16px;
+}
+
+.shopping-empty-desc {
+  font-size: 13px;
+  margin: 4px 0 16px 0;
+}
+
+.aisle-pending-count {
+  font-size: 11px;
+  color: var(--m3-on-surface-variant);
+}
+
+.grocery-origin-sub {
+  font-size: 11px;
+  color: var(--m3-on-surface-variant);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.u-flex-center-gap-8-shrink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.u-flex-center-gap-4-shrink {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.shopping-preview-group-card {
+  margin-bottom: 12px;
+  padding: 12px;
+  background-color: var(--m3-surface);
+  border: var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+.shopping-preview-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: var(--border-subtle);
+  gap: var(--space-1);
+}
+
+.shopping-preview-group-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.shopping-preview-thumb {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.shopping-preview-recipe-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--m3-on-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shopping-preview-count-sub {
+  font-size: 11px;
+  color: var(--m3-on-surface-variant);
+}
+
+.btn-preview-toggle-group {
+  font-size: 11px;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.shopping-preview-items-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.shopping-preview-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background-color: transparent;
+  transition: background-color var(--duration-fast) ease;
+}
+
+.shopping-preview-item-row.is-checked {
+  background-color: var(--m3-surface-container-low);
+}
+
+.shopping-preview-item-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  margin: 0;
+}
+
+.shopping-preview-item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--m3-on-surface);
+  word-break: break-word;
+}
+
+.shopping-preview-item-name.is-unchecked {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
+.shopping-preview-aisle-tag {
+  font-size: 10px;
+  color: var(--m3-on-surface-variant);
+  margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.shopping-preview-amount-input {
+  width: 64px;
+  padding: 4px 6px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+  height: 30px;
+}
+
+.shopping-preview-amount-input.is-unchecked {
+  opacity: 0.5;
+}
+
+.shopping-preview-unit-label {
+  font-size: 11px;
+  color: var(--m3-on-surface-variant);
+  min-width: 22px;
+}
+
+/* AI Assistant Messages & Status Notices */
+.ai-wait-notice {
+  font-size: 11px;
+  margin-top: 4px;
+  opacity: 0.85;
+  color: var(--m3-on-surface-variant);
+}
+
+.ai-status-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--m3-primary);
+  font-weight: 500;
+}
+
+.ai-history-bubble {
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  background: var(--m3-surface-container);
+  border: var(--border-subtle);
+}
+
+.ai-history-bubble.is-user {
+  background: var(--m3-primary-container);
+  border-color: var(--m3-outline-variant);
+}
+
+.ai-history-author-user {
+  color: var(--m3-primary);
+}
+
+.ai-history-author-assistant {
+  color: var(--color-brand);
+}
+
+.ai-fallback-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  background: rgba(234, 67, 53, 0.08);
+  border: 1px solid rgba(234, 67, 53, 0.25);
+  color: #c5221f;
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 11px;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.u-text-error-medium {
+  color: var(--m3-error);
+  font-weight: 500;
+}
+
+.u-text-brand-medium {
+  color: var(--color-brand);
+  font-weight: 500;
+}
+
+.u-text-muted {
+  color: var(--m3-on-surface-variant);
+}
+
+.u-text-muted-medium {
+  color: var(--m3-on-surface-variant);
+  font-weight: 500;
+}
+
+.bulk-empty-filter-msg {
+  text-align: center;
+  padding: var(--space-3);
+  color: var(--m3-on-surface-variant);
+  font-size: 13px;
+}
+
+.ai-user-bubble {
+  background-color: var(--m3-primary);
+  color: #ffffff;
+  padding: 10px 14px;
+  border-radius: var(--radius-lg);
+  font-size: 13px;
+  line-height: 1.45;
+  align-self: flex-end;
+  max-width: 85%;
+}
+
+.ai-assistant-bubble {
+  background-color: var(--m3-surface-container);
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  font-size: 13px;
+  line-height: 1.45;
+  align-self: flex-start;
+  max-width: 88%;
+}
+
+.ai-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: 10px;
+}
+
+
 
 

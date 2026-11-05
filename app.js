@@ -2142,11 +2142,12 @@ function getRecipePlaceholderHtml(recipeOrTitle, size = 'card') {
   const theme = getRecipeTheme(recipeOrTitle);
   const isDetail = size === 'detail';
   const sizeClass = isDetail ? 'size-detail' : 'size-card';
+  const iconSizeClass = isDetail ? 'icon-36' : 'icon-28';
 
   return `
-    <div class="recipe-placeholder-art ${sizeClass}" style="background: ${theme.gradient};" aria-hidden="true">
-      <div class="recipe-placeholder-avatar" style="background: ${theme.avatarBg}; color: ${theme.avatarColor};">
-        <span class="material-symbols-outlined" style="font-size: ${isDetail ? '36px' : '28px'};">${theme.icon}</span>
+    <div class="recipe-placeholder-art ${sizeClass}" style="--placeholder-gradient: ${theme.gradient};" aria-hidden="true">
+      <div class="recipe-placeholder-avatar" style="--avatar-bg: ${theme.avatarBg}; --avatar-color: ${theme.avatarColor};">
+        <span class="material-symbols-outlined ${iconSizeClass}">${theme.icon}</span>
       </div>
     </div>
   `;
@@ -3679,7 +3680,7 @@ const RecipeParser = {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.14';
+  window.APP_VERSION = 'v1.16';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -3716,7 +3717,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.14';
+    this.appVersion = window.APP_VERSION || 'v1.16';
     this.activeView = 'view-today';
     this.aiChatHistory = [];
     this.activeRecipe = null;
@@ -3927,7 +3928,7 @@ class FoodAssistantApp {
       <span class="material-symbols-outlined m3-toast-icon">${iconName}</span>
       <span class="m3-toast-message"></span>
       <button type="button" class="m3-toast-close" aria-label="Cerrar aviso">
-        <span class="material-symbols-outlined" style="font-size: 16px;">close</span>
+        <span class="material-symbols-outlined icon-16">close</span>
       </button>
     `;
     toast.querySelector('.m3-toast-message').textContent = message;
@@ -3982,7 +3983,7 @@ class FoodAssistantApp {
             <h3 class="confirm-dialog-title" id="confirm-dialog-title">Confirmar acción</h3>
           </div>
           <p class="confirm-dialog-message" id="confirm-dialog-message"></p>
-          <div id="confirm-dialog-input-wrap" style="display: none; margin-bottom: 16px;">
+          <div id="confirm-dialog-input-wrap" class="confirm-dialog-input-wrap">
             <input type="email" class="form-input" id="confirm-dialog-input" placeholder="usuario@gmail.com">
           </div>
           <div class="confirm-dialog-actions">
@@ -5999,16 +6000,16 @@ class FoodAssistantApp {
 
       const headerGoalsBtn = `
         <button type="button" class="btn-today-goals-trigger" id="btn-today-quick-goals" onclick="app.openNutritionGoalsModal()" title="Configurar metas nutricionales diarias">
-          <span class="material-symbols-outlined" style="font-size: 14px; color: var(--m3-primary);">tune</span>
+          <span class="material-symbols-outlined icon-14 icon-primary">tune</span>
           <span>${goalsEnabled ? 'Objetivos' : 'Configurar / Activar'}</span>
         </button>
       `;
 
       if (!goalsEnabled) {
         nutritionContainer.innerHTML = `
-          <div class="today-nutrition-header" style="margin-bottom: 0;">
-            <div class="today-nutrition-title" style="font-size: 12px; font-weight: 500; color: var(--m3-on-surface-variant);">
-              <span class="material-symbols-outlined icon-sm" style="color: var(--m3-on-surface-variant); font-size: 16px;">local_fire_department</span>
+          <div class="today-nutrition-header today-nutrition-header-Flush">
+            <div class="today-nutrition-title today-nutrition-title-zen">
+              <span class="material-symbols-outlined icon-sm icon-muted icon-16">local_fire_department</span>
               <span>Seguimiento nutricional desactivado</span>
             </div>
             ${headerGoalsBtn}
@@ -6018,15 +6019,15 @@ class FoodAssistantApp {
         nutritionContainer.innerHTML = `
           <div class="today-nutrition-header">
             <div class="today-nutrition-title">
-              <span class="material-symbols-outlined icon-sm" style="color: var(--m3-primary);">local_fire_department</span> Resumen Nutricional Diario
+              <span class="material-symbols-outlined icon-sm icon-primary">local_fire_department</span> Resumen Nutricional Diario
             </div>
-            <div style="display: flex; align-items: center; gap: 6px;">
+            <div class="u-flex-row-center-gap-6">
               ${headerGoalsBtn}
               <span class="today-nutrition-meta">0 comidas</span>
             </div>
           </div>
           <div class="today-nutrition-empty">
-            <span style="font-weight: 700; color: var(--m3-on-surface);">0 kcal</span> · ${goalsEnabled ? `Asigna platos a tu día para avanzar hacia tus metas (${goals.calories || 2000} kcal).` : 'Asigna platos a tu día para ver calorías y macronutrientes.'}
+            <span class="today-zen-cal-strong">0 kcal</span> · ${goalsEnabled ? `Asigna platos a tu día para avanzar hacia tus metas (${goals.calories || 2000} kcal).` : 'Asigna platos a tu día para ver calorías y macronutrientes.'}
           </div>
         `;
       } else {
@@ -6067,17 +6068,17 @@ class FoodAssistantApp {
           const barPercent = Math.min(100, Math.max(0, percent));
 
           return `
-            <div class="macro-chip macro-${macroKey}" style="align-items: stretch; text-align: left; padding: 10px 12px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; gap: 4px;">
-                <span class="macro-chip-label" style="margin-bottom: 0; font-size: 11px; font-weight: 600;">${label}</span>
+            <div class="macro-chip macro-${macroKey} macro-chip-expanded">
+              <div class="macro-chip-top-row">
+                <span class="macro-chip-label macro-chip-label-compact">${label}</span>
                 <span class="goal-status-badge ${statusClass}">${statusText}</span>
               </div>
-              <div class="macro-chip-val" id="today-macro-${macroKey}" style="text-align: left; font-size: 16px; font-weight: 700;">
+              <div class="macro-chip-val macro-chip-val-expanded" id="today-macro-${macroKey}">
                 ${currentNum}<span class="macro-chip-unit">${unit}</span>
               </div>
               <span class="macro-goal-subtext">de ${targetVal}${unit} (${percent}%)</span>
               <div class="goal-progress-track">
-                <div class="goal-progress-fill ${statusClass}" style="width: ${barPercent}%;"></div>
+                <div class="goal-progress-fill ${statusClass}" style="--bar-pct: ${barPercent}%;"></div>
               </div>
             </div>
           `;
@@ -6191,9 +6192,9 @@ class FoodAssistantApp {
         nutritionContainer.innerHTML = `
           <div class="today-nutrition-header">
             <div class="today-nutrition-title">
-              <span class="material-symbols-outlined icon-sm" style="color: var(--m3-primary);">local_fire_department</span> Resumen Nutricional Diario
+              <span class="material-symbols-outlined icon-sm icon-primary">local_fire_department</span> Resumen Nutricional Diario
             </div>
-            <div style="display: flex; align-items: center; gap: 6px;">
+            <div class="u-flex-row-center-gap-6">
               ${headerGoalsBtn}
               <span class="today-nutrition-meta">${todayNutrition.mealCount} ${todayNutrition.mealCount === 1 ? 'comida' : 'comidas'}</span>
             </div>
@@ -6205,9 +6206,9 @@ class FoodAssistantApp {
             ${formatChipWithGoal('fat', 'Grasas', todayNutrition.totalFat, 'g', goals.fat)}
           </div>
           <div class="macro-ratio-bar" title="Distribución: ${protPercent}% P / ${carbsPercent}% C / ${fatPercent}% G">
-            <div class="ratio-segment ratio-prot" style="width: ${protPercent}%;" title="Proteína: ${protPercent}%"></div>
-            <div class="ratio-segment ratio-carbs" style="width: ${carbsPercent}%;" title="Carbohidratos: ${carbsPercent}%"></div>
-            <div class="ratio-segment ratio-fat" style="width: ${fatPercent}%;" title="Grasa: ${fatPercent}%"></div>
+            <div class="ratio-segment ratio-prot" style="--seg-pct: ${protPercent}%;" title="Proteína: ${protPercent}%"></div>
+            <div class="ratio-segment ratio-carbs" style="--seg-pct: ${carbsPercent}%;" title="Carbohidratos: ${carbsPercent}%"></div>
+            <div class="ratio-segment ratio-fat" style="--seg-pct: ${fatPercent}%;" title="Grasa: ${fatPercent}%"></div>
           </div>
           ${goalBannerHtml}
           <div class="nutrition-estimation-disclaimer" id="today-nutrition-disclaimer">
@@ -6230,44 +6231,44 @@ class FoodAssistantApp {
         const comp = checkDietaryCompliance(recipe, state.dietaryPreferences);
         const warningBadgeHtml = !comp.compliant ? `
           <div class="dietary-warning-badge" title="Incumple preferencias dietéticas: ${comp.violations.join(', ')}">
-            <span class="material-symbols-outlined" style="font-size: 13px;">warning</span> No cumple: ${comp.violations.join(', ')}
+            <span class="material-symbols-outlined icon-13">warning</span> No cumple: ${comp.violations.join(', ')}
           </div>
         ` : '';
 
         return `
           <div class="meal-slot has-meal" onclick="app.openRecipeDetail('${recipe.id}')">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="u-flex-between-center">
               <span class="slot-label">
                 <span class="material-symbols-outlined icon-sm">${s.icon}</span> ${s.label}
               </span>
-              <div style="display: flex; align-items: center; gap: 4px;">
+              <div class="u-flex-row-center-gap-4">
                 ${isLeftover ? `
-                  <span style="background: var(--m3-secondary-container); color: var(--m3-on-secondary-container); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: var(--radius-full); display: inline-flex; align-items: center; gap: 2px;">
-                    <span class="material-symbols-outlined" style="font-size: 12px;">takeout_dining</span> Sobras
+                  <span class="leftover-pill-badge">
+                    <span class="material-symbols-outlined icon-12">takeout_dining</span> Sobras
                   </span>
                 ` : ''}
-                <button class="btn-ghost btn-sm" onclick="event.stopPropagation(); app.clearSlot('${todayStr}', '${s.key}')" title="Quitar plato" style="padding: 2px 4px; color: var(--m3-on-surface-variant);">
+                <button class="btn-ghost btn-sm btn-slot-clear" onclick="event.stopPropagation(); app.clearSlot('${todayStr}', '${s.key}')" title="Quitar plato">
                   <span class="material-symbols-outlined icon-sm">close</span>
                 </button>
               </div>
             </div>
-            <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px; min-width: 0;">
+            <div class="today-meal-body-row">
               ${recipe.imageUrl ? `
-                <img src="${recipe.imageUrl}" alt="" style="width: 48px; height: 48px; border-radius: 10px; object-fit: cover; flex-shrink: 0;" onerror="this.onerror=null; this.src=app.getRecipePlaceholderSvg('${(typeof escapeHtml === 'function' ? escapeHtml(recipe.title) : recipe.title).replace(/'/g, "\\'")}', 'thumb');">
+                <img src="${recipe.imageUrl}" alt="" class="today-meal-thumb-img" onerror="this.onerror=null; this.src=app.getRecipePlaceholderSvg('${(typeof escapeHtml === 'function' ? escapeHtml(recipe.title) : recipe.title).replace(/'/g, "\\'")}', 'thumb');">
               ` : `
-                <div style="width: 48px; height: 48px; border-radius: 10px; overflow: hidden; flex-shrink: 0;">
-                  <img src="${this.getRecipePlaceholderSvg(recipe.title, 'thumb')}" alt="" style="width: 100%; height: 100%; object-fit: cover;">
+                <div class="today-meal-thumb-wrap">
+                  <img src="${this.getRecipePlaceholderSvg(recipe.title, 'thumb')}" alt="" class="img-cover-full">
                 </div>
               `}
-              <div style="flex: 1; min-width: 0; overflow: hidden;">
+              <div class="u-flex-1-truncate">
                 <div class="slot-recipe-name" title="${recipe.title}">${recipe.title}</div>
                 ${warningBadgeHtml}
-                <div style="font-size: 11px; color: var(--m3-on-surface-variant); margin-top: 3px; display: flex; align-items: center; gap: 8px;">
-                  <span style="display: inline-flex; align-items: center; gap: 3px;">
+                <div class="today-meal-meta-row">
+                  <span class="u-inline-flex-gap-3">
                     <span class="material-symbols-outlined icon-sm">schedule</span> ${recipe.prepTimeMinutes + recipe.cookTimeMinutes} min
                   </span>
                   ${recipe.servings ? `
-                    <span style="display: inline-flex; align-items: center; gap: 3px;">
+                    <span class="u-inline-flex-gap-3">
                       <span class="material-symbols-outlined icon-sm">group</span> ${recipe.servings} p.
                     </span>
                   ` : ''}
@@ -6340,8 +6341,8 @@ class FoodAssistantApp {
             <span class="material-symbols-outlined icon-sm">schedule</span> ${rec.prepTimeMinutes + rec.cookTimeMinutes} min
           </div>
           ${fridgeMatch && fridgeMatch.matchCount > 0 ? `
-            <div style="position: absolute; bottom: 8px; left: 8px; background: rgba(0, 0, 0, 0.75); color: #81c995; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-full); display: flex; align-items: center; gap: 4px; backdrop-filter: blur(4px);">
-              <span class="material-symbols-outlined" style="font-size: 13px;">check_circle</span>
+            <div class="fridge-match-overlay-badge">
+              <span class="material-symbols-outlined icon-13">check_circle</span>
               <span>Tienes ${fridgeMatch.matchCount}/${fridgeMatch.totalCount} ingr.</span>
             </div>
           ` : ''}
@@ -6374,13 +6375,13 @@ class FoodAssistantApp {
 
           <div class="recipe-tags">
             ${rec.sourceDomain ? `
-              <span class="tag-chip" style="background: var(--m3-surface-container-high); color: var(--m3-primary); font-weight: 500; display: inline-flex; align-items: center; gap: 3px;" title="Fuente: ${rec.sourceDomain}">
-                <span class="material-symbols-outlined" style="font-size: 13px;">link</span> ${rec.sourceDomain}
+              <span class="tag-chip tag-chip-source" title="Fuente: ${rec.sourceDomain}">
+                <span class="material-symbols-outlined icon-13">link</span> ${rec.sourceDomain}
               </span>
             ` : ''}
             ${(rec.tags || []).map(t => {
               const isDiet = PREDEFINED_DIETARY_TAGS.includes(t);
-              return `<span class="tag-chip" ${isDiet ? 'style="border: 1px solid var(--color-brand); color: var(--color-brand); font-weight: 600;"' : ''}>${isDiet ? getDietaryTagEmoji(t) + ' ' : ''}${escapeHtml(t)}</span>`;
+              return `<span class="tag-chip${isDiet ? ' tag-chip-dietary' : ''}">${isDiet ? getDietaryTagEmoji(t) + ' ' : ''}${escapeHtml(t)}</span>`;
             }).join('')}
           </div>
         </div>
@@ -6409,8 +6410,8 @@ class FoodAssistantApp {
 
     if (!recipesList.length) {
       grid.innerHTML = `
-        <div style="grid-column: 1/-1; text-align: center; padding: 48px 16px; color: var(--m3-on-surface-variant);">
-          <span class="material-symbols-outlined" style="font-size: 40px; margin-bottom: 8px;">menu_book</span>
+        <div class="recipes-empty-state">
+          <span class="material-symbols-outlined recipes-empty-icon">menu_book</span>
           <h3>No se encontraron recetas</h3>
         </div>
       `;
@@ -6435,7 +6436,7 @@ class FoodAssistantApp {
     if (sortedList.length > this.recipesRenderedCount) {
       const remaining = sortedList.length - this.recipesRenderedCount;
       html += `
-        <div id="recipes-load-more-sentinel" style="grid-column: 1/-1; text-align: center; padding: 24px 16px;">
+        <div id="recipes-load-more-sentinel" class="recipes-load-more-sentinel">
           <button type="button" class="btn btn-secondary btn-sm" id="btn-load-more-recipes" onclick="app.loadMoreRecipes()">
             <span class="material-symbols-outlined icon-sm">expand_more</span>
             Mostrar más recetas (${remaining} restantes)
@@ -6520,7 +6521,7 @@ class FoodAssistantApp {
 
     let html = `
       <button type="button" class="m3-filter-chip ${isAllActive ? 'active' : ''}" data-tag="all">
-        ${isAllActive ? '<span class="material-symbols-outlined" style="font-size: 15px;">done</span>' : ''}
+        ${isAllActive ? '<span class="material-symbols-outlined icon-15">done</span>' : ''}
         Todas
       </button>
     `;
@@ -6531,7 +6532,7 @@ class FoodAssistantApp {
       html += `
         <button type="button" class="m3-filter-chip ${isDietary ? 'dietary-chip' : ''} ${isSelected ? 'active' : ''}" data-tag="${tag}">
           ${isDietary ? `<span class="dietary-emoji">${getDietaryTagEmoji(tag)}</span>` : ''}
-          ${isSelected && !isDietary ? '<span class="material-symbols-outlined" style="font-size: 14px;">done</span>' : ''}
+          ${isSelected && !isDietary ? '<span class="material-symbols-outlined icon-14">done</span>' : ''}
           ${tag}
         </button>
       `;
@@ -6600,7 +6601,7 @@ class FoodAssistantApp {
     if (!container) return;
 
     if (this.fridgeIngredients.length === 0) {
-      container.innerHTML = '<span style="font-size: 11px; color: var(--m3-on-surface-variant); font-style: italic;">Añade los ingredientes que tienes para encontrar recetas compatibles...</span>';
+      container.innerHTML = '<span class="fridge-empty-hint">Añade los ingredientes que tienes para encontrar recetas compatibles...</span>';
       if (clearBtn) clearBtn.style.display = 'none';
       if (inventBtn) inventBtn.style.display = 'none';
       return;
@@ -6610,10 +6611,10 @@ class FoodAssistantApp {
     if (inventBtn) inventBtn.style.display = 'flex';
 
     container.innerHTML = this.fridgeIngredients.map(ing => `
-      <span class="m3-filter-chip active" style="font-size: 11px; padding: 2px 8px; border-radius: var(--radius-full); display: inline-flex; align-items: center; gap: 4px; background: var(--m3-primary-container); color: var(--m3-on-primary-container);">
+      <span class="m3-filter-chip active fridge-active-chip">
         <span>${ing}</span>
-        <button type="button" onclick="app.removeFridgeIngredient('${ing.replace(/'/g, "\\'")}')" style="background: none; border: none; padding: 0; cursor: pointer; display: flex; align-items: center; color: inherit;">
-          <span class="material-symbols-outlined" style="font-size: 14px;">close</span>
+        <button type="button" class="fridge-chip-remove-btn" onclick="app.removeFridgeIngredient('${ing.replace(/'/g, "\\'")}')">
+          <span class="material-symbols-outlined icon-14">close</span>
         </button>
       </span>
     `).join('');
@@ -6878,60 +6879,60 @@ class FoodAssistantApp {
 
     body.innerHTML = `
       ${r.imageUrl ? `
-      <div style="position: relative; height: 220px; background: var(--m3-surface-container); overflow: hidden;">
-        <img src="${r.imageUrl}" alt="${r.title}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.onerror=null; this.parentElement.innerHTML=app.getRecipePlaceholderHtml('${r.id}', 'detail');">
+      <div class="recipe-detail-hero-photo">
+        <img src="${r.imageUrl}" alt="${r.title}" class="img-cover-full" onerror="this.onerror=null; this.parentElement.innerHTML=app.getRecipePlaceholderHtml('${r.id}', 'detail');">
       </div>
       ` : `
-      <div style="position: relative; height: 180px; overflow: hidden;">
+      <div class="recipe-detail-hero-placeholder">
         ${this.getRecipePlaceholderHtml(r, 'detail')}
       </div>
       `}
       
-      <div style="padding: 18px;">
+      <div class="recipe-detail-body">
         ${this.isReviewingImport ? `
-          <div style="background: var(--color-brand-container); color: var(--color-brand-on-container); border: 1px solid var(--color-brand); border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span class="material-symbols-outlined" style="color: var(--color-brand); font-size: 22px;">verified</span>
+          <div class="import-review-banner">
+            <div class="u-flex-row-center-gap-8">
+              <span class="material-symbols-outlined icon-brand icon-22">verified</span>
               <div>
-                <div style="font-size: 13px; font-weight: 700;">Revisión de Receta Importada (Borrador)</div>
-                <div style="font-size: 11px; opacity: 0.9;">Comprueba ingredientes y pasos antes de guardar o descártala.</div>
+                <div class="import-review-title">Revisión de Receta Importada (Borrador)</div>
+                <div class="import-review-subtitle">Comprueba ingredientes y pasos antes de guardar o descártala.</div>
               </div>
             </div>
-            <span class="badge" style="background: var(--color-brand); color: #ffffff; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-full); text-transform: uppercase;">Borrador</span>
+            <span class="badge import-review-badge">Borrador</span>
           </div>
         ` : ''}
 
-        <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center;">
+        <div class="recipe-detail-tags-row">
           ${isSafeUrl(r.sourceUrl) ? `
-            <a href="${sanitizeUrl(r.sourceUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="tag-chip" style="background: var(--m3-secondary-container); color: var(--m3-on-secondary-container); font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: var(--radius-full);" title="Abrir enlace original en nueva pestaña">
-              <span class="material-symbols-outlined" style="font-size: 14px;">open_in_new</span>
+            <a href="${sanitizeUrl(r.sourceUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="tag-chip tag-chip-external-link" title="Abrir enlace original en nueva pestaña">
+              <span class="material-symbols-outlined icon-14">open_in_new</span>
               Fuente: ${escapeHtml(r.sourceDomain || 'Web Original')}
             </a>
           ` : ''}
-          ${(r.tags || []).map(t => `<span class="tag-chip" style="background: var(--m3-primary-container); color: var(--m3-on-primary-container); font-weight: 700;">${escapeHtml(t)}</span>`).join('')}
+          ${(r.tags || []).map(t => `<span class="tag-chip tag-chip-primary">${escapeHtml(t)}</span>`).join('')}
         </div>
         
-        <h2 style="font-size: 20px; font-weight: 500; line-height: 1.3; margin-bottom: 6px;">${escapeHtml(r.title)}</h2>
-        <p style="font-size: 13px; color: var(--m3-on-surface-variant); line-height: 1.45; margin-bottom: 16px;">${escapeHtml(r.description)}</p>
+        <h2 class="recipe-detail-title">${escapeHtml(r.title)}</h2>
+        <p class="recipe-detail-desc">${escapeHtml(r.description)}</p>
         
-        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--m3-surface-container); padding: 10px 14px; border-radius: var(--radius-md); margin-bottom: 16px;">
+        <div class="recipe-detail-stats-bar">
           <div>
-            <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--m3-on-surface-variant);">Tiempo Total</div>
-            <div style="font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 4px; margin-top: 2px;">
+            <div class="recipe-stat-upper-label">Tiempo Total</div>
+            <div class="recipe-stat-time-val">
               <span class="material-symbols-outlined icon-sm">schedule</span> ${r.prepTimeMinutes + r.cookTimeMinutes} min
             </div>
           </div>
           
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <div style="text-align: right;">
-              <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--m3-on-surface-variant);">Porciones</div>
-              <div style="font-weight: 500; font-size: 13px; display: flex; align-items: center; gap: 4px; margin-top: 2px;">
+          <div class="u-flex-row-center-gap-8">
+            <div class="u-text-right">
+              <div class="recipe-stat-upper-label">Porciones</div>
+              <div class="recipe-stat-servings-val">
                 <span class="material-symbols-outlined icon-sm">group</span> ${this.activeServings} personas
               </div>
             </div>
-            <div style="display: flex; gap: 4px;">
-              <button class="btn btn-secondary btn-sm" onclick="app.adjustServings(-1)" style="width: 28px; height: 28px; padding: 0;">-</button>
-              <button class="btn btn-secondary btn-sm" onclick="app.adjustServings(1)" style="width: 28px; height: 28px; padding: 0;">+</button>
+            <div class="u-flex-row-center-gap-4">
+              <button class="btn btn-secondary btn-sm btn-servings-step" onclick="app.adjustServings(-1)">-</button>
+              <button class="btn btn-secondary btn-sm btn-servings-step" onclick="app.adjustServings(1)">+</button>
             </div>
           </div>
         </div>
@@ -6940,7 +6941,7 @@ class FoodAssistantApp {
         <div class="recipe-nutrition-card" id="recipe-nutrition-breakdown">
           <div class="recipe-nutrition-header">
             <div class="recipe-nutrition-title">
-              <span class="material-symbols-outlined icon-sm" style="color: #d9480f;">local_fire_department</span> Información Nutricional
+              <span class="material-symbols-outlined icon-sm icon-Flame">local_fire_department</span> Información Nutricional
             </div>
             <div class="recipe-nutrition-subtitle" id="recipe-nutrition-subtitle">
               Por ración individual
@@ -6970,40 +6971,40 @@ class FoodAssistantApp {
           </div>
         </div>
 
-        <div style="margin-bottom: 18px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h3 style="font-size: 15px; font-weight: 500;">Ingredientes</h3>
+        <div class="recipe-detail-section">
+          <div class="recipe-detail-section-header">
+            <h3 class="recipe-detail-section-title">Ingredientes</h3>
             ${!this.isReviewingImport ? `
               <button class="btn btn-tonal btn-sm" onclick="app.addRecipeIngredientsToShopping('${r.id}')">
                 <span class="material-symbols-outlined icon-sm">add_shopping_cart</span> Enviar a la Compra
               </button>
             ` : ''}
           </div>
-          <ul style="list-style: none; display: flex; flex-direction: column; gap: 6px;">
+          <ul class="recipe-ingredients-list">
             ${(r.ingredients || []).map(ing => {
               const adjustedAmount = ing.amount ? Math.round((ing.amount * scale) * 10) / 10 : null;
               return `
-                <li style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--m3-surface-container-low); border: 1px solid var(--m3-outline-variant); border-radius: var(--radius-sm); font-size: 13px;">
+                <li class="recipe-ingredient-item">
                   <span>${escapeHtml(ing.name)}</span>
-                  <strong style="color: var(--m3-primary);">${adjustedAmount !== null ? `${adjustedAmount} ${ing.unit || ''}` : ''}</strong>
+                  <strong class="recipe-ingredient-amount">${adjustedAmount !== null ? `${adjustedAmount} ${ing.unit || ''}` : ''}</strong>
                 </li>
               `;
             }).join('')}
           </ul>
         </div>
 
-        <div style="margin-bottom: 18px;">
-          <h3 style="font-size: 15px; font-weight: 500; margin-bottom: 10px;">Instrucciones</h3>
-          <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div class="recipe-detail-section">
+          <h3 class="recipe-detail-section-title-mb">Instrucciones</h3>
+          <div class="recipe-steps-list">
             ${(r.instructions || []).map(inst => `
-              <div style="display: flex; gap: 10px;">
-                <div style="width: 24px; height: 24px; border-radius: var(--radius-full); background: var(--m3-primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; flex-shrink: 0;">
+              <div class="recipe-step-row">
+                <div class="recipe-step-badge">
                   ${inst.step}
                 </div>
-                <div style="flex: 1; font-size: 13px; line-height: 1.45;">
+                <div class="recipe-step-text">
                   ${escapeHtml(inst.text)}
                   ${inst.timerMinutes > 0 ? `
-                    <div style="margin-top: 4px; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: var(--m3-primary); background: var(--m3-primary-container); padding: 2px 8px; border-radius: var(--radius-full);">
+                    <div class="recipe-step-timer-pill">
                       <span class="material-symbols-outlined icon-sm">timer</span> ${inst.timerMinutes} minutos
                     </div>
                   ` : ''}
@@ -7014,25 +7015,25 @@ class FoodAssistantApp {
         </div>
 
         ${this.isReviewingImport ? `
-          <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--m3-outline-variant);">
-            <button class="btn btn-primary" id="btn-bottom-save-import-recipe" style="width: 100%; padding: 12px; font-weight: 700; background-color: var(--color-brand); color: #ffffff; font-size: 14px;" onclick="app.confirmSaveImportRecipe()">
+          <div class="import-review-footer">
+            <button class="btn btn-primary btn-save-import-full" id="btn-bottom-save-import-recipe" onclick="app.confirmSaveImportRecipe()">
               <span class="material-symbols-outlined">check_circle</span> Guardar en Recetas
             </button>
-            <div style="display: flex; gap: 8px;">
-              <button class="btn btn-secondary" style="flex: 1; padding: 10px; font-size: 13px;" onclick="app.editImportReview()">
+            <div class="u-flex-row-center-gap-8">
+              <button class="btn btn-secondary btn-import-subaction" onclick="app.editImportReview()">
                 <span class="material-symbols-outlined icon-sm">edit</span> Editar receta
               </button>
-              <button class="btn btn-ghost" style="flex: 1; padding: 10px; font-size: 13px; color: var(--m3-error);" onclick="app.cancelImportReview()">
+              <button class="btn btn-ghost btn-import-cancel" onclick="app.cancelImportReview()">
                 <span class="material-symbols-outlined icon-sm">cancel</span> Cancelar importación
               </button>
             </div>
           </div>
         ` : `
-          <div style="display: flex; gap: 8px; margin-top: 16px;">
-            <button class="btn btn-secondary" id="btn-bottom-plan-recipe" style="flex: 1; padding: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="app.openPlanRecipeModal()">
+          <div class="recipe-detail-bottom-actions">
+            <button class="btn btn-secondary btn-detail-plan" id="btn-bottom-plan-recipe" onclick="app.openPlanRecipeModal()">
               <span class="material-symbols-outlined icon-sm">calendar_month</span> Añadir al Plan
             </button>
-            <button class="btn btn-primary" id="btn-bottom-start-cook-mode" style="flex: 1.5; padding: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="app.startCookMode()">
+            <button class="btn btn-primary btn-detail-cook" id="btn-bottom-start-cook-mode" onclick="app.startCookMode()">
               <span class="material-symbols-outlined icon-sm">skillet</span> Modo Cocina
             </button>
           </div>
@@ -7204,17 +7205,17 @@ class FoodAssistantApp {
 
       const safeTitle = (typeof escapeHtml === 'function' ? escapeHtml(currentTitle) : currentTitle).replace(/'/g, "\\'");
       previewContent.innerHTML = `
-        <div style="position: relative; width: 100%; height: 140px; background: #000; overflow: hidden; border-radius: var(--radius-sm);">
-          <img src="${currentUrl}" alt="Vista previa" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.onerror=null; this.parentElement.innerHTML=app.getRecipePlaceholderHtml('${safeTitle}', 'card');">
+        <div class="editor-image-preview-box">
+          <img src="${currentUrl}" alt="Vista previa" class="img-cover-full" onerror="this.onerror=null; this.parentElement.innerHTML=app.getRecipePlaceholderHtml('${safeTitle}', 'card');">
           <span class="recipe-image-preview-badge">
-            <span class="material-symbols-outlined" style="font-size: 12px;">${badgeIcon}</span> ${badgeText}
+            <span class="material-symbols-outlined icon-12">${badgeIcon}</span> ${badgeText}
           </span>
         </div>
       `;
     } else {
       if (removeBtn) removeBtn.style.display = 'none';
       previewContent.innerHTML = `
-        <div style="width: 100%; height: 140px; position: relative; border-radius: var(--radius-sm); overflow: hidden;">
+        <div class="editor-image-placeholder-box">
           ${this.getRecipePlaceholderHtml(currentTitle, 'card')}
         </div>
       `;
@@ -7266,15 +7267,15 @@ class FoodAssistantApp {
 
     if (aiBtn) {
       aiBtn.disabled = true;
-      aiBtn.innerHTML = '<span class="material-symbols-outlined icon-sm" style="animation: spin 1s linear infinite;">sync</span> Generando foto con IA...';
+      aiBtn.innerHTML = '<span class="material-symbols-outlined icon-sm icon-spin">sync</span> Generando foto con IA...';
     }
 
     const previewContent = document.getElementById('recipe-editor-image-preview-content');
     if (previewContent) {
       previewContent.innerHTML = `
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 140px; gap: 8px; color: var(--m3-primary);">
-          <span class="material-symbols-outlined" style="font-size: 32px; animation: spin 1.2s linear infinite;">auto_awesome</span>
-          <span style="font-size: 12px; font-weight: 500;">Creando fotografía gastronómica con IA...</span>
+        <div class="editor-ai-generating-box">
+          <span class="material-symbols-outlined icon-32 icon-spin-slow">auto_awesome</span>
+          <span class="editor-ai-generating-label">Creando fotografía gastronómica con IA...</span>
         </div>
       `;
     }
@@ -7326,7 +7327,7 @@ class FoodAssistantApp {
           <span class="editor-selected-chip">
             <span>${tag}</span>
             <button type="button" class="chip-remove-btn" onclick="app.removeEditorTag('${tag.replace(/'/g, "\\'")}')" title="Quitar etiqueta">
-              <span class="material-symbols-outlined" style="font-size: 14px;">close</span>
+              <span class="material-symbols-outlined icon-14">close</span>
             </button>
           </span>
         `).join('');
@@ -7339,7 +7340,7 @@ class FoodAssistantApp {
         const isSelected = this.editorSelectedTags.has(t);
         return `
           <button type="button" class="editor-suggested-chip ${isSelected ? 'active' : ''}" onclick="app.toggleEditorTag('${t.replace(/'/g, "\\'")}')">
-            ${PREDEFINED_DIETARY_TAGS.includes(t) ? `<span class="dietary-emoji">${getDietaryTagEmoji(t)}</span>` : `<span class="material-symbols-outlined" style="font-size: 14px;">${isSelected ? 'check' : 'add'}</span>`}
+            ${PREDEFINED_DIETARY_TAGS.includes(t) ? `<span class="dietary-emoji">${getDietaryTagEmoji(t)}</span>` : `<span class="material-symbols-outlined icon-14">${isSelected ? 'check' : 'add'}</span>`}
             <span>${t}</span>
           </button>
         `;
@@ -7558,7 +7559,7 @@ class FoodAssistantApp {
         <div class="ing-name-wrap">
           <span class="material-symbols-outlined icon-sm ing-icon-badge">${initialIcon}</span>
           <input type="text" class="form-input ing-name" placeholder="Nombre del ingrediente (ej. Castañas, Puerro...)" value="${data.name || ''}" autocomplete="off">
-          <div class="ing-autocomplete-dropdown autocomplete-dropdown" style="display: none;"></div>
+          <div class="ing-autocomplete-dropdown autocomplete-dropdown is-hidden"></div>
         </div>
         <button type="button" class="btn-remove-item" title="Eliminar ingrediente">
           <span class="material-symbols-outlined icon-sm">delete</span>
@@ -7699,14 +7700,14 @@ class FoodAssistantApp {
       if (mins > 0) {
         timerSlot.innerHTML = `
           <div class="step-timer-badge">
-            <span class="material-symbols-outlined icon-sm" style="font-size: 15px;">timer</span>
+            <span class="material-symbols-outlined icon-sm icon-15">timer</span>
             <span class="timer-display-text">${mins} min</span>
             ${isAutoDetected ? '<span class="step-timer-auto-tag">Auto</span>' : ''}
-            <button type="button" class="btn-timer-edit" style="background:none;border:none;cursor:pointer;padding:0 2px;color:inherit;display:inline-flex;align-items:center;" title="Cambiar minutos">
-              <span class="material-symbols-outlined" style="font-size: 14px;">edit</span>
+            <button type="button" class="btn-timer-edit btn-inline-icon-only" title="Cambiar minutos">
+              <span class="material-symbols-outlined icon-14">edit</span>
             </button>
-            <button type="button" class="btn-timer-remove" style="background:none;border:none;cursor:pointer;padding:0 2px;color:inherit;display:inline-flex;align-items:center;" title="Quitar temporizador">
-              <span class="material-symbols-outlined" style="font-size: 15px;">close</span>
+            <button type="button" class="btn-timer-remove btn-inline-icon-only" title="Quitar temporizador">
+              <span class="material-symbols-outlined icon-15">close</span>
             </button>
           </div>
         `;
@@ -7724,7 +7725,7 @@ class FoodAssistantApp {
       } else {
         timerSlot.innerHTML = `
           <button type="button" class="btn-step-timer-prompt" title="Añadir temporizador opcional">
-            <span class="material-symbols-outlined icon-sm" style="font-size: 14px;">timer</span>
+            <span class="material-symbols-outlined icon-sm icon-14">timer</span>
             <span>+ Tiempo opcional</span>
           </button>
         `;
@@ -7738,10 +7739,10 @@ class FoodAssistantApp {
     const showInlineTimerEdit = (initialVal) => {
       timerSlot.innerHTML = `
         <div class="step-timer-inline-edit">
-          <span class="material-symbols-outlined icon-sm" style="font-size: 15px; color: var(--m3-primary);">timer</span>
+          <span class="material-symbols-outlined icon-sm icon-15 icon-primary">timer</span>
           <input type="number" class="step-timer-mini-input" value="${initialVal || ''}" min="1" max="999" placeholder="Min" autofocus>
-          <span style="font-size: 12px; color: var(--m3-on-surface-variant);">min</span>
-          <button type="button" class="btn-save-inline-timer btn btn-primary btn-sm" style="padding: 2px 8px; font-size: 11px; height: 24px;">OK</button>
+          <span class="timer-unit-label">min</span>
+          <button type="button" class="btn-save-inline-timer btn btn-primary btn-sm btn-save-inline-timer-compact">OK</button>
         </div>
       `;
 
@@ -8160,7 +8161,7 @@ class FoodAssistantApp {
               <span class="day-date-label">${dayDateFormatted}</span>
               ${isToday ? `<span class="day-badge-today">HOY</span>` : ''}
             </div>
-            <button type="button" class="btn btn-ghost btn-sm" onclick="app.openAddCustomSlotModal('${dateStr}')" style="font-size: 11px; padding: 4px 8px; color: var(--m3-primary);" title="Añadir momento de comida">
+            <button type="button" class="btn btn-ghost btn-sm btn-add-custom-slot-header" onclick="app.openAddCustomSlotModal('${dateStr}')" title="Añadir momento de comida">
               <span class="material-symbols-outlined icon-sm">add</span> Añadir Comida
             </button>
           </div>
@@ -8170,8 +8171,8 @@ class FoodAssistantApp {
             ${customSlots.map(cs => this.renderCustomSlotCard(dateStr, cs)).join('')}
           </div>
 
-          <div style="margin-top: 8px; display: flex; justify-content: flex-end;">
-            <button type="button" class="btn btn-ghost btn-sm" onclick="app.openAddCustomSlotModal('${dateStr}')" style="font-size: 12px; color: var(--m3-primary); gap: 4px;">
+          <div class="planner-day-footer">
+            <button type="button" class="btn btn-ghost btn-sm btn-add-custom-slot-footer" onclick="app.openAddCustomSlotModal('${dateStr}')">
               <span class="material-symbols-outlined icon-sm">add_circle</span> Añadir momento (snack, merienda, batido...)
             </button>
           </div>
@@ -8189,36 +8190,36 @@ class FoodAssistantApp {
       const comp = checkDietaryCompliance(recipe, state.dietaryPreferences);
       const warningHtml = !comp.compliant ? `
         <div class="dietary-warning-badge" title="Incumple preferencias dietéticas: ${comp.violations.join(', ')}">
-          <span class="material-symbols-outlined" style="font-size: 13px;">warning</span> No cumple: ${comp.violations.join(', ')}
+          <span class="material-symbols-outlined icon-13">warning</span> No cumple: ${comp.violations.join(', ')}
         </div>
       ` : '';
 
       return `
         <div class="meal-slot has-meal" onclick="app.openRecipeDetail('${recipe.id}')">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="u-flex-between-center">
             <span class="slot-label">
               <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
             </span>
-            <div style="display: flex; align-items: center; gap: 4px;">
+            <div class="u-flex-row-center-gap-4">
               ${isLeftover ? `
-                <span style="background: var(--m3-secondary-container); color: var(--m3-on-secondary-container); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: var(--radius-full); display: inline-flex; align-items: center; gap: 2px;" title="Cocinado el día anterior para sobras">
-                  <span class="material-symbols-outlined" style="font-size: 12px;">takeout_dining</span> Sobras
+                <span class="leftover-pill-badge" title="Cocinado el día anterior para sobras">
+                  <span class="material-symbols-outlined icon-12">takeout_dining</span> Sobras
                 </span>
               ` : ''}
-              <button class="btn-ghost btn-sm" onclick="event.stopPropagation(); app.clearSlot('${dateStr}', '${slotType}')" title="Quitar receta" style="padding: 2px 4px;">
+              <button class="btn-ghost btn-sm btn-slot-clear" onclick="event.stopPropagation(); app.clearSlot('${dateStr}', '${slotType}')" title="Quitar receta">
                 <span class="material-symbols-outlined icon-sm">close</span>
               </button>
             </div>
           </div>
-          <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; min-width: 0;">
+          <div class="planner-slot-body-row">
             ${recipe.imageUrl ? `
-              <img src="${recipe.imageUrl}" alt="" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.onerror=null; this.src=app.getRecipePlaceholderSvg('${(typeof escapeHtml === 'function' ? escapeHtml(recipe.title) : recipe.title).replace(/'/g, "\\'")}', 'thumb');">
+              <img src="${recipe.imageUrl}" alt="" class="planner-slot-thumb" onerror="this.onerror=null; this.src=app.getRecipePlaceholderSvg('${(typeof escapeHtml === 'function' ? escapeHtml(recipe.title) : recipe.title).replace(/'/g, "\\'")}', 'thumb');">
             ` : `
-              <div style="width: 36px; height: 36px; border-radius: 6px; overflow: hidden; flex-shrink: 0;">
-                <img src="${this.getRecipePlaceholderSvg(recipe.title, 'thumb')}" alt="" style="width: 100%; height: 100%; object-fit: cover;">
+              <div class="planner-slot-thumb-wrap">
+                <img src="${this.getRecipePlaceholderSvg(recipe.title, 'thumb')}" alt="" class="img-cover-full">
               </div>
             `}
-            <div style="flex: 1; min-width: 0; overflow: hidden;">
+            <div class="u-flex-1-truncate">
               <div class="slot-recipe-name" title="${recipe.title}">${recipe.title}</div>
               ${warningHtml}
             </div>
@@ -8248,34 +8249,34 @@ class FoodAssistantApp {
       const comp = checkDietaryCompliance(recipe, state.dietaryPreferences);
       const warningHtml = !comp.compliant ? `
         <div class="dietary-warning-badge" title="Incumple preferencias dietéticas: ${comp.violations.join(', ')}">
-          <span class="material-symbols-outlined" style="font-size: 13px;">warning</span> No cumple: ${comp.violations.join(', ')}
+          <span class="material-symbols-outlined icon-13">warning</span> No cumple: ${comp.violations.join(', ')}
         </div>
       ` : '';
 
       return `
-        <div class="meal-slot has-meal" onclick="app.openRecipeDetail('${recipe.id}')" style="border-left: 3px solid var(--m3-primary);">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span class="slot-label" style="color: var(--m3-primary); font-weight: 700;">
+        <div class="meal-slot has-meal meal-slot-custom" onclick="app.openRecipeDetail('${recipe.id}')">
+          <div class="u-flex-between-center">
+            <span class="slot-label slot-label-custom">
               <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
             </span>
-            <div style="display: flex; gap: 2px;">
-              <button class="btn-ghost btn-sm" onclick="event.stopPropagation(); app.clearCustomSlotRecipe('${dateStr}', '${customSlot.id}')" title="Quitar receta" style="padding: 2px 4px;">
+            <div class="u-flex-gap-2">
+              <button class="btn-ghost btn-sm btn-slot-clear" onclick="event.stopPropagation(); app.clearCustomSlotRecipe('${dateStr}', '${customSlot.id}')" title="Quitar receta">
                 <span class="material-symbols-outlined icon-sm">remove_circle_outline</span>
               </button>
-              <button class="btn-ghost btn-sm" onclick="event.stopPropagation(); app.deleteCustomSlot('${dateStr}', '${customSlot.id}')" title="Eliminar este momento" style="padding: 2px 4px; color: var(--m3-error);">
+              <button class="btn-ghost btn-sm btn-slot-delete" onclick="event.stopPropagation(); app.deleteCustomSlot('${dateStr}', '${customSlot.id}')" title="Eliminar este momento">
                 <span class="material-symbols-outlined icon-sm">delete</span>
               </button>
             </div>
           </div>
-          <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; min-width: 0;">
+          <div class="planner-slot-body-row">
             ${recipe.imageUrl ? `
-              <img src="${recipe.imageUrl}" alt="" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.onerror=null; this.src=app.getRecipePlaceholderSvg('${(typeof escapeHtml === 'function' ? escapeHtml(recipe.title) : recipe.title).replace(/'/g, "\\'")}', 'thumb');">
+              <img src="${recipe.imageUrl}" alt="" class="planner-slot-thumb" onerror="this.onerror=null; this.src=app.getRecipePlaceholderSvg('${(typeof escapeHtml === 'function' ? escapeHtml(recipe.title) : recipe.title).replace(/'/g, "\\'")}', 'thumb');">
             ` : `
-              <div style="width: 36px; height: 36px; border-radius: 6px; overflow: hidden; flex-shrink: 0;">
-                <img src="${this.getRecipePlaceholderSvg(recipe.title, 'thumb')}" alt="" style="width: 100%; height: 100%; object-fit: cover;">
+              <div class="planner-slot-thumb-wrap">
+                <img src="${this.getRecipePlaceholderSvg(recipe.title, 'thumb')}" alt="" class="img-cover-full">
               </div>
             `}
-            <div style="flex: 1; min-width: 0; overflow: hidden;">
+            <div class="u-flex-1-truncate">
               <div class="slot-recipe-name" title="${recipe.title}">${recipe.title}</div>
               ${warningHtml}
             </div>
@@ -8284,12 +8285,12 @@ class FoodAssistantApp {
       `;
     } else {
       return `
-        <div class="meal-slot" onclick="app.openPickerModal('${dateStr}', '${customSlot.id}', true)" style="border-left: 3px solid var(--m3-primary);">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span class="slot-label" style="color: var(--m3-primary); font-weight: 700;">
+        <div class="meal-slot meal-slot-custom" onclick="app.openPickerModal('${dateStr}', '${customSlot.id}', true)">
+          <div class="u-flex-between-center">
+            <span class="slot-label slot-label-custom">
               <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
             </span>
-            <button class="btn-ghost btn-sm" onclick="event.stopPropagation(); app.deleteCustomSlot('${dateStr}', '${customSlot.id}')" title="Eliminar este momento" style="padding: 2px 4px; color: var(--m3-error);">
+            <button class="btn-ghost btn-sm btn-slot-delete" onclick="event.stopPropagation(); app.deleteCustomSlot('${dateStr}', '${customSlot.id}')" title="Eliminar este momento">
               <span class="material-symbols-outlined icon-sm">delete</span>
             </button>
           </div>
@@ -8589,7 +8590,7 @@ class FoodAssistantApp {
           <button type="button" class="copy-week-source-card ${isSelected ? 'active' : ''}" data-monday="${c.mondayKey}" onclick="app.selectCopyWeekSource('${c.mondayKey}')">
             <div class="copy-source-left">
               <span class="material-symbols-outlined icon-sm">${c.isImmediatePrev ? 'history' : 'date_range'}</span>
-              <div style="min-width: 0;">
+              <div class="u-min-w-0">
                 <span class="copy-source-title">${c.relativeLabel}</span>
                 <span class="copy-source-range">${subtitleText}</span>
               </div>
@@ -8615,8 +8616,8 @@ class FoodAssistantApp {
     if (previewBox) {
       if (sourceStats.mealCount === 0 && sourceStats.customSlotsCount === 0) {
         previewBox.innerHTML = `
-          <div style="text-align: center; padding: 14px 8px; color: var(--m3-on-surface-variant); font-size: 12px;">
-            <span class="material-symbols-outlined" style="font-size: 22px; display: block; margin-bottom: 4px; opacity: 0.7;">event_busy</span>
+          <div class="copy-week-empty-state">
+            <span class="material-symbols-outlined copy-week-empty-icon">event_busy</span>
             La semana seleccionada (${formatWeekRange(sourceWeekDays)}) no tiene platos ni momentos personalizados asignados.
           </div>
         `;
@@ -8646,7 +8647,7 @@ class FoodAssistantApp {
           return `
             <div class="copy-preview-day-row">
               <span class="copy-preview-day-name">${wDay.dayName}</span>
-              <span class="copy-preview-day-meals">${entries.length > 0 ? entries.join(' · ') : '<em style="opacity: 0.6;">Sin comidas</em>'}</span>
+              <span class="copy-preview-day-meals">${entries.length > 0 ? entries.join(' · ') : '<em class="copy-preview-empty-em">Sin comidas</em>'}</span>
             </div>
           `;
         }).join('');
@@ -8887,10 +8888,10 @@ class FoodAssistantApp {
     if (recipes.length === 0) {
       if (q) {
         list.innerHTML = `
-          <div style="text-align: center; padding: 28px 16px; color: var(--m3-on-surface-variant); font-size: 13px;">
-            <span class="material-symbols-outlined" style="font-size: 32px; display: block; margin-bottom: 6px; color: var(--m3-primary);">search_off</span>
+          <div class="picker-empty-state">
+            <span class="material-symbols-outlined picker-empty-icon">search_off</span>
             No se encontraron recetas para "<strong>${escapeHtml(q)}</strong>".
-            <div style="margin-top: 10px;">
+            <div class="u-mt-10">
               <button type="button" class="btn btn-secondary btn-sm" onclick="app.clearPickerSearch()">
                 <span class="material-symbols-outlined icon-sm">backspace</span> Limpiar búsqueda
               </button>
@@ -8902,8 +8903,8 @@ class FoodAssistantApp {
 
       if (this.pickerOnlyDietary && hasPreferences) {
         list.innerHTML = `
-          <div style="text-align: center; padding: 28px 16px; color: var(--m3-on-surface-variant); font-size: 13px;">
-            <span class="material-symbols-outlined" style="font-size: 32px; display: block; margin-bottom: 6px; color: var(--m3-primary);">eco</span>
+          <div class="picker-empty-state">
+            <span class="material-symbols-outlined picker-empty-icon">eco</span>
             No hay recetas que cumplan con los filtros dietéticos seleccionados.
           </div>
         `;
@@ -8911,8 +8912,8 @@ class FoodAssistantApp {
       }
 
       list.innerHTML = `
-        <div style="text-align: center; padding: 28px 16px; color: var(--m3-on-surface-variant); font-size: 13px;">
-          <span class="material-symbols-outlined" style="font-size: 32px; display: block; margin-bottom: 6px; color: var(--m3-primary);">menu_book</span>
+        <div class="picker-empty-state">
+          <span class="material-symbols-outlined picker-empty-icon">menu_book</span>
           Aún no tienes recetas guardadas en tu recetario.
         </div>
       `;
@@ -8922,29 +8923,29 @@ class FoodAssistantApp {
     list.innerHTML = recipes.map(r => {
       const comp = hasPreferences ? checkDietaryCompliance(r, state.dietaryPreferences) : { compliant: true, violations: [] };
       return `
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--m3-surface-container-low); border: 1px solid var(--m3-outline-variant); border-radius: var(--radius-md); cursor: pointer;"
+        <div class="picker-recipe-row"
              onclick="app.selectRecipeForSlot('${r.id}')">
-          <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; padding-right: 8px;">
+          <div class="picker-recipe-main">
             ${r.imageUrl ? `
-              <img src="${r.imageUrl}" alt="" style="width: 42px; height: 42px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" onerror="this.onerror=null; this.src=app.getRecipePlaceholderSvg('${(typeof escapeHtml === 'function' ? escapeHtml(r.title) : r.title).replace(/'/g, "\\'")}', 'thumb');">
+              <img src="${r.imageUrl}" alt="" class="picker-recipe-thumb" onerror="this.onerror=null; this.src=app.getRecipePlaceholderSvg('${(typeof escapeHtml === 'function' ? escapeHtml(r.title) : r.title).replace(/'/g, "\\'")}', 'thumb');">
             ` : `
-              <div style="width: 42px; height: 42px; border-radius: 6px; overflow: hidden; flex-shrink: 0;">
-                <img src="${this.getRecipePlaceholderSvg(r.title, 'thumb')}" alt="" style="width: 100%; height: 100%; object-fit: cover;">
+              <div class="picker-recipe-thumb-wrap">
+                <img src="${this.getRecipePlaceholderSvg(r.title, 'thumb')}" alt="" class="img-cover-full">
               </div>
             `}
-            <div style="min-width: 0;">
-              <strong style="font-size: 13px; color: var(--m3-on-surface); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${r.title}</strong>
-              <div style="font-size: 11px; color: var(--m3-on-surface-variant); display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+            <div class="u-min-w-0">
+              <strong class="picker-recipe-title">${r.title}</strong>
+              <div class="picker-recipe-meta">
                 <span class="material-symbols-outlined icon-sm">schedule</span> ${r.prepTimeMinutes + r.cookTimeMinutes} min
               </div>
               ${hasPreferences ? (
                 comp.compliant
-                  ? `<span class="dietary-ok-badge" style="margin-top: 3px;"><span class="material-symbols-outlined" style="font-size: 12px;">check</span> Apta (${state.dietaryPreferences.join(', ')})</span>`
-                  : `<span class="dietary-warning-badge" style="margin-top: 3px;"><span class="material-symbols-outlined" style="font-size: 12px;">warning</span> No cumple: ${comp.violations.join(', ')}</span>`
+                  ? `<span class="dietary-ok-badge u-mt-3"><span class="material-symbols-outlined icon-12">check</span> Apta (${state.dietaryPreferences.join(', ')})</span>`
+                  : `<span class="dietary-warning-badge u-mt-3"><span class="material-symbols-outlined icon-12">warning</span> No cumple: ${comp.violations.join(', ')}</span>`
               ) : ''}
             </div>
           </div>
-          <button class="btn btn-secondary btn-sm" style="flex-shrink: 0;">Elegir</button>
+          <button class="btn btn-secondary btn-sm u-shrink-0">Elegir</button>
         </div>
       `;
     }).join('');
@@ -9019,7 +9020,7 @@ class FoodAssistantApp {
       }
 
       quickDatesContainer.innerHTML = dates.map((item, idx) => `
-        <button type="button" class="m3-filter-chip plan-quick-date-chip ${idx === 0 ? 'active' : ''}" data-date="${item.key}" onclick="app.selectPlanRecipeQuickDate('${item.key}', this)" style="cursor: pointer;">
+        <button type="button" class="m3-filter-chip plan-quick-date-chip u-cursor-pointer ${idx === 0 ? 'active' : ''}" data-date="${item.key}" onclick="app.selectPlanRecipeQuickDate('${item.key}', this)">
           ${item.label}
         </button>
       `).join('');
@@ -9074,12 +9075,12 @@ class FoodAssistantApp {
       const hasCurrent = !!currentRecipeId;
 
       return `
-        <button type="button" class="plan-slot-card-choice ${isSelected ? 'selected' : ''}" onclick="app.selectPlanRecipeSlot('${s.key}', ${s.isCustom})" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: ${isSelected ? 'var(--m3-primary-container)' : 'var(--m3-surface-container-low)'}; color: ${isSelected ? 'var(--m3-on-primary-container)' : 'var(--m3-on-surface)'}; border: 1.5px solid ${isSelected ? 'var(--m3-primary)' : 'var(--m3-outline-variant)'}; border-radius: var(--radius-md); cursor: pointer; text-align: left; font-size: 13px; font-weight: 500;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span class="material-symbols-outlined icon-sm" style="color: ${isSelected ? 'var(--m3-primary)' : 'var(--m3-on-surface-variant)'};">${s.icon}</span>
+        <button type="button" class="plan-slot-card-choice ${isSelected ? 'selected' : ''}" onclick="app.selectPlanRecipeSlot('${s.key}', ${s.isCustom})">
+          <div class="u-flex-row-center-gap-8">
+            <span class="material-symbols-outlined icon-sm plan-slot-choice-icon">${s.icon}</span>
             <span>${s.label}</span>
           </div>
-          ${hasCurrent ? '<span class="material-symbols-outlined icon-sm" style="color: #f59e0b;" title="Ya tiene plato asignado">warning</span>' : ''}
+          ${hasCurrent ? '<span class="material-symbols-outlined icon-sm icon-warning" title="Ya tiene plato asignado">warning</span>' : ''}
         </button>
       `;
     }).join('');
@@ -9122,11 +9123,11 @@ class FoodAssistantApp {
       warningBox.style.borderColor = '#f59e0b';
       warningBox.style.color = 'var(--m3-on-surface)';
       warningBox.innerHTML = `
-        <div style="display: flex; gap: 8px; align-items: flex-start;">
-          <span class="material-symbols-outlined icon-sm" style="color: #f59e0b; flex-shrink: 0; margin-top: 1px;">warning</span>
+        <div class="plan-overwrite-row">
+          <span class="material-symbols-outlined icon-sm plan-overwrite-icon">warning</span>
           <div>
             <strong>Momento ocupado:</strong> Ya hay asignado "<em>${escapeHtml(existingTitle)}</em>" en ${slotLabel}.
-            <div style="font-size: 11px; margin-top: 3px; color: var(--m3-on-surface-variant);">
+            <div class="plan-overwrite-sub">
               Al confirmar, se sustituirá por "${escapeHtml(this.planRecipeTarget?.title || '')}".
             </div>
           </div>
@@ -9138,8 +9139,8 @@ class FoodAssistantApp {
       warningBox.style.borderColor = 'var(--m3-outline-variant)';
       warningBox.style.color = 'var(--m3-on-surface-variant)';
       warningBox.innerHTML = `
-        <div style="display: flex; gap: 8px; align-items: center;">
-          <span class="material-symbols-outlined icon-sm" style="color: var(--m3-primary);">check_circle</span>
+        <div class="u-flex-row-center-gap-8">
+          <span class="material-symbols-outlined icon-sm icon-primary">check_circle</span>
           <span>Hueco libre en <strong>${slotLabel}</strong>.</span>
         </div>
       `;
@@ -9248,10 +9249,10 @@ class FoodAssistantApp {
 
     if (!state.shoppingList.length) {
       container.innerHTML = `
-        <div class="card" style="text-align: center; padding: 40px 16px; color: var(--m3-on-surface-variant);">
-          <span class="material-symbols-outlined" style="font-size: 40px; margin-bottom: 6px; color: var(--m3-primary);">shopping_cart</span>
-          <h3 style="color: var(--m3-on-surface); font-size: 16px;">Lista de la compra vac\u00EDa</h3>
-          <p style="font-size: 13px; margin: 4px 0 16px 0;">
+        <div class="card shopping-empty-card">
+          <span class="material-symbols-outlined shopping-empty-icon">shopping_cart</span>
+          <h3 class="shopping-empty-title">Lista de la compra vac\u00EDa</h3>
+          <p class="shopping-empty-desc">
             Genera la lista desde tu plan semanal con un clic o a\u00F1ade art\u00EDculos manualmente.
           </p>
           <button class="btn btn-primary btn-sm" onclick="app.generateShoppingFromPlan()">
@@ -9276,11 +9277,11 @@ class FoodAssistantApp {
       return `
         <div class="aisle-card">
           <div class="aisle-header">
-            <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="u-flex-row-center-gap-8">
               <span class="material-symbols-outlined icon-sm">${meta.icon}</span>
               <span>${meta.label}</span>
             </div>
-            <span style="font-size: 11px; color: var(--m3-on-surface-variant);">${pendingInAisle} pendientes</span>
+            <span class="aisle-pending-count">${pendingInAisle} pendientes</span>
           </div>
 
           <div>
@@ -9291,12 +9292,12 @@ class FoodAssistantApp {
                   <div class="grocery-item-icon-badge" title="${item.name}">
                     <span class="material-symbols-outlined icon-sm">${getIngredientIcon(item.name, item.aisle)}</span>
                   </div>
-                  <div style="flex: 1; min-width: 0; overflow: hidden;">
+                  <div class="u-flex-1-truncate">
                     <div class="grocery-name">${item.name}</div>
-                    ${item.recipeOrigin ? `<div style="font-size: 11px; color: var(--m3-on-surface-variant); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Para: ${item.recipeOrigin}</div>` : ''}
+                    ${item.recipeOrigin ? `<div class="grocery-origin-sub">Para: ${item.recipeOrigin}</div>` : ''}
                   </div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                <div class="u-flex-center-gap-8-shrink">
                   ${item.amount ? `<span class="grocery-amount">${item.amount} ${item.unit || ''}</span>` : ''}
                   <button class="btn-ghost btn-sm" onclick="app.deleteGroceryItem(${item.originalIndex})" title="Eliminar">
                     <span class="material-symbols-outlined icon-sm">close</span>
@@ -9644,50 +9645,49 @@ class FoodAssistantApp {
       const checkedInGroup = group.items.filter(i => i.checked).length;
 
       return `
-        <div class="card" style="margin-bottom: 12px; padding: 12px; background-color: var(--m3-surface); border: 1px solid var(--m3-outline-variant); border-radius: var(--radius-lg);">
+        <div class="card shopping-preview-group-card">
           <!-- Recipe Section Header -->
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--m3-outline-variant); gap: 8px;">
-            <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">
-              ${group.recipeImage ? `<img src="${group.recipeImage}" alt="" style="width: 34px; height: 34px; border-radius: 6px; object-fit: cover; flex-shrink: 0;">` : `<span class="material-symbols-outlined" style="color: var(--m3-primary);">restaurant</span>`}
-              <div style="flex: 1; min-width: 0;">
-                <div style="font-size: 14px; font-weight: 700; color: var(--m3-on-surface); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${group.recipeTitle}</div>
-                <div style="font-size: 11px; color: var(--m3-on-surface-variant);">${checkedInGroup} de ${group.items.length} ingredientes seleccionados</div>
+          <div class="shopping-preview-group-header">
+            <div class="shopping-preview-group-title-wrap">
+              ${group.recipeImage ? `<img src="${group.recipeImage}" alt="" class="shopping-preview-thumb">` : `<span class="material-symbols-outlined icon-primary">restaurant</span>`}
+              <div class="u-flex-1-truncate">
+                <div class="shopping-preview-recipe-title">${group.recipeTitle}</div>
+                <div class="shopping-preview-count-sub">${checkedInGroup} de ${group.items.length} ingredientes seleccionados</div>
               </div>
             </div>
             
-            <button type="button" class="btn btn-ghost btn-sm" style="font-size: 11px; padding: 4px 8px; white-space: nowrap;" onclick="app.toggleGroupShoppingPreview(${groupIdx}, ${!allChecked})">
+            <button type="button" class="btn btn-ghost btn-sm btn-preview-toggle-group" onclick="app.toggleGroupShoppingPreview(${groupIdx}, ${!allChecked})">
               ${allChecked ? 'Desmarcar receta' : 'Marcar receta'}
             </button>
           </div>
 
           <!-- Recipe Ingredients List -->
-          <div style="display: flex; flex-direction: column; gap: 6px;">
+          <div class="shopping-preview-items-col">
             ${group.items.map((ing, itemIdx) => {
               const meta = AISLE_METADATA[ing.aisle] || AISLE_METADATA.other;
               const isChecked = ing.checked !== false;
 
               return `
-                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border-radius: var(--radius-sm); background-color: ${isChecked ? 'var(--m3-surface-container-low)' : 'transparent'}; transition: background-color 0.15s ease;">
-                  <label style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; cursor: pointer; margin: 0;">
-                    <input type="checkbox" class="grocery-checkbox" ${isChecked ? 'checked' : ''} onchange="app.handleShoppingPreviewItemCheck(${groupIdx}, ${itemIdx}, this.checked)" style="flex-shrink: 0;">
-                    <div style="flex: 1; min-width: 0; overflow: hidden;">
-                      <span style="font-size: 13px; font-weight: 500; color: var(--m3-on-surface); word-break: break-word; ${isChecked ? '' : 'text-decoration: line-through; opacity: 0.55;'}">
+                <div class="shopping-preview-item-row ${isChecked ? 'is-checked' : ''}">
+                  <label class="shopping-preview-item-label">
+                    <input type="checkbox" class="grocery-checkbox u-shrink-0" ${isChecked ? 'checked' : ''} onchange="app.handleShoppingPreviewItemCheck(${groupIdx}, ${itemIdx}, this.checked)">
+                    <div class="u-flex-1-truncate">
+                      <span class="shopping-preview-item-name ${isChecked ? '' : 'is-unchecked'}">
                         ${ing.name}
                       </span>
-                      <span style="font-size: 10px; color: var(--m3-on-surface-variant); margin-left: 4px; display: inline-flex; align-items: center; gap: 2px;">
-                        <span class="material-symbols-outlined icon-sm" style="font-size: 12px;">${meta.icon}</span> ${meta.label}
+                      <span class="shopping-preview-aisle-tag">
+                        <span class="material-symbols-outlined icon-sm icon-12">${meta.icon}</span> ${meta.label}
                       </span>
                     </div>
                   </label>
 
-                  <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                  <div class="u-flex-center-gap-4-shrink">
                     <input type="number" step="any" min="0" value="${ing.amount !== null && ing.amount !== undefined ? ing.amount : ''}" 
                       placeholder="Cant." 
-                      class="form-input" 
-                      style="width: 64px; padding: 4px 6px; text-align: center; font-size: 12px; font-weight: 500; height: 30px; ${isChecked ? '' : 'opacity: 0.5;'}"
+                      class="form-input shopping-preview-amount-input ${isChecked ? '' : 'is-unchecked'}" 
                       onchange="app.handleShoppingPreviewAmountChange(${groupIdx}, ${itemIdx}, this.value)"
                       ${isChecked ? '' : 'disabled'}>
-                    <span style="font-size: 11px; color: var(--m3-on-surface-variant); min-width: 22px;">${ing.unit || ''}</span>
+                    <span class="shopping-preview-unit-label">${ing.unit || ''}</span>
                   </div>
                 </div>
               `;
@@ -11356,16 +11356,16 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     if (!history) return;
     
     const userBubble = document.createElement('div');
-    userBubble.style = 'background-color: var(--m3-primary); color: white; padding: 10px 14px; border-radius: var(--radius-lg); font-size: 13px; line-height: 1.45; align-self: flex-end; max-width: 85%;';
+    userBubble.className = 'ai-user-bubble';
     userBubble.textContent = text;
     history.appendChild(userBubble);
     input.value = '';
     history.scrollTop = history.scrollHeight;
 
     const aiBubble = document.createElement('div');
-    aiBubble.style = 'background-color: var(--m3-surface-container); padding: 12px 14px; border-radius: var(--radius-lg); font-size: 13px; line-height: 1.45; align-self: flex-start; max-width: 88%;';
+    aiBubble.className = 'ai-assistant-bubble';
     const isFullCatalog = (state.recipes && state.recipes.length > 120 && this.detectPromptCriteria(text).length === 0);
-    const waitNotice = isFullCatalog ? `<div style="font-size:11px; margin-top:4px; opacity:0.85;">Analizando recetario completo (${state.recipes.length} recetas)... unos segundos.</div>` : '';
+    const waitNotice = isFullCatalog ? `<div class="ai-wait-notice">Analizando recetario completo (${state.recipes.length} recetas)... unos segundos.</div>` : '';
     aiBubble.innerHTML = `<em>Consultando al Asistente...</em>${waitNotice}`;
     history.appendChild(aiBubble);
     history.scrollTop = history.scrollHeight;
@@ -11519,7 +11519,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
       if (executedResults.length > 0) {
         const actionsContainer = document.createElement('div');
-        actionsContainer.style = 'display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;';
+        actionsContainer.className = 'ai-actions-row';
 
         executedResults.forEach(res => {
           if (res.tool === 'set_weekly_plan' || res.tool === 'set_day_plan') {
@@ -11695,7 +11695,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     if (micBtn) {
       micBtn.classList.toggle('listening', isListening);
       micBtn.innerHTML = isListening
-        ? '<span class="material-symbols-outlined icon-sm" style="animation: pulse 1s infinite; color: var(--m3-error, #ba1a1a);">mic</span>'
+        ? '<span class="material-symbols-outlined icon-sm icon-pulse icon-error">mic</span>'
         : '<span class="material-symbols-outlined icon-sm">mic</span>';
       micBtn.title = isListening ? 'Escuchando... pulsa para parar' : 'Hablar por micrófono';
     }
@@ -11788,11 +11788,11 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
     const isFullCatalog = (state.recipes && state.recipes.length > 120 && this.detectPromptCriteria(prompt).length === 0);
     const noticeHtml = isFullCatalog
-      ? `<div style="font-size:11px; margin-top:4px; opacity:0.85; color:var(--m3-on-surface-variant);">Analizando tu recetario completo (${state.recipes.length} recetas)... Esto puede tardar unos segundos.</div>`
+      ? `<div class="ai-wait-notice">Analizando tu recetario completo (${state.recipes.length} recetas)... Esto puede tardar unos segundos.</div>`
       : '';
     if (transcription) {
-      transcription.innerHTML = `<span style="display:inline-flex; align-items:center; gap:6px; color:var(--m3-primary); font-weight:500;">
-        <span class="material-symbols-outlined icon-sm" style="animation: spin 1s linear infinite;">sync</span>
+      transcription.innerHTML = `<span class="ai-status-loading">
+        <span class="material-symbols-outlined icon-sm icon-spin">sync</span>
         El Asistente está pensando...
       </span>${noticeHtml}`;
     }
@@ -11844,11 +11844,9 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
           threadBox.style.display = 'flex';
           threadBox.innerHTML = previousTurns.map(t => {
             const isU = t.role === 'user';
-            const bg = isU ? 'var(--m3-surface-container-high, #f1f3f4)' : 'var(--m3-surface, #fff)';
-            const border = isU ? 'transparent' : 'var(--m3-outline-variant, rgba(0,0,0,0.08))';
             const escaped = typeof escapeHtml === 'function' ? escapeHtml(t.text) : String(t.text).replace(/</g, '&lt;');
-            return `<div style="background: ${bg}; border: 1px solid ${border}; border-radius: 8px; padding: 6px 10px; font-size: 12px; line-height: 1.4;">
-              <strong style="color: ${isU ? 'var(--m3-primary)' : 'var(--color-brand)'};">${isU ? 'Tú' : 'Asistente'}:</strong> ${escaped.slice(0, 160)}${escaped.length > 160 ? '...' : ''}
+            return `<div class="ai-history-bubble ${isU ? 'is-user' : ''}">
+              <strong class="${isU ? 'ai-history-author-user' : 'ai-history-author-assistant'}">${isU ? 'Tú' : 'Asistente'}:</strong> ${escaped.slice(0, 160)}${escaped.length > 160 ? '...' : ''}
             </div>`;
           }).join('');
         } else {
@@ -11861,8 +11859,8 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
         resultBox.style.display = 'flex';
         let fallbackBanner = '';
         if (response && response.isSimulatedFallback) {
-          fallbackBanner = `<div style="display:flex; align-items:flex-start; gap:8px; background: rgba(234, 67, 53, 0.08); border: 1px solid rgba(234, 67, 53, 0.25); color: #c5221f; border-radius: 8px; padding: 8px 10px; font-size: 11px; margin-bottom: 10px; line-height: 1.4;">
-            <span class="material-symbols-outlined" style="font-size:18px; line-height:1; flex-shrink:0;">cloud_off</span>
+          fallbackBanner = `<div class="ai-fallback-banner">
+            <span class="material-symbols-outlined icon-18 u-shrink-0">cloud_off</span>
             <span><strong>Aviso de conexión:</strong> No se pudo contactar con Gemini en la nube (${response.originalError || 'tiempo de espera agotado'}). Se ha activado la simulación local provisional de emergencia.</span>
           </div>`;
         }
@@ -11941,7 +11939,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       this.showToast('✓ Tu Asistente respondió.', 'success');
     } catch (err) {
       if (transcription) {
-        transcription.innerHTML = `<span style="color:var(--m3-error); font-weight:500;">Error: ${err.message}</span>`;
+        transcription.innerHTML = `<span class="u-text-error-medium">Error: ${err.message}</span>`;
       }
       this.showToast(`Error del Asistente: ${err.message}`, 'error');
     } finally {
@@ -12579,7 +12577,7 @@ REGLAS CRÍTICAS:
       if (status) {
         status.style.display = 'block';
         status.style.color = 'var(--m3-on-surface-variant)';
-        status.innerHTML = '<span class="material-symbols-outlined icon-sm" style="vertical-align: middle;">help</span> Para pegar, pulsa <strong>Ctrl + V</strong> (o mantén pulsado el área de texto en móvil).';
+        status.innerHTML = '<span class="material-symbols-outlined icon-sm icon-valign-middle">help</span> Para pegar, pulsa <strong>Ctrl + V</strong> (o mantén pulsado el área de texto en móvil).';
       }
     }
   }
@@ -12618,7 +12616,7 @@ REGLAS CRÍTICAS:
     if (status) {
       status.style.display = 'block';
       status.style.color = 'var(--m3-primary)';
-      status.innerHTML = '<span class="material-symbols-outlined icon-sm" style="animation: spin 1s linear infinite; vertical-align: middle;">sync</span> Analizando receta con IA y extrayendo ingredientes...';
+      status.innerHTML = '<span class="material-symbols-outlined icon-sm icon-spin icon-valign-middle">sync</span> Analizando receta con IA y extrayendo ingredientes...';
     }
 
     try {
@@ -12942,9 +12940,9 @@ REGLAS CRÍTICAS:
     if (status) {
       if (state.settings.geminiApiKey) {
         const provName = currentProvider === 'openai' ? 'OpenAI ChatGPT' : (currentProvider === 'claude' ? 'Anthropic Claude' : 'Google Gemini');
-        status.innerHTML = `<span style="color: var(--color-brand); font-weight: 500;">✓ Clave configurada (${provName} activo)</span>`;
+        status.innerHTML = `<span class="u-text-brand-medium">✓ Clave configurada (${provName} activo)</span>`;
       } else {
-        status.innerHTML = '<span style="color: var(--m3-on-surface-variant);">Modo Asistente Integrado activo (sin coste ni clave requerida)</span>';
+        status.innerHTML = '<span class="u-text-muted">Modo Asistente Integrado activo (sin coste ni clave requerida)</span>';
       }
     }
 
@@ -13035,8 +13033,8 @@ REGLAS CRÍTICAS:
 
     const endpoint = this.getExternalAgentEndpoint();
     statusEl.innerHTML = hasToken
-      ? `<span style="color: ${enabled ? 'var(--color-brand)' : 'var(--m3-on-surface-variant)'}; font-weight: 500;">${enabled ? '✓ Acceso externo activo' : 'Acceso externo en pausa'} · token fa_live_••••${state.settings.agentTokenHint || ''}</span>`
-      : '<span style="color: var(--m3-on-surface-variant);">Sin token. Genera uno para conectar asistentes externos.</span>';
+      ? `<span class="${enabled ? 'u-text-brand-medium' : 'u-text-muted-medium'}">${enabled ? '✓ Acceso externo activo' : 'Acceso externo en pausa'} · token fa_live_••••${state.settings.agentTokenHint || ''}</span>`
+      : '<span class="u-text-muted">Sin token. Genera uno para conectar asistentes externos.</span>';
 
     const reveal = document.getElementById('external-agent-token-reveal');
     const tokenInput = document.getElementById('external-agent-token');
@@ -13075,7 +13073,7 @@ Autenticación: API Key → Bearer → ${tk}`;
       const isSelected = (state.dietaryPreferences || []).includes(pref);
       return `
         <button type="button" class="m3-filter-chip dietary-chip ${isSelected ? 'active' : ''}" onclick="app.toggleDietaryPreference('${pref}')">
-          ${isSelected ? '<span class="material-symbols-outlined" style="font-size: 14px;">check_circle</span>' : `<span class="dietary-emoji">${getDietaryTagEmoji(pref)}</span>`}
+          ${isSelected ? '<span class="material-symbols-outlined icon-14">check_circle</span>' : `<span class="dietary-emoji">${getDietaryTagEmoji(pref)}</span>`}
           <span>${pref}</span>
         </button>
       `;
@@ -13243,9 +13241,9 @@ Autenticación: API Key → Bearer → ${tk}`;
     if (resultMsg) {
       resultMsg.style.display = 'block';
       if (updatedCount > 0) {
-        resultMsg.innerHTML = `<span style="color: var(--color-brand); font-weight: 500;">✓ ¡Análisis completado! Se actualizaron ${updatedCount} ${updatedCount === 1 ? 'receta' : 'recetas'} con ${totalTagsAdded} nuevas ${totalTagsAdded === 1 ? 'etiqueta' : 'etiquetas'}.</span>`;
+        resultMsg.innerHTML = `<span class="u-text-brand-medium">✓ ¡Análisis completado! Se actualizaron ${updatedCount} ${updatedCount === 1 ? 'receta' : 'recetas'} con ${totalTagsAdded} nuevas ${totalTagsAdded === 1 ? 'etiqueta' : 'etiquetas'}.</span>`;
       } else {
-        resultMsg.innerHTML = `<span style="color: var(--m3-on-surface-variant); font-weight: 500;">✓ Todas tus recetas ya cuentan con las etiquetas correspondientes.</span>`;
+        resultMsg.innerHTML = `<span class="u-text-muted-medium">✓ Todas tus recetas ya cuentan con las etiquetas correspondientes.</span>`;
       }
     }
 
@@ -13345,7 +13343,7 @@ Autenticación: API Key → Bearer → ${tk}`;
         const parts = [];
         if (extraData.hasMealPlan) parts.push('Plan Semanal');
         if (extraData.hasShoppingList) parts.push('Lista de la Compra');
-        extraNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size: 16px; vertical-align: text-bottom; color: var(--m3-primary);">inventory_2</span> Esta copia también incluye datos de <strong>${parts.join(' y ')}</strong> que se sincronizarán al importar.`;
+        extraNotice.innerHTML = `<span class="material-symbols-outlined icon-16 icon-valign-bottom icon-primary">inventory_2</span> Esta copia también incluye datos de <strong>${parts.join(' y ')}</strong> que se sincronizarán al importar.`;
       } else {
         extraNotice.style.display = 'none';
       }
@@ -13442,7 +13440,7 @@ Autenticación: API Key → Bearer → ${tk}`;
 
     if (filtered.length === 0) {
       listContainer.innerHTML = `
-        <div style="text-align: center; padding: 24px; color: var(--m3-on-surface-variant); font-size: 13px;">
+        <div class="bulk-empty-filter-msg">
           No hay recetas en esta categoría.
         </div>
       `;
@@ -13456,15 +13454,15 @@ Autenticación: API Key → Bearer → ${tk}`;
         : `<div class="bulk-item-thumb"><span class="material-symbols-outlined">restaurant</span></div>`;
 
       const dupBadge = c.isDuplicate
-        ? `<span class="bulk-badge bulk-badge-dup"><span class="material-symbols-outlined" style="font-size: 12px;">sync_problem</span> ${c.duplicateReason || 'Ya existe'}</span>`
-        : `<span class="bulk-badge bulk-badge-new"><span class="material-symbols-outlined" style="font-size: 12px;">auto_awesome</span> Nueva</span>`;
+        ? `<span class="bulk-badge bulk-badge-dup"><span class="material-symbols-outlined icon-12">sync_problem</span> ${c.duplicateReason || 'Ya existe'}</span>`
+        : `<span class="bulk-badge bulk-badge-new"><span class="material-symbols-outlined icon-12">auto_awesome</span> Nueva</span>`;
 
       const domainBadge = c.sourceDomain
-        ? `<span class="bulk-badge bulk-badge-domain"><span class="material-symbols-outlined" style="font-size: 12px;">public</span> ${c.sourceDomain}</span>`
+        ? `<span class="bulk-badge bulk-badge-domain"><span class="material-symbols-outlined icon-12">public</span> ${c.sourceDomain}</span>`
         : '';
 
       const warningsBadges = (c.warnings || []).map(w => 
-        `<span class="bulk-badge bulk-badge-warn"><span class="material-symbols-outlined" style="font-size: 12px;">warning</span> ${w}</span>`
+        `<span class="bulk-badge bulk-badge-warn"><span class="material-symbols-outlined icon-12">warning</span> ${w}</span>`
       ).join('');
 
       const totalTime = (c.prepTimeMinutes || 0) + (c.cookTimeMinutes || 0);
