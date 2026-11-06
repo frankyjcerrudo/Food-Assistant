@@ -4273,7 +4273,7 @@ isWrapperDomain(domainOrUrl) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.33';
+  window.APP_VERSION = 'v1.34';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4311,7 +4311,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.33';
+    this.appVersion = window.APP_VERSION || 'v1.34';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -6152,6 +6152,21 @@ class FoodAssistantApp {
     if (this._eventDelegationInitialized) return;
     this._eventDelegationInitialized = true;
 
+    // Cierre al hacer click fuera del popover de macros de Hoy o con Escape (US-76)
+    document.addEventListener('click', (e) => {
+      if (!this.todayNutritionExpanded) return;
+      const card = document.getElementById('today-nutrition-card');
+      if (card && !card.contains(e.target)) {
+        this.toggleTodayNutritionDetails();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.todayNutritionExpanded) {
+        this.toggleTodayNutritionDetails();
+      }
+    });
+
     document.addEventListener('click', (e) => {
       const target = e.target.closest('[data-action]');
       if (!target) return;
@@ -7095,7 +7110,7 @@ class FoodAssistantApp {
                 <span class="material-symbols-outlined icon-15 icon-primary">local_fire_department</span>
                 <strong>${todayNutrition.totalCalories}</strong>${calGoalNum > 0 ? `<span class="today-header-cal-goal">/${calGoalNum}</span>` : ''} <span class="today-header-cal-unit">kcal</span>
               </span>
-              <span class="material-symbols-outlined icon-16 today-nutrition-pill-chevron">expand_more</span>
+              <span class="material-symbols-outlined icon-16 today-nutrition-pill-chevron mobile-only-chevron">expand_more</span>
             </div>
             ${calGoalNum > 0 ? `
               <div class="today-header-mini-bar" aria-hidden="true">
@@ -7107,6 +7122,10 @@ class FoodAssistantApp {
               <span class="today-header-macro-badge macro-badge-carbs"><em>C</em> ${Math.round(todayNutrition.totalCarbs)}g</span>
               <span class="today-header-macro-badge macro-badge-fat"><em>G</em> ${Math.round(todayNutrition.totalFat)}g</span>
             </div>
+            <div class="today-header-macro-action desktop-only-action">
+              <span class="today-header-macro-action-label">${this.todayNutritionExpanded ? 'Ocultar desglose' : 'Ver desglose'}</span>
+              <span class="material-symbols-outlined icon-16 today-nutrition-pill-chevron">expand_more</span>
+            </div>
           </div>
           <div class="today-nutrition-details-body" id="today-nutrition-details-body">
             <div class="today-nutrition-header">
@@ -7116,6 +7135,9 @@ class FoodAssistantApp {
               <div class="u-flex-row-center-gap-6">
                 ${headerGoalsBtn}
                 <span class="today-nutrition-meta">${todayNutrition.mealCount} ${todayNutrition.mealCount === 1 ? 'comida' : 'comidas'}</span>
+                <button type="button" class="btn btn-ghost btn-icon btn-sm popover-close-btn desktop-only-close" onclick="event.stopPropagation(); app.toggleTodayNutritionDetails();" aria-label="Cerrar desglose" title="Cerrar">
+                  <span class="material-symbols-outlined icon-sm">close</span>
+                </button>
               </div>
             </div>
             <div class="today-macros-grid ${goalsEnabled ? 'has-goals' : ''}">
@@ -7255,6 +7277,10 @@ class FoodAssistantApp {
       card.classList.toggle('is-expanded', this.todayNutritionExpanded);
       const pill = document.getElementById('today-nutrition-pill-bar');
       if (pill) pill.setAttribute('aria-expanded', String(this.todayNutritionExpanded));
+      const actionLabel = card.querySelector('.today-header-macro-action-label');
+      if (actionLabel) {
+        actionLabel.textContent = this.todayNutritionExpanded ? 'Ocultar desglose' : 'Ver desglose';
+      }
     }
   }
 

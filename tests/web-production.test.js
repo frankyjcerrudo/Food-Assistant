@@ -193,6 +193,50 @@ describe('US-76: Adaptación Web de Producción para sabory.food', () => {
       expect(media900).toMatch(/\.today-header-macros\.is-expanded\s+\.today-macros-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*1fr\)/s);
     });
 
+    it('estila la barra de macros horizontal y el desglose detallado como popover flotante sin layout shift', () => {
+      expect(media900).toMatch(/\.today-nutrition-pill-bar\s*\{[\s\S]*?flex-direction:\s*row/s);
+      expect(media900).toMatch(/\.today-nutrition-card\.is-expanded\s+\.today-nutrition-details-body\s*\{[\s\S]*?position:\s*absolute/s);
+      expect(media900).toMatch(/\.today-nutrition-card\.is-expanded\s+\.today-nutrition-details-body\s*\{[\s\S]*?z-index:\s*80/s);
+    });
+
+    it('toggleTodayNutritionDetails actualiza el texto de acción y cierra el popover al hacer click fuera o pulsar Escape', () => {
+      new Function(fs.readFileSync(path.resolve(process.cwd(), 'app.js'), 'utf-8'))();
+      const app = new window.FoodAssistantApp();
+      window.app = app;
+
+      document.body.innerHTML = `
+        <div id="today-slots-container"></div>
+        <div id="today-nutrition-card" class="today-nutrition-card today-header-macros">
+          <div class="today-nutrition-pill-bar" id="today-nutrition-pill-bar">
+            <span class="today-header-macro-action-label">Ver desglose</span>
+          </div>
+          <div class="today-nutrition-details-body" id="today-nutrition-details-body"></div>
+        </div>
+        <div id="outside-element">Fuera</div>
+      `;
+
+      app._eventDelegationInitialized = false;
+      app.initEventDelegation();
+
+      // Abrir popover
+      app.toggleTodayNutritionDetails();
+      const card = document.getElementById('today-nutrition-card');
+      const label = card.querySelector('.today-header-macro-action-label');
+      expect(card.classList.contains('is-expanded')).toBe(true);
+      expect(label.textContent).toBe('Ocultar desglose');
+
+      // Click fuera cierra el popover
+      document.getElementById('outside-element').click();
+      expect(card.classList.contains('is-expanded')).toBe(false);
+      expect(label.textContent).toBe('Ver desglose');
+
+      // Abrir de nuevo y cerrar con Escape
+      app.toggleTodayNutritionDetails();
+      expect(card.classList.contains('is-expanded')).toBe(true);
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      expect(card.classList.contains('is-expanded')).toBe(false);
+    });
+
     it('renderTodaySlots genera tarjetas enriquecidas con calorías, macros, tags y acción de ver receta', () => {
       document.body.innerHTML = `
         <div id="today-slots-container"></div>

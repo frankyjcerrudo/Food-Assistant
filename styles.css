@@ -5441,6 +5441,32 @@ h2,
   color: #E57A52;
 }
 
+.desktop-only-action,
+.desktop-only-close {
+  display: none !important;
+}
+
+.mobile-only-chevron {
+  display: inline-flex;
+}
+
+.popover-close-btn {
+  color: var(--m3-on-surface-variant);
+  border-radius: var(--radius-full);
+}
+
+.today-header-macros-zen {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.today-header-macros-zen-label {
+  font-size: 11.5px;
+  color: var(--m3-on-surface-variant);
+  font-weight: 500;
+}
+
 .today-nutrition-details-body {
   display: none;
   margin-top: 12px;
@@ -6497,46 +6523,136 @@ h2,
     gap: 20px;
   }
 
-  /* Menú de Hoy: Cabecera equilibrada con Widget de Macros compacto (no alargado) */
+  /* Menú de Hoy: Cabecera con barra horizontal de macros sin layout shift (US-76) */
   .today-header {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
-    gap: 32px;
+    gap: 24px;
     margin-bottom: 24px;
     position: relative;
     flex-wrap: nowrap;
   }
 
   .today-header-info {
-    flex: 1 1 auto;
-    min-width: 0;
+    flex: 0 1 auto;
+    min-width: 260px;
   }
 
-  /* Widget de Macros en Desktop: No se estira a 100%, se mantiene en tarjeta compacta a la derecha */
+  /* Widget de Macros en Desktop: Barra horizontal estilizada que aprovecha el espacio central-derecho */
   .today-nutrition-card.today-header-macros {
-    flex: 0 0 auto;
+    flex: 0 1 auto;
     margin-left: auto;
+    position: relative;
+    padding: 7px 18px;
+    border-radius: var(--radius-full);
+    background: var(--m3-surface);
+    border: var(--border-subtle);
+    box-shadow: 0 2px 8px rgba(42, 33, 27, 0.05);
+    max-width: none;
+    min-width: auto;
+    transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+  }
+
+  .today-nutrition-card.today-header-macros:hover {
+    border-color: var(--m3-primary-light, #E07A5F);
+    box-shadow: 0 4px 16px rgba(42, 33, 27, 0.09);
   }
 
   .today-header-macros.is-collapsed-zen {
-    max-width: 280px;
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    max-width: 320px;
   }
 
-  .today-header-macros:not(.is-expanded) {
-    min-width: 220px;
-    max-width: 290px;
+  .today-nutrition-pill-bar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+    white-space: nowrap;
   }
 
+  .today-header-macro-top-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .today-nutrition-pill-kcal {
+    font-size: 15.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .today-header-mini-bar {
+    width: 68px;
+    height: 5px !important;
+    flex-shrink: 0;
+    margin: 0 !important;
+  }
+
+  .today-header-macro-pills-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-left: 1px solid var(--m3-outline-variant);
+    padding-left: 14px;
+    border-right: 1px solid var(--m3-outline-variant);
+    padding-right: 14px;
+  }
+
+  .today-header-macro-badge {
+    padding: 3px 8px;
+    font-size: 12px;
+  }
+
+  .desktop-only-action {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 4px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--m3-primary);
+    cursor: pointer;
+    margin-left: 2px;
+  }
+
+  .desktop-only-close {
+    display: inline-flex !important;
+  }
+
+  .mobile-only-chevron {
+    display: none !important;
+  }
+
+  /* Popover flotante (Zero Layout Shift para las recetas inferiores) */
   .today-header-macros.is-expanded {
-    flex: 0 0 460px !important;
-    max-width: 460px !important;
-    width: 460px !important;
-    padding: 16px 18px !important;
-    box-shadow: 0 10px 32px rgba(42, 33, 27, 0.12) !important;
-    border-radius: var(--radius-lg) !important;
+    flex: 0 1 auto !important;
+    width: auto !important;
+    max-width: 480px !important;
+    padding: 7px 18px !important;
     background: var(--m3-surface) !important;
     border: var(--border-subtle) !important;
+    box-shadow: 0 2px 8px rgba(42, 33, 27, 0.05) !important;
+    border-radius: var(--radius-full) !important;
+  }
+
+  .today-nutrition-card.is-expanded .today-nutrition-details-body {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: 480px;
+    max-width: 480px;
+    z-index: 80;
+    background: var(--m3-surface);
+    border-radius: var(--radius-lg);
+    border: var(--border-subtle);
+    box-shadow: 0 16px 40px rgba(42, 33, 27, 0.18), 0 2px 10px rgba(0, 0, 0, 0.06);
+    padding: 18px 20px;
+    margin-top: 0;
   }
 
   .today-header-macros.is-expanded .today-macros-grid {
