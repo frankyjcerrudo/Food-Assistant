@@ -4270,7 +4270,7 @@ isWrapperDomain(domainOrUrl) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.29';
+  window.APP_VERSION = 'v1.30';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4308,7 +4308,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.29';
+    this.appVersion = window.APP_VERSION || 'v1.30';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5249,6 +5249,76 @@ class FoodAssistantApp {
     this.updateUserAccountUI();
     this.closeAuthModal();
     this.showToast("Has cerrado sesión. Tus datos continúan disponibles localmente.", 'info');
+  }
+
+  // US-74: Eliminación de Cuenta y Datos en la Nube (Google Play Account Deletion Policy & GDPR)
+  async deleteAccountAndData(skipConfirm = false) {
+    const isCloud = !!(this.supabaseClient && state.cloudUser?.id && !state.cloudUser.isDemo);
+    const confirmMessage = isCloud
+      ? '¿Estás seguro de que deseas eliminar definitivamente tu cuenta y todos tus datos? Esta acción es irreversible: se borrarán de la nube todas tus recetas, planificaciones y listas de la compra, y se cerrará tu sesión.'
+      : '¿Estás seguro de que deseas eliminar todos tus datos? Esta acción es irreversible: se borrarán todas tus recetas personalizadas, planes semanales y listas de la compra locales.';
+
+    const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
+      title: 'Eliminar cuenta y datos',
+      message: confirmMessage,
+      confirmText: 'Eliminar definitivamente',
+      cancelText: 'Cancelar',
+      danger: true,
+      icon: 'delete_forever'
+    });
+
+    if (!confirmed) return false;
+
+    // 1. Si está conectado a Supabase, eliminar datos remotos
+    if (isCloud) {
+      const uid = state.cloudUser.id;
+      try {
+        await Promise.allSettled([
+          this.supabaseClient.from('recipes').delete().eq('user_id', uid),
+          this.supabaseClient.from('planner_slots').delete().eq('user_id', uid),
+          this.supabaseClient.from('shopping_list').delete().eq('user_id', uid),
+          this.supabaseClient.from('user_settings').delete().eq('user_id', uid),
+          this.supabaseClient.from('external_agent_tokens').delete().eq('user_id', uid)
+        ]);
+      } catch (err) {
+        console.warn('[Supabase] Error al limpiar tablas remotas:', err);
+      }
+      try {
+        await this.supabaseClient.auth.signOut();
+      } catch (e) {}
+    }
+
+    // 2. Limpiar sesión y rastro de sincronización
+    state.cloudUser = null;
+    state.save('fa_cloud_user', null);
+    state.lastSyncedAt = null;
+    state.save('fa_last_synced_at', null);
+    state.deletedRecords = { recipes: [], mealPlans: [], shoppingItems: [] };
+    state.save('fa_deleted_records', state.deletedRecords);
+
+    // 3. Resetear almacenamiento local y base de recetas a estado inicial
+    try {
+      localStorage.removeItem('fa_recipes');
+      localStorage.removeItem('fa_mealplan');
+      localStorage.removeItem('fa_shopping');
+      localStorage.removeItem('fa_deleted_records');
+      localStorage.removeItem('fa_cloud_user');
+      localStorage.removeItem('fa_last_synced_at');
+    } catch (e) {}
+
+    state.recipes = typeof structuredClone === 'function' ? structuredClone(SEED_RECIPES) : JSON.parse(JSON.stringify(SEED_RECIPES));
+    state.mealPlan = state.generateInitialMealPlan();
+    state.shoppingList = [];
+    state.save('fa_recipes', state.recipes);
+    state.save('fa_mealplan', state.mealPlan);
+    state.save('fa_shopping', state.shoppingList);
+
+    // 4. Actualizar interfaz y notificar al usuario
+    this.closeAuthModal();
+    this.updateUserAccountUI();
+    this.render();
+    this.showToast(isCloud ? "Tu cuenta y tus datos han sido eliminados de la nube." : "Tus datos locales han sido eliminados.", 'info');
+    return true;
   }
 
   // BUG-24: Sincronización diferida con debounce para mutaciones frecuentes
@@ -6258,6 +6328,8 @@ class FoodAssistantApp {
     });
     document.getElementById('btn-submit-auth')?.addEventListener('click', () => this.handleAuthSubmit());
     document.getElementById('btn-auth-logout')?.addEventListener('click', () => this.logoutCloudUser());
+    document.getElementById('btn-auth-delete-account')?.addEventListener('click', () => this.deleteAccountAndData());
+    document.getElementById('btn-settings-delete-account')?.addEventListener('click', () => this.deleteAccountAndData());
 
     // Importer (US-15: Schema.org & Text Parser)
     document.getElementById('btn-close-import-modal')?.addEventListener('click', () => this.closeImportModal());

@@ -2,8 +2,8 @@
 
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
-> **Versión Actual**: v1.29  
-> **Última actualización**: Noviembre 2026 (v1.29 — Fase 2 de preparación para Google Play completada y aprobada por Franky: US-10, US-59, US-53, US-41 y US-47 cerradas en `Done`; Fase 1 cerrada en v1.28)
+> **Versión Actual**: v1.30  
+> **Última actualización**: Noviembre 2026 (v1.30 — Fase 3 de preparación para Google Play completada y aprobada: US-74 [Eliminación de cuenta y datos] y US-75 [Política de Privacidad pública /privacy.html] en `Done`; Fase 2 cerrada en v1.29; Fase 1 cerrada en v1.28)
 
 ---
 
@@ -104,6 +104,8 @@
 | :--- | :--- | :---: | :---: | :--- |
 | **US-26** | Publicación en Google Play Store (TWA / Capacitor AAB) | 🟢 Baja | `Backlog` | • Configurar empaquetado nativo para Android (Trusted Web Activity / Bubblewrap o Capacitor).<br>• Generar paquete `.aab` (Android App Bundle) firmado con keystore de producción.<br>• Configurar `assetlinks.json` en el dominio para verificar propiedad y navegación a pantalla completa.<br>• Cumplir políticas de Google Play Store (icono adaptativo 512×512, capturas y política de privacidad). |
 | **US-27** | Widget de Android para Pantalla de Inicio (Plan del día y Lista rápida) | 🟢 Baja | `Backlog` | • Widget para el escritorio de Android con diseño nativo (Material You / Glance).<br>• Mostrar en tiempo real las comidas programadas para el día de hoy ("Hoy toca...").<br>• Botón de acceso directo para abrir la receta actual o añadir a la lista de la compra.<br>• Sincronización en segundo plano con el almacenamiento local / Supabase. |
+| **US-74** | [FASE 3 PLAY STORE] Eliminación de Cuenta y Datos en la Nube (Google Play Account Deletion Policy & GDPR) | 🔴 Alta | `Done` | • **Eliminación Directa en la App**: Botón visible en Ajustes (`#btn-settings-delete-account`) y en el modal de cuenta (`#btn-auth-delete-account`).<br>• **Borrado Total e Irreversible**: Diálogo modal de confirmación destructiva (`#modal-confirm-dialog`) con icono `delete_forever` y advertencia clara.<br>• **Supresión en Supabase**: Borrado de filas en tablas remotas (`recipes`, `planner_slots`, `shopping_list`, `user_settings`, `external_agent_tokens`) mediante `user_id = auth.uid()` y cierre de sesión con `auth.signOut()`.<br>• **Limpieza Local y Reversión a Semilla**: Borrado de storage/IndexedDB y restauración limpia del recetario base.<br>• *Estado: Completado y validado con tests unitarios en `tests/legal-privacy.test.js` (v1.30).* |
+| **US-75** | [FASE 3 PLAY STORE] Política de Privacidad Pública y Cumplimiento Legal (`/privacy.html` y Enlaces en App) | 🔴 Alta | `Done` | • **Página Pública `/privacy.html`**: Documento HTML5 responsivo y accesible con diseño editorial Sabory.<br>• **Requisitos Google Play Console**: Sección explícita con ancla `#account-deletion` para el campo obligatorio de solicitud web de borrado de datos.<br>• **Transparencia Total**: Divulgación de arquitectura Offline-First, Supabase (RLS), procesamiento efímero con Gemini API (BYOK), permisos (cámara/fotos, micrófono y screen wake lock) y contacto del desarrollador.<br>• **Disponibilidad Offline y Accesos**: Añadido a `ASSETS_TO_CACHE` en `sw.js` y enlaces directos desde Ajustes (`#card-legal-privacy`) y el modal de cuenta (`#modal-auth`).<br>• *Estado: Completado y validado en `tests/legal-privacy.test.js` (v1.30).* |
 
 ---
 

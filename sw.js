@@ -1,10 +1,10 @@
-const CACHE_NAME = 'food-assistant-v1.29';
+const CACHE_NAME = 'food-assistant-v1.30';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './styles.css?v=1.29',
-  './config.js?v=1.29',
-  './app.js?v=1.29',
+  './styles.css?v=1.30',
+  './config.js?v=1.30',
+  './app.js?v=1.30',
   './manifest.json',
   './icon.svg',
   './icon-192.png',
@@ -13,6 +13,7 @@ const ASSETS_TO_CACHE = [
   './icon-maskable-192.png',
   './icon-maskable-512.png',
   './apple-touch-icon.png',
+  './privacy.html',
   'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js'
 ];

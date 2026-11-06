@@ -13,15 +13,15 @@
   <meta name="application-name" content="Sabory">
   <meta name="apple-mobile-web-app-title" content="Sabory">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <link rel="manifest" href="manifest.json?v=1.29">
+  <link rel="manifest" href="manifest.json?v=1.30">
   <meta name="theme-color" content="#FAF7F2">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=1.29">
-  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.29">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.29">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.29">
+  <link rel="stylesheet" href="styles.css?v=1.30">
+  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.30">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.30">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.30">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <!-- US-41: versión fija + Subresource Integrity (sha384) para el SDK de Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"
@@ -467,6 +467,27 @@
         </select>
       </div>
 
+      <!-- 6: PRIVACIDAD Y CONTROL DE DATOS (US-74 & US-75) -->
+      <div class="card" id="card-legal-privacy">
+        <h3
+          style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+          <span class="material-symbols-outlined" style="color: var(--m3-primary);">policy</span> Privacidad y Control de Datos
+        </h3>
+        <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;">
+          Sabory funciona offline de forma predeterminada y solo sincroniza tus datos si decides iniciar sesión. Puedes consultar nuestras condiciones o solicitar el borrado permanente de tu cuenta y datos.
+        </p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+          <a href="privacy.html" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" id="link-privacy-policy" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+            <span class="material-symbols-outlined icon-sm">description</span> Política de Privacidad
+          </a>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-settings-delete-account"
+            style="color: var(--m3-error); display: inline-flex; align-items: center; gap: 6px;"
+            title="Eliminar permanentemente tu cuenta y datos de la nube">
+            <span class="material-symbols-outlined icon-sm">delete_forever</span> Eliminar cuenta y datos
+          </button>
+        </div>
+      </div>
+
       <!-- TIER 2: CONFIGURACIÓN AVANZADA Y SISTEMA (COLLAPSIBLE ACCORDION) -->
       <details class="settings-advanced-accordion" id="settings-advanced-accordion">
         <summary class="settings-advanced-summary">
@@ -627,8 +648,8 @@
             </h3>
             <p
               style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-              Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.29</strong>
-              <span class="app-version-badge" id="app-version-badge">v1.29</span>
+              Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.30</strong>
+              <span class="app-version-badge" id="app-version-badge">v1.30</span>
             </p>
             <div
               style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
@@ -879,9 +900,9 @@
         </form>
 
         <div
-          style="margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--m3-outline-variant); font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
-          <p>Tus recetas y planes se guardan en la nube para que nunca los pierdas y puedas usarlos en cualquier
-            dispositivo.</p>
+          style="margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--m3-outline-variant); font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+          <p style="margin: 0;">Tus recetas y planes se sincronizan de forma segura.</p>
+          <a href="privacy.html" target="_blank" rel="noopener noreferrer" id="link-auth-privacy" style="color: var(--m3-primary); font-weight: 500; text-decoration: underline; white-space: nowrap;">Privacidad</a>
         </div>
       </div>
 
@@ -904,6 +925,14 @@
             style="color: var(--m3-error); width: 100%; padding: 12px;">
             <span class="material-symbols-outlined icon-sm">logout</span> Cerrar Sesión
           </button>
+          <button type="button" class="btn btn-ghost" id="btn-auth-delete-account"
+            style="color: var(--m3-error); width: 100%; padding: 10px; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px;"
+            title="Eliminar permanentemente mi cuenta y mis datos de la nube">
+            <span class="material-symbols-outlined icon-sm">delete_forever</span> Eliminar mi cuenta y datos
+          </button>
+          <div style="text-align: center; margin-top: 6px;">
+            <a href="privacy.html" target="_blank" rel="noopener noreferrer" style="font-size: 11px; color: var(--m3-on-surface-variant); text-decoration: underline;">Consultar Política de Privacidad</a>
+          </div>
         </div>
       </div>
     </div>
@@ -2265,8 +2294,8 @@
     </div>
   </div>
 
-  <script src="config.js?v=1.29"></script>
-  <script src="app.js?v=1.29"></script>
+  <script src="config.js?v=1.30"></script>
+  <script src="app.js?v=1.30"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Política de Privacidad y Tratamiento de Datos — Sabory</title>
+  <meta name="description" content="Política de privacidad de Sabory (Asistente de Cocina & Planificador Inteligente). Información detallada sobre el almacenamiento local, sincronización y eliminación de cuentas.">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="theme-color" content="#A0401B">
+
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
+
+  <style>
+    :root {
+      --color-brand: #A0401B;
+      --color-brand-hover: #863414;
+      --color-brand-container: #FFDBCF;
+      --color-brand-on-container: #3B0900;
+      --color-surface: #FBF9F6;
+      --color-surface-card: #FFFFFF;
+      --color-on-surface: #1E1B16;
+      --color-on-surface-variant: #52443C;
+      --color-outline: #85736B;
+      --color-outline-variant: #E8E0DB;
+      --color-success: #2E6A44;
+      --color-error: #BA1A1A;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-full: 9999px;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.08);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.04);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      background-color: var(--color-surface);
+      color: var(--color-on-surface);
+      line-height: 1.65;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+      padding: 0 16px 48px;
+    }
+
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+    }
+
+    /* HEADER */
+    .header-bar {
+      padding: 24px 0 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--color-outline-variant);
+      margin-bottom: 32px;
+    }
+
+    .brand-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--color-on-surface);
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--color-brand-container);
+      color: var(--color-brand);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .brand-title {
+      font-family: 'Newsreader', Georgia, serif;
+      font-size: 26px;
+      font-weight: 500;
+      color: var(--color-brand);
+      letter-spacing: -0.5px;
+    }
+
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      background: var(--color-surface-card);
+      border: 1px solid var(--color-outline-variant);
+      border-radius: var(--radius-full);
+      color: var(--color-brand);
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      box-shadow: var(--shadow-sm);
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .back-btn:hover {
+      background: var(--color-brand-container);
+      border-color: var(--color-brand);
+    }
+
+    /* HERO */
+    .hero {
+      margin-bottom: 32px;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #E8F5E9;
+      color: var(--color-success);
+      padding: 4px 12px;
+      border-radius: var(--radius-full);
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .hero h1 {
+      font-family: 'Newsreader', Georgia, serif;
+      font-size: 34px;
+      font-weight: 500;
+      color: var(--color-on-surface);
+      line-height: 1.25;
+      margin-bottom: 10px;
+      letter-spacing: -0.5px;
+    }
+
+    .hero-meta {
+      font-size: 13px;
+      color: var(--color-on-surface-variant);
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    /* SUMMARY PILLS */
+    .key-points-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin-bottom: 36px;
+    }
+
+    .point-card {
+      background: var(--color-surface-card);
+      border: 1px solid var(--color-outline-variant);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .point-card .icon {
+      color: var(--color-brand);
+      font-size: 22px;
+      margin-bottom: 6px;
+      display: inline-block;
+    }
+
+    .point-card h4 {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: var(--color-on-surface);
+    }
+
+    .point-card p {
+      font-size: 12px;
+      color: var(--color-on-surface-variant);
+      line-height: 1.5;
+    }
+
+    /* CONTENT SECTIONS */
+    .section-card {
+      background: var(--color-surface-card);
+      border: 1px solid var(--color-outline-variant);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .section-card h2 {
+      font-size: 19px;
+      font-weight: 700;
+      color: var(--color-brand);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: -0.3px;
+    }
+
+    .section-card h3 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--color-on-surface);
+      margin: 18px 0 8px;
+    }
+
+    .section-card p {
+      margin-bottom: 12px;
+      color: var(--color-on-surface-variant);
+    }
+
+    .section-card ul {
+      margin-left: 20px;
+      margin-bottom: 14px;
+      color: var(--color-on-surface-variant);
+    }
+
+    .section-card li {
+      margin-bottom: 6px;
+    }
+
+    /* CALLOUT BOXES */
+    .callout-highlight {
+      background: var(--color-brand-container);
+      color: var(--color-brand-on-container);
+      padding: 14px 18px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      line-height: 1.55;
+      margin: 16px 0;
+      border-left: 4px solid var(--color-brand);
+    }
+
+    .callout-danger {
+      background: #FFEDEA;
+      color: #5C0000;
+      padding: 16px 20px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      line-height: 1.55;
+      margin: 16px 0;
+      border-left: 4px solid var(--color-error);
+    }
+
+    /* STEP INSTRUCTIONS */
+    .step-box {
+      background: var(--color-surface);
+      border: 1px solid var(--color-outline-variant);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      margin: 12px 0;
+    }
+
+    .step-box ol {
+      margin-left: 20px;
+      color: var(--color-on-surface);
+    }
+
+    .step-box li {
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    /* FOOTER */
+    .footer-bar {
+      margin-top: 40px;
+      padding-top: 24px;
+      border-top: 1px solid var(--color-outline-variant);
+      text-align: center;
+      font-size: 13px;
+      color: var(--color-on-surface-variant);
+    }
+
+    .footer-bar a {
+      color: var(--color-brand);
+      text-decoration: underline;
+    }
+
+    @media (max-width: 600px) {
+      .hero h1 {
+        font-size: 26px;
+      }
+      .section-card {
+        padding: 20px 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- HEADER -->
+    <header class="header-bar">
+      <a href="index.html" class="brand-link" title="Volver a Sabory">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M14 4C11.5 4 9.45 5.45 8.65 7.55C8.28 7.45 7.9 7.4 7.5 7.4C5.01 7.4 3 9.41 3 11.9C3 13.97 4.4 15.71 6.3 16.24V20.2C6.3 21.2 7.1 22 8.1 22H19.9C20.9 22 21.7 21.2 21.7 20.2V16.24C23.6 15.71 25 13.97 25 11.9C25 9.41 22.99 7.4 20.5 7.4C20.1 7.4 19.72 7.45 19.35 7.55C18.55 5.45 16.5 4 14 4Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M6.4 18.2H21.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+        </div>
+        <span class="brand-title">Sabory</span>
+      </a>
+      <a href="index.html" class="back-btn">
+        <span class="material-symbols-outlined" style="font-size: 16px;">arrow_back</span> Volver a la App
+      </a>
+    </header>
+
+    <!-- HERO -->
+    <div class="hero">
+      <div class="hero-badge">
+        <span class="material-symbols-outlined" style="font-size: 14px;">verified_user</span> Privacidad Transparente y Offline-First
+      </div>
+      <h1>Política de Privacidad y Tratamiento de Datos</h1>
+      <div class="hero-meta">
+        <span><strong>Aplicación:</strong> Sabory (Asistente de Cocina & Planificador Inteligente)</span>
+        <span><strong>Versión:</strong> 1.30</span>
+        <span><strong>Última actualización:</strong> Noviembre 2026</span>
+      </div>
+    </div>
+
+    <!-- SUMMARY HIGHLIGHTS -->
+    <div class="key-points-grid">
+      <div class="point-card">
+        <span class="material-symbols-outlined icon">cloud_off</span>
+        <h4>Offline-First</h4>
+        <p>Tus recetas y menús se guardan localmente en tu dispositivo. Funcionamiento 100% autónomo sin necesidad de internet.</p>
+      </div>
+      <div class="point-card">
+        <span class="material-symbols-outlined icon">block</span>
+        <h4>Cero Anuncios ni Venta</h4>
+        <p>No recopilamos datos con fines publicitarios, no integramos redes de anuncios ni vendemos tus datos personales.</p>
+      </div>
+      <div class="point-card">
+        <span class="material-symbols-outlined icon">key</span>
+        <h4>Claves Seguras (BYOK)</h4>
+        <p>Tus claves personales de IA se almacenan exclusivamente en el almacenamiento seguro de tu propio navegador.</p>
+      </div>
+      <div class="point-card">
+        <span class="material-symbols-outlined icon">delete_forever</span>
+        <h4>Control y Borrado Total</h4>
+        <p>Puedes eliminar tu cuenta y todos tus datos guardados en la nube con un solo clic desde la app o por solicitud web.</p>
+      </div>
+    </div>
+
+    <!-- SECTION 1 -->
+    <section class="section-card">
+      <h2><span class="material-symbols-outlined">info</span> 1. Responsable del Tratamiento</h2>
+      <p>
+        El responsable del tratamiento de los datos tratados a través de la aplicación web y móvil <strong>Sabory</strong> es <strong>Franky Cerrudo</strong> (en adelante, el "Desarrollador").
+      </p>
+      <p>
+        Para cualquier duda, sugerencia o ejercicio de tus derechos de protección de datos (acceso, rectificación, supresión o portabilidad), puedes ponerte en contacto directamente a través del correo electrónico:
+      </p>
+      <p style="font-weight: 600; color: var(--color-brand);">
+        <a href="mailto:frankyjcerrudo@gmail.com" style="color: inherit; text-decoration: underline;">frankyjcerrudo@gmail.com</a>
+      </p>
+    </section>
+
+    <!-- SECTION 2 -->
+    <section class="section-card">
+      <h2><span class="material-symbols-outlined">data_object</span> 2. Datos Tratados y Finalidad</h2>
+      <p>Sabory procesa única y exclusivamente la información estrictamente necesaria para ofrecerte las funciones gastronómicas de la aplicación:</p>
+      <ul>
+        <li><strong>Recetas Personales:</strong> Título, tiempo de preparación, raciones, ingredientes, pasos elaborados, fotos e información nutricional orientativa. Se emplean para organizar tu recetario personal.</li>
+        <li><strong>Planificador Semanal de Comidas:</strong> Asignación de platos a días de la semana y momentos del día (Desayuno, Almuerzo, Merienda, Cena).</li>
+        <li><strong>Lista de la Compra:</strong> Productos, cantidades e ingredientes añadidos manualmente o extraídos de tus recetas y planes semanales.</li>
+        <li><strong>Preferencias Dietéticas y Nutricionales:</strong> Selección de tipos de dieta (ej. vegana, vegetariana, sin gluten) y objetivos diarios de calorías y macronutrientes. Su única finalidad es mostrar avisos y orientaciones dentro de la app.</li>
+        <li><strong>Cuenta de Usuario (Opcional):</strong> Dirección de correo electrónico y nombre de perfil en caso de que decidas registrarte voluntariamente para sincronizar tu recetario entre varios dispositivos móviles o de escritorio.</li>
+        <li><strong>Claves de API Personales (BYOK - Bring Your Own Key):</strong> Si decides conectar tus propias claves para Google Gemini, OpenAI o Anthropic Claude, estas claves se almacenan <em>exclusivamente en el LocalStorage de tu dispositivo</em> y nunca son enviadas ni almacenadas en servidores del Desarrollador.</li>
+      </ul>
+    </section>
+
+    <!-- SECTION 3 -->
+    <section class="section-card">
+      <h2><span class="material-symbols-outlined">storage</span> 3. Arquitectura Local (Offline-First) y Nube Opcional</h2>
+      <p>
+        Sabory ha sido desarrollada siguiendo una arquitectura <strong>Offline-First</strong>. La aplicación almacena tus datos de forma local mediante <code>IndexedDB</code> y <code>LocalStorage</code> en el navegador de tu dispositivo.
+      </p>
+      <div class="callout-highlight">
+        <strong>Modo Invitado / Sin Cuenta:</strong> Si utilizas Sabory sin iniciar sesión, todos tus datos residen únicamente en tu dispositivo. Si borras los datos de navegación de tu dispositivo o pulsas "Restablecer" en Ajustes, dichos datos se eliminan localmente sin dejar rastro en ningún servidor.
+      </div>
+      <p>
+        <strong>Sincronización en la Nube con Supabase (Opcional):</strong> Si creas una cuenta de usuario, tus recetas, planes y listas se sincronizan con una base de datos gestionada en la nube mediante <strong>Supabase</strong> (PostgreSQL). La base de datos implementa estrictas políticas de seguridad por fila (<em>Row Level Security - RLS</em>), garantizando que solo tú, mediante tu token de autenticación cifrado, puedes leer, insertar, editar o borrar tus propios datos.
+      </p>
+    </section>
+
+    <!-- SECTION 4 -->
+    <section class="section-card">
+      <h2><span class="material-symbols-outlined">smart_toy</span> 4. Uso de Inteligencia Artificial (Google Gemini API)</h2>
+      <p>
+        Sabory integra capacidades de asistencia inteligente mediante los modelos oficiales de Google Gemini (tales como <code>gemini-3.5-flash-lite</code> y <code>gemini-3.8-flash</code>):
+      </p>
+      <ul>
+        <li><strong>Importación por Foto/Texto:</strong> Si decides fotografiar una página de un libro de cocina o pegar texto de una red social, el fragmento o imagen comprimida se envía a la API de Google Gemini para extraer y estructurar automáticamente los ingredientes y los pasos.</li>
+        <li><strong>Asistente Culinario:</strong> Las consultas y peticiones que realices al Chef Asistente se procesan en tiempo real para generar ideas, sugerencias y planes de comida.</li>
+      </ul>
+      <p>
+        De acuerdo con los términos de servicio de la <em>Google Gemini API</em> y la <em>Google API Services User Data Policy</em>, las peticiones son de procesamiento efímero y no se utilizan para entrenar modelos fundacionales públicos de terceros.
+      </p>
+    </section>
+
+    <!-- SECTION 5 -->
+    <section class="section-card">
+      <h2><span class="material-symbols-outlined">devices</span> 5. Permisos Solicitados en el Dispositivo</h2>
+      <p>Sabory solicita únicamente los permisos que el usuario activa de manera consciente e interactiva:</p>
+      <ul>
+        <li><strong>Cámara y Galería de Fotos:</strong> Se solicita únicamente si decides usar la pestaña <em>"✨ Foto / IA"</em> del importador o añadir una foto a una receta. La imagen se comprime y procesa en tu dispositivo mediante un elemento <code>&lt;canvas&gt;</code> antes de ser almacenada.</li>
+        <li><strong>Micrófono:</strong> Se solicita únicamente cuando pulsas el botón del micrófono en el Asistente de Cocina para dictar consultas por voz a través de la Web Speech API del navegador. La app nunca escucha ni graba audio de fondo.</li>
+        <li><strong>Pantalla Activa (Screen Wake Lock):</strong> Se utiliza exclusivamente para evitar que la pantalla del móvil se apague mientras tienes una receta abierta o te encuentras cocinando en el Modo Cocina.</li>
+      </ul>
+    </section>
+
+    <!-- SECTION 6: GOOGLE PLAY ACCOUNT DELETION COMPLIANCE -->
+    <section class="section-card" id="account-deletion">
+      <h2><span class="material-symbols-outlined" style="color: var(--color-error);">delete_forever</span> 6. Eliminación de Cuenta y Retención de Datos</h2>
+      <p>
+        En cumplimiento estricto con las <strong>Políticas de Datos de Usuario de Google Play Store</strong> y la normativa europea <strong>RGPD</strong>, todo usuario que cree una cuenta en Sabory tiene el derecho inalienable de eliminar su cuenta y todos sus datos personales de forma total, inmediata y permanente.
+      </p>
+
+      <div class="callout-danger">
+        <strong>Efecto de la eliminación:</strong> Al solicitar el borrado, se destruyen permanentemente de la base de datos remota todas las recetas, los planes semanales de comidas, las listas de la compra, las configuraciones de usuario y los tokens de acceso vinculados a tu identificador de usuario. Esta acción es irreversible.
+      </div>
+
+      <h3>A. Eliminación Directa desde la Aplicación (Recomendado)</h3>
+      <p>Puedes ejecutar el borrado instantáneo en cualquier momento siguiendo estos sencillos pasos:</p>
+      <div class="step-box">
+        <ol>
+          <li>Abre <strong>Sabory</strong> en tu dispositivo.</li>
+          <li>Entra en la sección <strong>Ajustes</strong> (icono de engranaje en la cabecera).</li>
+          <li>En la tarjeta <strong>"Cuenta de Usuario"</strong> o en la tarjeta <strong>"Privacidad y Control de Datos"</strong>, pulsa el botón <strong>"Eliminar cuenta y datos"</strong> (también disponible dentro del modal de cuenta tras pulsar "Ver Cuenta").</li>
+          <li>Confirma la acción en el cuadro de diálogo pulsando <strong>"Eliminar definitivamente"</strong>.</li>
+          <li>Tu cuenta y todos tus datos en la nube y en el dispositivo se eliminarán en ese mismo instante.</li>
+        </ol>
+      </div>
+
+      <h3>B. Solicitud Web / Remota de Eliminación de Cuenta y Datos</h3>
+      <p>
+        Si has desinstalado la aplicación, no tienes acceso a tu dispositivo o prefieres que gestionemos la baja manualmente, puedes solicitar el borrado completo por vía telemática:
+      </p>
+      <div class="step-box">
+        <p>Envía un correo electrónico a <strong><a href="mailto:frankyjcerrudo@gmail.com?subject=Solicitud%20de%20Eliminaci%C3%B3n%20de%20Cuenta%20-%20Sabory" style="color: var(--color-brand); text-decoration: underline;">frankyjcerrudo@gmail.com</a></strong> con los siguientes datos:</p>
+        <ul style="margin-top: 8px;">
+          <li><strong>Asunto:</strong> Solicitud de Eliminación de Cuenta y Datos - Sabory</li>
+          <li><strong>Remitente:</strong> La solicitud debe enviarse desde la misma dirección de correo electrónico con la que te diste de alta en la aplicación.</li>
+        </ul>
+        <p style="margin-top: 10px; font-size: 13px; color: var(--color-on-surface-variant);">
+          <em>Plazo de tramitación:</em> El Desarrollador procederá a la baja y supresión definitiva de la cuenta en Supabase en un plazo inferior a 48 horas laborables, remitiéndote una confirmación escrita sin coste alguno.
+        </p>
+      </div>
+    </section>
+
+    <!-- SECTION 7 -->
+    <section class="section-card">
+      <h2><span class="material-symbols-outlined">gavel</span> 7. Derechos del Usuario (RGPD y Portabilidad)</h2>
+      <p>
+        Como usuario, dispones de plenos derechos de acceso, rectificación, supresión, limitación del tratamiento, oposición y portabilidad de tus datos personales:
+      </p>
+      <ul>
+        <li><strong>Portabilidad Completa:</strong> Puedes exportar en cualquier momento una copia íntegra de todas tus recetas y planes en un archivo legible estándar <code>JSON</code> desde <em>Ajustes &gt; Configuración Avanzada &gt; Copia de Seguridad Local &gt; Exportar</em>.</li>
+        <li><strong>Reclamación:</strong> Tienes derecho a presentar una reclamación ante la autoridad de control en materia de protección de datos correspondiente (en España, la Agencia Española de Protección de Datos - AEPD).</li>
+      </ul>
+    </section>
+
+    <!-- SECTION 8 -->
+    <section class="section-card">
+      <h2><span class="material-symbols-outlined">update</span> 8. Modificaciones de la Política de Privacidad</h2>
+      <p>
+        El Desarrollador se reserva el derecho a actualizar la presente Política de Privacidad para adecuarla a novedades legislativas, cambios técnicos o nuevas funcionalidades de la aplicación. Cualquier modificación sustancial será comunicada a través de la propia aplicación o en esta misma página web.
+      </p>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="footer-bar">
+      <p>© 2026 <strong>Sabory</strong> — Creado con esmero para cocinar mejor.</p>
+      <p style="margin-top: 6px;">
+        <a href="index.html">Abrir Aplicación</a> · 
+        <a href="#account-deletion">Eliminar Cuenta</a> · 
+        <a href="https://github.com/frankyjcerrudo/Food-Assistant" target="_blank" rel="noopener noreferrer">Código Fuente en GitHub</a>
+      </p>
+    </footer>
+  </div>
+</body>
+</html>
