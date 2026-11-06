@@ -607,7 +607,125 @@ const RecipeParser = {
     }
   },
 
-  parseSchemaRecipe(schema, sourceUrl = '') {
+  isWrapperDomain(domainOrUrl) {
+    if (!domainOrUrl || typeof domainOrUrl !== 'string') return false;
+    const domain = (domainOrUrl.includes('://') ? this.getDomain(domainOrUrl) : domainOrUrl).toLowerCase().trim();
+    if (!domain) return false;
+    return domain === 'share.google' ||
+           domain.endsWith('.share.google') ||
+           domain === 'google.com' ||
+           domain.endsWith('.google.com') ||
+           domain === 'google.es' ||
+           domain.endsWith('.google.es') ||
+           domain === 'goo.gl' ||
+           domain === 't.co' ||
+           domain === 'bit.ly' ||
+           domain === 'tinyurl.com' ||
+           domain === 'out.reddit.com' ||
+           domain === 'l.instagram.com' ||
+           domain === 'l.facebook.com' ||
+           domain === 'lm.facebook.com';
+  },
+
+  unwrapRedirectUrl(rawUrl) {
+    if (!rawUrl || typeof rawUrl !== 'string') return rawUrl || '';
+    let url = rawUrl.trim();
+    const ampMatch = url.match(/^https?:\/\/(?:www\.)?google\.[a-z.]+\/amp\/s\/(.+)$/i);
+    if (ampMatch) {
+      url = 'https://' + ampMatch[1];
+    }
+    try {
+      const parsed = new URL(url);
+      for (const param of ['url', 'q', 'u', 'target', 'dest', 'destination', 'link']) {
+        const val = parsed.searchParams.get(param);
+        if (val && /^https?:\/\//i.test(val)) {
+          return this.unwrapRedirectUrl(val);
+        }
+      }
+    } catch (e) {}
+    return url;
+  },
+
+  extractCanonicalUrl(schema, html = '') {
+    if (schema) {
+      if (typeof schema.mainEntityOfPage === 'string' && /^https?:\/\//i.test(schema.mainEntityOfPage)) {
+        return schema.mainEntityOfPage.trim();
+      }
+      if (schema.mainEntityOfPage && typeof schema.mainEntityOfPage === 'object') {
+        const id = schema.mainEntityOfPage['@id'] || schema.mainEntityOfPage.url;
+        if (typeof id === 'string' && /^https?:\/\//i.test(id)) return id.trim();
+      }
+      if (typeof schema.url === 'string' && /^https?:\/\//i.test(schema.url)) {
+        return schema.url.trim();
+      }
+      if (typeof schema['@id'] === 'string' && /^https?:\/\//i.test(schema['@id'])) {
+        return schema['@id'].trim();
+      }
+    }
+    if (html && typeof html === 'string') {
+      const canonicalMatch = html.match(/<link\s+[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)["']/i) ||
+                             html.match(/<link\s+[^>]*href=["']([^"']+)["'][^>]*rel=["']canonical["']/i);
+      if (canonicalMatch && /^https?:\/\//i.test(canonicalMatch[1])) {
+        return canonicalMatch[1].trim();
+      }
+      const ogMatch = html.match(/<meta\s+[^>]*property=["']og:url["'][^>]*content=["']([^"']+)["']/i) ||
+                      html.match(/<meta\s+[^>]*content=["']([^"']+)["'][^>]*property=["']og:url["']/i);
+      if (ogMatch && /^https?:\/\//i.test(ogMatch[1])) {
+        return ogMatch[1].trim();
+      }
+    }
+    return '';
+  },
+
+  extractSiteName(schema, html = '') {
+    if (schema?.publisher?.name && typeof schema.publisher.name === 'string') {
+      const pub = schema.publisher.name.trim();
+      if (pub && !this.isWrapperDomain(pub)) return pub;
+    }
+    if (html && typeof html === 'string') {
+      const ogSite = html.match(/<meta\s+[^>]*property=["']og:site_name["'][^>]*content=["']([^"']+)["']/i) ||
+                     html.match(/<meta\s+[^>]*content=["']([^"']+)["'][^>]*property=["']og:site_name["']/i);
+      if (ogSite && ogSite[1].trim()) {
+        const site = ogSite[1].trim();
+        if (!this.isWrapperDomain(site)) return site;
+      }
+    }
+    return '';
+  },
+
+  resolveSourceMetadata(sourceUrl = '', schema = null, html = '') {
+    let cleanSource = this.unwrapRedirectUrl(sourceUrl);
+    const canonical = this.extractCanonicalUrl(schema, html);
+    const siteName = this.extractSiteName(schema, html);
+
+    const sourceDomain = this.getDomain(cleanSource);
+    const isWrapper = !cleanSource || this.isWrapperDomain(sourceDomain);
+
+    let finalUrl = cleanSource;
+    if ((isWrapper || !finalUrl) && canonical) {
+      const canonicalDomain = this.getDomain(canonical);
+      if (!this.isWrapperDomain(canonicalDomain)) {
+        finalUrl = canonical;
+      }
+    }
+
+    let finalDomain = this.getDomain(finalUrl);
+    if (!finalDomain || this.isWrapperDomain(finalDomain)) {
+      if (canonical) {
+        finalDomain = this.getDomain(canonical);
+      }
+      if ((!finalDomain || this.isWrapperDomain(finalDomain)) && siteName) {
+        finalDomain = siteName;
+      }
+    }
+
+    return {
+      sourceUrl: finalUrl || '',
+      sourceDomain: finalDomain || (siteName || '')
+    };
+  },
+
+  parseSchemaRecipe(schema, sourceUrl = '', html = '') {
     if (!schema) return null;
     let imageUrl = '';
     if (schema.image) {
@@ -684,8 +802,9 @@ const RecipeParser = {
       });
     }
 
-    const resolvedSourceUrl = sourceUrl || schema.mainEntityOfPage || schema.url || '';
-    const resolvedDomain = this.getDomain(resolvedSourceUrl) || (schema.publisher?.name || '');
+    const sourceMeta = this.resolveSourceMetadata(sourceUrl, schema, html);
+    const resolvedSourceUrl = sourceMeta.sourceUrl;
+    const resolvedDomain = sourceMeta.sourceDomain;
 
     const parsedNutrition = this.parseNutrition(schema.nutrition);
     const parsedServings = this.parseServings(schema.recipeYield);
@@ -744,7 +863,7 @@ const RecipeParser = {
   },
 
 
-  parseRecipeText(rawText, sourceUrl = '') {
+  parseRecipeText(rawText, sourceUrl = '', html = '') {
     if (!rawText || typeof rawText !== 'string') return null;
     const trimmed = rawText.trim();
     if (!trimmed) return null;
@@ -754,7 +873,7 @@ const RecipeParser = {
       try {
         const schema = this.extractJsonLdFromHtml(trimmed) || (trimmed.startsWith('{') ? JSON.parse(trimmed) : null);
         if (schema && (this.isRecipeType(schema['@type']) || schema.recipeIngredient || schema.ingredients)) {
-          return this.parseSchemaRecipe(schema, sourceUrl);
+          return this.parseSchemaRecipe(schema, sourceUrl, html);
         }
       } catch (e) {}
     }
@@ -1051,7 +1170,9 @@ const RecipeParser = {
       }
     }
 
-    const resolvedDomain = sourceUrl ? this.getDomain(sourceUrl) : '';
+    const sourceMeta = this.resolveSourceMetadata(sourceUrl, null, html || rawText);
+    const resolvedSourceUrl = sourceMeta.sourceUrl;
+    const resolvedDomain = sourceMeta.sourceDomain;
     const recipe = {
       id: generateId('rec-'),
       title: title || 'Receta de Notas',
@@ -1064,7 +1185,7 @@ const RecipeParser = {
       tags: [],
       ingredients: ingredients,
       instructions: instructions,
-      sourceUrl: sanitizeUrl(sourceUrl || ''),
+      sourceUrl: sanitizeUrl(resolvedSourceUrl || ''),
       sourceDomain: resolvedDomain
     };
     this.detectRobotFeatures(recipe);

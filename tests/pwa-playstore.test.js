@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 
 new Function(fs.readFileSync(path.resolve(process.cwd(), 'app.js'), 'utf-8'))();
-const { FoodAssistantApp } = window;
+const { FoodAssistantApp, RecipeParser } = window;
 
 const read = (f) => fs.readFileSync(path.resolve(process.cwd(), f), 'utf-8');
 
@@ -107,5 +107,73 @@ describe('Fase 2 Google Play: PWA, Share Target, Accesibilidad y VersiÃ³n (US-
     expect(promptEvent.prompt).toHaveBeenCalledTimes(1);
     expect(fake.deferredInstallPrompt).toBeNull();
     await expect(FoodAssistantApp.prototype.promptPwaInstall.call(fake)).resolves.toBe(false);
+  });
+
+  it('US-59: RecipeParser.unwrapRedirectUrl desempaqueta URLs de Google redirect y AMP', () => {
+    expect(RecipeParser.unwrapRedirectUrl('https://www.google.com/url?q=https%3A%2F%2Fwww.directoalpaladar.com%2Freceta-pollo&sa=D'))
+      .toBe('https://www.directoalpaladar.com/receta-pollo');
+    expect(RecipeParser.unwrapRedirectUrl('https://www.google.es/amp/s/www.directoalpaladar.com/receta-pollo'))
+      .toBe('https://www.directoalpaladar.com/receta-pollo');
+    expect(RecipeParser.unwrapRedirectUrl('https://share.google/exp/12345'))
+      .toBe('https://share.google/exp/12345');
+  });
+
+  it('US-59: RecipeParser.isWrapperDomain detecta dominios envoltorio como share.google, google.com y redes sociales', () => {
+    expect(RecipeParser.isWrapperDomain('share.google')).toBe(true);
+    expect(RecipeParser.isWrapperDomain('https://share.google/exp/123')).toBe(true);
+    expect(RecipeParser.isWrapperDomain('google.com')).toBe(true);
+    expect(RecipeParser.isWrapperDomain('t.co')).toBe(true);
+    expect(RecipeParser.isWrapperDomain('directoalpaladar.com')).toBe(false);
+    expect(RecipeParser.isWrapperDomain('https://www.directoalpaladar.com/post')).toBe(false);
+  });
+
+  it('US-59: RecipeParser.parseSchemaRecipe resuelve el dominio canónico cuando se comparte desde share.google', () => {
+    const schema = {
+      '@type': 'Recipe',
+      name: 'Pollo al Horno',
+      mainEntityOfPage: 'https://www.directoalpaladar.com/recetas-de-pollo/pollo-al-horno',
+      recipeIngredient: ['1 pollo entero', 'sal'],
+      recipeInstructions: [{ text: 'Hornear a 200°C' }]
+    };
+    const html = '<html><head><link rel="canonical" href="https://www.directoalpaladar.com/recetas-de-pollo/pollo-al-horno"></head></html>';
+    const parsed = RecipeParser.parseSchemaRecipe(schema, 'https://share.google/exp/999', html);
+    expect(parsed.sourceDomain).toBe('directoalpaladar.com');
+    expect(parsed.sourceUrl).toBe('https://www.directoalpaladar.com/recetas-de-pollo/pollo-al-horno');
+  });
+
+  it('US-59: sanitizeRecipeSourceDomains sanea recetas guardadas previamente con sourceDomain de share.google', () => {
+    const prevRecipes = window.state.recipes;
+    const saveSpy = vi.spyOn(window.state, 'save');
+    window.state.recipes = [
+      {
+        id: 'rec-1',
+        title: 'Pollo al curry',
+        sourceUrl: 'https://www.google.com/url?q=https%3A%2F%2Fwww.directoalpaladar.com%2Fcurry&sa=D',
+        sourceDomain: 'share.google'
+      },
+      {
+        id: 'rec-2',
+        title: 'Bizcocho',
+        sourceUrl: 'https://share.google/exp/only-share',
+        sourceDomain: 'share.google'
+      },
+      {
+        id: 'rec-3',
+        title: 'Ensalada',
+        sourceUrl: 'https://www.directoalpaladar.com/ensalada',
+        sourceDomain: 'directoalpaladar.com'
+      }
+    ];
+    try {
+      FoodAssistantApp.prototype.sanitizeRecipeSourceDomains.call({});
+      expect(window.state.recipes[0].sourceDomain).toBe('directoalpaladar.com');
+      expect(window.state.recipes[0].sourceUrl).toBe('https://www.directoalpaladar.com/curry');
+      expect(window.state.recipes[1].sourceDomain).toBe('');
+      expect(window.state.recipes[2].sourceDomain).toBe('directoalpaladar.com');
+      expect(saveSpy).toHaveBeenCalledWith('fa_recipes', window.state.recipes);
+    } finally {
+      window.state.recipes = prevRecipes;
+      saveSpy.mockRestore();
+    }
   });
 });
