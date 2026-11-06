@@ -24,7 +24,7 @@ describe('Fase 3 Google Play: Requisitos Legales y Políticas (US-74 & US-75)', 
     it('privacy.html contiene el ancla #account-deletion exigida por Google Play Console para solicitud de borrado', () => {
       expect(privacyHtml).toMatch(/id=["']account-deletion["']/);
       expect(privacyHtml).toContain('Eliminación de Cuenta y Retención de Datos');
-      expect(privacyHtml).toContain('frankyjcerrudo@gmail.com');
+      expect(privacyHtml).toContain('saboryfood@gmail.com');
     });
 
     it('privacy.html detalla la arquitectura Offline-First, Supabase (RLS), BYOK y Google Gemini API', () => {
