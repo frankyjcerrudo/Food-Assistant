@@ -4273,7 +4273,7 @@ isWrapperDomain(domainOrUrl) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.30';
+  window.APP_VERSION = 'v1.31';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4311,7 +4311,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.30';
+    this.appVersion = window.APP_VERSION || 'v1.31';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -4487,10 +4487,34 @@ class FoodAssistantApp {
     }
   }
 
+  isPwaBannerDismissed() {
+    try {
+      return localStorage.getItem('fa_pwa_banner_dismissed') === 'true';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  dismissPwaBanner() {
+    try {
+      localStorage.setItem('fa_pwa_banner_dismissed', 'true');
+    } catch (e) {}
+    const banner = document.getElementById('pwa-smart-banner');
+    if (banner) banner.hidden = true;
+  }
+
   updatePwaInstallUI() {
     const box = document.getElementById('pwa-install-box');
-    if (!box) return;
-    box.hidden = !this.deferredInstallPrompt || this.isStandaloneDisplay();
+    if (box) {
+      box.hidden = !this.deferredInstallPrompt || this.isStandaloneDisplay();
+    }
+    const banner = document.getElementById('pwa-smart-banner');
+    if (banner) {
+      const isDismissed = this.isPwaBannerDismissed();
+      const isStandalone = this.isStandaloneDisplay();
+      const canInstall = Boolean(this.deferredInstallPrompt);
+      banner.hidden = !canInstall || isStandalone || isDismissed;
+    }
   }
 
   initPwaInstall() {
@@ -4511,6 +4535,8 @@ class FoodAssistantApp {
     });
 
     document.getElementById('btn-install-pwa')?.addEventListener('click', () => this.promptPwaInstall());
+    document.getElementById('btn-smart-install-pwa')?.addEventListener('click', () => this.promptPwaInstall());
+    document.getElementById('btn-smart-dismiss-pwa')?.addEventListener('click', () => this.dismissPwaBanner());
     this.updatePwaInstallUI();
   }
 

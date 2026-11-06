@@ -10,18 +10,40 @@
   <title>Sabory</title>
   <meta name="description"
     content="Sabory — Recetario editorial, planificador semanal y lista de la compra inteligente.">
+  <link rel="canonical" href="https://sabory.food/">
+
+  <!-- US-76: Previsualización Social Enriquecida (Open Graph & Twitter Cards) para sabory.food -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Sabory">
+  <meta property="og:url" content="https://sabory.food/">
+  <meta property="og:title" content="Sabory — Planificador Culinario & Recetario Inteligente">
+  <meta property="og:description"
+    content="Organiza tus recetas, planifica tu menú semanal con IA y haz la compra organizada por pasillos de supermercado.">
+  <meta property="og:image" content="https://sabory.food/icon-512.png">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+  <meta property="og:image:alt" content="Sabory — Planificador Culinario Inteligente">
+  <meta property="og:locale" content="es_ES">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Sabory — Planificador Culinario & Recetario Inteligente">
+  <meta name="twitter:description"
+    content="Organiza tus recetas, planifica tu menú semanal con IA y haz la compra organizada por pasillos de supermercado.">
+  <meta name="twitter:image" content="https://sabory.food/icon-512.png">
+  <meta name="twitter:image:alt" content="Sabory — Planificador Culinario Inteligente">
+
   <meta name="application-name" content="Sabory">
   <meta name="apple-mobile-web-app-title" content="Sabory">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <link rel="manifest" href="manifest.json?v=1.30">
+  <link rel="manifest" href="manifest.json?v=1.31">
   <meta name="theme-color" content="#FAF7F2">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=1.30">
-  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.30">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.30">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.30">
+  <link rel="stylesheet" href="styles.css?v=1.31">
+  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.31">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.31">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.31">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <!-- US-41: versión fija + Subresource Integrity (sha384) para el SDK de Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"
@@ -67,6 +89,28 @@
         </button>
       </div>
     </header>
+
+    <!-- US-76: Smart Install Banner PWA para Web Móvil -->
+    <aside class="pwa-smart-banner" id="pwa-smart-banner" hidden aria-label="Instalación de la app en la pantalla de inicio">
+      <div class="pwa-smart-banner-content">
+        <div class="pwa-smart-banner-icon" aria-hidden="true">
+          <img src="icon-192.png?v=1.31" alt="" width="28" height="28" class="pwa-smart-banner-img">
+        </div>
+        <div class="pwa-smart-banner-texts">
+          <strong class="pwa-smart-banner-title">Prueba Sabory como App</strong>
+          <span class="pwa-smart-banner-sub">Acceso rápido desde tu pantalla de inicio y modo offline.</span>
+        </div>
+      </div>
+      <div class="pwa-smart-banner-actions">
+        <button type="button" class="btn btn-primary btn-sm pwa-smart-banner-install-btn" id="btn-smart-install-pwa">
+          <span class="material-symbols-outlined icon-sm">download</span>
+          <span>Instalar</span>
+        </button>
+        <button type="button" class="btn btn-ghost btn-icon pwa-smart-banner-dismiss-btn" id="btn-smart-dismiss-pwa" aria-label="Descartar banner de instalación" title="Descartar aviso">
+          <span class="material-symbols-outlined icon-sm">close</span>
+        </button>
+      </div>
+    </aside>
 
     <!-- VIEW 1: TODAY / HEADER WITH RIGHT-SIDE MACROS + MEALS FIRST (US-28 / US-73) -->
     <main class="view-panel active" id="view-today">
@@ -648,8 +692,8 @@
             </h3>
             <p
               style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-              Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.30</strong>
-              <span class="app-version-badge" id="app-version-badge">v1.30</span>
+              Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.31</strong>
+              <span class="app-version-badge" id="app-version-badge">v1.31</span>
             </p>
             <div
               style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
@@ -2294,8 +2338,8 @@
     </div>
   </div>
 
-  <script src="config.js?v=1.30"></script>
-  <script src="app.js?v=1.30"></script>
+  <script src="config.js?v=1.31"></script>
+  <script src="app.js?v=1.31"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
