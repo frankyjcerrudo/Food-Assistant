@@ -6639,74 +6639,26 @@ h2,
     display: none !important;
   }
 
-  /* Desplegado integrado en flujo natural (4 columnas en 1 fila horizontal, sin descuadre ni popups flotantes) */
+  /* En escritorio, el widget se mantiene como barra horizontal compacta fija y el desglose completo abre el modal (US-76) */
   .today-header-macros.is-expanded {
     flex: 1 1 auto !important;
     width: 100% !important;
     max-width: none !important;
-    padding: 14px 20px !important;
-    border-radius: var(--radius-lg) !important;
+    padding: 8px 20px !important;
+    border-radius: var(--radius-full) !important;
     background: var(--m3-surface) !important;
     border: var(--border-subtle) !important;
-    box-shadow: 0 4px 20px rgba(42, 33, 27, 0.08) !important;
+    box-shadow: 0 2px 8px rgba(42, 33, 27, 0.05) !important;
   }
 
   .today-header-macros.is-expanded .today-nutrition-pill-bar {
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--m3-outline-variant);
-    margin-bottom: 14px;
+    padding-bottom: 0 !important;
+    border-bottom: none !important;
+    margin-bottom: 0 !important;
   }
 
   .today-nutrition-card.is-expanded .today-nutrition-details-body {
-    position: static !important;
-    display: block !important;
-    width: 100% !important;
-    max-width: none !important;
-    box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    background: transparent !important;
-  }
-
-  .today-header-macros.is-expanded .today-nutrition-header {
     display: none !important;
-  }
-
-  .today-header-macros.is-expanded .today-macros-grid {
-    display: grid !important;
-    grid-template-columns: repeat(4, 1fr) !important;
-    gap: 12px !important;
-    margin: 0 0 12px 0 !important;
-  }
-
-  .today-header-macros.is-expanded .macro-chip-expanded {
-    padding: 10px 14px !important;
-    border-radius: var(--radius-md) !important;
-    background: var(--m3-surface-container) !important;
-  }
-
-  .today-header-macros.is-expanded .macro-chip-val-expanded {
-    font-size: 20px !important;
-    font-weight: 800 !important;
-  }
-
-  .today-header-macros.is-expanded .macro-ratio-bar {
-    margin: 10px 0 !important;
-    height: 6px !important;
-  }
-
-  .today-header-macros.is-expanded .today-goal-banner {
-    padding: 8px 14px !important;
-    font-size: 12px !important;
-    margin-top: 10px !important;
-    border-radius: var(--radius-sm) !important;
-  }
-
-  .today-header-macros.is-expanded .nutrition-estimation-disclaimer {
-    margin-top: 8px !important;
-    font-size: 11px !important;
-    padding: 6px 12px !important;
   }
 
   /* Tarjetas de Recetas en Hoy enriquecidas y grandes para Desktop */
@@ -6876,4 +6828,47 @@ h2,
     grid-template-columns: repeat(4, 1fr);
     gap: 22px;
   }
+}
+
+/* Modal de Desglose Nutricional Diario (US-76 / US-49) */
+.modal-nutrition-breakdown-content {
+  max-width: 620px;
+  padding: 22px 24px;
+}
+.modal-nutrition-icon-circle {
+  background: rgba(200, 90, 50, 0.12);
+  color: var(--m3-primary);
+}
+.modal-macros-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.modal-ratio-bar {
+  margin: 12px 0 6px 0;
+  height: 8px;
+}
+.modal-macro-ratio-labels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--m3-on-surface-variant);
+  margin-bottom: 12px;
+}
+.modal-goal-banner {
+  margin-top: 14px;
+}
+.modal-nutrition-disclaimer {
+  margin-top: 10px;
+  font-size: 11px;
+}
+.modal-nutrition-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: var(--border-subtle);
 }

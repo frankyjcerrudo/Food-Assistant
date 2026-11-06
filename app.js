@@ -4273,7 +4273,7 @@ isWrapperDomain(domainOrUrl) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.36';
+  window.APP_VERSION = 'v1.37';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4311,7 +4311,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.36';
+    this.appVersion = window.APP_VERSION || 'v1.37';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -6249,6 +6249,12 @@ class FoodAssistantApp {
         case 'openNutritionGoalsModal':
           this.openNutritionGoalsModal();
           break;
+        case 'openNutritionBreakdownModal':
+          this.openNutritionBreakdownModal();
+          break;
+        case 'closeNutritionBreakdownModal':
+          this.closeNutritionBreakdownModal();
+          break;
         case 'closeNutritionGoalsModal':
           this.closeNutritionGoalsModal();
           break;
@@ -7122,10 +7128,10 @@ class FoodAssistantApp {
               <span class="today-header-macro-badge macro-badge-carbs"><em>C</em> ${Math.round(todayNutrition.totalCarbs)}g</span>
               <span class="today-header-macro-badge macro-badge-fat"><em>G</em> ${Math.round(todayNutrition.totalFat)}g</span>
             </div>
-            <div class="today-header-macro-action desktop-only-action">
+            <div class="today-header-macro-action desktop-only-action" onclick="event.stopPropagation(); app.openNutritionBreakdownModal();" title="Ver desglose nutricional completo en ventana modal">
               ${headerGoalsBtn}
-              <span class="today-header-macro-action-label">${this.todayNutritionExpanded ? 'Ocultar desglose' : 'Ver desglose'}</span>
-              <span class="material-symbols-outlined icon-16 today-nutrition-pill-chevron">expand_more</span>
+              <span class="today-header-macro-action-label">Ver desglose</span>
+              <span class="material-symbols-outlined icon-16">open_in_new</span>
             </div>
           </div>
           <div class="today-nutrition-details-body" id="today-nutrition-details-body">
@@ -7283,6 +7289,112 @@ class FoodAssistantApp {
         actionLabel.textContent = this.todayNutritionExpanded ? 'Ocultar desglose' : 'Ver desglose';
       }
     }
+    if (typeof window !== 'undefined' && window.innerWidth >= 900 && this.todayNutritionExpanded) {
+      this.openNutritionBreakdownModal();
+    }
+  }
+
+  openNutritionBreakdownModal() {
+    const modal = document.getElementById('modal-nutrition-breakdown');
+    if (!modal) return;
+    this.renderNutritionBreakdownModal();
+    this.openDialogModal(modal);
+  }
+
+  closeNutritionBreakdownModal() {
+    const modal = document.getElementById('modal-nutrition-breakdown');
+    if (modal) this.closeDialogModal(modal);
+  }
+
+  renderNutritionBreakdownModal() {
+    const body = document.getElementById('nutrition-breakdown-modal-body');
+    if (!body) return;
+    const todayKey = window.toLocalDateKey ? window.toLocalDateKey(new Date()) : new Date().toISOString().slice(0, 10);
+    const todayPlan = (state.mealPlan && state.mealPlan[todayKey]) || {};
+    const todayNutrition = this.calculateTodayNutrition(todayPlan);
+    const goals = state.settings?.nutritionGoals || { enabled: false };
+    const goalsEnabled = !!goals.enabled;
+
+    const subtitleElem = document.getElementById('nutrition-breakdown-modal-subtitle');
+    if (subtitleElem) {
+      subtitleElem.textContent = `Plan para hoy (${todayNutrition.mealCount} ${todayNutrition.mealCount === 1 ? 'comida' : 'comidas'}).`;
+    }
+
+    const totalMacroGrams = (todayNutrition.totalProtein + todayNutrition.totalCarbs + todayNutrition.totalFat) || 1;
+    const protPercent = Math.round((todayNutrition.totalProtein / totalMacroGrams) * 100);
+    const carbsPercent = Math.round((todayNutrition.totalCarbs / totalMacroGrams) * 100);
+    const fatPercent = Math.max(0, 100 - protPercent - carbsPercent);
+
+    const formatChip = (macroKey, label, currentVal, unit, targetVal, isProtein = false) => {
+      const currentNum = Math.round(currentVal);
+      if (!goalsEnabled || !targetVal || targetVal <= 0) {
+        return `
+          <div class="macro-chip macro-${macroKey} macro-chip-expanded">
+            <span class="macro-chip-label">${label}</span>
+            <div class="macro-chip-val macro-chip-val-expanded">${currentNum}<span class="macro-chip-unit">${unit}</span></div>
+          </div>
+        `;
+      }
+      const percent = Math.round((currentVal / targetVal) * 100);
+      const diff = currentNum - Math.round(targetVal);
+      let statusClass = 'goal-ok';
+      let statusText = 'En rango';
+      if (percent < 85) {
+        statusClass = 'goal-under';
+        statusText = `Faltan ${Math.abs(diff)}${unit}`;
+      } else if (percent > 110) {
+        statusClass = isProtein && percent <= 130 ? 'goal-super' : 'goal-over';
+        statusText = isProtein && percent <= 130 ? '+ Superado' : `+${diff}${unit}`;
+      }
+      const barPercent = Math.min(100, Math.max(0, percent));
+      return `
+        <div class="macro-chip macro-${macroKey} macro-chip-expanded">
+          <div class="macro-chip-top-row">
+            <span class="macro-chip-label">${label}</span>
+            <span class="goal-status-badge ${statusClass}">${statusText}</span>
+          </div>
+          <div class="macro-chip-val macro-chip-val-expanded">${currentNum}<span class="macro-chip-unit">${unit}</span></div>
+          <span class="macro-goal-subtext">de ${targetVal}${unit} (${percent}%)</span>
+          <div class="goal-progress-track">
+            <div class="goal-progress-fill ${statusClass}" style="--bar-pct: ${barPercent}%;"></div>
+          </div>
+        </div>
+      `;
+    };
+
+    let goalBannerHtml = '';
+    if (goalsEnabled) {
+      goalBannerHtml = `
+        <div class="today-goal-banner banner-ok modal-goal-banner">
+          <span class="material-symbols-outlined icon-sm">check_circle</span>
+          <span>Valores nutricionales sincronizados con tus objetivos diarios configurados.</span>
+        </div>
+      `;
+    }
+
+    body.innerHTML = `
+      <div class="today-macros-grid has-goals modal-macros-grid">
+        ${formatChip('cal', 'Calorías', todayNutrition.totalCalories, 'kcal', goals.calories)}
+        ${formatChip('prot', 'Proteínas', todayNutrition.totalProtein, 'g', goals.protein, true)}
+        ${formatChip('carbs', 'Carbos', todayNutrition.totalCarbs, 'g', goals.carbs)}
+        ${formatChip('fat', 'Grasas', todayNutrition.totalFat, 'g', goals.fat)}
+      </div>
+      <div class="macro-ratio-bar modal-ratio-bar" title="Distribución: ${protPercent}% P / ${carbsPercent}% C / ${fatPercent}% G">
+        <div class="ratio-segment ratio-prot" style="--seg-pct: ${protPercent}%;"></div>
+        <div class="ratio-segment ratio-carbs" style="--seg-pct: ${carbsPercent}%;"></div>
+        <div class="ratio-segment ratio-fat" style="--seg-pct: ${fatPercent}%;"></div>
+      </div>
+      <div class="modal-macro-ratio-labels">
+        <span>Proteínas: ${protPercent}%</span>
+        <span>Carbohidratos: ${carbsPercent}%</span>
+        <span>Grasas: ${fatPercent}%</span>
+      </div>
+      ${goalBannerHtml}
+      <div class="nutrition-estimation-disclaimer modal-nutrition-disclaimer">
+        <span class="material-symbols-outlined">info</span>
+        <span>Valores orientativos calculados a partir de recetas creadas o importadas; úsalos como guía general.</span>
+      </div>
+    `;
   }
 
   getSortedRecipes(recipesList = state.recipes) {

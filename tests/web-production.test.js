@@ -188,14 +188,14 @@ describe('US-76: Adaptación Web de Producción para sabory.food', () => {
       expect(media900).toMatch(/#shopping-aisles-container\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fill/s);
     });
 
-    it('estila el widget de macros en desktop ocupando todo el ancho disponible y 4 columnas en 1 fila horizontal al desplegar', () => {
+    it('estila el widget de macros en desktop ocupando todo el ancho disponible con cero layout shift en las recetas', () => {
       expect(media900).toMatch(/\.today-subtitle\s*\{[^}]*display:\s*none\s*!important;/s);
       expect(media900).toMatch(/\.today-nutrition-card\.today-header-macros\s*\{[^}]*flex:\s*1\s+1\s+auto;/s);
       expect(media900).toMatch(/\.today-nutrition-pill-bar\s*\{[\s\S]*?flex-direction:\s*row/s);
-      expect(media900).toMatch(/\.today-header-macros\.is-expanded\s+\.today-macros-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4,\s*1fr\)/s);
+      expect(media900).toMatch(/\.today-nutrition-card\.is-expanded\s+\.today-nutrition-details-body\s*\{[^}]*display:\s*none\s*!important;/s);
     });
 
-    it('toggleTodayNutritionDetails actualiza el texto de acción y cierra el popover al hacer click fuera o pulsar Escape', () => {
+    it('openNutritionBreakdownModal abre el modal de desglose nutricional en escritorio con cero layout shift en las recetas', () => {
       new Function(fs.readFileSync(path.resolve(process.cwd(), 'app.js'), 'utf-8'))();
       const app = new window.FoodAssistantApp();
       window.app = app;
@@ -208,29 +208,24 @@ describe('US-76: Adaptación Web de Producción para sabory.food', () => {
           </div>
           <div class="today-nutrition-details-body" id="today-nutrition-details-body"></div>
         </div>
-        <div id="outside-element">Fuera</div>
+        <dialog class="modal-overlay" id="modal-nutrition-breakdown">
+          <div class="nutrition-breakdown-modal-body" id="nutrition-breakdown-modal-body"></div>
+        </dialog>
       `;
 
-      app._eventDelegationInitialized = false;
-      app.initEventDelegation();
+      const modal = document.getElementById('modal-nutrition-breakdown');
+      modal.showModal = vi.fn(() => { modal.open = true; });
+      modal.close = vi.fn(() => { modal.open = false; });
 
-      // Abrir popover
-      app.toggleTodayNutritionDetails();
-      const card = document.getElementById('today-nutrition-card');
-      const label = card.querySelector('.today-header-macro-action-label');
-      expect(card.classList.contains('is-expanded')).toBe(true);
-      expect(label.textContent).toBe('Ocultar desglose');
+      app.openNutritionBreakdownModal();
+      expect(modal.showModal).toHaveBeenCalledTimes(1);
 
-      // Click fuera cierra el popover
-      document.getElementById('outside-element').click();
-      expect(card.classList.contains('is-expanded')).toBe(false);
-      expect(label.textContent).toBe('Ver desglose');
+      const body = document.getElementById('nutrition-breakdown-modal-body');
+      expect(body.innerHTML).toContain('macro-chip');
+      expect(body.innerHTML).toContain('macro-ratio-bar');
 
-      // Abrir de nuevo y cerrar con Escape
-      app.toggleTodayNutritionDetails();
-      expect(card.classList.contains('is-expanded')).toBe(true);
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-      expect(card.classList.contains('is-expanded')).toBe(false);
+      app.closeNutritionBreakdownModal();
+      expect(modal.close).toHaveBeenCalledTimes(1);
     });
 
     it('renderTodaySlots genera tarjetas enriquecidas con calorías, macros, tags y acción de ver receta', () => {
