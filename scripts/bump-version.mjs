@@ -34,3 +34,4 @@ edit('tests/modals.test.js', s => s.replace(/(APP_VERSION\)\.toBe\(')v[\d.]+('\)
   .replace(/(appVersion\)\.toBe\(')v[\d.]+('\))/, `$1${tag}$2`)
   .replace(/(badge\.textContent\)\.toBe\(')v[\d.]+('\))/, `$1${tag}$2`)
   .replace(/(settingsVer\.textContent\)\.toBe\(')v[\d.]+('\))/, `$1${tag}$2`));
+
