@@ -6371,65 +6371,126 @@ h2,
   color: var(--m3-on-surface-variant);
 }
 
+/* Navigation bar desktop / mobile switch */
+.desktop-header-nav {
+  display: none;
+}
+
+@media (max-width: 899px) {
+  .desktop-header-nav {
+    display: none !important;
+  }
+}
+
 /* Optimización Responsive Pantallas Grandes (Desktop / Tablet >= 900px) */
 @media (min-width: 900px) {
-  .app-container {
-    max-width: 1240px;
-    padding-left: 32px;
-    padding-right: 32px;
-    padding-bottom: 48px;
-  }
-
-  /* Integrar navegación en cabecera/lateral superior en lugar de cápsula flotante en el vacío */
+  /* Eliminar cápsula flotante móvil en desktop */
   .bottom-nav {
-    position: sticky;
-    top: 68px;
-    bottom: auto;
-    left: auto;
-    right: auto;
-    transform: none;
-    width: 100%;
-    max-width: 600px;
-    margin: 12px auto 20px auto;
+    display: none !important;
+  }
+
+  /* Integrar navegación real de aplicación web en la cabecera */
+  .desktop-header-nav {
+    display: flex !important;
+    align-items: center;
+    gap: 4px;
+    background: var(--m3-surface-container-low);
+    border: var(--border-subtle);
     border-radius: var(--radius-full);
-    padding: 4px 14px;
-    box-shadow: 0 4px 20px rgba(42, 33, 27, 0.08);
-    z-index: 45;
+    padding: 4px 6px;
+    box-shadow: 0 1px 3px rgba(42, 33, 27, 0.05);
   }
 
-  .nav-item {
-    flex-direction: row;
-    gap: 8px;
-    padding: 8px 14px;
-    font-size: 13px;
+  .header-nav-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-full);
+    padding: 7px 14px;
+    font-family: var(--font-family);
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--m3-on-surface-variant);
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, transform var(--duration-fast) var(--ease-out);
   }
 
-  .nav-item .nav-icon-wrapper {
-    width: 32px;
-    height: 28px;
+  .header-nav-btn:hover {
+    background: var(--m3-surface-container-high);
+    color: var(--m3-on-surface);
   }
 
-  .nav-item-gemini {
-    top: 0;
-    flex-direction: row;
-    gap: 8px;
+  .header-nav-btn.active {
+    background: var(--m3-primary);
+    color: #ffffff;
+    font-weight: 700;
+    box-shadow: 0 2px 6px rgba(200, 90, 50, 0.25);
   }
 
-  .nav-gemini-fab {
-    width: 32px;
-    height: 32px;
+  .header-nav-btn.active .material-symbols-outlined {
+    font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+  }
+
+  .header-nav-btn-chef {
+    background: linear-gradient(135deg, rgba(200, 90, 50, 0.12) 0%, rgba(224, 122, 95, 0.18) 100%);
+    color: var(--m3-primary);
+    font-weight: 700;
+  }
+
+  .header-nav-btn-chef:hover {
+    background: linear-gradient(135deg, #C85A32 0%, #E07A5F 100%);
+    color: #ffffff;
+  }
+
+  /* Ancho de contenedor desktop completo */
+  .app-container {
+    max-width: 1380px;
+    padding-left: 36px;
+    padding-right: 36px;
+    padding-bottom: 56px;
+  }
+
+  .app-header {
+    padding: 12px 28px;
+    gap: 20px;
+  }
+
+  /* Menú de Hoy en Desktop */
+  .today-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 28px;
+    margin-bottom: 24px;
+  }
+
+  #today-slots-container {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  /* Planificador Semanal en Desktop: cada día muestra sus comidas en columnas */
+  .day-card .slots-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
   }
 
   /* Rejilla de recetas a 3 columnas en pantallas medianas/grandes */
   .recipes-grid {
     grid-template-columns: repeat(3, 1fr);
-    gap: var(--space-3);
+    gap: 20px;
   }
 
-  /* Planificador y slots optimizados para ancho superior */
-  .slots-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+  /* Lista de la compra por pasillos en cuadrícula de tarjetas */
+  #shopping-aisles-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 16px;
+    align-items: start;
   }
 
   .pwa-smart-banner {
@@ -6438,15 +6499,20 @@ h2,
   }
 }
 
-/* Rejilla de recetas a 4 columnas y slots a 4 columnas en pantallas muy amplias (>= 1200px) */
-@media (min-width: 1200px) {
-  .recipes-grid {
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--space-3);
+/* Pantallas extra anchas (Desktop >= 1180px) */
+@media (min-width: 1180px) {
+  #today-slots-container {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 18px;
   }
 
-  .slots-grid {
+  .day-card .slots-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px;
+    gap: 14px;
+  }
+
+  .recipes-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 22px;
   }
 }

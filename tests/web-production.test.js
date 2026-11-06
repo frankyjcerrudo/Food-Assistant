@@ -121,25 +121,71 @@ describe('US-76: Adaptación Web de Producción para sabory.food', () => {
     });
   });
 
+  describe('Barra de Navegación Integrada en Cabecera para Desktop (HTML & app.js)', () => {
+    it('index.html incluye nav.desktop-header-nav con accesos a Hoy, Recetas, Planificador, Compra y Asistente IA', () => {
+      expect(html).toContain('id="desktop-header-nav"');
+      expect(html).toMatch(/class="header-nav-btn[^"]*"\s+data-view="view-today"/);
+      expect(html).toMatch(/class="header-nav-btn[^"]*"\s+data-view="view-recipes"/);
+      expect(html).toMatch(/class="header-nav-btn[^"]*"\s+data-view="view-planner"/);
+      expect(html).toMatch(/class="header-nav-btn[^"]*"\s+data-view="view-shopping"/);
+      expect(html).toContain('id="btn-desktop-gemini-invoke"');
+    });
+
+    it('switchView sincroniza la clase active tanto en la navegación móvil como en la cabecera desktop', () => {
+      document.body.innerHTML = `
+        <header class="app-header">
+          <nav class="desktop-header-nav">
+            <button class="header-nav-btn active" data-view="view-today">Hoy</button>
+            <button class="header-nav-btn" data-view="view-recipes">Recetas</button>
+          </nav>
+        </header>
+        <main class="view-panel active" id="view-today"></main>
+        <section class="view-panel" id="view-recipes"></section>
+        <nav class="bottom-nav">
+          <button class="nav-item active" data-view="view-today">Hoy</button>
+          <button class="nav-item" data-view="view-recipes">Recetas</button>
+        </nav>
+      `;
+
+      new Function(fs.readFileSync(path.resolve(process.cwd(), 'app.js'), 'utf-8'))();
+      const app = new window.FoodAssistantApp();
+      app.initElements();
+
+      app.switchView('view-recipes');
+
+      const desktopActive = document.querySelector('.desktop-header-nav .header-nav-btn.active');
+      const mobileActive = document.querySelector('.bottom-nav .nav-item.active');
+
+      expect(desktopActive?.dataset.view).toBe('view-recipes');
+      expect(mobileActive?.dataset.view).toBe('view-recipes');
+    });
+  });
+
   describe('Optimización Responsive para Pantallas Grandes (Desktop / Tablet >= 900px)', () => {
     const media900 = css.slice(css.indexOf('@media (min-width: 900px)'));
 
-    it('styles.css incluye regla @media (min-width: 900px) con ancho ampliado para app-container', () => {
+    it('styles.css incluye regla @media (min-width: 900px) con ancho ampliado >= 1300px para app-container', () => {
       expect(media900).toContain('@media (min-width: 900px)');
-      expect(media900).toMatch(/max-width:\s*12[0-9]{2}px/);
+      expect(media900).toMatch(/max-width:\s*13[0-9]{2}px/);
     });
 
-    it('reposiciona la barra de navegación para evitar la cápsula flotante en el vacío en desktop', () => {
-      expect(media900).toMatch(/\.bottom-nav\s*\{[^}]*position:\s*sticky;/s);
+    it('oculta la cápsula flotante inferior en desktop y activa la navegación en cabecera', () => {
+      expect(media900).toMatch(/\.bottom-nav\s*\{[^}]*display:\s*none\s*!important;/s);
+      expect(media900).toMatch(/\.desktop-header-nav\s*\{[^}]*display:\s*flex\s*!important;/s);
     });
 
-    it('amplía la cuadrícula de recetas a 3 columnas en >= 900px y 4 columnas en >= 1200px', () => {
+    it('amplía la cuadrícula de recetas a 3 columnas en >= 900px y 4 columnas en >= 1180px', () => {
       expect(media900).toMatch(/\.recipes-grid\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*1fr\)/s);
-      expect(media900).toMatch(/@media\s*\(\s*min-width:\s*1200px\s*\)[^}]*\.recipes-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*1fr\)/s);
+      expect(media900).toMatch(/@media\s*\(\s*min-width:\s*1180px\s*\)[\s\S]*?\.recipes-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*1fr\)/s);
     });
 
-    it('optimiza la disposición de slots del planificador para pantallas anchas', () => {
-      expect(media900).toMatch(/\.slots-grid\s*\{[^}]*grid-template-columns:\s*repeat\([24],\s*minmax\(0,\s*1fr\)\)/s);
+    it('organiza los slots del menú de Hoy y del planificador en columnas horizontales en desktop', () => {
+      expect(media900).toMatch(/#today-slots-container\s*\{[^}]*grid-template-columns:\s*repeat\([24],\s*minmax\(0,\s*1fr\)\)/s);
+      expect(media900).toMatch(/\.day-card\s+\.slots-grid\s*\{[^}]*grid-template-columns:\s*repeat\([24],\s*minmax\(0,\s*1fr\)\)/s);
+    });
+
+    it('muestra los pasillos de compra en cuadrícula multi-tarjeta en desktop', () => {
+      expect(media900).toMatch(/#shopping-aisles-container\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fill/s);
     });
   });
 });

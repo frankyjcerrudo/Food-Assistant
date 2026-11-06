@@ -35,15 +35,15 @@
   <meta name="application-name" content="Sabory">
   <meta name="apple-mobile-web-app-title" content="Sabory">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <link rel="manifest" href="manifest.json?v=1.31">
+  <link rel="manifest" href="manifest.json?v=1.32">
   <meta name="theme-color" content="#FAF7F2">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=1.31">
-  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.31">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.31">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.31">
+  <link rel="stylesheet" href="styles.css?v=1.32">
+  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.32">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.32">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.32">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <!-- US-41: versión fija + Subresource Integrity (sha384) para el SDK de Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"
@@ -77,6 +77,31 @@
         </div>
         <h1 class="brand-name">Sabory</h1>
       </div>
+
+      <!-- Desktop Navigation Bar (US-76: Real Web App Navigation for >= 900px) -->
+      <nav class="desktop-header-nav" id="desktop-header-nav" aria-label="Navegación principal">
+        <button type="button" class="header-nav-btn active" data-view="view-today">
+          <span class="material-symbols-outlined icon-sm">today</span>
+          <span>Hoy</span>
+        </button>
+        <button type="button" class="header-nav-btn" data-view="view-recipes">
+          <span class="material-symbols-outlined icon-sm">menu_book</span>
+          <span>Recetas</span>
+        </button>
+        <button type="button" class="header-nav-btn" data-view="view-planner">
+          <span class="material-symbols-outlined icon-sm">calendar_month</span>
+          <span>Planificador</span>
+        </button>
+        <button type="button" class="header-nav-btn" data-view="view-shopping">
+          <span class="material-symbols-outlined icon-sm">shopping_cart</span>
+          <span>Compra</span>
+        </button>
+        <button type="button" class="header-nav-btn header-nav-btn-chef" id="btn-desktop-gemini-invoke" title="Hablar con el Asistente de Cocina">
+          <span class="material-symbols-outlined icon-sm">auto_awesome</span>
+          <span>Asistente IA</span>
+        </button>
+      </nav>
+
       <div class="header-actions">
         <!-- Cloud User Account Pill -->
         <button class="user-pill" id="btn-header-account" title="Mi Cuenta">
@@ -94,7 +119,7 @@
     <aside class="pwa-smart-banner" id="pwa-smart-banner" hidden aria-label="Instalación de la app en la pantalla de inicio">
       <div class="pwa-smart-banner-content">
         <div class="pwa-smart-banner-icon" aria-hidden="true">
-          <img src="icon-192.png?v=1.31" alt="" width="28" height="28" class="pwa-smart-banner-img">
+          <img src="icon-192.png?v=1.32" alt="" width="28" height="28" class="pwa-smart-banner-img">
         </div>
         <div class="pwa-smart-banner-texts">
           <strong class="pwa-smart-banner-title">Prueba Sabory como App</strong>
@@ -692,8 +717,8 @@
             </h3>
             <p
               style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-              Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.31</strong>
-              <span class="app-version-badge" id="app-version-badge">v1.31</span>
+              Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.32</strong>
+              <span class="app-version-badge" id="app-version-badge">v1.32</span>
             </p>
             <div
               style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
@@ -2338,8 +2363,8 @@
     </div>
   </div>
 
-  <script src="config.js?v=1.31"></script>
-  <script src="app.js?v=1.31"></script>
+  <script src="config.js?v=1.32"></script>
+  <script src="app.js?v=1.32"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
