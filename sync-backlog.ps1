@@ -43,6 +43,19 @@ if (-not $Token) {
                 $Token = $matches[1]
             }
         } catch {}
+
+        # Intentar consultar Git Credential Manager
+        if (-not $Token) {
+            try {
+                $credOut = "protocol=https`nhost=github.com`n`n" | git credential fill 2>$null
+                foreach ($cline in $credOut) {
+                    if ($cline -match '^password=(.+)$') {
+                        $Token = $matches[1].Trim()
+                        break
+                    }
+                }
+            } catch {}
+        }
     }
 }
 
