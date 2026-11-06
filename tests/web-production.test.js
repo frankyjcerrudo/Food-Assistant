@@ -188,15 +188,11 @@ describe('US-76: Adaptación Web de Producción para sabory.food', () => {
       expect(media900).toMatch(/#shopping-aisles-container\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fill/s);
     });
 
-    it('limita el ancho del widget de macros expandido en desktop a una tarjeta compacta 2x2', () => {
-      expect(media900).toMatch(/\.today-header-macros\.is-expanded\s*\{[\s\S]*?max-width:\s*4[0-9]{2}px/s);
-      expect(media900).toMatch(/\.today-header-macros\.is-expanded\s+\.today-macros-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*1fr\)/s);
-    });
-
-    it('estila la barra de macros horizontal y el desglose detallado como popover flotante sin layout shift', () => {
+    it('estila el widget de macros en desktop ocupando todo el ancho disponible y 4 columnas en 1 fila horizontal al desplegar', () => {
+      expect(media900).toMatch(/\.today-subtitle\s*\{[^}]*display:\s*none\s*!important;/s);
+      expect(media900).toMatch(/\.today-nutrition-card\.today-header-macros\s*\{[^}]*flex:\s*1\s+1\s+auto;/s);
       expect(media900).toMatch(/\.today-nutrition-pill-bar\s*\{[\s\S]*?flex-direction:\s*row/s);
-      expect(media900).toMatch(/\.today-nutrition-card\.is-expanded\s+\.today-nutrition-details-body\s*\{[\s\S]*?position:\s*absolute/s);
-      expect(media900).toMatch(/\.today-nutrition-card\.is-expanded\s+\.today-nutrition-details-body\s*\{[\s\S]*?z-index:\s*80/s);
+      expect(media900).toMatch(/\.today-header-macros\.is-expanded\s+\.today-macros-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4,\s*1fr\)/s);
     });
 
     it('toggleTodayNutritionDetails actualiza el texto de acción y cierra el popover al hacer click fuera o pulsar Escape', () => {

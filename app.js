@@ -4273,7 +4273,7 @@ isWrapperDomain(domainOrUrl) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.34';
+  window.APP_VERSION = 'v1.35';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4311,7 +4311,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.34';
+    this.appVersion = window.APP_VERSION || 'v1.35';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -7123,6 +7123,7 @@ class FoodAssistantApp {
               <span class="today-header-macro-badge macro-badge-fat"><em>G</em> ${Math.round(todayNutrition.totalFat)}g</span>
             </div>
             <div class="today-header-macro-action desktop-only-action">
+              ${headerGoalsBtn}
               <span class="today-header-macro-action-label">${this.todayNutritionExpanded ? 'Ocultar desglose' : 'Ver desglose'}</span>
               <span class="material-symbols-outlined icon-16 today-nutrition-pill-chevron">expand_more</span>
             </div>
