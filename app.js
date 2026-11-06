@@ -4120,8 +4120,11 @@ isWrapperDomain(domainOrUrl) {
         nutrition = estimateRecipeNutrition({ title, ingredients, servings });
       }
 
+      const safeId = (cand.id && typeof cand.id === 'string' && /^[a-zA-Z0-9_-]+$/.test(cand.id))
+        ? cand.id
+        : generateId('rec-');
       const recipe = {
-        id: cand.id || generateId('rec-'),
+        id: safeId,
         title: title,
         description: description,
         imageUrl: isSafeUrl(imageUrl) ? imageUrl : '',
@@ -5275,8 +5278,8 @@ class FoodAssistantApp {
       try {
         await Promise.allSettled([
           this.supabaseClient.from('recipes').delete().eq('user_id', uid),
-          this.supabaseClient.from('planner_slots').delete().eq('user_id', uid),
-          this.supabaseClient.from('shopping_list').delete().eq('user_id', uid),
+          this.supabaseClient.from('meal_plans').delete().eq('user_id', uid),
+          this.supabaseClient.from('shopping_items').delete().eq('user_id', uid),
           this.supabaseClient.from('user_settings').delete().eq('user_id', uid),
           this.supabaseClient.from('external_agent_tokens').delete().eq('user_id', uid)
         ]);
@@ -7124,8 +7127,9 @@ class FoodAssistantApp {
           </div>
         ` : '';
 
+        const safeRecipeId = escapeHtml(recipe.id).replace(/'/g, "\\'");
         return `
-          <div class="meal-slot has-meal" onclick="app.openRecipeDetail('${recipe.id}')">
+          <div class="meal-slot has-meal" onclick="app.openRecipeDetail('${safeRecipeId}')">
             <div class="u-flex-between-center">
               <span class="slot-label">
                 <span class="material-symbols-outlined icon-sm">${s.icon}</span> ${s.label}
@@ -7228,11 +7232,12 @@ class FoodAssistantApp {
       ? this.getRecipeFridgeMatch(rec)
       : null;
 
+    const safeRecipeId = escapeHtml(rec.id).replace(/'/g, "\\'");
     return `
-      <article class="recipe-card" onclick="app.openRecipeDetail('${rec.id}')" data-action="openRecipeDetail" data-recipe-id="${rec.id}">
+      <article class="recipe-card" onclick="app.openRecipeDetail('${safeRecipeId}')" data-action="openRecipeDetail" data-recipe-id="${escapeHtml(rec.id)}">
         <div class="recipe-image-wrap">
           ${isSafeUrl(rec.imageUrl) ? `
-            <img class="recipe-img" src="${sanitizeUrl(rec.imageUrl)}" alt="${escapeHtml(rec.title)}" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML=app.getRecipePlaceholderHtml('${rec.id}', 'card');">
+            <img class="recipe-img" src="${sanitizeUrl(rec.imageUrl)}" alt="${escapeHtml(rec.title)}" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML=app.getRecipePlaceholderHtml('${safeRecipeId}', 'card');">
           ` : `
             ${this.getRecipePlaceholderHtml(rec, 'card')}
           `}
@@ -7240,8 +7245,8 @@ class FoodAssistantApp {
             <span class="material-symbols-outlined icon-sm">schedule</span> ${rec.prepTimeMinutes + rec.cookTimeMinutes} min
           </div>
           <button type="button" class="recipe-fav-btn ${rec.isFavorite ? 'active' : ''}"
-            onclick="event.stopPropagation(); app.toggleRecipeFavorite('${rec.id}')"
-            data-action="toggleRecipeFavorite" data-recipe-id="${rec.id}"
+            onclick="event.stopPropagation(); app.toggleRecipeFavorite('${safeRecipeId}')"
+            data-action="toggleRecipeFavorite" data-recipe-id="${escapeHtml(rec.id)}"
             aria-pressed="${rec.isFavorite ? 'true' : 'false'}"
             aria-label="${rec.isFavorite ? 'Quitar de favoritas' : 'Marcar como favorita'}"
             title="${rec.isFavorite ? 'Quitar de favoritas' : 'Marcar como favorita'}">
@@ -7947,9 +7952,9 @@ class FoodAssistantApp {
     const baseNutrition = getRecipeNutrition(r);
 
     body.innerHTML = `
-      ${r.imageUrl ? `
+      ${isSafeUrl(r.imageUrl) ? `
       <div class="recipe-detail-hero-photo">
-        <img src="${r.imageUrl}" alt="${r.title}" class="img-cover-full" onerror="this.onerror=null; this.parentElement.innerHTML=app.getRecipePlaceholderHtml('${r.id}', 'detail');">
+        <img src="${sanitizeUrl(r.imageUrl)}" alt="${escapeHtml(r.title)}" class="img-cover-full" onerror="this.onerror=null; this.parentElement.innerHTML=app.getRecipePlaceholderHtml('${escapeHtml(r.id).replace(/'/g, "\\'")}', 'detail');">
       </div>
       ` : `
       <div class="recipe-detail-hero-placeholder">
@@ -8044,7 +8049,7 @@ class FoodAssistantApp {
           <div class="recipe-detail-section-header">
             <h3 class="recipe-detail-section-title">Ingredientes</h3>
             ${!this.isReviewingImport ? `
-              <button class="btn btn-tonal btn-sm" onclick="app.addRecipeIngredientsToShopping('${r.id}')">
+              <button class="btn btn-tonal btn-sm" onclick="app.addRecipeIngredientsToShopping('${escapeHtml(r.id).replace(/'/g, "\\'")}')">
                 <span class="material-symbols-outlined icon-sm">add_shopping_cart</span> Enviar a la Compra
               </button>
             ` : ''}
@@ -9381,8 +9386,9 @@ class FoodAssistantApp {
         </div>
       ` : '';
 
+      const safeRecipeId = escapeHtml(recipe.id).replace(/'/g, "\\'");
       return `
-        <div class="meal-slot has-meal" onclick="app.openRecipeDetail('${recipe.id}')">
+        <div class="meal-slot has-meal" onclick="app.openRecipeDetail('${safeRecipeId}')">
           <div class="u-flex-between-center">
             <span class="slot-label">
               <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
@@ -9440,8 +9446,9 @@ class FoodAssistantApp {
         </div>
       ` : '';
 
+      const safeRecipeId = escapeHtml(recipe.id).replace(/'/g, "\\'");
       return `
-        <div class="meal-slot has-meal meal-slot-custom" onclick="app.openRecipeDetail('${recipe.id}')">
+        <div class="meal-slot has-meal meal-slot-custom" onclick="app.openRecipeDetail('${safeRecipeId}')">
           <div class="u-flex-between-center">
             <span class="slot-label slot-label-custom">
               <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
@@ -12484,7 +12491,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       }).filter(s => s.text);
 
       const newRecipe = {
-        id: (args.id && !state.recipes.some(r => r.id === args.id)) ? String(args.id) : generateId('rec-'),
+        id: (args.id && typeof args.id === 'string' && /^[a-zA-Z0-9_-]+$/.test(args.id) && !state.recipes.some(r => r.id === args.id)) ? String(args.id) : generateId('rec-'),
         title: String(args.title || 'Receta creada con IA').trim(),
         description: String(args.description || 'Receta generada a medida con IA.').trim(),
         imageUrl: args.imageUrl ? String(args.imageUrl).trim() : '',
@@ -13326,9 +13333,10 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
         resultBox.style.display = 'flex';
         let fallbackBanner = '';
         if (response && response.isSimulatedFallback) {
+          const safeErrorMsg = escapeHtml(response.originalError || 'tiempo de espera agotado');
           fallbackBanner = `<div class="ai-fallback-banner">
             <span class="material-symbols-outlined icon-18 u-shrink-0">cloud_off</span>
-            <span><strong>Aviso de conexión:</strong> No se pudo contactar con Gemini en la nube (${response.originalError || 'tiempo de espera agotado'}). Se ha activado la simulación local provisional de emergencia.</span>
+            <span><strong>Aviso de conexión:</strong> No se pudo contactar con Gemini en la nube (${safeErrorMsg}). Se ha activado la simulación local provisional de emergencia.</span>
           </div>`;
         }
         resultText.innerHTML = fallbackBanner + formatSafeAiMarkdown(cleanText);

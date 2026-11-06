@@ -207,4 +207,91 @@ describe('Fase 1: Seguridad y Endurecimiento (US-36, US-38, US-40)', () => {
       expect(serverCode).toContain('SSRF protegido');
     });
   });
+  describe('Auditoría de Seguridad Formal (Security Audit Fixes)', () => {
+    it('renderRecipeModalContent con r.imageUrl sanea src y escapa alt y r.id', () => {
+      app.activeRecipe = {
+        id: "x'onerror='alert(1)",
+        title: 'Tacos" onerror="alert(\'xss-title\')" x="',
+        description: 'Deliciosos tacos',
+        servings: 2,
+        imageUrl: 'https://images.unsplash.com/photo-test',
+        sourceUrl: 'https://ejemplo.com/tacos',
+        sourceDomain: 'ejemplo.com',
+        tags: ['Cena'],
+        ingredients: [{ name: 'Tortilla', amount: 2, unit: 'ud' }],
+        instructions: [{ step: 1, text: 'Calentar tortilla', timerMinutes: 2 }]
+      };
+      app.activeServings = 2;
+
+      app.renderRecipeModalContent();
+
+      const modalBody = document.getElementById('recipe-modal-body');
+      const img = modalBody.querySelector('.recipe-detail-hero-photo img');
+      expect(img).not.toBeNull();
+      // El atributo alt contiene el texto pero no rompió la etiqueta ni inyectó onerror
+      expect(img.getAttribute('alt')).toBe('Tacos" onerror="alert(\'xss-title\')" x="');
+      expect(modalBody.querySelector('img[onerror*="xss-title"]')).toBeNull();
+      // onerror escapa la comilla simple del id
+      expect(img.getAttribute('onerror')).toContain("x\'onerror=\'alert(1)");
+    });
+
+    it('RecipeParser.parseBulkCollection sanea IDs maliciosos con comillas o scripts', () => {
+      const malicious = {
+        recipes: [
+          {
+            id: "bad'id\");alert(1);//",
+            title: 'Receta Peligrosa',
+            ingredients: ['1 huevo'],
+            instructions: ['Cocer']
+          }
+        ]
+      };
+
+      const result = RecipeParser.parseBulkCollection(malicious);
+      expect(result.candidates.length).toBe(1);
+      // El ID debe haber sido reemplazado por un ID seguro generado
+      expect(result.candidates[0].id).toMatch(/^rec-[a-zA-Z0-9-]+$/);
+      expect(result.candidates[0].id).not.toContain("'");
+    });
+
+    it('renderSingleRecipeCardHtml escapa comillas en rec.id para evitar breakout en onclick', () => {
+      const recipe = {
+        id: "rec-safe-1",
+        title: 'Receta Test',
+        prepTimeMinutes: 10,
+        cookTimeMinutes: 15,
+        imageUrl: '',
+        isFavorite: false
+      };
+
+      const html = app.renderSingleRecipeCardHtml(recipe, false);
+      expect(html).toContain("onclick=\"app.openRecipeDetail('rec-safe-1')\"");
+    });
+
+    it('handleGeminiInvokeSubmit sanea mensajes de error en el banner de fallback para prevenir XSS', async () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <input id="gemini-invoke-input" value="Quiero una receta">
+        <div id="gemini-invoke-transcription"></div>
+        <div id="gemini-invoke-result" style="display: none;"></div>
+        <div id="gemini-invoke-result-text"></div>
+        <div id="gemini-invoke-result-actions"></div>
+        <button id="btn-gemini-invoke-send"></button>
+      `;
+      document.body.appendChild(container);
+
+      app.callGeminiAgent = vi.fn().mockResolvedValue({
+        text: 'Respuesta simulada',
+        toolCalls: [],
+        isSimulatedFallback: true,
+        originalError: '<img src=x onerror=alert("err-xss")>'
+      });
+
+      await app.handleGeminiInvokeSubmit();
+
+      const resultText = document.getElementById('gemini-invoke-result-text');
+      expect(resultText.querySelector('img')).toBeNull();
+      expect(resultText.textContent).toContain('<img src=x onerror=alert("err-xss")>');
+    });
+  });
 });

@@ -74,6 +74,7 @@ Deno.serve(async (req: Request) => {
     const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
     const upstreamRes = await fetch(parsed.toString(), {
+      redirect: 'error',
       signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 FoodAssistant/1.14',

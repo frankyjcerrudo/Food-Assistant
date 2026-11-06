@@ -50,7 +50,7 @@ function Test-IsSafeExternalUrl([string]$urlString) {
 # Reutilizar una única instancia de HttpClient (evita socket exhaustion)
 $handler = [System.Net.Http.HttpClientHandler]::new()
 $handler.AutomaticDecompression = [System.Net.DecompressionMethods]::GZip -bor [System.Net.DecompressionMethods]::Deflate
-$handler.AllowAutoRedirect = $true
+$handler.AllowAutoRedirect = $false
 $httpClient = [System.Net.Http.HttpClient]::new($handler)
 $httpClient.Timeout = [System.TimeSpan]::FromSeconds(12)
 $httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")

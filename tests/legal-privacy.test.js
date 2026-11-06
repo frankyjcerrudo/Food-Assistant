@@ -157,8 +157,8 @@ describe('Fase 3 Google Play: Requisitos Legales y Políticas (US-74 & US-75)', 
         const result = await app.deleteAccountAndData(true);
         expect(result).toBe(true);
         expect(fromMock).toHaveBeenCalledWith('recipes');
-        expect(fromMock).toHaveBeenCalledWith('planner_slots');
-        expect(fromMock).toHaveBeenCalledWith('shopping_list');
+        expect(fromMock).toHaveBeenCalledWith('meal_plans');
+        expect(fromMock).toHaveBeenCalledWith('shopping_items');
         expect(fromMock).toHaveBeenCalledWith('user_settings');
         expect(fromMock).toHaveBeenCalledWith('external_agent_tokens');
         expect(deleteEqMock).toHaveBeenCalledWith('user_id', 'usr-123');
