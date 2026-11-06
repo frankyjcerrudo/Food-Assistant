@@ -187,5 +187,53 @@ describe('US-76: Adaptación Web de Producción para sabory.food', () => {
     it('muestra los pasillos de compra en cuadrícula multi-tarjeta en desktop', () => {
       expect(media900).toMatch(/#shopping-aisles-container\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fill/s);
     });
+
+    it('limita el ancho del widget de macros expandido en desktop a una tarjeta compacta 2x2', () => {
+      expect(media900).toMatch(/\.today-header-macros\.is-expanded\s*\{[\s\S]*?max-width:\s*4[0-9]{2}px/s);
+      expect(media900).toMatch(/\.today-header-macros\.is-expanded\s+\.today-macros-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*1fr\)/s);
+    });
+
+    it('renderTodaySlots genera tarjetas enriquecidas con calorías, macros, tags y acción de ver receta', () => {
+      document.body.innerHTML = `
+        <div id="today-slots-container"></div>
+        <div id="today-nutrition-card"></div>
+        <span id="today-summary-text"></span>
+      `;
+
+      new Function(fs.readFileSync(path.resolve(process.cwd(), 'app.js'), 'utf-8'))();
+      const app = new window.FoodAssistantApp();
+
+      window.state = {
+        recipes: [{
+          id: 'rec-test-1',
+          title: 'Pollo al Curry con Arroz',
+          prepTimeMinutes: 10,
+          cookTimeMinutes: 20,
+          servings: 2,
+          tags: ['Alto en proteína', 'Cena'],
+          ingredients: [{ name: 'Pollo', amount: 200, unit: 'g' }]
+        }],
+        mealPlan: {
+          [window.toLocalDateKey(new Date())]: {
+            breakfast: null,
+            lunch: 'rec-test-1',
+            snack: null,
+            dinner: null,
+            leftoverSlots: {}
+          }
+        },
+        dietaryPreferences: [],
+        settings: { nutritionGoals: { enabled: true, calories: 2000, protein: 120, carbs: 200, fat: 60 } }
+      };
+
+      app.renderTodayView();
+
+      const container = document.getElementById('today-slots-container');
+      expect(container.innerHTML).toContain('today-meal-slot-card');
+      expect(container.innerHTML).toContain('today-meal-desktop-action');
+      expect(container.innerHTML).toContain('today-meal-kcal-badge');
+      expect(container.innerHTML).toContain('today-meal-macro-pill');
+      expect(container.innerHTML).toContain('Ver receta');
+    });
   });
 });

@@ -4273,7 +4273,7 @@ isWrapperDomain(domainOrUrl) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.32';
+  window.APP_VERSION = 'v1.33';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4311,7 +4311,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.32';
+    this.appVersion = window.APP_VERSION || 'v1.33';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -7149,6 +7149,12 @@ class FoodAssistantApp {
       const recipe = state.recipes.find(r => r.id === recId);
 
       if (recipe) {
+        const nut = typeof getRecipeNutrition === 'function' ? getRecipeNutrition(recipe) : null;
+        const calNum = nut ? Math.round(nut.calories) : 0;
+        const protNum = nut ? Math.round(nut.protein) : 0;
+        const firstTag = (Array.isArray(recipe.tags) && recipe.tags.length > 0) ? recipe.tags[0] : '';
+        const totalTime = (Number(recipe.prepTimeMinutes) || 0) + (Number(recipe.cookTimeMinutes) || 0);
+
         const comp = checkDietaryCompliance(recipe, state.dietaryPreferences);
         const warningBadgeHtml = !comp.compliant ? `
           <div class="dietary-warning-badge" title="Incumple preferencias dietéticas: ${comp.violations.join(', ')}">
@@ -7158,8 +7164,8 @@ class FoodAssistantApp {
 
         const safeRecipeId = escapeHtml(recipe.id).replace(/'/g, "\\'");
         return `
-          <div class="meal-slot has-meal" onclick="app.openRecipeDetail('${safeRecipeId}')">
-            <div class="u-flex-between-center">
+          <div class="meal-slot has-meal today-meal-slot-card" onclick="app.openRecipeDetail('${safeRecipeId}')">
+            <div class="u-flex-between-center today-meal-slot-top">
               <span class="slot-label">
                 <span class="material-symbols-outlined icon-sm">${s.icon}</span> ${s.label}
               </span>
@@ -7182,26 +7188,41 @@ class FoodAssistantApp {
                   <img src="${this.getRecipePlaceholderSvg(recipe.title, 'thumb')}" alt="" class="img-cover-full">
                 </div>
               `}
-              <div class="u-flex-1-truncate">
+              <div class="u-flex-1-truncate today-meal-content-col">
                 <div class="slot-recipe-name" title="${recipe.title}">${recipe.title}</div>
                 ${warningBadgeHtml}
                 <div class="today-meal-meta-row">
                   <span class="u-inline-flex-gap-3">
-                    <span class="material-symbols-outlined icon-sm">schedule</span> ${recipe.prepTimeMinutes + recipe.cookTimeMinutes} min
+                    <span class="material-symbols-outlined icon-sm">schedule</span> ${totalTime} min
                   </span>
                   ${recipe.servings ? `
                     <span class="u-inline-flex-gap-3">
                       <span class="material-symbols-outlined icon-sm">group</span> ${recipe.servings} p.
                     </span>
                   ` : ''}
+                  ${calNum > 0 ? `
+                    <span class="today-meal-kcal-badge">
+                      <span class="material-symbols-outlined icon-sm">local_fire_department</span> ${calNum} kcal
+                    </span>
+                  ` : ''}
                 </div>
+                ${(protNum > 0 || firstTag) ? `
+                  <div class="today-meal-pills-row">
+                    ${protNum > 0 ? `<span class="today-meal-macro-pill">${protNum}g proteína</span>` : ''}
+                    ${firstTag ? `<span class="today-meal-tag-pill">${escapeHtml(firstTag)}</span>` : ''}
+                  </div>
+                ` : ''}
               </div>
+            </div>
+            <div class="today-meal-desktop-action">
+              <span>Ver receta</span>
+              <span class="material-symbols-outlined icon-14">arrow_forward</span>
             </div>
           </div>
         `;
       } else {
         return `
-          <div class="meal-slot" onclick="app.openPickerModal('${todayStr}', '${s.key}')">
+          <div class="meal-slot today-meal-slot-empty" onclick="app.openPickerModal('${todayStr}', '${s.key}')">
             <span class="slot-label">
               <span class="material-symbols-outlined icon-sm">${s.icon}</span> ${s.label}
             </span>
