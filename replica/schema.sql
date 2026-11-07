@@ -24,7 +24,26 @@ create table if not exists public.recipes (
   primary key (user_id, id)
 );
 
--- Si la tabla ya existía con clave primaria simple, aplicar migraciones idempotentes:
+-- Si la tabla ya existía con clave primaria simple (id), migrar idempotentemente a clave compuesta (user_id, id) (BUG-22):
+do $$
+declare
+  pk_name text;
+begin
+  select con.conname into pk_name
+  from pg_constraint con
+  join pg_class rel on rel.oid = con.conrelid
+  join pg_namespace nsp on nsp.oid = rel.relnamespace
+  where nsp.nspname = 'public'
+    and rel.relname = 'recipes'
+    and con.contype = 'p'
+    and array_length(con.conkey, 1) = 1;
+
+  if pk_name is not null then
+    execute format('alter table public.recipes drop constraint %I', pk_name);
+    alter table public.recipes add primary key (user_id, id);
+  end if;
+end $$;
+
 alter table public.recipes add column if not exists source_url text default '';
 alter table public.recipes add column if not exists source_domain text default '';
 alter table public.recipes add column if not exists nutrition jsonb default null;
@@ -46,6 +65,25 @@ create table if not exists public.meal_plans (
 );
 
 -- Migraciones idempotentes para meal_plans:
+do $$
+declare
+  pk_name text;
+begin
+  select con.conname into pk_name
+  from pg_constraint con
+  join pg_class rel on rel.oid = con.conrelid
+  join pg_namespace nsp on nsp.oid = rel.relnamespace
+  where nsp.nspname = 'public'
+    and rel.relname = 'meal_plans'
+    and con.contype = 'p'
+    and array_length(con.conkey, 1) = 1;
+
+  if pk_name is not null then
+    execute format('alter table public.meal_plans drop constraint %I', pk_name);
+    alter table public.meal_plans add primary key (user_id, id);
+  end if;
+end $$;
+
 alter table public.meal_plans add column if not exists breakfast_recipe_id text;
 alter table public.meal_plans add column if not exists snack_recipe_id text;
 alter table public.meal_plans add column if not exists custom_slots jsonb not null default '[]'::jsonb;
@@ -67,6 +105,25 @@ create table if not exists public.shopping_items (
 );
 
 -- Migraciones idempotentes para shopping_items:
+do $$
+declare
+  pk_name text;
+begin
+  select con.conname into pk_name
+  from pg_constraint con
+  join pg_class rel on rel.oid = con.conrelid
+  join pg_namespace nsp on nsp.oid = rel.relnamespace
+  where nsp.nspname = 'public'
+    and rel.relname = 'shopping_items'
+    and con.contype = 'p'
+    and array_length(con.conkey, 1) = 1;
+
+  if pk_name is not null then
+    execute format('alter table public.shopping_items drop constraint %I', pk_name);
+    alter table public.shopping_items add primary key (user_id, id);
+  end if;
+end $$;
+
 alter table public.shopping_items add column if not exists updated_at timestamptz not null default now();
 
 -- 4. SEGURIDAD RLS (Row Level Security)
@@ -177,6 +234,47 @@ alter table public.meal_plans add column if not exists household_id uuid referen
 alter table public.shopping_items add column if not exists household_id uuid references public.households(id) on delete set null;
 alter table public.user_settings add column if not exists active_household_id uuid references public.households(id) on delete set null;
 
+-- Asegurar clave primaria compuesta (user_id, id) en recipes, meal_plans y shopping_items para multi-usuario
+do $$
+declare
+  pk_name text;
+begin
+  -- 1. recipes
+  select con.conname into pk_name
+  from pg_constraint con
+  join pg_class rel on rel.oid = con.conrelid
+  join pg_namespace nsp on nsp.oid = rel.relnamespace
+  where nsp.nspname = 'public' and rel.relname = 'recipes' and con.contype = 'p' and array_length(con.conkey, 1) = 1;
+  if pk_name is not null then
+    execute format('alter table public.recipes drop constraint %I', pk_name);
+    alter table public.recipes add primary key (user_id, id);
+  end if;
+
+  -- 2. meal_plans
+  pk_name := null;
+  select con.conname into pk_name
+  from pg_constraint con
+  join pg_class rel on rel.oid = con.conrelid
+  join pg_namespace nsp on nsp.oid = rel.relnamespace
+  where nsp.nspname = 'public' and rel.relname = 'meal_plans' and con.contype = 'p' and array_length(con.conkey, 1) = 1;
+  if pk_name is not null then
+    execute format('alter table public.meal_plans drop constraint %I', pk_name);
+    alter table public.meal_plans add primary key (user_id, id);
+  end if;
+
+  -- 3. shopping_items
+  pk_name := null;
+  select con.conname into pk_name
+  from pg_constraint con
+  join pg_class rel on rel.oid = con.conrelid
+  join pg_namespace nsp on nsp.oid = rel.relnamespace
+  where nsp.nspname = 'public' and rel.relname = 'shopping_items' and con.contype = 'p' and array_length(con.conkey, 1) = 1;
+  if pk_name is not null then
+    execute format('alter table public.shopping_items drop constraint %I', pk_name);
+    alter table public.shopping_items add primary key (user_id, id);
+  end if;
+end $$;
+
 create index if not exists recipes_household_id_idx on public.recipes (household_id) where household_id is not null;
 create index if not exists meal_plans_household_id_idx on public.meal_plans (household_id) where household_id is not null;
 create index if not exists shopping_items_household_id_idx on public.shopping_items (household_id) where household_id is not null;
@@ -211,7 +309,8 @@ create policy "Households insert policy" on public.households
 
 drop policy if exists "Households update policy" on public.households;
 create policy "Households update policy" on public.households
-  for update using (auth.uid() = owner_id or public.is_household_member(id));
+  for update using (auth.uid() = owner_id or public.is_household_member(id))
+  with check (auth.uid() = owner_id or public.is_household_member(id));
 
 drop policy if exists "Households delete policy" on public.households;
 create policy "Households delete policy" on public.households
@@ -228,7 +327,8 @@ create policy "Household members insert policy" on public.household_members
 
 drop policy if exists "Household members update policy" on public.household_members;
 create policy "Household members update policy" on public.household_members
-  for update using (auth.uid() = user_id or public.is_household_member(household_id));
+  for update using (auth.uid() = user_id or public.is_household_member(household_id))
+  with check (auth.uid() = user_id or public.is_household_member(household_id));
 
 drop policy if exists "Household members delete policy" on public.household_members;
 create policy "Household members delete policy" on public.household_members
@@ -245,7 +345,8 @@ create policy "Users own recipes insert" on public.recipes
 
 drop policy if exists "Users own recipes update" on public.recipes;
 create policy "Users own recipes update" on public.recipes
-  for update using (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)));
+  for update using (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)))
+  with check (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)));
 
 drop policy if exists "Users own recipes delete" on public.recipes;
 create policy "Users own recipes delete" on public.recipes
@@ -261,7 +362,8 @@ create policy "Users own meal_plans insert" on public.meal_plans
 
 drop policy if exists "Users own meal_plans update" on public.meal_plans;
 create policy "Users own meal_plans update" on public.meal_plans
-  for update using (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)));
+  for update using (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)))
+  with check (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)));
 
 drop policy if exists "Users own meal_plans delete" on public.meal_plans;
 create policy "Users own meal_plans delete" on public.meal_plans
@@ -277,9 +379,13 @@ create policy "Users own shopping insert" on public.shopping_items
 
 drop policy if exists "Users own shopping update" on public.shopping_items;
 create policy "Users own shopping update" on public.shopping_items
-  for update using (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)));
+  for update using (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)))
+  with check (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)));
 
 drop policy if exists "Users own shopping delete" on public.shopping_items;
 create policy "Users own shopping delete" on public.shopping_items
   for delete using (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)));
+
+-- Recargar caché de esquema de PostgREST / Supabase API
+notify pgrst, 'reload schema';
 

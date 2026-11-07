@@ -4463,7 +4463,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.45';
+  window.APP_VERSION = 'v1.46';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4504,7 +4504,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.45';
+    this.appVersion = window.APP_VERSION || 'v1.46';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5774,6 +5774,14 @@ class FoodAssistantApp {
                 local.tags = remoteRecipe.tags;
                 updated = true;
               }
+              if (remoteRecipe.ownerUserId && !local.ownerUserId) {
+                local.ownerUserId = remoteRecipe.ownerUserId;
+                updated = true;
+              }
+              if (remoteRecipe.householdId && !local.householdId) {
+                local.householdId = remoteRecipe.householdId;
+                updated = true;
+              }
               if (updated) {
                 stateChanged = true;
               }
@@ -5781,6 +5789,14 @@ class FoodAssistantApp {
               // Si local es más nuevo pero carece de nutrición y remota sí la tiene, recuperarla
               if (!localHasNutrition && remoteHasNutrition) {
                 local.nutrition = remoteRecipe.nutrition;
+                stateChanged = true;
+              }
+              if (remoteRecipe.ownerUserId && !local.ownerUserId) {
+                local.ownerUserId = remoteRecipe.ownerUserId;
+                stateChanged = true;
+              }
+              if (remoteRecipe.householdId && !local.householdId) {
+                local.householdId = remoteRecipe.householdId;
                 stateChanged = true;
               }
             }
@@ -6158,6 +6174,20 @@ class FoodAssistantApp {
         const jitterMs = 250 + Math.floor(Math.random() * 350);
         await new Promise(resolve => setTimeout(resolve, jitterMs));
         continue;
+      }
+
+      // Fallback 4: RLS violation on collaborative or legacy single-PK tables
+      if (error.code === '42501' || (error.message && error.message.toLowerCase().includes('row-level security policy'))) {
+        if (table !== 'user_settings' && this.preferredConflictTargets[table] === 'id') {
+          this.preferredConflictTargets[table] = 'user_id,id';
+        }
+        const currentUserId = state.cloudUser?.id;
+        if (currentUserId && currentPayload.some(row => row.user_id && row.user_id !== currentUserId)) {
+          console.warn(`[Sync] RLS en '${table}' sobre filas de otro propietario; reintentando bajo el usuario activo...`);
+          currentPayload = currentPayload.map(row => ({ ...row, user_id: currentUserId }));
+          conflict = table === 'user_settings' ? 'user_id' : 'user_id,id';
+          continue;
+        }
       }
 
       // Unrecoverable error (e.g. auth / RLS / network)
