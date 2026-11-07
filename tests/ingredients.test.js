@@ -281,6 +281,76 @@ describe('US-20: Autocompletado Inteligente de Ingredientes e Iconos Distintivos
       expect(container.textContent).toContain('TORTILLA DE ESPINACAS');
     });
 
+    it('reconcileShoppingItemBreakdown reensambla recetas con comas en el título y no deja unidades flotantes', () => {
+      window.state.recipes = [
+        {
+          id: 'rec-arroz',
+          title: 'Arroz con sepia, shiitake y romero, una receta de arroz en paella para disfrutar en familia',
+          ingredients: [{ name: 'Setas shiitake', amount: 2, unit: 'ud', aisle: 'produce' }]
+        },
+        {
+          id: 'rec-pollo',
+          title: 'Pechuga de pollo al Ras-el-Hanout con calabacín, salsa de yogur y arroz aderezado',
+          ingredients: [{ name: 'Yogur griego', amount: 1, unit: 'ud', aisle: 'dairy' }]
+        },
+        {
+          id: 'rec-merluza',
+          title: 'Merluza al estilo tandoori con verduras asadas a la cúrcuma y salsa de yogur',
+          ingredients: [{ name: 'Yogur griego', amount: 0.5, unit: 'ud', aisle: 'dairy' }]
+        }
+      ];
+
+      window.state.shoppingList = [
+        {
+          id: 'item-shiitake',
+          name: 'Setas shiitake',
+          amount: null,
+          unit: 'ud',
+          displayAmount: 'ud',
+          aisle: 'produce',
+          isChecked: false,
+          recipeOrigin: 'Arroz con sepia, shiitake y romero, una receta de arroz en paella para disfrutar en familia',
+          recipeBreakdown: [
+            { recipe: 'Arroz con sepia', name: 'Setas shiitake', amount: null, unit: 'ud' },
+            { recipe: 'shiitake y romero', name: 'Setas shiitake', amount: null, unit: 'ud' },
+            { recipe: 'una receta de arroz en paella para disfrutar en familia', name: 'Setas shiitake', amount: null, unit: 'ud' }
+          ]
+        },
+        {
+          id: 'item-yogur',
+          name: 'Yogur griego',
+          amount: null,
+          unit: 'ud',
+          displayAmount: 'ud',
+          aisle: 'dairy',
+          isChecked: false,
+          recipeOrigin: 'Pechuga de pollo al Ras-el-Hanout con calabacín, salsa de yogur y arroz aderezado, Merluza al estilo tandoori con verduras asadas a la cúrcuma y salsa de yogur',
+          recipeBreakdown: [
+            { recipe: 'Pechuga de pollo al Ras-el-Hanout con calabacín', name: 'Yogur griego', amount: null, unit: 'ud' },
+            { recipe: 'salsa de yogur y arroz aderezado', name: 'Yogur griego', amount: null, unit: 'ud' },
+            { recipe: 'Merluza al estilo tandoori con verduras asadas a la cúrcuma y salsa de yogur', name: 'Yogur griego', amount: null, unit: 'ud' }
+          ]
+        }
+      ];
+
+      appInstance.renderShoppingList();
+
+      const container = document.getElementById('shopping-aisles-container');
+
+      // Setas shiitake debe curarse a 1 sola receta sin viñetas fragmentadas
+      expect(container.textContent).toContain('Para: Arroz con sepia, shiitake y romero, una receta de arroz en paella para disfrutar en familia');
+      expect(container.textContent).toContain('2 ud');
+
+      // Yogur griego debe tener exactamente 2 filas de desglose (una por receta) con 1.5 ud
+      const yogurCard = Array.from(container.querySelectorAll('.grocery-item-row')).find(r => r.textContent.includes('Yogur griego'));
+      expect(yogurCard).toBeDefined();
+      const yogurRows = yogurCard.querySelectorAll('.grocery-breakdown-row');
+      expect(yogurRows.length).toBe(2);
+      expect(yogurRows[0].textContent).toContain('Pechuga de pollo al Ras-el-Hanout con calabacín, salsa de yogur y arroz aderezado');
+      expect(yogurRows[1].textContent).toContain('Merluza al estilo tandoori con verduras asadas a la cúrcuma y salsa de yogur');
+      expect(yogurCard.querySelector('.grocery-amount').textContent).toBe('1.5 ud');
+    });
+
     it('addIngredientRow clasifica automáticamente el pasillo en el formulario de recetas al escribir', () => {
       appInstance.addIngredientRow();
 

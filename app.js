@@ -1161,6 +1161,117 @@ function recalculateShoppingItemQuantities(item) {
   }
 }
 
+function formatDisplayAmount(amt, unit, displayAmt) {
+  if (displayAmt && typeof displayAmt === 'string') {
+    const trimmed = displayAmt.trim();
+    if (/^(ud|uds|unidad|unidades|g|gr|kg|ml|l|sobre|sobres)$/i.test(trimmed)) {
+      return '';
+    }
+    return trimmed;
+  }
+  if (amt !== null && amt !== undefined && !isNaN(Number(amt))) {
+    return `${amt} ${unit || ''}`.trim();
+  }
+  if (unit && typeof unit === 'string') {
+    const trimmedU = unit.trim();
+    if (!/^(ud|uds|unidad|unidades|g|gr|kg|ml|l|sobre|sobres)$/i.test(trimmedU)) {
+      return trimmedU;
+    }
+  }
+  return '';
+}
+
+function reconcileShoppingItemBreakdown(item, recipes = []) {
+  if (!item) return item;
+  const knownRecipes = Array.isArray(recipes) ? recipes : [];
+  const knownTitles = knownRecipes.map(r => (r && r.title ? r.title.trim() : '')).filter(Boolean);
+  if (knownTitles.length === 0) return item;
+
+  let currentPieces = [];
+  if (Array.isArray(item.recipeBreakdown) && item.recipeBreakdown.length > 0) {
+    currentPieces = item.recipeBreakdown.map(b => (b && b.recipe ? String(b.recipe).trim() : '')).filter(Boolean);
+  } else if (item.recipeOrigin) {
+    currentPieces = parseRecipeOrigins(item.recipeOrigin, knownRecipes);
+  }
+
+  if (currentPieces.length === 0) return item;
+
+  const healedRecipes = [];
+  let buffer = '';
+
+  for (let i = 0; i < currentPieces.length; i++) {
+    const piece = currentPieces[i];
+    const candidate = buffer ? `${buffer}, ${piece}` : piece;
+    const candidateLower = candidate.toLowerCase();
+
+    const isExact = knownTitles.some(t => t.toLowerCase() === candidateLower);
+    const isPrefix = knownTitles.some(t => t.toLowerCase().startsWith(`${candidateLower},`));
+
+    if (isPrefix && i < currentPieces.length - 1) {
+      buffer = candidate;
+    } else {
+      healedRecipes.push(candidate);
+      buffer = '';
+    }
+  }
+  if (buffer) {
+    healedRecipes.push(buffer);
+  }
+
+  // Si no hubo fractura y ya tiene breakdown válido, no tocar nada
+  const hadBreakdown = Array.isArray(item.recipeBreakdown) && item.recipeBreakdown.length > 0;
+  if (hadBreakdown && healedRecipes.length === currentPieces.length) {
+    return item;
+  }
+
+  // Si no tenía breakdown pero solo hay 1 receta (o ninguna fractura), inicializar breakdown simple
+  if (!hadBreakdown && healedRecipes.length <= 1) {
+    item.recipeOrigin = healedRecipes[0] || item.recipeOrigin;
+    return item;
+  }
+
+  const newBreakdown = [];
+  healedRecipes.forEach(recTitle => {
+    const matchedRecipe = knownRecipes.find(r => r && r.title && r.title.trim().toLowerCase() === recTitle.trim().toLowerCase());
+    let ingName = item.name;
+    let ingAmount = item.amount !== null && item.amount !== undefined ? item.amount : null;
+    let ingUnit = item.unit || '';
+
+    if (matchedRecipe && Array.isArray(matchedRecipe.ingredients)) {
+      const targetKey = getCanonicalIngredientKey(item.name);
+      const foundIng = matchedRecipe.ingredients.find(ing => ing && getCanonicalIngredientKey(ing.name) === targetKey);
+      if (foundIng) {
+        ingName = foundIng.name || item.name;
+        ingAmount = (foundIng.amount !== null && foundIng.amount !== undefined && !isNaN(Number(foundIng.amount))) ? Number(foundIng.amount) : null;
+        ingUnit = foundIng.unit || ingUnit;
+      }
+    }
+
+    if (Array.isArray(item.recipeBreakdown)) {
+      const prevB = item.recipeBreakdown.find(b => b.recipe && b.recipe.trim().toLowerCase() === recTitle.trim().toLowerCase());
+      if (prevB && prevB.amount !== null && prevB.amount !== undefined) {
+        ingAmount = prevB.amount;
+        ingUnit = prevB.unit || ingUnit;
+        if (prevB.name) ingName = prevB.name;
+      }
+    }
+
+    newBreakdown.push({
+      recipe: recTitle,
+      name: ingName,
+      amount: ingAmount,
+      unit: ingUnit
+    });
+  });
+
+  item.recipeBreakdown = newBreakdown;
+  item.recipeOrigin = healedRecipes.join(', ');
+
+  recalculateShoppingItemQuantities(item);
+
+  return item;
+}
+
 function mergeOrAddShoppingItem(shoppingList, newItem) {
   if (!Array.isArray(shoppingList) || !newItem || !newItem.name) return null;
   const targetKey = getCanonicalIngredientKey(newItem.name);
@@ -2077,17 +2188,11 @@ class StateStore {
           item.id = generateId('shop-');
           migrated = true;
         }
-        if ((!Array.isArray(item.recipeBreakdown) || item.recipeBreakdown.length <= 1) && item.recipeOrigin && item.recipeOrigin.includes(',')) {
-          const parts = parseRecipeOrigins(item.recipeOrigin, this.recipes || []);
-          if (parts.length > 1) {
-            item.recipeBreakdown = parts.map(p => ({
-              recipe: p,
-              name: item.name,
-              amount: null,
-              unit: item.unit || ''
-            }));
-            migrated = true;
-          }
+        const prevOrigin = item.recipeOrigin;
+        const prevLen = Array.isArray(item.recipeBreakdown) ? item.recipeBreakdown.length : 0;
+        reconcileShoppingItemBreakdown(item, this.recipes || []);
+        if (item.recipeOrigin !== prevOrigin || (Array.isArray(item.recipeBreakdown) ? item.recipeBreakdown.length : 0) !== prevLen) {
+          migrated = true;
         }
       });
       if (migrated) this.save('fa_shopping', this.shoppingList);
@@ -4331,7 +4436,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.41';
+  window.APP_VERSION = 'v1.42';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4365,12 +4470,14 @@ if (typeof window !== 'undefined') {
   window.getRecipeNutrition = getRecipeNutrition;
   window.getPrimaryProteinCategory = getPrimaryProteinCategory;
   window.parseRecipeOrigins = parseRecipeOrigins;
+  window.reconcileShoppingItemBreakdown = reconcileShoppingItemBreakdown;
+  window.formatDisplayAmount = formatDisplayAmount;
 }
 
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.41';
+    this.appVersion = window.APP_VERSION || 'v1.42';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5686,6 +5793,7 @@ class FoodAssistantApp {
             recipeBreakdown: breakdown,
             updatedAt: remoteRow.updated_at
           };
+          reconcileShoppingItemBreakdown(remoteItem, state.recipes || []);
 
           if (localIdx >= 0) {
             const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
@@ -10889,6 +10997,21 @@ class FoodAssistantApp {
     const container = document.getElementById('shopping-aisles-container');
     if (!container) return;
 
+    if (state.shoppingList && state.recipes && state.recipes.length > 0) {
+      let listHealed = false;
+      state.shoppingList.forEach(item => {
+        const prevOrigin = item.recipeOrigin;
+        const prevLen = Array.isArray(item.recipeBreakdown) ? item.recipeBreakdown.length : 0;
+        reconcileShoppingItemBreakdown(item, state.recipes);
+        if (item.recipeOrigin !== prevOrigin || (Array.isArray(item.recipeBreakdown) ? item.recipeBreakdown.length : 0) !== prevLen) {
+          listHealed = true;
+        }
+      });
+      if (listHealed) {
+        state.save('fa_shopping', state.shoppingList);
+      }
+    }
+
     const btnAisle = document.getElementById('btn-shopping-view-aisle');
     const btnRecipe = document.getElementById('btn-shopping-view-recipe');
     const isRecipeView = this.shoppingViewMode === 'recipe';
@@ -10973,7 +11096,7 @@ class FoodAssistantApp {
               ${items.map(item => {
                 const aisleMeta = AISLE_METADATA[item.aisle || 'other'] || AISLE_METADATA.other;
                 const displayName = item.recipeSpecificName || item.name;
-                const displayAmt = item.recipeSpecificAmount || item.displayAmount || (item.amount ? `${item.amount} ${item.unit || ''}`.trim() : (item.unit || ''));
+                const displayAmt = formatDisplayAmount(item.amount, item.unit, item.recipeSpecificAmount || item.displayAmount);
                 return `
                   <div class="grocery-item-row ${item.isChecked ? 'checked' : ''}">
                     <div class="grocery-left" onclick="app.toggleGroceryCheck(${item.originalIndex})">
@@ -11027,7 +11150,7 @@ class FoodAssistantApp {
 
           <div>
             ${items.map(item => {
-              const displayAmt = item.displayAmount || (item.amount ? `${item.amount} ${item.unit || ''}`.trim() : (item.unit || ''));
+              const displayAmt = formatDisplayAmount(item.amount, item.unit, item.displayAmount);
               let subtextHtml = '';
               let breakdown = Array.isArray(item.recipeBreakdown) && item.recipeBreakdown.length > 0 ? item.recipeBreakdown : null;
 
