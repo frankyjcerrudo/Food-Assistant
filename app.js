@@ -2069,13 +2069,25 @@ class StateStore {
     }
 
     this.shoppingList = this.load('fa_shopping', []);
-    // US-45 & BUG-23: Migración transparente para asegurar que todo artículo tenga id
+    // US-45 & BUG-23 & US-33: Migración transparente para asegurar que todo artículo tenga id y desglose
     if (Array.isArray(this.shoppingList)) {
       let migrated = false;
       this.shoppingList.forEach(item => {
         if (!item.id) {
           item.id = generateId('shop-');
           migrated = true;
+        }
+        if ((!Array.isArray(item.recipeBreakdown) || item.recipeBreakdown.length <= 1) && item.recipeOrigin && item.recipeOrigin.includes(',')) {
+          const parts = item.recipeOrigin.split(',').map(s => s.trim()).filter(Boolean);
+          if (parts.length > 1) {
+            item.recipeBreakdown = parts.map(p => ({
+              recipe: p,
+              name: item.name,
+              amount: null,
+              unit: item.unit || ''
+            }));
+            migrated = true;
+          }
         }
       });
       if (migrated) this.save('fa_shopping', this.shoppingList);
@@ -4273,7 +4285,7 @@ isWrapperDomain(domainOrUrl) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.38';
+  window.APP_VERSION = 'v1.39';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4311,7 +4323,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.38';
+    this.appVersion = window.APP_VERSION || 'v1.39';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5591,6 +5603,31 @@ class FoodAssistantApp {
           if (state.deletedRecords.shoppingItems?.includes(remoteRow.id)) return;
 
           const localIdx = state.shoppingList.findIndex(i => i.id === remoteRow.id);
+          const local = localIdx >= 0 ? state.shoppingList[localIdx] : null;
+
+          let breakdown = null;
+          if (Array.isArray(remoteRow.recipe_breakdown)) {
+            breakdown = remoteRow.recipe_breakdown;
+          } else if (typeof remoteRow.recipe_breakdown === 'string') {
+            try { breakdown = JSON.parse(remoteRow.recipe_breakdown); } catch (e) {}
+          }
+
+          if (!breakdown && local && Array.isArray(local.recipeBreakdown) && local.recipeBreakdown.length > 0) {
+            breakdown = local.recipeBreakdown;
+          }
+
+          if (!breakdown && remoteRow.recipe_origin && remoteRow.recipe_origin.includes(',')) {
+            const parts = remoteRow.recipe_origin.split(',').map(s => s.trim()).filter(Boolean);
+            if (parts.length > 1) {
+              breakdown = parts.map(p => ({
+                recipe: p,
+                name: remoteRow.name,
+                amount: null,
+                unit: remoteRow.unit || ''
+              }));
+            }
+          }
+
           const remoteItem = {
             id: remoteRow.id,
             name: remoteRow.name,
@@ -5599,11 +5636,11 @@ class FoodAssistantApp {
             aisle: remoteRow.aisle || 'other',
             isChecked: !!remoteRow.is_checked,
             recipeOrigin: remoteRow.recipe_origin || '',
+            recipeBreakdown: breakdown,
             updatedAt: remoteRow.updated_at
           };
 
           if (localIdx >= 0) {
-            const local = state.shoppingList[localIdx];
             const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
             const localDate = new Date(local.updatedAt || 0).getTime();
             if (remoteDate >= localDate) {
@@ -6045,6 +6082,7 @@ class FoodAssistantApp {
             aisle: item.aisle || 'other',
             is_checked: !!item.isChecked,
             recipe_origin: item.recipeOrigin || null,
+            recipe_breakdown: Array.isArray(item.recipeBreakdown) && item.recipeBreakdown.length > 0 ? item.recipeBreakdown : null,
             updated_at: item.updatedAt || new Date().toISOString()
           };
         });
@@ -10912,30 +10950,53 @@ class FoodAssistantApp {
             ${items.map(item => {
               const displayAmt = item.displayAmount || (item.amount ? `${item.amount} ${item.unit || ''}`.trim() : (item.unit || ''));
               let subtextHtml = '';
-              if (Array.isArray(item.recipeBreakdown) && item.recipeBreakdown.length > 0) {
-                if (item.recipeBreakdown.length === 1) {
-                  const b = item.recipeBreakdown[0];
-                  const nameDiff = b.name && b.name.toLowerCase().trim() !== item.name.toLowerCase().trim() ? ` (como "${escapeHtml(b.name)}")` : '';
-                  subtextHtml = `<div class="grocery-origin-sub">Para: ${escapeHtml(b.recipe)}${nameDiff}</div>`;
-                } else {
-                  subtextHtml = `
-                    <div class="grocery-breakdown-list">
-                      ${item.recipeBreakdown.map(b => {
-                        const qtyStr = (b.amount !== null && b.amount !== undefined) ? `${b.amount} ${b.unit || ''}`.trim() : (b.unit || '');
-                        const nameDiff = b.name && b.name.toLowerCase().trim() !== item.name.toLowerCase().trim() ? ` (${escapeHtml(b.name)})` : '';
-                        return `
-                          <div class="grocery-breakdown-row" title="${escapeHtml(b.recipe)}">
-                            <span class="grocery-breakdown-dot">•</span>
-                            <div class="grocery-breakdown-body">
-                              <span class="grocery-breakdown-recipe">${escapeHtml(b.recipe)}:</span>
-                              <span class="grocery-breakdown-qty">${escapeHtml(qtyStr)}${nameDiff}</span>
-                            </div>
-                          </div>
-                        `;
-                      }).join('')}
-                    </div>
-                  `;
+              let breakdown = Array.isArray(item.recipeBreakdown) && item.recipeBreakdown.length > 0 ? item.recipeBreakdown : null;
+
+              // Reconstruir desglose si no está en memoria pero recipeOrigin contiene múltiples recetas separadas por coma
+              if (!breakdown && item.recipeOrigin && item.recipeOrigin.includes(',')) {
+                const parts = item.recipeOrigin.split(',').map(s => s.trim()).filter(Boolean);
+                if (parts.length > 1) {
+                  breakdown = parts.map(p => ({
+                    recipe: p,
+                    name: item.name,
+                    amount: null,
+                    unit: item.unit || ''
+                  }));
                 }
+              } else if (breakdown && breakdown.length === 1 && breakdown[0].recipe && breakdown[0].recipe.includes(',')) {
+                const parts = breakdown[0].recipe.split(',').map(s => s.trim()).filter(Boolean);
+                if (parts.length > 1) {
+                  breakdown = parts.map(p => ({
+                    recipe: p,
+                    name: breakdown[0].name || item.name,
+                    amount: null,
+                    unit: item.unit || ''
+                  }));
+                }
+              }
+
+              if (breakdown && breakdown.length > 1) {
+                subtextHtml = `
+                  <div class="grocery-breakdown-list">
+                    ${breakdown.map(b => {
+                      const qtyStr = (b.amount !== null && b.amount !== undefined) ? `${b.amount} ${b.unit || ''}`.trim() : '';
+                      const nameDiff = b.name && b.name.toLowerCase().trim() !== item.name.toLowerCase().trim() ? ` (${escapeHtml(b.name)})` : '';
+                      return `
+                        <div class="grocery-breakdown-row" title="${escapeHtml(b.recipe)}">
+                          <span class="grocery-breakdown-dot">•</span>
+                          <div class="grocery-breakdown-body">
+                            <span class="grocery-breakdown-recipe">${escapeHtml(b.recipe)}${qtyStr ? ':' : ''}</span>
+                            ${qtyStr ? `<span class="grocery-breakdown-qty">${escapeHtml(qtyStr)}${nameDiff}</span>` : (nameDiff ? `<span class="grocery-breakdown-qty">${nameDiff}</span>` : '')}
+                          </div>
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                `;
+              } else if (breakdown && breakdown.length === 1) {
+                const b = breakdown[0];
+                const nameDiff = b.name && b.name.toLowerCase().trim() !== item.name.toLowerCase().trim() ? ` (como "${escapeHtml(b.name)}")` : '';
+                subtextHtml = `<div class="grocery-origin-sub">Para: ${escapeHtml(b.recipe)}${nameDiff}</div>`;
               } else if (item.recipeOrigin) {
                 subtextHtml = `<div class="grocery-origin-sub">Para: ${escapeHtml(item.recipeOrigin)}</div>`;
               }

@@ -259,6 +259,28 @@ describe('US-20: Autocompletado Inteligente de Ingredientes e Iconos Distintivos
       expect(body.querySelector('.grocery-breakdown-qty').textContent).toContain('4 ud');
     });
 
+    it('renderShoppingList muestra todas las recetas asignadas aunque recipeBreakdown provenga solo de recipeOrigin sincronizado', () => {
+      window.state.shoppingList = [
+        {
+          id: 'item-sync-eggs',
+          name: 'Huevos',
+          amount: 8,
+          unit: 'ud',
+          aisle: 'dairy',
+          isChecked: false,
+          recipeOrigin: 'Tostadas con Revuelto de Huevo y Queso Fresco, TORTILLA DE ESPINACAS'
+        }
+      ];
+
+      appInstance.renderShoppingList();
+
+      const container = document.getElementById('shopping-aisles-container');
+      const breakdownRows = container.querySelectorAll('.grocery-breakdown-row');
+      expect(breakdownRows.length).toBe(2);
+      expect(container.textContent).toContain('Tostadas con Revuelto de Huevo y Queso Fresco');
+      expect(container.textContent).toContain('TORTILLA DE ESPINACAS');
+    });
+
     it('addIngredientRow clasifica automáticamente el pasillo en el formulario de recetas al escribir', () => {
       appInstance.addIngredientRow();
 

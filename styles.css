@@ -1752,8 +1752,13 @@ textarea {
   border: var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: var(--space-2);
-  margin-bottom: var(--space-2);
+  margin-bottom: 16px;
   box-shadow: var(--elevation-1);
+  break-inside: avoid;
+  page-break-inside: avoid;
+  display: inline-block;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .aisle-header {
@@ -5072,9 +5077,9 @@ h2,
 .grocery-origin-sub {
   font-size: 11px;
   color: var(--m3-on-surface-variant);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  word-break: break-word;
+  margin-top: 2px;
 }
 
 .u-flex-center-gap-8-shrink {
@@ -6855,12 +6860,11 @@ h2,
     gap: 20px;
   }
 
-  /* Lista de la compra por pasillos en cuadrícula de tarjetas */
+  /* Lista de la compra por pasillos en columnas fluidas (masonry sin huecos vacíos) */
   #shopping-aisles-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 16px;
-    align-items: start;
+    display: block;
+    column-width: 340px;
+    column-gap: 16px;
   }
 
   .pwa-smart-banner {
