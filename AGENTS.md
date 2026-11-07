@@ -11,3 +11,7 @@
 
 3. **Trato y Comunicación con el Usuario**:
    - En cada respuesta o mensaje que el agente escriba, debe dirigirse siempre al usuario por su nombre: **Franky**.
+
+4. **Explicación y Aprobación Previa antes de Actuar**:
+   - Ante cualquier error reportado, ajuste o nueva tarea, el agente **nunca debe modificar archivos ni hacer commit/push directamente**.
+   - Primero debe analizar qué ocurre, explicar claramente a **Franky** cuál es la causa y qué solución o cambios propone hacer, y **esperar su confirmación explícita** antes de tocar código o ejecutar cambios.
