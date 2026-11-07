@@ -185,7 +185,7 @@ describe('US-76: Adaptación Web de Producción para sabory.food', () => {
     });
 
     it('muestra los pasillos de compra en columnas multi-tarjeta masonry sin huecos en desktop', () => {
-      expect(media900).toMatch(/#shopping-aisles-container\s*\{[^}]*(column-width:\s*\d+px|grid-template-columns:\s*repeat\(auto-fill)/s);
+      expect(media900).toMatch(/#shopping-aisles-container\s*\{[^}]*(column-count:\s*\d+|column-width:\s*\d+px|grid-template-columns:\s*repeat\(auto-fill)/s);
     });
 
     it('estila el widget de macros en desktop ocupando todo el ancho disponible con cero layout shift en las recetas', () => {
