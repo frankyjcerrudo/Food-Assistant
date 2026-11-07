@@ -764,7 +764,7 @@ textarea {
   color: var(--m3-on-surface-variant);
 }
 
-/* Filter Chips */
+/* Filter Chips (BUG-28: Scroll horizontal y navegación en escritorio) */
 .chips-scroll-container {
   display: flex;
   gap: 8px;
@@ -772,6 +772,14 @@ textarea {
   padding-bottom: 8px;
   margin-bottom: 16px;
   scrollbar-width: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.chips-scroll-container.is-dragging-scroll {
+  cursor: grabbing;
+  scroll-behavior: auto;
 }
 
 .chips-scroll-container::-webkit-scrollbar {
@@ -1418,6 +1426,24 @@ textarea {
 .meal-slot.has-meal:hover {
   box-shadow: var(--elevation-2);
   transform: translateY(-1px);
+}
+
+/* US-19: Drag and Drop visual feedback */
+.meal-slot.has-meal[draggable="true"] {
+  cursor: grab;
+}
+.meal-slot.has-meal.is-dragging {
+  opacity: 0.4;
+  transform: scale(0.98);
+  cursor: grabbing;
+}
+.meal-slot.drag-over {
+  border: 2px dashed var(--m3-primary, #6750a4) !important;
+  background-color: var(--m3-primary-container, rgba(103, 80, 164, 0.12)) !important;
+  outline: 2px solid var(--m3-primary, #6750a4);
+  outline-offset: -2px;
+  transform: scale(1.02);
+  transition: transform var(--duration-fast, 150ms) ease, background-color var(--duration-fast, 150ms) ease, border-color var(--duration-fast, 150ms) ease;
 }
 
 .slot-label {

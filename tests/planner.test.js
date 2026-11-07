@@ -715,4 +715,90 @@ describe('US-72: Planificar receta directamente desde su ficha ("Añadir al plan
     const modal = document.getElementById('modal-plan-recipe');
     expect(modal.classList.contains('active')).toBe(false);
   });
+
+  describe('US-19: Mover recetas por la semana y cambiar momentos (Drag & Drop)', () => {
+    it('renderSlotCard genera atributos draggable y listeners de drag & drop', () => {
+      window.state.recipes = [
+        { id: 'rec-pasta', title: 'Pasta boloñesa', ingredients: [] }
+      ];
+      const htmlWithMeal = appInstance.renderSlotCard('2026-11-02', 'lunch', 'Almuerzo', 'lunch_dining', 'rec-pasta');
+      expect(htmlWithMeal).toContain('draggable="true"');
+      expect(htmlWithMeal).toContain('handlePlannerSlotDragStart');
+      expect(htmlWithMeal).toContain('handlePlannerSlotDrop');
+
+      const htmlEmpty = appInstance.renderSlotCard('2026-11-02', 'dinner', 'Cena', 'dinner_dining', null);
+      expect(htmlEmpty).not.toContain('draggable="true"');
+      expect(htmlEmpty).toContain('handlePlannerSlotDrop');
+    });
+
+    it('moveOrSwapPlannerSlot mueve una receta a un slot libre en otro momento o día', () => {
+      window.state.recipes = [
+        { id: 'rec-pasta', title: 'Pasta boloñesa', ingredients: [] },
+        { id: 'rec-pollo', title: 'Pollo al horno', ingredients: [] }
+      ];
+      window.state.mealPlan = {
+        '2026-11-02': {
+          dayName: 'Lunes',
+          breakfast: null,
+          lunch: 'rec-pasta',
+          snack: null,
+          dinner: null,
+          customSlots: []
+        },
+        '2026-11-03': {
+          dayName: 'Martes',
+          breakfast: null,
+          lunch: null,
+          snack: null,
+          dinner: 'rec-pollo',
+          customSlots: []
+        }
+      };
+
+      let toast = '';
+      appInstance.showToast = (msg) => { toast = msg; };
+
+      // Mover pasta de Lunes Almuerzo a Lunes Cena
+      const moved = appInstance.moveOrSwapPlannerSlot('2026-11-02', 'lunch', false, '2026-11-02', 'dinner', false);
+      expect(moved).toBe(true);
+      expect(window.state.mealPlan['2026-11-02'].lunch).toBeNull();
+      expect(window.state.mealPlan['2026-11-02'].dinner).toBe('rec-pasta');
+      expect(toast).toContain('movida con éxito');
+    });
+
+    it('moveOrSwapPlannerSlot intercambia recetas (swap) si el slot destino ya está ocupado', () => {
+      window.state.recipes = [
+        { id: 'rec-pasta', title: 'Pasta boloñesa', ingredients: [] },
+        { id: 'rec-pollo', title: 'Pollo al horno', ingredients: [] }
+      ];
+      window.state.mealPlan = {
+        '2026-11-02': {
+          dayName: 'Lunes',
+          breakfast: null,
+          lunch: 'rec-pasta',
+          snack: null,
+          dinner: null,
+          customSlots: []
+        },
+        '2026-11-03': {
+          dayName: 'Martes',
+          breakfast: null,
+          lunch: null,
+          snack: null,
+          dinner: 'rec-pollo',
+          customSlots: []
+        }
+      };
+
+      let toast = '';
+      appInstance.showToast = (msg) => { toast = msg; };
+
+      // Intercambiar Lunes Almuerzo (rec-pasta) con Martes Cena (rec-pollo)
+      const swapped = appInstance.moveOrSwapPlannerSlot('2026-11-02', 'lunch', false, '2026-11-03', 'dinner', false);
+      expect(swapped).toBe(true);
+      expect(window.state.mealPlan['2026-11-02'].lunch).toBe('rec-pollo');
+      expect(window.state.mealPlan['2026-11-03'].dinner).toBe('rec-pasta');
+      expect(toast).toContain('Recetas intercambiadas');
+    });
+  });
 });

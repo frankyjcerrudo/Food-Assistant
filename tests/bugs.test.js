@@ -637,4 +637,86 @@ describe('Verificación y Cobertura de Bugs Abiertos (v1.06)', () => {
       expect(renderSpy).toHaveBeenCalledWith('view-recipes');
     });
   });
+
+  describe('BUG-27: Recetas sin ingredientes muestran macros vacíos y no infieren Alta en Proteínas', () => {
+    it('estimateRecipeNutrition devuelve ceros cuando la receta no tiene ingredientes', () => {
+      const emptyRecipe = {
+        id: 'rec-no-ing',
+        title: 'Receta sin ingredientes',
+        ingredients: []
+      };
+      const nut = window.estimateRecipeNutrition(emptyRecipe);
+      expect(nut.calories).toBe(0);
+      expect(nut.protein).toBe(0);
+      expect(nut.carbs).toBe(0);
+      expect(nut.fat).toBe(0);
+    });
+
+    it('analyzeAndInferRecipeTags no asigna Alta en Proteínas si carece de ingredientes', () => {
+      const emptyRecipe = {
+        id: 'rec-no-ing-2',
+        title: 'Guiso misterioso',
+        description: 'Plato tradicional sin ingredientes cargados',
+        ingredients: []
+      };
+      const tags = window.analyzeAndInferRecipeTags(emptyRecipe);
+      expect(tags).not.toContain('Alta en Proteínas');
+    });
+
+    it('renderSingleRecipeCardHtml muestra la cajita de macros con datos vacíos (—) para recetas sin ingredientes', () => {
+      const emptyRecipe = {
+        id: 'rec-no-ing-3',
+        title: 'Café solo o infusión',
+        description: 'Bebida sin ingredientes',
+        prepTimeMinutes: 5,
+        cookTimeMinutes: 0,
+        ingredients: []
+      };
+      const html = appInstance.renderSingleRecipeCardHtml(emptyRecipe, true);
+      expect(html).toContain('recipe-card-macros');
+      expect(html).toContain('—');
+      expect(html).not.toContain('450');
+      expect(html).not.toContain('28<span class="card-macro-unit">g</span>');
+    });
+  });
+
+  describe('BUG-28: Navegación horizontal en selector de etiquetas (Wheel & Grab-to-scroll)', () => {
+    it('initChipsScrollContainers adjunta scroll horizontal con rueda del ratón y arrastre', () => {
+      document.body.innerHTML += `
+        <div class="chips-scroll-container" id="test-chips-container" style="overflow-x: auto; width: 100px;">
+          <button class="m3-filter-chip">Tag 1</button>
+          <button class="m3-filter-chip">Tag 2</button>
+        </div>
+      `;
+      const container = document.getElementById('test-chips-container');
+      Object.defineProperty(container, 'scrollWidth', { value: 500, configurable: true });
+      Object.defineProperty(container, 'clientWidth', { value: 100, configurable: true });
+      container.scrollLeft = 0;
+
+      appInstance.initChipsScrollContainers();
+      expect(container._chipsScrollAttached).toBe(true);
+
+      // Simular evento Wheel
+      const wheelEv = new Event('wheel', { bubbles: true, cancelable: true });
+      wheelEv.deltaY = 50;
+      wheelEv.deltaX = 0;
+      container.dispatchEvent(wheelEv);
+      expect(container.scrollLeft).toBe(50);
+
+      // Simular Grab-to-scroll (mousedown + mousemove)
+      const mouseDownEv = new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: 100 });
+      Object.defineProperty(mouseDownEv, 'pageX', { value: 100 });
+      container.dispatchEvent(mouseDownEv);
+      expect(container.classList.contains('is-dragging-scroll')).toBe(true);
+
+      const mouseMoveEv = new MouseEvent('mousemove', { bubbles: true, cancelable: true });
+      Object.defineProperty(mouseMoveEv, 'pageX', { value: 60 });
+      container.dispatchEvent(mouseMoveEv);
+      expect(container.scrollLeft).toBeGreaterThan(50);
+
+      // Mouseup para finalizar
+      window.dispatchEvent(new MouseEvent('mouseup'));
+      expect(container.classList.contains('is-dragging-scroll')).toBe(false);
+    });
+  });
 });

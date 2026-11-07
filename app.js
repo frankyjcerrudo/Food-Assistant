@@ -217,14 +217,7 @@ function estimateRecipeNutrition(recipe) {
   const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
 
   if (ingredients.length === 0) {
-    const title = (recipe.title || '').toLowerCase();
-    if (/\b(snack|merienda|tostas?|fruta|yogur)\b/i.test(title)) {
-      return { calories: 280, protein: 12, carbs: 35, fat: 8 };
-    }
-    if (/\b(desayuno|avena|porridge|tostadas?)\b/i.test(title)) {
-      return { calories: 350, protein: 14, carbs: 48, fat: 10 };
-    }
-    return { calories: 450, protein: 28, carbs: 45, fat: 15 };
+    return { calories: 0, protein: 0, carbs: 0, fat: 0 };
   }
 
   let totalCal = 0;
@@ -619,8 +612,14 @@ function analyzeAndInferRecipeTags(recipe) {
     }
   } else {
     // Si la receta no tiene ingredientes desglosados pero sí nutrición directa
+    const hasExplicitNutrition = recipe && recipe.nutrition && (
+      (Number(recipe.nutrition.calories) || 0) > 0 ||
+      (Number(recipe.nutrition.protein) || 0) > 0 ||
+      (Number(recipe.nutrition.carbs) || 0) > 0 ||
+      (Number(recipe.nutrition.fat) || 0) > 0
+    );
     const nutrition = (typeof getRecipeNutrition === 'function') ? getRecipeNutrition(recipe) : null;
-    if (nutrition) {
+    if (hasExplicitNutrition && nutrition) {
       const p = Number(nutrition.protein) || 0;
       const cal = Number(nutrition.calories) || 0;
       const density = cal > 0 ? (p * 4) / cal : 0;
@@ -4468,7 +4467,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.48';
+  window.APP_VERSION = 'v1.49';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4509,7 +4508,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.48';
+    this.appVersion = window.APP_VERSION || 'v1.49';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -7301,6 +7300,8 @@ class FoodAssistantApp {
         }
       });
     });
+
+    this.initChipsScrollContainers();
   }
 
   switchView(viewId) {
@@ -7962,6 +7963,14 @@ class FoodAssistantApp {
 
   renderSingleRecipeCardHtml(rec, showCardMacros) {
     const nut = showCardMacros ? getRecipeNutrition(rec) : null;
+    const hasNutData = (Array.isArray(rec.ingredients) && rec.ingredients.length > 0) || (
+      rec.nutrition && (
+        (Number(rec.nutrition.calories) || 0) > 0 ||
+        (Number(rec.nutrition.protein) || 0) > 0 ||
+        (Number(rec.nutrition.carbs) || 0) > 0 ||
+        (Number(rec.nutrition.fat) || 0) > 0
+      )
+    );
     const fridgeMatch = (this.fridgeIngredients && this.fridgeIngredients.length > 0)
       ? this.getRecipeFridgeMatch(rec)
       : null;
@@ -8011,24 +8020,24 @@ class FoodAssistantApp {
           <h3 class="recipe-title">${escapeHtml(rec.title)}</h3>
           <p class="recipe-desc">${escapeHtml(rec.description)}</p>
 
-          ${showCardMacros && nut ? `
-          <!-- Tabla compacta de valores nutricionales por ración (US-01) -->
-          <div class="recipe-card-macros" title="Valores nutricionales orientativos por ración individual">
+          ${showCardMacros ? `
+          <!-- Tabla compacta de valores nutricionales por ración (US-01 / BUG-27) -->
+          <div class="recipe-card-macros" title="${hasNutData ? 'Valores nutricionales orientativos por ración individual' : 'Sin información nutricional ni ingredientes'}">
             <div class="card-macro-item card-macro-cal" title="Calorías">
               <span class="card-macro-lbl">Calorías</span>
-              <span class="card-macro-val">${nut.calories}<span class="card-macro-unit">kcal</span></span>
+              <span class="card-macro-val">${hasNutData && nut && nut.calories > 0 ? `${nut.calories}<span class="card-macro-unit">kcal</span>` : '—'}</span>
             </div>
             <div class="card-macro-item card-macro-prot" title="Proteínas">
               <span class="card-macro-lbl">Proteínas</span>
-              <span class="card-macro-val">${Math.round(nut.protein)}<span class="card-macro-unit">g</span></span>
+              <span class="card-macro-val">${hasNutData && nut && nut.protein > 0 ? `${Math.round(nut.protein)}<span class="card-macro-unit">g</span>` : '—'}</span>
             </div>
             <div class="card-macro-item card-macro-carbs" title="Carbohidratos">
               <span class="card-macro-lbl">Carbos</span>
-              <span class="card-macro-val">${Math.round(nut.carbs)}<span class="card-macro-unit">g</span></span>
+              <span class="card-macro-val">${hasNutData && nut && (nut.carbs > 0 || nut.carbs === 0) ? `${Math.round(nut.carbs)}<span class="card-macro-unit">g</span>` : '—'}</span>
             </div>
             <div class="card-macro-item card-macro-fat" title="Grasas">
               <span class="card-macro-lbl">Grasas</span>
-              <span class="card-macro-val">${Math.round(nut.fat)}<span class="card-macro-unit">g</span></span>
+              <span class="card-macro-val">${hasNutData && nut && (nut.fat > 0 || nut.fat === 0) ? `${Math.round(nut.fat)}<span class="card-macro-unit">g</span>` : '—'}</span>
             </div>
           </div>
           ` : ''}
@@ -8429,6 +8438,74 @@ class FoodAssistantApp {
         this.initRecipeTagFilters();
         this.applyRecipeFilters();
       });
+    });
+
+    this.initChipsScrollContainers();
+  }
+
+  // ==========================================================================
+  // BUG-28: NAVEGACIÓN HORIZONTAL Y DRAG EN SELECTOR DE ETIQUETAS (CHIPS)
+  // ==========================================================================
+  initChipsScrollContainers() {
+    const containers = document.querySelectorAll('.chips-scroll-container');
+    containers.forEach(container => {
+      if (container._chipsScrollAttached) return;
+      container._chipsScrollAttached = true;
+
+      // 1. Scroll horizontal con rueda del ratón en escritorio
+      container.addEventListener('wheel', (e) => {
+        if (container.scrollWidth > container.clientWidth) {
+          if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+            e.preventDefault();
+            container.scrollLeft += e.deltaY;
+          }
+        }
+      }, { passive: false });
+
+      // 2. Grab-to-scroll (arrastre táctil/ratón en escritorio)
+      let isDown = false;
+      let startX = 0;
+      let scrollLeft = 0;
+      let hasDragged = false;
+
+      container.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        isDown = true;
+        hasDragged = false;
+        container.classList.add('is-dragging-scroll');
+        startX = e.pageX - container.offsetLeft;
+        scrollLeft = container.scrollLeft;
+      });
+
+      const stopDrag = () => {
+        if (isDown) {
+          isDown = false;
+          container.classList.remove('is-dragging-scroll');
+        }
+      };
+
+      window.addEventListener('mouseup', stopDrag);
+      container.addEventListener('mouseleave', stopDrag);
+
+      container.addEventListener('mousemove', (e) => {
+        if (!isDown) return;
+        const x = e.pageX - container.offsetLeft;
+        const walk = (x - startX) * 1.5;
+        if (Math.abs(walk) > 4) {
+          hasDragged = true;
+          e.preventDefault();
+        }
+        container.scrollLeft = scrollLeft - walk;
+      });
+
+      // Evitar clic accidental si el usuario estaba arrastrando
+      container.addEventListener('click', (e) => {
+        if (hasDragged) {
+          e.stopPropagation();
+          e.preventDefault();
+          hasDragged = false;
+        }
+      }, true);
     });
   }
 
@@ -10349,7 +10426,14 @@ class FoodAssistantApp {
 
       const safeRecipeId = escapeHtml(recipe.id).replace(/'/g, "\\'");
       return `
-        <div class="meal-slot has-meal" onclick="app.openRecipeDetail('${safeRecipeId}')">
+        <div class="meal-slot has-meal" draggable="true"
+          ondragstart="app.handlePlannerSlotDragStart(event, '${dateStr}', '${slotType}', false)"
+          ondragend="app.handlePlannerSlotDragEnd(event)"
+          ondragover="app.handlePlannerSlotDragOver(event)"
+          ondragleave="app.handlePlannerSlotDragLeave(event)"
+          ondrop="app.handlePlannerSlotDrop(event, '${dateStr}', '${slotType}', false)"
+          onclick="app.openRecipeDetail('${safeRecipeId}')"
+          title="Arrastra para mover o intercambiar a otro día o momento">
           <div class="u-flex-between-center">
             <span class="slot-label">
               <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
@@ -10382,7 +10466,11 @@ class FoodAssistantApp {
       `;
     } else {
       return `
-        <div class="meal-slot" onclick="app.openPickerModal('${dateStr}', '${slotType}', false)">
+        <div class="meal-slot"
+          ondragover="app.handlePlannerSlotDragOver(event)"
+          ondragleave="app.handlePlannerSlotDragLeave(event)"
+          ondrop="app.handlePlannerSlotDrop(event, '${dateStr}', '${slotType}', false)"
+          onclick="app.openPickerModal('${dateStr}', '${slotType}', false)">
           <span class="slot-label">
             <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
           </span>
@@ -10409,7 +10497,14 @@ class FoodAssistantApp {
 
       const safeRecipeId = escapeHtml(recipe.id).replace(/'/g, "\\'");
       return `
-        <div class="meal-slot has-meal meal-slot-custom" onclick="app.openRecipeDetail('${safeRecipeId}')">
+        <div class="meal-slot has-meal meal-slot-custom" draggable="true"
+          ondragstart="app.handlePlannerSlotDragStart(event, '${dateStr}', '${customSlot.id}', true)"
+          ondragend="app.handlePlannerSlotDragEnd(event)"
+          ondragover="app.handlePlannerSlotDragOver(event)"
+          ondragleave="app.handlePlannerSlotDragLeave(event)"
+          ondrop="app.handlePlannerSlotDrop(event, '${dateStr}', '${customSlot.id}', true)"
+          onclick="app.openRecipeDetail('${safeRecipeId}')"
+          title="Arrastra para mover o intercambiar a otro día o momento">
           <div class="u-flex-between-center">
             <span class="slot-label slot-label-custom">
               <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
@@ -10440,7 +10535,11 @@ class FoodAssistantApp {
       `;
     } else {
       return `
-        <div class="meal-slot meal-slot-custom" onclick="app.openPickerModal('${dateStr}', '${customSlot.id}', true)">
+        <div class="meal-slot meal-slot-custom"
+          ondragover="app.handlePlannerSlotDragOver(event)"
+          ondragleave="app.handlePlannerSlotDragLeave(event)"
+          ondrop="app.handlePlannerSlotDrop(event, '${dateStr}', '${customSlot.id}', true)"
+          onclick="app.openPickerModal('${dateStr}', '${customSlot.id}', true)">
           <div class="u-flex-between-center">
             <span class="slot-label slot-label-custom">
               <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
@@ -10488,6 +10587,158 @@ class FoodAssistantApp {
       this.scheduleSyncWithCloud();
       this.render();
     }
+  }
+
+  // ==========================================================================
+  // US-19: MOVER RECETAS POR LA SEMANA Y CAMBIAR MOMENTOS (DRAG & DROP)
+  // ==========================================================================
+  handlePlannerSlotDragStart(e, dateStr, slotKey, isCustom) {
+    if (e.stopPropagation) e.stopPropagation();
+    this._draggingPlannerSlot = {
+      dateStr,
+      slotKey,
+      isCustom: !!isCustom
+    };
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      try {
+        e.dataTransfer.setData('text/plain', JSON.stringify(this._draggingPlannerSlot));
+      } catch (err) {}
+    }
+    const targetSlot = e.currentTarget && e.currentTarget.closest ? e.currentTarget.closest('.meal-slot') : e.currentTarget;
+    if (targetSlot) {
+      targetSlot.classList.add('is-dragging');
+    }
+  }
+
+  handlePlannerSlotDragEnd(e) {
+    this._draggingPlannerSlot = null;
+    document.querySelectorAll('.meal-slot.is-dragging').forEach(el => el.classList.remove('is-dragging'));
+    document.querySelectorAll('.meal-slot.drag-over').forEach(el => el.classList.remove('drag-over'));
+  }
+
+  handlePlannerSlotDragOver(e) {
+    if (e.preventDefault) e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'move';
+    }
+    const targetSlot = e.currentTarget && e.currentTarget.closest ? e.currentTarget.closest('.meal-slot') : e.currentTarget;
+    if (targetSlot && !targetSlot.classList.contains('drag-over')) {
+      targetSlot.classList.add('drag-over');
+    }
+  }
+
+  handlePlannerSlotDragLeave(e) {
+    const targetSlot = e.currentTarget && e.currentTarget.closest ? e.currentTarget.closest('.meal-slot') : e.currentTarget;
+    if (targetSlot) {
+      targetSlot.classList.remove('drag-over');
+    }
+  }
+
+  handlePlannerSlotDrop(e, targetDateStr, targetSlotKey, isTargetCustom) {
+    if (e.preventDefault) e.preventDefault();
+    if (e.stopPropagation) e.stopPropagation();
+    const targetSlot = e.currentTarget && e.currentTarget.closest ? e.currentTarget.closest('.meal-slot') : e.currentTarget;
+    if (targetSlot) {
+      targetSlot.classList.remove('drag-over');
+    }
+
+    let source = this._draggingPlannerSlot;
+    if (!source && e.dataTransfer && typeof e.dataTransfer.getData === 'function') {
+      try {
+        const raw = e.dataTransfer.getData('text/plain');
+        if (raw) source = JSON.parse(raw);
+      } catch (err) {}
+    }
+
+    this._draggingPlannerSlot = null;
+    document.querySelectorAll('.meal-slot.is-dragging').forEach(el => el.classList.remove('is-dragging'));
+
+    if (!source) return false;
+
+    return this.moveOrSwapPlannerSlot(
+      source.dateStr,
+      source.slotKey,
+      source.isCustom,
+      targetDateStr,
+      targetSlotKey,
+      !!isTargetCustom
+    );
+  }
+
+  moveOrSwapPlannerSlot(sourceDate, sourceSlotKey, isSourceCustom, targetDate, targetSlotKey, isTargetCustom) {
+    if (sourceDate === targetDate && sourceSlotKey === targetSlotKey && !!isSourceCustom === !!isTargetCustom) {
+      return false;
+    }
+
+    const srcDay = state.getDayPlan(sourceDate);
+    const tgtDay = state.getDayPlan(targetDate);
+    if (!srcDay || !tgtDay) return false;
+
+    // Obtener receta y sobrante origen
+    let srcRecipeId = null;
+    let srcLeftover = false;
+    if (isSourceCustom) {
+      const cs = (srcDay.customSlots || []).find(c => c.id === sourceSlotKey);
+      srcRecipeId = cs ? cs.recipeId : null;
+    } else {
+      srcRecipeId = srcDay[sourceSlotKey] || null;
+      srcLeftover = !!(srcDay.leftoverSlots && srcDay.leftoverSlots[sourceSlotKey]);
+    }
+
+    if (!srcRecipeId) return false;
+
+    // Obtener receta y sobrante destino
+    let tgtRecipeId = null;
+    let tgtLeftover = false;
+    if (isTargetCustom) {
+      const tgtCs = (tgtDay.customSlots || []).find(c => c.id === targetSlotKey);
+      tgtRecipeId = tgtCs ? tgtCs.recipeId : null;
+    } else {
+      tgtRecipeId = tgtDay[targetSlotKey] || null;
+      tgtLeftover = !!(tgtDay.leftoverSlots && tgtDay.leftoverSlots[targetSlotKey]);
+    }
+
+    // 1. Asignar origen en destino
+    if (isTargetCustom) {
+      const tgtCs = (tgtDay.customSlots || []).find(c => c.id === targetSlotKey);
+      if (tgtCs) tgtCs.recipeId = srcRecipeId;
+    } else {
+      tgtDay[targetSlotKey] = srcRecipeId;
+      if (!tgtDay.leftoverSlots) tgtDay.leftoverSlots = {};
+      if (srcLeftover) tgtDay.leftoverSlots[targetSlotKey] = true;
+      else delete tgtDay.leftoverSlots[targetSlotKey];
+    }
+
+    // 2. Asignar destino previo en origen (swap o limpiar)
+    if (isSourceCustom) {
+      const srcCs = (srcDay.customSlots || []).find(c => c.id === sourceSlotKey);
+      if (srcCs) srcCs.recipeId = tgtRecipeId || null;
+    } else {
+      srcDay[sourceSlotKey] = tgtRecipeId || null;
+      if (!srcDay.leftoverSlots) srcDay.leftoverSlots = {};
+      if (tgtLeftover) srcDay.leftoverSlots[sourceSlotKey] = true;
+      else delete srcDay.leftoverSlots[sourceSlotKey];
+    }
+
+    // 3. Persistir y actualizar
+    const nowIso = new Date().toISOString();
+    srcDay.updatedAt = nowIso;
+    tgtDay.updatedAt = nowIso;
+    state.save('fa_mealplan', state.mealPlan);
+    this.scheduleSyncWithCloud();
+    this.renderPlanner();
+    this.renderTodayView();
+
+    // 4. Feedback al usuario
+    const srcRec = state.recipes.find(r => r.id === srcRecipeId);
+    const tgtRec = tgtRecipeId ? state.recipes.find(r => r.id === tgtRecipeId) : null;
+    if (tgtRec) {
+      this.showToast(`Recetas intercambiadas: "${srcRec?.title || 'Receta'}" y "${tgtRec.title}"`, 'success');
+    } else {
+      this.showToast(`"${srcRec?.title || 'Receta'}" movida con éxito`, 'success');
+    }
+    return true;
   }
 
   // CUSTOM SLOT MODAL METHODS
@@ -11034,6 +11285,8 @@ class FoodAssistantApp {
         this.renderPickerRecipesList();
       });
     });
+
+    this.initChipsScrollContainers();
   }
 
   openPickerModal(dateStr, slotKey, isCustom = false) {

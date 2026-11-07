@@ -215,14 +215,7 @@ function estimateRecipeNutrition(recipe) {
   const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
 
   if (ingredients.length === 0) {
-    const title = (recipe.title || '').toLowerCase();
-    if (/\b(snack|merienda|tostas?|fruta|yogur)\b/i.test(title)) {
-      return { calories: 280, protein: 12, carbs: 35, fat: 8 };
-    }
-    if (/\b(desayuno|avena|porridge|tostadas?)\b/i.test(title)) {
-      return { calories: 350, protein: 14, carbs: 48, fat: 10 };
-    }
-    return { calories: 450, protein: 28, carbs: 45, fat: 15 };
+    return { calories: 0, protein: 0, carbs: 0, fat: 0 };
   }
 
   let totalCal = 0;
@@ -596,8 +589,14 @@ function analyzeAndInferRecipeTags(recipe) {
     }
   } else {
     // Si la receta no tiene ingredientes desglosados pero sí nutrición directa
+    const hasExplicitNutrition = recipe && recipe.nutrition && (
+      (Number(recipe.nutrition.calories) || 0) > 0 ||
+      (Number(recipe.nutrition.protein) || 0) > 0 ||
+      (Number(recipe.nutrition.carbs) || 0) > 0 ||
+      (Number(recipe.nutrition.fat) || 0) > 0
+    );
     const nutrition = (typeof getRecipeNutrition === 'function') ? getRecipeNutrition(recipe) : null;
-    if (nutrition) {
+    if (hasExplicitNutrition && nutrition) {
       const p = Number(nutrition.protein) || 0;
       const cal = Number(nutrition.calories) || 0;
       const density = cal > 0 ? (p * 4) / cal : 0;
