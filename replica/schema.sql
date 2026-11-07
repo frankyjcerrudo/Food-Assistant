@@ -145,3 +145,141 @@ alter table public.user_settings add column if not exists agent_token_hash text 
 alter table public.user_settings add column if not exists agent_enabled boolean not null default false;
 alter table public.user_settings add column if not exists default_servings integer not null default 2;
 create index if not exists user_settings_agent_token_hash_idx on public.user_settings (agent_token_hash) where agent_token_hash is not null;
+
+-- 6. MODO FAMILIA / ESPACIO COLABORATIVO DEL HOGAR (US-77)
+create table if not exists public.households (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  invite_code text not null unique,
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists households_invite_code_idx on public.households (invite_code);
+
+create table if not exists public.household_members (
+  household_id uuid not null references public.households(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  role text not null default 'member',
+  display_name text default '',
+  email text default '',
+  joined_at timestamptz not null default now(),
+  primary key (household_id, user_id)
+);
+
+create index if not exists household_members_user_id_idx on public.household_members (user_id);
+
+-- Columnas de vinculación de hogar en tablas de dominio
+alter table public.recipes add column if not exists household_id uuid references public.households(id) on delete set null;
+alter table public.recipes add column if not exists is_private boolean not null default false;
+alter table public.meal_plans add column if not exists household_id uuid references public.households(id) on delete set null;
+alter table public.shopping_items add column if not exists household_id uuid references public.households(id) on delete set null;
+alter table public.user_settings add column if not exists active_household_id uuid references public.households(id) on delete set null;
+
+create index if not exists recipes_household_id_idx on public.recipes (household_id) where household_id is not null;
+create index if not exists meal_plans_household_id_idx on public.meal_plans (household_id) where household_id is not null;
+create index if not exists shopping_items_household_id_idx on public.shopping_items (household_id) where household_id is not null;
+
+-- Función auxiliar Security Definer para verificar pertenencia al hogar sin recursión RLS
+create or replace function public.is_household_member(hid uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1
+    from public.household_members hm
+    where hm.household_id = hid
+      and hm.user_id = auth.uid()
+  );
+$$;
+
+alter table public.households enable row level security;
+alter table public.household_members enable row level security;
+
+-- Políticas para households (lectura para miembros o por código al unirse, creación por usuario autenticado, edición/borrado por owner)
+drop policy if exists "Households select policy" on public.households;
+create policy "Households select policy" on public.households
+  for select using (auth.uid() is not null);
+
+drop policy if exists "Households insert policy" on public.households;
+create policy "Households insert policy" on public.households
+  for insert with check (auth.uid() = owner_id);
+
+drop policy if exists "Households update policy" on public.households;
+create policy "Households update policy" on public.households
+  for update using (auth.uid() = owner_id or public.is_household_member(id));
+
+drop policy if exists "Households delete policy" on public.households;
+create policy "Households delete policy" on public.households
+  for delete using (auth.uid() = owner_id);
+
+-- Políticas para household_members
+drop policy if exists "Household members select policy" on public.household_members;
+create policy "Household members select policy" on public.household_members
+  for select using (auth.uid() = user_id or public.is_household_member(household_id));
+
+drop policy if exists "Household members insert policy" on public.household_members;
+create policy "Household members insert policy" on public.household_members
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "Household members update policy" on public.household_members;
+create policy "Household members update policy" on public.household_members
+  for update using (auth.uid() = user_id or public.is_household_member(household_id));
+
+drop policy if exists "Household members delete policy" on public.household_members;
+create policy "Household members delete policy" on public.household_members
+  for delete using (auth.uid() = user_id or public.is_household_member(household_id));
+
+-- Actualización de políticas RLS colaborativas en recipes, meal_plans y shopping_items
+drop policy if exists "Users own recipes select" on public.recipes;
+create policy "Users own recipes select" on public.recipes
+  for select using (auth.uid() = user_id or (household_id is not null and not is_private and public.is_household_member(household_id)));
+
+drop policy if exists "Users own recipes insert" on public.recipes;
+create policy "Users own recipes insert" on public.recipes
+  for insert with check (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)));
+
+drop policy if exists "Users own recipes update" on public.recipes;
+create policy "Users own recipes update" on public.recipes
+  for update using (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)));
+
+drop policy if exists "Users own recipes delete" on public.recipes;
+create policy "Users own recipes delete" on public.recipes
+  for delete using (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)));
+
+drop policy if exists "Users own meal_plans select" on public.meal_plans;
+create policy "Users own meal_plans select" on public.meal_plans
+  for select using (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)));
+
+drop policy if exists "Users own meal_plans insert" on public.meal_plans;
+create policy "Users own meal_plans insert" on public.meal_plans
+  for insert with check (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)));
+
+drop policy if exists "Users own meal_plans update" on public.meal_plans;
+create policy "Users own meal_plans update" on public.meal_plans
+  for update using (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)));
+
+drop policy if exists "Users own meal_plans delete" on public.meal_plans;
+create policy "Users own meal_plans delete" on public.meal_plans
+  for delete using (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)));
+
+drop policy if exists "Users own shopping select" on public.shopping_items;
+create policy "Users own shopping select" on public.shopping_items
+  for select using (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)));
+
+drop policy if exists "Users own shopping insert" on public.shopping_items;
+create policy "Users own shopping insert" on public.shopping_items
+  for insert with check (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)));
+
+drop policy if exists "Users own shopping update" on public.shopping_items;
+create policy "Users own shopping update" on public.shopping_items
+  for update using (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)));
+
+drop policy if exists "Users own shopping delete" on public.shopping_items;
+create policy "Users own shopping delete" on public.shopping_items
+  for delete using (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)));
+

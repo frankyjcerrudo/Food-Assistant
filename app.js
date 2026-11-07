@@ -2103,6 +2103,26 @@ class IndexedDbStorage {
   }
 }
 
+// US-77: Generador y normalizador de códigos de invitación del Hogar Familiar
+function generateHouseholdInviteCode() {
+  const alphabet = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let suffix = '';
+  for (let i = 0; i < 4; i++) {
+    suffix += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return `SAB-${suffix}`;
+}
+
+function normalizeHouseholdInviteCode(raw) {
+  if (!raw || typeof raw !== 'string') return '';
+  const cleaned = raw.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+  if (!cleaned) return '';
+  if (/^SAB[A-Z0-9]{4,8}$/.test(cleaned)) {
+    return `SAB-${cleaned.slice(3)}`;
+  }
+  return cleaned;
+}
+
 class StateStore {
   constructor() {
     this.idb = new IndexedDbStorage();
@@ -2223,11 +2243,18 @@ class StateStore {
     this.customTags = this.load('fa_custom_tags', []);
     this.theme = localStorage.getItem('fa_theme_mode') || 'light';
     this.cloudUser = this.load('fa_cloud_user', null);
+    this.household = this.load('fa_household', null);
+    this.personalBackup = this.load('fa_personal_backup', null);
     this.supabaseConfig = {
       url: window.APP_CONFIG?.supabaseUrl || localStorage.getItem('fa_sb_url') || '',
       anonKey: window.APP_CONFIG?.supabaseAnonKey || localStorage.getItem('fa_sb_key') || ''
     };
     this.lastSyncedAt = localStorage.getItem('fa_last_sync') || null;
+  }
+
+  saveHousehold(household) {
+    this.household = household || null;
+    this.save('fa_household', this.household);
   }
 
   saveNutritionGoals(goals) {
@@ -4436,7 +4463,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.44';
+  window.APP_VERSION = 'v1.45';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4477,7 +4504,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.44';
+    this.appVersion = window.APP_VERSION || 'v1.45';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5157,6 +5184,8 @@ class FoodAssistantApp {
             this.updateUserAccountUI();
             // US-35: Descarga y sincronización automática al abrir la app con sesión activa
             this.syncDataWithCloud(true);
+            this.initHouseholdRealtimeSubscription();
+            this.processPendingHouseholdJoin();
           }
         }).catch(err => console.warn("Supabase session check error:", err));
 
@@ -5172,6 +5201,8 @@ class FoodAssistantApp {
             state.save('fa_cloud_user', state.cloudUser);
             this.updateUserAccountUI();
             this.syncDataWithCloud(true);
+            this.initHouseholdRealtimeSubscription();
+            this.processPendingHouseholdJoin();
           } else if (event === 'USER_UPDATED' && session?.user) {
             // Actualizar datos del usuario local sin disparar bucle recursivo de sync
             state.cloudUser = {
@@ -5319,6 +5350,9 @@ class FoodAssistantApp {
       if (authForms) authForms.style.display = 'block';
       if (authLoggedIn) authLoggedIn.style.display = 'none';
     }
+    if (typeof this.renderHouseholdSettings === 'function') {
+      this.renderHouseholdSettings();
+    }
   }
 
   openAuthModal() {
@@ -5422,6 +5456,7 @@ class FoodAssistantApp {
     this.updateUserAccountUI();
     this.closeAuthModal();
     this.syncDataWithCloud(true);
+    this.processPendingHouseholdJoin();
     this.showToast(`¡Bienvenido a Food Assistant, ${state.cloudUser.name}! Tu cuenta está conectada.`, 'success');
   }
 
@@ -5492,8 +5527,18 @@ class FoodAssistantApp {
     }
 
     // 2. Limpiar sesión y rastro de sincronización
+    if (typeof this.teardownHouseholdRealtimeSubscription === 'function') {
+      this.teardownHouseholdRealtimeSubscription();
+    }
     state.cloudUser = null;
     state.save('fa_cloud_user', null);
+    if (typeof state.saveHousehold === 'function') {
+      state.saveHousehold(null);
+    } else {
+      state.household = null;
+    }
+    state.personalBackup = null;
+    state.save('fa_personal_backup', null);
     state.lastSyncedAt = null;
     state.save('fa_last_synced_at', null);
     state.deletedRecords = { recipes: [], mealPlans: [], shoppingItems: [] };
@@ -5506,6 +5551,8 @@ class FoodAssistantApp {
       localStorage.removeItem('fa_shopping');
       localStorage.removeItem('fa_deleted_records');
       localStorage.removeItem('fa_cloud_user');
+      localStorage.removeItem('fa_household');
+      localStorage.removeItem('fa_personal_backup');
       localStorage.removeItem('fa_last_synced_at');
     } catch (e) {}
 
@@ -5554,11 +5601,38 @@ class FoodAssistantApp {
     }
 
     try {
-      let recQuery = this.supabaseClient.from('recipes').select('*').eq('user_id', state.cloudUser.id);
+      const activeHouseholdId = state.household?.id || null;
+
+      // US-77: Si hay un hogar activo, refrescar la lista de miembros en segundo plano
+      if (activeHouseholdId && typeof this.refreshHouseholdMembersFromCloud === 'function') {
+        try {
+          await this.refreshHouseholdMembersFromCloud(activeHouseholdId);
+        } catch (hhErr) {}
+      }
+
+      let recBase = this.supabaseClient.from('recipes').select('*');
+      let recQuery;
+      if (activeHouseholdId) {
+        if (typeof recBase.or === 'function') {
+          recQuery = recBase.or(`household_id.eq.${activeHouseholdId},user_id.eq.${state.cloudUser.id}`);
+        } else {
+          recQuery = recBase.eq('household_id', activeHouseholdId);
+        }
+      } else {
+        recQuery = recBase.eq('user_id', state.cloudUser.id);
+      }
       if (typeof recQuery.limit === 'function') recQuery = recQuery.limit(5000);
-      let planQuery = this.supabaseClient.from('meal_plans').select('*').eq('user_id', state.cloudUser.id);
+
+      let planBase = this.supabaseClient.from('meal_plans').select('*');
+      let planQuery = activeHouseholdId
+        ? planBase.eq('household_id', activeHouseholdId)
+        : planBase.eq('user_id', state.cloudUser.id);
       if (typeof planQuery.limit === 'function') planQuery = planQuery.limit(5000);
-      let shopQuery = this.supabaseClient.from('shopping_items').select('*').eq('user_id', state.cloudUser.id);
+
+      let shopBase = this.supabaseClient.from('shopping_items').select('*');
+      let shopQuery = activeHouseholdId
+        ? shopBase.eq('household_id', activeHouseholdId)
+        : shopBase.eq('user_id', state.cloudUser.id);
       if (typeof shopQuery.limit === 'function') shopQuery = shopQuery.limit(5000);
 
       const [recRes, planRes, shopRes] = await Promise.all([
@@ -5573,9 +5647,26 @@ class FoodAssistantApp {
 
       let stateChanged = false;
 
-      // 1. Fusión de Recetas
+      // 1. Fusión de Recetas (con desduplicación y respeto de recetas privadas en Modo Familia US-77)
       if (Array.isArray(recRes.data)) {
-        const remoteRecipeIds = new Set(recRes.data.map(r => r.id));
+        const dedupedRemoteRecipesMap = new Map();
+        recRes.data.forEach(row => {
+          if (!row || !row.id) return;
+          // No incluir recetas privadas de otros miembros del hogar
+          if (row.is_private && row.user_id && row.user_id !== state.cloudUser.id) return;
+          const existing = dedupedRemoteRecipesMap.get(row.id);
+          if (!existing) {
+            dedupedRemoteRecipesMap.set(row.id, row);
+          } else {
+            const existTime = new Date(existing.updated_at || existing.created_at || 0).getTime();
+            const newTime = new Date(row.updated_at || row.created_at || 0).getTime();
+            if (newTime >= existTime) {
+              dedupedRemoteRecipesMap.set(row.id, row);
+            }
+          }
+        });
+        const remoteRecipesList = Array.from(dedupedRemoteRecipesMap.values());
+        const remoteRecipeIds = new Set(remoteRecipesList.map(r => r.id));
 
         // Propagación de borrados remotos entre dispositivos (BUG-23 / Multi-device):
         // Si el cliente ya sincronizó con la nube con anterioridad (state.lastSyncedAt no es null),
@@ -5597,7 +5688,7 @@ class FoodAssistantApp {
           if (state.recipes.length !== initialLen) {
             stateChanged = true;
           }
-        } else if (recRes.data.length > 0 && Array.isArray(state.recipes)) {
+        } else if (remoteRecipesList.length > 0 && Array.isArray(state.recipes)) {
           // Si es el primer inicio de sesión en un dispositivo nuevo y el almacenamiento local
           // solo contenía las recetas demo iniciales (SEED_RECIPES), reemplazarlas por las de la nube
           const isOnlySeed = state.recipes.every(r => SEED_RECIPES.some(s => s.id === r.id));
@@ -5607,7 +5698,7 @@ class FoodAssistantApp {
           }
         }
 
-        recRes.data.forEach(remoteRow => {
+        remoteRecipesList.forEach(remoteRow => {
           if (state.deletedRecords.recipes?.includes(remoteRow.id)) return;
 
           const localIdx = state.recipes.findIndex(r => r.id === remoteRow.id);
@@ -5653,6 +5744,9 @@ class FoodAssistantApp {
             createdAt: remoteRow.created_at || remoteRow.updated_at || null,
             updatedAt: remoteRow.updated_at
           };
+          if (remoteRow.is_private !== undefined) remoteRecipe.isPrivate = !!remoteRow.is_private;
+          if (remoteRow.household_id) remoteRecipe.householdId = remoteRow.household_id;
+          if (remoteRow.user_id) remoteRecipe.ownerUserId = remoteRow.user_id;
 
           if (localIdx >= 0) {
             const local = state.recipes[localIdx];
@@ -5697,9 +5791,19 @@ class FoodAssistantApp {
         });
       }
 
-      // 2. Fusión de Meal Plans
+      // 2. Fusión de Meal Plans (con desduplicación por fecha en Modo Familia US-77)
       if (Array.isArray(planRes.data)) {
-        const remotePlanKeys = new Set(planRes.data.map(r => r.plan_date || r.id));
+        const dedupedPlansMap = new Map();
+        planRes.data.forEach(row => {
+          const dKey = row?.plan_date || row?.id;
+          if (!dKey) return;
+          const prev = dedupedPlansMap.get(dKey);
+          if (!prev || new Date(row.updated_at || 0).getTime() >= new Date(prev.updated_at || 0).getTime()) {
+            dedupedPlansMap.set(dKey, row);
+          }
+        });
+        const remotePlansList = Array.from(dedupedPlansMap.values());
+        const remotePlanKeys = new Set(remotePlansList.map(r => r.plan_date || r.id));
         if (state.lastSyncedAt) {
           const lastSyncTime = new Date(state.lastSyncedAt).getTime();
           Object.keys(state.mealPlan).forEach(dateKey => {
@@ -5719,7 +5823,7 @@ class FoodAssistantApp {
           });
         }
 
-        planRes.data.forEach(remoteRow => {
+        remotePlansList.forEach(remoteRow => {
           const dateKey = remoteRow.plan_date || remoteRow.id;
           if (!dateKey || state.deletedRecords.mealPlans?.includes(dateKey)) return;
 
@@ -5728,7 +5832,7 @@ class FoodAssistantApp {
           const localDate = new Date(localPlan?.updatedAt || 0).getTime();
 
           if (!localPlan || remoteDate >= localDate) {
-            state.mealPlan[dateKey] = {
+            const mergedDay = {
               dayName: remoteRow.day_name || localPlan?.dayName || 'Día',
               breakfast: remoteRow.breakfast_recipe_id || null,
               lunch: remoteRow.lunch_recipe_id || null,
@@ -5737,14 +5841,26 @@ class FoodAssistantApp {
               customSlots: Array.isArray(remoteRow.custom_slots) ? remoteRow.custom_slots : [],
               updatedAt: remoteRow.updated_at
             };
+            if (remoteRow.household_id) mergedDay.householdId = remoteRow.household_id;
+            if (remoteRow.user_id) mergedDay.ownerUserId = remoteRow.user_id;
+            state.mealPlan[dateKey] = mergedDay;
             stateChanged = true;
           }
         });
       }
 
-      // 3. Fusión de Shopping Items
+      // 3. Fusión de Shopping Items (con desduplicación colaborativa en Modo Familia US-77)
       if (Array.isArray(shopRes.data)) {
-        const remoteShopIds = new Set(shopRes.data.map(i => i.id));
+        const dedupedShopMap = new Map();
+        shopRes.data.forEach(row => {
+          if (!row || !row.id) return;
+          const prev = dedupedShopMap.get(row.id);
+          if (!prev || new Date(row.updated_at || 0).getTime() >= new Date(prev.updated_at || 0).getTime()) {
+            dedupedShopMap.set(row.id, row);
+          }
+        });
+        const remoteShopList = Array.from(dedupedShopMap.values());
+        const remoteShopIds = new Set(remoteShopList.map(i => i.id));
         if (state.lastSyncedAt) {
           const lastSyncTime = new Date(state.lastSyncedAt).getTime();
           const initialShopLen = state.shoppingList.length;
@@ -5760,7 +5876,7 @@ class FoodAssistantApp {
           }
         }
 
-        shopRes.data.forEach(remoteRow => {
+        remoteShopList.forEach(remoteRow => {
           if (state.deletedRecords.shoppingItems?.includes(remoteRow.id)) return;
 
           const localIdx = state.shoppingList.findIndex(i => i.id === remoteRow.id);
@@ -5800,6 +5916,8 @@ class FoodAssistantApp {
             recipeBreakdown: breakdown,
             updatedAt: remoteRow.updated_at
           };
+          if (remoteRow.household_id) remoteItem.householdId = remoteRow.household_id;
+          if (remoteRow.user_id) remoteItem.ownerUserId = remoteRow.user_id;
           reconcileShoppingItemBreakdown(remoteItem, state.recipes || []);
 
           if (localIdx >= 0) {
@@ -5839,6 +5957,11 @@ class FoodAssistantApp {
               state.settings.agentTokenHash = sRow.agent_token_hash;
               state.settings.agentEnabled = !!sRow.agent_enabled;
               state.save('fa_settings', state.settings);
+              stateChanged = true;
+            }
+            // US-77: Adoptar Hogar activo si el usuario inicia sesión desde un dispositivo nuevo
+            if (sRow.active_household_id && !state.household?.id && typeof this.loadHouseholdByIdFromCloud === 'function') {
+              await this.loadHouseholdByIdFromCloud(sRow.active_household_id);
               stateChanged = true;
             }
           }
@@ -6065,7 +6188,11 @@ class FoodAssistantApp {
     this.updateSyncIndicator('Sincronizando con la nube...', 'syncing');
 
     try {
-      // 1. Propagar borrados pendientes (BUG-23)
+      const activeHouseholdId = state.household?.id || null;
+      const deleteScopeCol = activeHouseholdId ? 'household_id' : 'user_id';
+      const deleteScopeVal = activeHouseholdId || state.cloudUser.id;
+
+      // 1. Propagar borrados pendientes (BUG-23 & US-77 Modo Familia)
       if (state.deletedRecords.recipes?.length > 0) {
         const toDelete = [...state.deletedRecords.recipes];
         const CHUNK_SIZE = 50;
@@ -6075,7 +6202,7 @@ class FoodAssistantApp {
           const { error } = await this.supabaseClient.from('recipes')
             .delete()
             .in('id', chunk)
-            .eq('user_id', state.cloudUser.id);
+            .eq(deleteScopeCol, deleteScopeVal);
           if (!error) {
             successfullyDeleted.push(...chunk);
           } else {
@@ -6091,7 +6218,7 @@ class FoodAssistantApp {
         const { error } = await this.supabaseClient.from('meal_plans')
           .delete()
           .in('id', state.deletedRecords.mealPlans)
-          .eq('user_id', state.cloudUser.id);
+          .eq(deleteScopeCol, deleteScopeVal);
         if (!error) {
           state.clearDeletedRecords('mealPlans', [...state.deletedRecords.mealPlans]);
         } else {
@@ -6103,7 +6230,7 @@ class FoodAssistantApp {
         const { error } = await this.supabaseClient.from('shopping_items')
           .delete()
           .in('id', state.deletedRecords.shoppingItems)
-          .eq('user_id', state.cloudUser.id);
+          .eq(deleteScopeCol, deleteScopeVal);
         if (!error) {
           state.clearDeletedRecords('shoppingItems', [...state.deletedRecords.shoppingItems]);
         } else {
@@ -6111,7 +6238,7 @@ class FoodAssistantApp {
         }
       }
 
-      // 2. Batch Upsert Recipes (BUG-22, BUG-24)
+      // 2. Batch Upsert Recipes (BUG-22, BUG-24 & US-77 Modo Familia)
       const lastSyncTimeMs = state.lastSyncedAt ? new Date(state.lastSyncedAt).getTime() : 0;
       const dirtyRecipes = Array.isArray(state.recipes)
         ? state.recipes.filter(recipe => {
@@ -6170,9 +6297,9 @@ class FoodAssistantApp {
               }))
             : [];
 
-          return {
+          const rowPayload = {
             id: recipe.id,
-            user_id: state.cloudUser.id,
+            user_id: (activeHouseholdId && !recipe.isPrivate && recipe.ownerUserId) ? recipe.ownerUserId : state.cloudUser.id,
             title: safeString(recipe.title),
             description: safeString(recipe.description || ''),
             image_url: recipe.imageUrl || null,
@@ -6189,6 +6316,11 @@ class FoodAssistantApp {
             created_at: recipe.createdAt || recipe.updatedAt || new Date().toISOString(),
             updated_at: recipe.updatedAt || new Date().toISOString()
           };
+          if (activeHouseholdId || recipe.isPrivate !== undefined) {
+            rowPayload.household_id = recipe.isPrivate ? null : activeHouseholdId;
+            rowPayload.is_private = !!recipe.isPrivate;
+          }
+          return rowPayload;
         });
 
         const rRes = await this.upsertWithSchemaFallback('recipes', recipesPayload);
@@ -6208,14 +6340,14 @@ class FoodAssistantApp {
         }
       }
 
-      // 3. Batch Upsert Meal Plans (BUG-23, BUG-24)
+      // 3. Batch Upsert Meal Plans (BUG-23, BUG-24 & US-77 Modo Familia)
       const planKeys = Object.keys(state.mealPlan || {});
       if (planKeys.length > 0) {
         const mealPlansPayload = planKeys.map(dateKey => {
           const day = state.mealPlan[dateKey] || {};
-          return {
+          const rowPayload = {
             id: dateKey,
-            user_id: state.cloudUser.id,
+            user_id: (activeHouseholdId && day.ownerUserId) ? day.ownerUserId : state.cloudUser.id,
             plan_date: dateKey,
             day_name: day.dayName || 'Día',
             breakfast_recipe_id: day.breakfast || null,
@@ -6225,19 +6357,23 @@ class FoodAssistantApp {
             custom_slots: Array.isArray(day.customSlots) ? day.customSlots : [],
             updated_at: day.updatedAt || new Date().toISOString()
           };
+          if (activeHouseholdId) {
+            rowPayload.household_id = activeHouseholdId;
+          }
+          return rowPayload;
         });
 
         const mRes = await this.upsertWithSchemaFallback('meal_plans', mealPlansPayload);
         if (!mRes.success) throw mRes.error;
       }
 
-      // 4. Batch Upsert Shopping Items (US-45, BUG-23, BUG-24)
+      // 4. Batch Upsert Shopping Items (US-45, BUG-23, BUG-24 & US-77 Modo Familia)
       if (Array.isArray(state.shoppingList) && state.shoppingList.length > 0) {
         const shoppingPayload = state.shoppingList.map(item => {
           if (!item.id) item.id = generateId('shop-');
-          return {
+          const rowPayload = {
             id: item.id,
-            user_id: state.cloudUser.id,
+            user_id: (activeHouseholdId && item.ownerUserId) ? item.ownerUserId : state.cloudUser.id,
             name: item.name,
             amount: item.amount !== null && !isNaN(item.amount) ? Number(item.amount) : null,
             unit: item.unit || '',
@@ -6247,6 +6383,10 @@ class FoodAssistantApp {
             recipe_breakdown: Array.isArray(item.recipeBreakdown) && item.recipeBreakdown.length > 0 ? item.recipeBreakdown : null,
             updated_at: item.updatedAt || new Date().toISOString()
           };
+          if (activeHouseholdId) {
+            rowPayload.household_id = activeHouseholdId;
+          }
+          return rowPayload;
         });
 
         const sRes = await this.upsertWithSchemaFallback('shopping_items', shoppingPayload);
@@ -6291,6 +6431,10 @@ class FoodAssistantApp {
           if (state.settings?.agentTokenHash !== undefined) {
             settingsRow.agent_token_hash = state.settings.agentTokenHash || null;
             settingsRow.agent_enabled = !!state.settings.agentEnabled;
+          }
+          // US-77: sincronizar el hogar activo del usuario si pertenece a uno
+          if (activeHouseholdId) {
+            settingsRow.active_household_id = activeHouseholdId;
           }
           await this.upsertWithSchemaFallback('user_settings', [settingsRow]);
         }
@@ -6514,6 +6658,27 @@ class FoodAssistantApp {
           break;
         case 'stepOnboardingServings':
           this.stepOnboardingServings(target.dataset.step);
+          break;
+        case 'openHouseholdSettings':
+          this.openHouseholdSettings();
+          break;
+        case 'copyHouseholdInviteCode':
+          this.copyHouseholdInviteCode();
+          break;
+        case 'shareHouseholdInviteLink':
+          this.shareHouseholdInviteLink();
+          break;
+        case 'leaveHousehold':
+          this.leaveHousehold();
+          break;
+        case 'refreshHouseholdSync':
+          this.syncDataWithCloud(false);
+          break;
+        case 'transferHouseholdOwnership':
+          if (target.dataset.userId) {
+            this.transferHouseholdOwnership(target.dataset.userId);
+          }
+          break;
           break;
         case 'inputOnboardingServings':
           this.inputOnboardingServings(e);
@@ -6948,6 +7113,13 @@ class FoodAssistantApp {
 
     // Web Share Target (US-59): ?url= / ?text= / ?title= compartidos desde otras apps de Android
     this.handleShareTargetLaunch();
+
+    // US-77: Modo Familia — Enlace de invitación (?join=SAB-XXXX) y formularios en Ajustes
+    this.initHouseholdEvents();
+    this.handleHouseholdJoinUrlLaunch();
+    if (state.household?.id) {
+      this.initHouseholdRealtimeSubscription();
+    }
 
     // PWA Shortcut trigger: ?action=voice
     if (typeof window !== 'undefined' && window.location?.search) {
@@ -7700,6 +7872,11 @@ class FoodAssistantApp {
           ` : ''}
 
           <div class="recipe-tags">
+            ${rec.isPrivate ? `
+              <span class="tag-chip recipe-privacy-badge" title="Receta privada (solo visible para ti)">
+                <span class="material-symbols-outlined icon-13">lock</span> Privada
+              </span>
+            ` : ''}
             ${rec.sourceDomain ? `
               <span class="tag-chip tag-chip-source" title="Fuente: ${rec.sourceDomain}">
                 <span class="material-symbols-outlined icon-13">link</span> ${rec.sourceDomain}
@@ -7731,7 +7908,9 @@ class FoodAssistantApp {
     }
     const subtitle = document.getElementById('recipes-count-subtitle');
     if (subtitle) {
-      subtitle.textContent = 'Tu recetario personal.';
+      subtitle.textContent = state.household?.name
+        ? `Recetario compartido de ${state.household.name} y personal.`
+        : 'Tu recetario personal.';
     }
 
     if (!recipesList.length) {
@@ -8792,6 +8971,8 @@ class FoodAssistantApp {
     if (fatEl) fatEl.value = "";
     this.editorSelectedTags = new Set(["Cena", "Saludable"]);
     this.renderRecipeEditorChips();
+    const privCheckbox = document.getElementById('edit-recipe-private');
+    if (privCheckbox) privCheckbox.checked = false;
 
     document.getElementById('edit-ingredients-container').innerHTML = "";
     document.getElementById('edit-steps-container').innerHTML = "";
@@ -8835,6 +9016,8 @@ class FoodAssistantApp {
     if (fatEl) fatEl.value = (nut && nut.fat > 0) ? nut.fat : "";
     this.editorSelectedTags = new Set(Array.isArray(r.tags) ? r.tags : []);
     this.renderRecipeEditorChips();
+    const editPrivCheckbox = document.getElementById('edit-recipe-private');
+    if (editPrivCheckbox) editPrivCheckbox.checked = !!r.isPrivate;
 
     const ingContainer = document.getElementById('edit-ingredients-container');
     ingContainer.innerHTML = "";
@@ -9611,6 +9794,7 @@ class FoodAssistantApp {
       }
     }
 
+    const isPrivate = !!document.getElementById('edit-recipe-private')?.checked;
     const updatedRecipe = {
       id,
       title,
@@ -9624,6 +9808,9 @@ class FoodAssistantApp {
       ingredients,
       instructions
     };
+    if (isPrivate || existing?.isPrivate !== undefined || state.household?.id) {
+      updatedRecipe.isPrivate = isPrivate;
+    }
 
     const baseRecipe = existing || (this.isReviewingImport ? this.pendingImportRecipe : null) || {};
     const finalRecipe = {
@@ -15296,6 +15483,743 @@ REGLAS CRÍTICAS:
     this.renderDietaryPreferencesSettings();
     this.renderNutritionGoalsSettings();
     this.renderExternalAgentSettings();
+    this.renderHouseholdSettings();
+  }
+
+  // ==========================================================================
+  // US-77: MODO FAMILIA / ESPACIO COLABORATIVO DEL HOGAR (FAMILY MODE)
+  // ==========================================================================
+  initHouseholdEvents() {
+    if (this._householdEventsInitialized) return;
+    this._householdEventsInitialized = true;
+
+    const createForm = document.getElementById('form-create-household');
+    if (createForm) {
+      createForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('input-create-household-name');
+        await this.createHousehold(input ? input.value : '');
+      });
+    }
+
+    const joinForm = document.getElementById('form-join-household');
+    if (joinForm) {
+      joinForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('input-join-household-code');
+        await this.joinHouseholdByCode(input ? input.value : '');
+      });
+    }
+
+    const createInput = document.getElementById('input-create-household-name');
+    if (createInput) {
+      createInput.addEventListener('input', () => {
+        createInput.setCustomValidity?.('');
+        createInput.classList.remove('input-error');
+      });
+    }
+
+    const joinInput = document.getElementById('input-join-household-code');
+    if (joinInput) {
+      joinInput.addEventListener('input', () => {
+        joinInput.setCustomValidity?.('');
+        joinInput.classList.remove('input-error');
+      });
+    }
+  }
+
+  openHouseholdSettings() {
+    this.switchView('view-settings');
+    const card = document.getElementById('card-family-household');
+    if (card && typeof card.scrollIntoView === 'function') {
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  renderHouseholdSettings() {
+    const hh = state.household;
+    const isActive = !!(hh && hh.id);
+
+    const headerBadge = document.getElementById('header-household-badge');
+    const headerName = document.getElementById('header-household-name');
+    if (headerBadge) {
+      if (isActive) {
+        headerBadge.removeAttribute('hidden');
+        headerBadge.style.display = 'inline-flex';
+        if (headerName) headerName.textContent = hh.name || 'Mi Hogar';
+      } else {
+        headerBadge.setAttribute('hidden', '');
+        headerBadge.style.display = 'none';
+      }
+    }
+
+    const statusBadge = document.getElementById('household-status-badge');
+    const emptyView = document.getElementById('household-empty-view');
+    const activeView = document.getElementById('household-active-view');
+
+    if (statusBadge) {
+      statusBadge.textContent = isActive ? `Hogar: ${hh.name}` : 'Modo Personal';
+      statusBadge.classList.toggle('is-active', isActive);
+    }
+
+    if (emptyView) emptyView.style.display = isActive ? 'none' : 'block';
+    if (activeView) activeView.style.display = isActive ? 'block' : 'none';
+
+    if (!isActive) return;
+
+    const activeNameEl = document.getElementById('household-active-name');
+    const activeRoleEl = document.getElementById('household-active-role');
+    const membersCountEl = document.getElementById('household-members-count');
+    const inviteCodeEl = document.getElementById('household-invite-code-display');
+    const membersListEl = document.getElementById('household-members-list');
+    const leaveBtnText = document.getElementById('btn-leave-household-text');
+
+    const currentUserId = state.cloudUser?.id || '';
+    const isOwner = hh.role === 'owner' || (currentUserId && hh.ownerId === currentUserId);
+    const members = Array.isArray(hh.members) && hh.members.length > 0
+      ? hh.members
+      : [{
+          userId: currentUserId || hh.ownerId || 'local',
+          name: state.cloudUser?.name || 'Anfitrión',
+          email: state.cloudUser?.email || '',
+          role: 'owner'
+        }];
+
+    if (activeNameEl) activeNameEl.textContent = hh.name || 'Mi Hogar';
+    if (activeRoleEl) activeRoleEl.textContent = isOwner ? 'Anfitrión' : 'Miembro';
+    if (membersCountEl) {
+      membersCountEl.textContent = `${members.length} ${members.length === 1 ? 'miembro sincronizado' : 'miembros sincronizados'}`;
+    }
+    if (inviteCodeEl) inviteCodeEl.textContent = hh.inviteCode || 'SAB-0000';
+    if (leaveBtnText) {
+      leaveBtnText.textContent = (isOwner && members.length === 1) ? 'Disolver hogar' : 'Abandonar hogar';
+    }
+
+    if (membersListEl) {
+      membersListEl.innerHTML = members.map(m => {
+        const displayName = m.name || m.display_name || (m.email ? m.email.split('@')[0] : 'Miembro');
+        const initials = displayName.trim().slice(0, 2).toUpperCase() || 'HM';
+        const mRole = (m.role === 'owner' || m.userId === hh.ownerId) ? 'owner' : 'member';
+        const isMe = currentUserId && (m.userId === currentUserId || m.user_id === currentUserId);
+        const targetId = m.userId || m.user_id || '';
+
+        return `
+          <div class="household-member-item" role="listitem">
+            <div class="household-member-info">
+              <div class="household-member-avatar" aria-hidden="true">${escapeHtml(initials)}</div>
+              <div class="household-member-texts">
+                <span class="household-member-name">
+                  ${escapeHtml(displayName)}${isMe ? ' <span class="household-member-self-tag">(Tú)</span>' : ''}
+                </span>
+                ${m.email ? `<span class="household-member-email">${escapeHtml(m.email)}</span>` : ''}
+              </div>
+            </div>
+            <div class="household-member-actions">
+              <span class="household-role-pill">${mRole === 'owner' ? 'Anfitrión' : 'Miembro'}</span>
+              ${isOwner && !isMe && targetId ? `
+                <button type="button" class="btn btn-secondary btn-sm"
+                  data-action="transferHouseholdOwnership"
+                  data-user-id="${escapeHtml(targetId)}"
+                  title="Transferir administración del hogar a ${escapeHtml(displayName)}">
+                  Hacer anfitrión
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  async createHousehold(rawName) {
+    const nameInput = document.getElementById('input-create-household-name');
+    const cleanName = typeof rawName === 'string'
+      ? rawName.trim()
+      : (nameInput?.value.trim() || '');
+
+    if (!cleanName || cleanName.length < 2) {
+      if (nameInput) {
+        this.highlightInputError(nameInput, 'Introduce un nombre para tu Hogar (mínimo 2 caracteres).');
+      } else {
+        this.showToast('Introduce un nombre para tu Hogar.', 'warning');
+      }
+      return { success: false, reason: 'invalid_name' };
+    }
+
+    if (!state.cloudUser?.id) {
+      this.showToast('Inicia sesión en tu cuenta para crear un Hogar compartido.', 'info');
+      this.openAuthModal();
+      return { success: false, reason: 'auth_required' };
+    }
+
+    const householdId = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+      ? crypto.randomUUID()
+      : generateId('hh-');
+    const inviteCode = generateHouseholdInviteCode();
+    const nowIso = new Date().toISOString();
+
+    const ownerMember = {
+      userId: state.cloudUser.id,
+      name: state.cloudUser.name || (state.cloudUser.email ? state.cloudUser.email.split('@')[0] : 'Anfitrión'),
+      email: state.cloudUser.email || '',
+      role: 'owner',
+      joinedAt: nowIso
+    };
+
+    if (this.supabaseClient?.from) {
+      try {
+        const hhRes = await this.supabaseClient.from('households').insert({
+          id: householdId,
+          name: cleanName,
+          invite_code: inviteCode,
+          owner_id: state.cloudUser.id,
+          created_at: nowIso,
+          updated_at: nowIso
+        });
+        if (hhRes?.error) throw hhRes.error;
+
+        const memRes = await this.supabaseClient.from('household_members').upsert({
+          household_id: householdId,
+          user_id: state.cloudUser.id,
+          role: 'owner',
+          display_name: ownerMember.name,
+          email: ownerMember.email,
+          joined_at: nowIso
+        }, { onConflict: 'household_id,user_id' });
+        if (memRes?.error) {
+          console.warn('[Household] Aviso al insertar miembro propietario:', memRes.error);
+        }
+      } catch (err) {
+        console.warn('[Household] Error al crear hogar en Supabase:', err);
+        this.showToast('Error al crear el hogar en la nube: ' + (err.message || 'Fallo de red'), 'error');
+        return { success: false, reason: 'cloud_error', error: err };
+      }
+    }
+
+    const newHousehold = {
+      id: householdId,
+      name: cleanName,
+      inviteCode,
+      ownerId: state.cloudUser.id,
+      role: 'owner',
+      createdAt: nowIso,
+      members: [ownerMember]
+    };
+
+    state.saveHousehold(newHousehold);
+
+    // Convertir el plan semanal, compra y recetas actuales (no privadas) en la base compartida del Hogar
+    if (Array.isArray(state.recipes)) {
+      state.recipes.forEach(r => {
+        if (!r.isPrivate) {
+          r.householdId = householdId;
+          r.ownerUserId = r.ownerUserId || state.cloudUser.id;
+          r.updatedAt = nowIso;
+        }
+      });
+      state.save('fa_recipes', state.recipes);
+    }
+    if (state.mealPlan && typeof state.mealPlan === 'object') {
+      Object.keys(state.mealPlan).forEach(k => {
+        const day = state.mealPlan[k];
+        if (day) {
+          day.householdId = householdId;
+          day.ownerUserId = day.ownerUserId || state.cloudUser.id;
+          day.updatedAt = day.updatedAt || nowIso;
+        }
+      });
+      state.save('fa_mealplan', state.mealPlan);
+    }
+    if (Array.isArray(state.shoppingList)) {
+      state.shoppingList.forEach(item => {
+        item.householdId = householdId;
+        item.ownerUserId = item.ownerUserId || state.cloudUser.id;
+        item.updatedAt = item.updatedAt || nowIso;
+      });
+      state.save('fa_shopping', state.shoppingList);
+    }
+
+    // Forzar subida de todos los registros al hogar recién creado
+    state.lastSyncedAt = null;
+    if (nameInput) nameInput.value = '';
+    this.renderHouseholdSettings();
+    this.render();
+    this.initHouseholdRealtimeSubscription();
+    await this.pushToCloud(true);
+
+    this.showToast(`¡Hogar "${cleanName}" creado! Código de invitación: ${inviteCode}`, 'success');
+    return { success: true, household: newHousehold };
+  }
+
+  async joinHouseholdByCode(rawCode) {
+    const codeInput = document.getElementById('input-join-household-code');
+    const cleanCode = normalizeHouseholdInviteCode(
+      typeof rawCode === 'string' ? rawCode : (codeInput?.value || '')
+    );
+
+    if (!cleanCode || cleanCode.length < 4) {
+      if (codeInput) {
+        this.highlightInputError(codeInput, 'Introduce un código de invitación válido (ej. SAB-4F8K).');
+      } else {
+        this.showToast('Introduce un código de invitación válido.', 'warning');
+      }
+      return { success: false, reason: 'invalid_code' };
+    }
+
+    if (!state.cloudUser?.id) {
+      try {
+        localStorage.setItem('fa_pending_household_join', cleanCode);
+      } catch (e) {}
+      this.showToast(`Inicia sesión para unirte al Hogar con el código ${cleanCode}.`, 'info');
+      this.openAuthModal();
+      return { success: false, reason: 'auth_required', pendingCode: cleanCode };
+    }
+
+    if (!this.supabaseClient?.from) {
+      this.showToast('La unión a un Hogar requiere conexión con Supabase.', 'warning');
+      return { success: false, reason: 'no_supabase' };
+    }
+
+    try {
+      const hhQuery = this.supabaseClient.from('households').select('*').eq('invite_code', cleanCode);
+      const hhRes = typeof hhQuery.maybeSingle === 'function'
+        ? await hhQuery.maybeSingle()
+        : await hhQuery;
+
+      const remoteHousehold = Array.isArray(hhRes?.data) ? hhRes.data[0] : hhRes?.data;
+      if (hhRes?.error || !remoteHousehold || !remoteHousehold.id) {
+        if (codeInput) {
+          this.highlightInputError(codeInput, 'No se encontró ningún Hogar con ese código.');
+        } else {
+          this.showToast('No se encontró ningún Hogar con ese código de invitación.', 'error');
+        }
+        return { success: false, reason: 'not_found' };
+      }
+
+      // Respaldar el plan semanal y lista de compra personal antes de adoptar el espacio familiar unificado
+      if (!state.household?.id) {
+        state.personalBackup = {
+          mealPlan: typeof structuredClone === 'function' ? structuredClone(state.mealPlan || {}) : JSON.parse(JSON.stringify(state.mealPlan || {})),
+          shoppingList: typeof structuredClone === 'function' ? structuredClone(state.shoppingList || []) : JSON.parse(JSON.stringify(state.shoppingList || [])),
+          savedAt: new Date().toISOString()
+        };
+        state.save('fa_personal_backup', state.personalBackup);
+      }
+
+      const nowIso = new Date().toISOString();
+      const myRole = remoteHousehold.owner_id === state.cloudUser.id ? 'owner' : 'member';
+      const myDisplayName = state.cloudUser.name || (state.cloudUser.email ? state.cloudUser.email.split('@')[0] : 'Miembro');
+
+      await this.supabaseClient.from('household_members').upsert({
+        household_id: remoteHousehold.id,
+        user_id: state.cloudUser.id,
+        role: myRole,
+        display_name: myDisplayName,
+        email: state.cloudUser.email || '',
+        joined_at: nowIso
+      }, { onConflict: 'household_id,user_id' });
+
+      let membersList = [
+        {
+          userId: state.cloudUser.id,
+          name: myDisplayName,
+          email: state.cloudUser.email || '',
+          role: myRole,
+          joinedAt: nowIso
+        }
+      ];
+
+      try {
+        const memRes = await this.supabaseClient.from('household_members').select('*').eq('household_id', remoteHousehold.id);
+        if (Array.isArray(memRes?.data) && memRes.data.length > 0) {
+          membersList = memRes.data.map(m => ({
+            userId: m.user_id || m.userId,
+            name: m.display_name || m.name || (m.email ? m.email.split('@')[0] : 'Miembro'),
+            email: m.email || '',
+            role: m.role || (m.user_id === remoteHousehold.owner_id ? 'owner' : 'member'),
+            joinedAt: m.joined_at || nowIso
+          }));
+        }
+      } catch (e) {}
+
+      const joinedHousehold = {
+        id: remoteHousehold.id,
+        name: remoteHousehold.name || 'Hogar Familiar',
+        inviteCode: remoteHousehold.invite_code || cleanCode,
+        ownerId: remoteHousehold.owner_id,
+        role: myRole,
+        createdAt: remoteHousehold.created_at || nowIso,
+        members: membersList
+      };
+
+      state.saveHousehold(joinedHousehold);
+      try {
+        localStorage.removeItem('fa_pending_household_join');
+      } catch (e) {}
+
+      // Limpiar plan y lista locales para adoptar el Planificador y Lista de Compra unificados del Hogar
+      state.mealPlan = {};
+      state.shoppingList = [];
+      state.lastSyncedAt = null;
+      state.save('fa_mealplan', state.mealPlan);
+      state.save('fa_shopping', state.shoppingList);
+
+      if (codeInput) codeInput.value = '';
+      await this.pullFromCloud();
+      // Si el hogar aún no tenía días en mealPlan, inicializar la semana actual
+      if (!state.mealPlan || Object.keys(state.mealPlan).length === 0) {
+        state.mealPlan = state.generateInitialMealPlan();
+        state.save('fa_mealplan', state.mealPlan);
+      }
+      await this.pushToCloud(true);
+
+      this.initHouseholdRealtimeSubscription();
+      this.renderHouseholdSettings();
+      this.render();
+      this.showToast(`¡Te has unido a "${joinedHousehold.name}"! Menú, recetas y compra sincronizados.`, 'success');
+      return { success: true, household: joinedHousehold };
+    } catch (err) {
+      console.warn('[Household] Error al unirse al hogar:', err);
+      this.showToast('Error al unirse al hogar: ' + (err.message || 'Fallo de conexión'), 'error');
+      return { success: false, reason: 'cloud_error', error: err };
+    }
+  }
+
+  async refreshHouseholdMembersFromCloud(householdId = state.household?.id) {
+    if (!householdId || !this.supabaseClient?.from || !state.household) return;
+    try {
+      const [hhRes, memRes] = await Promise.all([
+        this.supabaseClient.from('households').select('*').eq('id', householdId),
+        this.supabaseClient.from('household_members').select('*').eq('household_id', householdId)
+      ]);
+      const hhRow = Array.isArray(hhRes?.data) ? hhRes.data[0] : hhRes?.data;
+      if (hhRow && hhRow.id) {
+        state.household.name = hhRow.name || state.household.name;
+        state.household.inviteCode = hhRow.invite_code || state.household.inviteCode;
+        state.household.ownerId = hhRow.owner_id || state.household.ownerId;
+        state.household.role = hhRow.owner_id === state.cloudUser?.id ? 'owner' : 'member';
+      }
+      if (Array.isArray(memRes?.data) && memRes.data.length > 0) {
+        state.household.members = memRes.data.map(m => ({
+          userId: m.user_id || m.userId,
+          name: m.display_name || m.name || (m.email ? m.email.split('@')[0] : 'Miembro'),
+          email: m.email || '',
+          role: m.role || (m.user_id === state.household.ownerId ? 'owner' : 'member'),
+          joinedAt: m.joined_at
+        }));
+      }
+      state.saveHousehold(state.household);
+      this.renderHouseholdSettings();
+    } catch (e) {}
+  }
+
+  async loadHouseholdByIdFromCloud(householdId) {
+    if (!householdId || !this.supabaseClient?.from) return null;
+    try {
+      const [hhRes, memRes] = await Promise.all([
+        this.supabaseClient.from('households').select('*').eq('id', householdId),
+        this.supabaseClient.from('household_members').select('*').eq('household_id', householdId)
+      ]);
+      const hhRow = Array.isArray(hhRes?.data) ? hhRes.data[0] : hhRes?.data;
+      if (!hhRow || !hhRow.id) return null;
+
+      const members = Array.isArray(memRes?.data)
+        ? memRes.data.map(m => ({
+            userId: m.user_id || m.userId,
+            name: m.display_name || m.name || (m.email ? m.email.split('@')[0] : 'Miembro'),
+            email: m.email || '',
+            role: m.role || (m.user_id === hhRow.owner_id ? 'owner' : 'member'),
+            joinedAt: m.joined_at
+          }))
+        : [];
+
+      const loaded = {
+        id: hhRow.id,
+        name: hhRow.name,
+        inviteCode: hhRow.invite_code,
+        ownerId: hhRow.owner_id,
+        role: hhRow.owner_id === state.cloudUser?.id ? 'owner' : 'member',
+        createdAt: hhRow.created_at,
+        members
+      };
+      state.saveHousehold(loaded);
+      this.initHouseholdRealtimeSubscription();
+      this.renderHouseholdSettings();
+      return loaded;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async transferHouseholdOwnership(targetUserId) {
+    if (!state.household?.id || !targetUserId) {
+      return { success: false, reason: 'invalid_state' };
+    }
+    const currentUserId = state.cloudUser?.id || '';
+    const isOwner = state.household.role === 'owner' || state.household.ownerId === currentUserId;
+    if (!isOwner) {
+      this.showToast('Solo el anfitrión actual puede transferir la administración del hogar.', 'warning');
+      return { success: false, reason: 'not_owner' };
+    }
+
+    const householdId = state.household.id;
+    const targetMember = (state.household.members || []).find(m => (m.userId || m.user_id) === targetUserId);
+    const targetName = targetMember?.name || 'el miembro seleccionado';
+
+    if (this.supabaseClient?.from) {
+      try {
+        await Promise.all([
+          this.supabaseClient.from('households').update({ owner_id: targetUserId, updated_at: new Date().toISOString() }).eq('id', householdId),
+          this.supabaseClient.from('household_members').update({ role: 'owner' }).eq('household_id', householdId).eq('user_id', targetUserId),
+          this.supabaseClient.from('household_members').update({ role: 'member' }).eq('household_id', householdId).eq('user_id', currentUserId)
+        ]);
+      } catch (err) {
+        console.warn('[Household] Error al transferir propiedad:', err);
+      }
+    }
+
+    state.household.ownerId = targetUserId;
+    state.household.role = 'member';
+    if (Array.isArray(state.household.members)) {
+      state.household.members = state.household.members.map(m => {
+        const uid = m.userId || m.user_id;
+        return {
+          ...m,
+          role: uid === targetUserId ? 'owner' : 'member'
+        };
+      });
+    }
+    state.saveHousehold(state.household);
+    this.renderHouseholdSettings();
+    this.showToast(`Ahora ${targetName} es el anfitrión de "${state.household.name}".`, 'success');
+    return { success: true };
+  }
+
+  async leaveHousehold(skipConfirm = false) {
+    if (!state.household?.id) {
+      return { success: false, reason: 'no_household' };
+    }
+
+    const hh = state.household;
+    const currentUserId = state.cloudUser?.id || '';
+    const isOwner = hh.role === 'owner' || hh.ownerId === currentUserId;
+    const otherMembers = (hh.members || []).filter(m => (m.userId || m.user_id) !== currentUserId);
+
+    const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
+      title: isOwner && otherMembers.length === 0 ? `¿Disolver "${hh.name}"?` : `¿Abandonar "${hh.name}"?`,
+      message: isOwner && otherMembers.length > 0
+        ? `Saldrás del hogar "${hh.name}" y la administración pasará automáticamente a ${otherMembers[0].name || 'otro miembro'}. Volverás a tu Modo Personal.`
+        : `Dejarás de compartir el menú semanal y la lista de la compra con "${hh.name}" y volverás a tu Modo Personal.`,
+      confirmText: isOwner && otherMembers.length === 0 ? 'Disolver hogar' : 'Salir del hogar',
+      cancelText: 'Cancelar',
+      danger: true,
+      icon: 'logout'
+    });
+
+    if (!confirmed) return { success: false, reason: 'cancelled' };
+
+    this.teardownHouseholdRealtimeSubscription();
+
+    if (this.supabaseClient?.from && currentUserId) {
+      try {
+        if (isOwner) {
+          if (otherMembers.length > 0) {
+            const nextOwnerId = otherMembers[0].userId || otherMembers[0].user_id;
+            await this.supabaseClient.from('households').update({ owner_id: nextOwnerId }).eq('id', hh.id);
+            await this.supabaseClient.from('household_members').update({ role: 'owner' }).eq('household_id', hh.id).eq('user_id', nextOwnerId);
+          } else {
+            await this.supabaseClient.from('households').delete().eq('id', hh.id);
+          }
+        }
+        await this.supabaseClient.from('household_members').delete().eq('household_id', hh.id).eq('user_id', currentUserId);
+        await this.upsertWithSchemaFallback('user_settings', [{
+          user_id: currentUserId,
+          active_household_id: null,
+          updated_at: new Date().toISOString()
+        }]);
+      } catch (err) {
+        console.warn('[Household] Error al abandonar hogar en Supabase:', err);
+      }
+    }
+
+    // Restaurar espacio individual (planificador y lista de compra previos) y conservar recetas propias
+    if (state.personalBackup) {
+      if (state.personalBackup.mealPlan) {
+        state.mealPlan = state.personalBackup.mealPlan;
+      }
+      if (Array.isArray(state.personalBackup.shoppingList)) {
+        state.shoppingList = state.personalBackup.shoppingList;
+      }
+      state.personalBackup = null;
+      state.save('fa_personal_backup', null);
+      try { localStorage.removeItem('fa_personal_backup'); } catch (e) {}
+    }
+
+    if (Array.isArray(state.recipes)) {
+      state.recipes = state.recipes
+        .filter(r => !r.ownerUserId || !currentUserId || r.ownerUserId === currentUserId)
+        .map(r => {
+          const copy = { ...r };
+          delete copy.householdId;
+          return copy;
+        });
+    }
+
+    state.saveHousehold(null);
+    try { localStorage.removeItem('fa_household'); } catch (e) {}
+    state.lastSyncedAt = null;
+    state.save('fa_recipes', state.recipes);
+    state.save('fa_mealplan', state.mealPlan);
+    state.save('fa_shopping', state.shoppingList);
+
+    this.renderHouseholdSettings();
+    this.render();
+    this.showToast(`Has salido de "${hh.name}". Estás de nuevo en tu Modo Personal.`, 'info');
+    return { success: true };
+  }
+
+  getHouseholdInviteUrl() {
+    const code = state.household?.inviteCode || '';
+    const origin = (typeof window !== 'undefined' && window.location?.origin && /^https?:\/\//i.test(window.location.origin) && !/localhost|127\.0\.0\.1/i.test(window.location.origin))
+      ? `${window.location.origin}${window.location.pathname || '/'}`
+      : 'https://sabory.food/';
+    return `${origin.replace(/\?.*$/, '')}?join=${encodeURIComponent(code)}`;
+  }
+
+  async copyHouseholdInviteCode() {
+    if (!state.household?.inviteCode) return false;
+    const code = state.household.inviteCode;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(code);
+      }
+    } catch (e) {}
+    this.showToast(`Código ${code} copiado al portapapeles.`, 'success');
+    return true;
+  }
+
+  async shareHouseholdInviteLink() {
+    if (!state.household?.inviteCode) return false;
+    const url = this.getHouseholdInviteUrl();
+    const message = `🏠 ¡Únete a nuestro hogar "${state.household.name}" en Sabory para compartir el menú semanal, el recetario y la lista de la compra en tiempo real!\n\n🔑 Código: ${state.household.inviteCode}\n👉 Enlace directo: ${url}`;
+
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({
+          title: `Invitación a ${state.household.name} en Sabory`,
+          text: message,
+          url
+        });
+        return true;
+      } catch (err) {
+        if (err?.name === 'AbortError') return false;
+      }
+    }
+
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(message);
+      }
+    } catch (e) {}
+    this.showToast('Invitación copiada al portapapeles lista para pegar en WhatsApp.', 'success');
+    return true;
+  }
+
+  handleHouseholdJoinUrlLaunch() {
+    if (typeof window === 'undefined' || !window.location?.search) return false;
+    let params;
+    try {
+      params = new URLSearchParams(window.location.search);
+    } catch (e) {
+      return false;
+    }
+
+    const rawJoin = params.get('join') || params.get('household') || '';
+    const cleanCode = normalizeHouseholdInviteCode(rawJoin);
+    if (!cleanCode) return false;
+
+    try {
+      if (window.history && typeof window.history.replaceState === 'function') {
+        const cleanUrl = window.location.pathname + (window.location.hash || '');
+        window.history.replaceState({}, '', cleanUrl);
+      }
+    } catch (e) {}
+
+    setTimeout(() => {
+      this.joinHouseholdByCode(cleanCode);
+    }, 120);
+    return true;
+  }
+
+  processPendingHouseholdJoin() {
+    let pendingCode = '';
+    try {
+      pendingCode = localStorage.getItem('fa_pending_household_join') || '';
+    } catch (e) {}
+    if (!pendingCode || !state.cloudUser?.id) return false;
+    try {
+      localStorage.removeItem('fa_pending_household_join');
+    } catch (e) {}
+    setTimeout(() => {
+      this.joinHouseholdByCode(pendingCode);
+    }, 200);
+    return true;
+  }
+
+  initHouseholdRealtimeSubscription() {
+    this.teardownHouseholdRealtimeSubscription();
+    const householdId = state.household?.id;
+    if (!householdId || !this.supabaseClient || typeof this.supabaseClient.channel !== 'function') {
+      return null;
+    }
+
+    try {
+      const channel = this.supabaseClient.channel(`household-${householdId}`);
+      const onRealtimeChange = (payload) => {
+        this.handleHouseholdRealtimeEvent(payload);
+      };
+
+      channel
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_items', filter: `household_id=eq.${householdId}` }, onRealtimeChange)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'meal_plans', filter: `household_id=eq.${householdId}` }, onRealtimeChange)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'recipes', filter: `household_id=eq.${householdId}` }, onRealtimeChange)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'household_members', filter: `household_id=eq.${householdId}` }, onRealtimeChange)
+        .subscribe();
+
+      this.householdRealtimeChannel = channel;
+      return channel;
+    } catch (err) {
+      console.warn('[Household Realtime] No se pudo suscribir al canal en tiempo real:', err);
+      return null;
+    }
+  }
+
+  teardownHouseholdRealtimeSubscription() {
+    if (this._householdRealtimeDebounce) {
+      clearTimeout(this._householdRealtimeDebounce);
+      this._householdRealtimeDebounce = null;
+    }
+    if (this.householdRealtimeChannel) {
+      try {
+        if (this.supabaseClient && typeof this.supabaseClient.removeChannel === 'function') {
+          this.supabaseClient.removeChannel(this.householdRealtimeChannel);
+        } else if (typeof this.householdRealtimeChannel.unsubscribe === 'function') {
+          this.householdRealtimeChannel.unsubscribe();
+        }
+      } catch (e) {}
+      this.householdRealtimeChannel = null;
+    }
+  }
+
+  handleHouseholdRealtimeEvent(payload) {
+    if (!state.household?.id) return;
+    if (this._householdRealtimeDebounce) {
+      clearTimeout(this._householdRealtimeDebounce);
+    }
+    this._householdRealtimeDebounce = setTimeout(async () => {
+      this._householdRealtimeDebounce = null;
+      await this.pullFromCloud();
+    }, 250);
   }
 
   // ==========================================================================
@@ -16497,6 +17421,8 @@ if (typeof window !== 'undefined') {
   window.formatSafeAiMarkdown = formatSafeAiMarkdown;
   window.AI_TOOLS_DECLARATIONS = AI_TOOLS_DECLARATIONS;
   window.checkDietaryCompliance = checkDietaryCompliance;
+  window.generateHouseholdInviteCode = generateHouseholdInviteCode;
+  window.normalizeHouseholdInviteCode = normalizeHouseholdInviteCode;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -16538,6 +17464,8 @@ if (typeof module !== 'undefined' && module.exports) {
     getRecipeNutrition,
     formatSafeAiMarkdown,
     AI_TOOLS_DECLARATIONS,
-    checkDietaryCompliance
+    checkDietaryCompliance,
+    generateHouseholdInviteCode,
+    normalizeHouseholdInviteCode
   };
 }
