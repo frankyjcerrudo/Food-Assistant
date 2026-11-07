@@ -1281,11 +1281,11 @@ function mergeOrAddShoppingItem(shoppingList, newItem) {
   const incomingBreakdown = Array.isArray(newItem.recipeBreakdown) && newItem.recipeBreakdown.length > 0
     ? newItem.recipeBreakdown
     : [{
-        recipe: newItem.recipeOrigin ? String(newItem.recipeOrigin).trim() : 'Añadido manualmente',
-        name: String(newItem.name).trim(),
-        amount: newItem.amount !== undefined && newItem.amount !== null && !isNaN(Number(newItem.amount)) ? Number(newItem.amount) : null,
-        unit: newItem.unit || ''
-      }];
+      recipe: newItem.recipeOrigin ? String(newItem.recipeOrigin).trim() : 'Añadido manualmente',
+      name: String(newItem.name).trim(),
+      amount: newItem.amount !== undefined && newItem.amount !== null && !isNaN(Number(newItem.amount)) ? Number(newItem.amount) : null,
+      unit: newItem.unit || ''
+    }];
 
   for (let i = 0; i < shoppingList.length; i++) {
     const existing = shoppingList[i];
@@ -1454,7 +1454,7 @@ function setCachedAisle(normalizedText, aisle) {
     const cache = getAisleCache();
     cache[normalizedText] = aisle;
     localStorage.setItem(AISLE_CACHE_KEY, JSON.stringify(cache));
-  } catch (e) {}
+  } catch (e) { }
 }
 
 let _aisleLookupTimeout = null;
@@ -1830,7 +1830,7 @@ function getIngredientSuggestions(query, max = 6, extraItems = []) {
 // ==========================================================================
 function extractTimerFromStepText(text) {
   if (!text || typeof text !== 'string') return 0;
-  
+
   // Try RecipeParser.extractTimerMinutes if available
   if (typeof RecipeParser !== 'undefined' && typeof RecipeParser.extractTimerMinutes === 'function') {
     const pVal = RecipeParser.extractTimerMinutes(text);
@@ -2067,9 +2067,9 @@ class IndexedDbStorage {
       try {
         const tx = db.transaction(FA_IDB_STORE, 'readwrite');
         tx.objectStore(FA_IDB_STORE).delete(key);
-      } catch {}
+      } catch { }
     }
-    try { localStorage.removeItem(key); } catch {}
+    try { localStorage.removeItem(key); } catch { }
   }
 
   async migrateFromLocalStorage() {
@@ -2091,7 +2091,7 @@ class IndexedDbStorage {
             const val = JSON.parse(raw);
             await this.set(k, val);
           }
-        } catch {}
+        } catch { }
       }
       await this.set('fa_idb_migrated', new Date().toISOString());
       console.log(`[Storage] Migración exitosa de ${keysToMigrate.length} claves fa_* a IndexedDB.`);
@@ -2139,7 +2139,7 @@ class StateStore {
     let savedRecipes = this.load('fa_recipes', null);
     if (!savedRecipes) {
       savedRecipes = typeof structuredClone === 'function' ? structuredClone(SEED_RECIPES) : JSON.parse(JSON.stringify(SEED_RECIPES));
-      try { localStorage.setItem('fa_recipes_seeded', 'v8'); } catch (e) {}
+      try { localStorage.setItem('fa_recipes_seeded', 'v8'); } catch (e) { }
     } else {
       const seeded = localStorage.getItem('fa_recipes_seeded');
       if (seeded !== 'v8') {
@@ -2149,7 +2149,7 @@ class StateStore {
             savedRecipes.push(seed);
           }
         });
-        try { localStorage.setItem('fa_recipes_seeded', 'v8'); } catch (e) {}
+        try { localStorage.setItem('fa_recipes_seeded', 'v8'); } catch (e) { }
       }
     }
     if (Array.isArray(savedRecipes)) {
@@ -2170,7 +2170,7 @@ class StateStore {
         }
       });
       if (tagsCleaned) {
-        try { localStorage.setItem('fa_recipes', JSON.stringify(savedRecipes)); } catch (e) {}
+        try { localStorage.setItem('fa_recipes', JSON.stringify(savedRecipes)); } catch (e) { }
       }
     }
     this.recipes = savedRecipes;
@@ -2923,7 +2923,7 @@ const RecipeParser = {
 
     // 1. Spanish fraction hour expressions
     const halfMatch = stepText.match(/(?:durante|por|remojo|reposar|cocer|hornear|cocinar|llevar[aá])\s+(?:unos?\s+)?(?:(\d+)\s*(?:h|horas?)\s*y\s*media|media\s*hora)/i) ||
-                      stepText.match(/(?:(\d+)\s*(?:h|horas?)\s*y\s*media|media\s*hora)/i);
+      stepText.match(/(?:(\d+)\s*(?:h|horas?)\s*y\s*media|media\s*hora)/i);
     if (halfMatch) {
       return this.parseIsoDuration(halfMatch[0]);
     }
@@ -2988,9 +2988,9 @@ const RecipeParser = {
     }
 
     // Reject obvious instruction / procedural lines that slipped into ingredient parsing
-    if (clean.length > 95 || 
-        /^(?:limpia|remueve|unta|vierte|introduce|sirve|bate|hornea|saltea|precalienta|pela|trocea|fr[i\u00ED]e)\b/i.test(clean) ||
-        /\b(?:pelamos|cortamos|batimos|mezclamos|ponemos|a[n\u00F1]adimos|dejamos|doramos|sofre[i\u00ED]mos|cocinamos|horneamos|trituramos|se\s+(?:pelan|cortan|baten|rebozan|fr[i\u00ED]en|mezclan|presenta|ponen))\b/i.test(clean)) {
+    if (clean.length > 95 ||
+      /^(?:limpia|remueve|unta|vierte|introduce|sirve|bate|hornea|saltea|precalienta|pela|trocea|fr[i\u00ED]e)\b/i.test(clean) ||
+      /\b(?:pelamos|cortamos|batimos|mezclamos|ponemos|a[n\u00F1]adimos|dejamos|doramos|sofre[i\u00ED]mos|cocinamos|horneamos|trituramos|se\s+(?:pelan|cortan|baten|rebozan|fr[i\u00ED]en|mezclan|presenta|ponen))\b/i.test(clean)) {
       return null;
     }
 
@@ -3172,7 +3172,7 @@ const RecipeParser = {
         } else {
           jsonObjects.push(parsed);
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     for (const item of jsonObjects) {
@@ -3234,31 +3234,31 @@ const RecipeParser = {
             recipeInstructions: instructions
           };
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     return null;
   },
 
   extractImageFromHtml(html) {
     if (!html || typeof html !== 'string') return '';
-    
+
     // 1. OpenGraph image (og:image)
     const ogMatch = html.match(/<meta\s+[^>]*property=["']og:image(?::secure_url)?["'][^>]*content=["']([^"']+)["']/i) ||
-                    html.match(/<meta\s+[^>]*content=["']([^"']+)["'][^>]*property=["']og:image(?::secure_url)?["']/i);
+      html.match(/<meta\s+[^>]*content=["']([^"']+)["'][^>]*property=["']og:image(?::secure_url)?["']/i);
     if (ogMatch && ogMatch[1] && !this.isBadImage(ogMatch[1])) {
       return this.cleanImageUrl(ogMatch[1]);
     }
 
     // 2. Twitter Card image (twitter:image)
     const twMatch = html.match(/<meta\s+[^>]*name=["']twitter:image(?::src)?["'][^>]*content=["']([^"']+)["']/i) ||
-                    html.match(/<meta\s+[^>]*content=["']([^"']+)["'][^>]*name=["']twitter:image(?::src)?["']/i);
+      html.match(/<meta\s+[^>]*content=["']([^"']+)["'][^>]*name=["']twitter:image(?::src)?["']/i);
     if (twMatch && twMatch[1] && !this.isBadImage(twMatch[1])) {
       return this.cleanImageUrl(twMatch[1]);
     }
 
     // 3. Schema.org / Microdata image link
     const schemaImgMatch = html.match(/<meta\s+[^>]*itemprop=["']image["'][^>]*content=["']([^"']+)["']/i) ||
-                           html.match(/<link\s+[^>]*rel=["']image_src["'][^>]*href=["']([^"']+)["']/i);
+      html.match(/<link\s+[^>]*rel=["']image_src["'][^>]*href=["']([^"']+)["']/i);
     if (schemaImgMatch && schemaImgMatch[1] && !this.isBadImage(schemaImgMatch[1])) {
       return this.cleanImageUrl(schemaImgMatch[1]);
     }
@@ -3275,7 +3275,7 @@ const RecipeParser = {
             return this.cleanImageUrl(src);
           }
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     return '';
@@ -3352,7 +3352,7 @@ const RecipeParser = {
         if (text && text.trim().length > 50) {
           return text.trim();
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     return html
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
@@ -3376,24 +3376,24 @@ const RecipeParser = {
     }
   },
 
-isWrapperDomain(domainOrUrl) {
+  isWrapperDomain(domainOrUrl) {
     if (!domainOrUrl || typeof domainOrUrl !== 'string') return false;
     const domain = (domainOrUrl.includes('://') ? this.getDomain(domainOrUrl) : domainOrUrl).toLowerCase().trim();
     if (!domain) return false;
     return domain === 'share.google' ||
-           domain.endsWith('.share.google') ||
-           domain === 'google.com' ||
-           domain.endsWith('.google.com') ||
-           domain === 'google.es' ||
-           domain.endsWith('.google.es') ||
-           domain === 'goo.gl' ||
-           domain === 't.co' ||
-           domain === 'bit.ly' ||
-           domain === 'tinyurl.com' ||
-           domain === 'out.reddit.com' ||
-           domain === 'l.instagram.com' ||
-           domain === 'l.facebook.com' ||
-           domain === 'lm.facebook.com';
+      domain.endsWith('.share.google') ||
+      domain === 'google.com' ||
+      domain.endsWith('.google.com') ||
+      domain === 'google.es' ||
+      domain.endsWith('.google.es') ||
+      domain === 'goo.gl' ||
+      domain === 't.co' ||
+      domain === 'bit.ly' ||
+      domain === 'tinyurl.com' ||
+      domain === 'out.reddit.com' ||
+      domain === 'l.instagram.com' ||
+      domain === 'l.facebook.com' ||
+      domain === 'lm.facebook.com';
   },
 
   unwrapRedirectUrl(rawUrl) {
@@ -3411,7 +3411,7 @@ isWrapperDomain(domainOrUrl) {
           return this.unwrapRedirectUrl(val);
         }
       }
-    } catch (e) {}
+    } catch (e) { }
     return url;
   },
 
@@ -3433,12 +3433,12 @@ isWrapperDomain(domainOrUrl) {
     }
     if (html && typeof html === 'string') {
       const canonicalMatch = html.match(/<link\s+[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)["']/i) ||
-                             html.match(/<link\s+[^>]*href=["']([^"']+)["'][^>]*rel=["']canonical["']/i);
+        html.match(/<link\s+[^>]*href=["']([^"']+)["'][^>]*rel=["']canonical["']/i);
       if (canonicalMatch && /^https?:\/\//i.test(canonicalMatch[1])) {
         return canonicalMatch[1].trim();
       }
       const ogMatch = html.match(/<meta\s+[^>]*property=["']og:url["'][^>]*content=["']([^"']+)["']/i) ||
-                      html.match(/<meta\s+[^>]*content=["']([^"']+)["'][^>]*property=["']og:url["']/i);
+        html.match(/<meta\s+[^>]*content=["']([^"']+)["'][^>]*property=["']og:url["']/i);
       if (ogMatch && /^https?:\/\//i.test(ogMatch[1])) {
         return ogMatch[1].trim();
       }
@@ -3453,7 +3453,7 @@ isWrapperDomain(domainOrUrl) {
     }
     if (html && typeof html === 'string') {
       const ogSite = html.match(/<meta\s+[^>]*property=["']og:site_name["'][^>]*content=["']([^"']+)["']/i) ||
-                     html.match(/<meta\s+[^>]*content=["']([^"']+)["'][^>]*property=["']og:site_name["']/i);
+        html.match(/<meta\s+[^>]*content=["']([^"']+)["'][^>]*property=["']og:site_name["']/i);
       if (ogSite && ogSite[1].trim()) {
         const site = ogSite[1].trim();
         if (!this.isWrapperDomain(site)) return site;
@@ -3550,10 +3550,10 @@ isWrapperDomain(domainOrUrl) {
           .replace(/\s+/g, ' ')
           .trim();
         if (cleaned && cleaned.length > 5) {
-          instructions.push({ 
-            step: instructions.length + 1, 
-            text: cleaned, 
-            timerMinutes: this.extractTimerMinutes(cleaned) 
+          instructions.push({
+            step: instructions.length + 1,
+            text: cleaned,
+            timerMinutes: this.extractTimerMinutes(cleaned)
           });
         }
       }
@@ -3644,7 +3644,7 @@ isWrapperDomain(domainOrUrl) {
         if (schema && (this.isRecipeType(schema['@type']) || schema.recipeIngredient || schema.ingredients)) {
           return this.parseSchemaRecipe(schema, sourceUrl, html);
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     // Extract first valid food image from HTML / OpenGraph or markdown
@@ -3867,8 +3867,8 @@ isWrapperDomain(domainOrUrl) {
       const isShortMeta = line.length < 80 && !/(?:mezclamos|escurrimos|colocamos|ponemos|abrimos|limpia|corta|vierte|hornea|dora)/i.test(line);
       if (currentSection !== 'instructions' || isShortMeta) {
         const servingsMatch = line.match(/(?:para|rinde|porciones|raciones|comensales|personas|servings|cantidad)[:\s]+(\d+)/i) ||
-                              line.match(/(?:para|de|rinde)\s+(\d+)\s*(?:personas|raciones|porciones|comensales|servings|bocadillos|unidades|piezas)/i) ||
-                              line.match(/^(\d+)\s*(?:personas|raciones|porciones|comensales|servings|bocadillos|unidades|piezas)$/i);
+          line.match(/(?:para|de|rinde)\s+(\d+)\s*(?:personas|raciones|porciones|comensales|servings|bocadillos|unidades|piezas)/i) ||
+          line.match(/^(\d+)\s*(?:personas|raciones|porciones|comensales|servings|bocadillos|unidades|piezas)$/i);
         if (servingsMatch) {
           servings = parseInt(servingsMatch[1], 10);
         }
@@ -4377,8 +4377,8 @@ isWrapperDomain(domainOrUrl) {
     // Normalization of ingredients with aisle categorization
     if (Array.isArray(finalRecipe.ingredients)) {
       finalRecipe.ingredients = finalRecipe.ingredients.map(ing => {
-        const itemAisle = ing.aisle && ing.aisle !== 'other' 
-          ? ing.aisle 
+        const itemAisle = ing.aisle && ing.aisle !== 'other'
+          ? ing.aisle
           : (typeof categorizeIngredientAisle === 'function' ? categorizeIngredientAisle(ing.name) : 'other');
         return {
           id: ing.id || generateId('i-'),
@@ -4530,7 +4530,7 @@ class FoodAssistantApp {
     this.onboardingStep = 1; // US-68: Onboarding Wizard current step (1..5)
     this.onboardingDietary = new Set(Array.isArray(state.dietaryPreferences) ? state.dietaryPreferences : []);
     this.onboardingServings = state.defaultServings || 2;
-    
+
     // US-34: Fridge Reverse Search state
     this.fridgeIngredients = [];
 
@@ -4702,7 +4702,7 @@ class FoodAssistantApp {
   dismissPwaBanner() {
     try {
       localStorage.setItem('fa_pwa_banner_dismissed', 'true');
-    } catch (e) {}
+    } catch (e) { }
     const banner = document.getElementById('pwa-smart-banner');
     if (banner) banner.hidden = true;
   }
@@ -4820,7 +4820,7 @@ class FoodAssistantApp {
   initElements() {
     this.navItems = document.querySelectorAll('.bottom-nav .nav-item, .desktop-header-nav .header-nav-btn');
     this.viewPanels = document.querySelectorAll('.view-panel');
-    
+
     // Modals
     this.modalRecipeDetail = document.getElementById('modal-recipe-detail');
     this.modalRecipePicker = document.getElementById('modal-recipe-picker');
@@ -5319,7 +5319,7 @@ class FoodAssistantApp {
       if (settingsIcon) settingsIcon.textContent = isDemoSession ? 'account_circle' : 'cloud_done';
       if (settingsName) settingsName.textContent = user.name || user.email.split('@')[0];
       if (settingsStatus) {
-        settingsStatus.textContent = !this.supabaseClient 
+        settingsStatus.textContent = !this.supabaseClient
           ? 'Perfil local (Demo) - Supabase no configurado'
           : `Sincronizado con Supabase (${user.provider || 'email'})`;
       }
@@ -5485,7 +5485,7 @@ class FoodAssistantApp {
 
   logoutCloudUser() {
     if (this.supabaseClient) {
-      this.supabaseClient.auth.signOut().catch(() => {});
+      this.supabaseClient.auth.signOut().catch(() => { });
     }
     state.cloudUser = null;
     state.save('fa_cloud_user', null);
@@ -5532,7 +5532,7 @@ class FoodAssistantApp {
       }
       try {
         await this.supabaseClient.auth.signOut();
-      } catch (e) {}
+      } catch (e) { }
     }
 
     // 2. Limpiar sesión y rastro de sincronización
@@ -5563,7 +5563,7 @@ class FoodAssistantApp {
       localStorage.removeItem('fa_household');
       localStorage.removeItem('fa_personal_backup');
       localStorage.removeItem('fa_last_synced_at');
-    } catch (e) {}
+    } catch (e) { }
 
     state.recipes = typeof structuredClone === 'function' ? structuredClone(SEED_RECIPES) : JSON.parse(JSON.stringify(SEED_RECIPES));
     state.mealPlan = state.generateInitialMealPlan();
@@ -5616,7 +5616,7 @@ class FoodAssistantApp {
       if (activeHouseholdId && typeof this.refreshHouseholdMembersFromCloud === 'function') {
         try {
           await this.refreshHouseholdMembersFromCloud(activeHouseholdId);
-        } catch (hhErr) {}
+        } catch (hhErr) { }
       }
 
       let recBase = this.supabaseClient.from('recipes').select('*');
@@ -5725,14 +5725,14 @@ class FoodAssistantApp {
 
           const cleanInstructions = Array.isArray(remoteRow.instructions)
             ? remoteRow.instructions.map((inst, idx) => {
-                if (idx === 0 && inst && typeof inst === 'object' && ('_nutrition' in inst || '_isFavorite' in inst)) {
-                  const copy = { ...inst };
-                  delete copy._nutrition;
-                  delete copy._isFavorite;
-                  return copy;
-                }
-                return inst;
-              }).filter(inst => inst && (typeof inst === 'string' ? inst.trim() !== '' : (inst.text?.trim() !== '' || inst.timerMinutes > 0)))
+              if (idx === 0 && inst && typeof inst === 'object' && ('_nutrition' in inst || '_isFavorite' in inst)) {
+                const copy = { ...inst };
+                delete copy._nutrition;
+                delete copy._isFavorite;
+                return copy;
+              }
+              return inst;
+            }).filter(inst => inst && (typeof inst === 'string' ? inst.trim() !== '' : (inst.text?.trim() !== '' || inst.timerMinutes > 0)))
             : [];
 
           const remoteRecipe = {
@@ -5940,7 +5940,7 @@ class FoodAssistantApp {
           if (Array.isArray(remoteRow.recipe_breakdown)) {
             breakdown = remoteRow.recipe_breakdown;
           } else if (typeof remoteRow.recipe_breakdown === 'string') {
-            try { breakdown = JSON.parse(remoteRow.recipe_breakdown); } catch (e) {}
+            try { breakdown = JSON.parse(remoteRow.recipe_breakdown); } catch (e) { }
           }
 
           if (!breakdown && local && Array.isArray(local.recipeBreakdown) && local.recipeBreakdown.length > 0) {
@@ -6352,13 +6352,13 @@ class FoodAssistantApp {
       const lastSyncTimeMs = state.lastSyncedAt ? new Date(state.lastSyncedAt).getTime() : 0;
       const dirtyRecipes = Array.isArray(state.recipes)
         ? state.recipes.filter(recipe => {
-            if (!recipe || !recipe.id) return false;
-            if (state.deletedRecords.recipes?.includes(recipe.id)) return false;
-            if (recipe._isLocalDraft) return true;
-            if (!lastSyncTimeMs) return true;
-            const modTime = new Date(recipe.updatedAt || recipe.createdAt || 0).getTime();
-            return modTime > lastSyncTimeMs;
-          })
+          if (!recipe || !recipe.id) return false;
+          if (state.deletedRecords.recipes?.includes(recipe.id)) return false;
+          if (recipe._isLocalDraft) return true;
+          if (!lastSyncTimeMs) return true;
+          const modTime = new Date(recipe.updatedAt || recipe.createdAt || 0).getTime();
+          return modTime > lastSyncTimeMs;
+        })
         : [];
 
       if (dirtyRecipes.length > 0) {
@@ -6376,14 +6376,14 @@ class FoodAssistantApp {
 
           let instructionsCopy = Array.isArray(recipe.instructions)
             ? recipe.instructions.map(inst => {
-                if (typeof inst === 'object' && inst !== null) {
-                  return {
-                    ...inst,
-                    text: safeString(inst.text)
-                  };
-                }
-                return { text: safeString(inst) };
-              })
+              if (typeof inst === 'object' && inst !== null) {
+                return {
+                  ...inst,
+                  text: safeString(inst.text)
+                };
+              }
+              return { text: safeString(inst) };
+            })
             : [];
 
           // Adjuntar _nutrition e _isFavorite como metadato seguro en instructions[0] para persistencia ante fallbacks de esquema
@@ -6401,10 +6401,10 @@ class FoodAssistantApp {
 
           const safeIngredients = Array.isArray(recipe.ingredients)
             ? recipe.ingredients.map(ing => ({
-                ...ing,
-                name: safeString(ing.name),
-                unit: safeString(ing.unit)
-              }))
+              ...ing,
+              name: safeString(ing.name),
+              unit: safeString(ing.unit)
+            }))
             : [];
 
           const rowPayload = {
@@ -6651,7 +6651,7 @@ class FoodAssistantApp {
   // ==========================================================================
   // EVENT LISTENERS & NAVIGATION
   // ==========================================================================
-  
+
   // ==========================================================================
   // US-43: DELEGACIÓN CENTRALIZADA DE EVENTOS (data-action)
   // ==========================================================================
@@ -8045,9 +8045,9 @@ class FoodAssistantApp {
               </span>
             ` : ''}
             ${(rec.tags || []).map(t => {
-              const isDiet = PREDEFINED_DIETARY_TAGS.includes(t);
-              return `<span class="tag-chip${isDiet ? ' tag-chip-dietary' : ''}">${isDiet ? getDietaryTagEmoji(t) + ' ' : ''}${escapeHtml(t)}</span>`;
-            }).join('')}
+      const isDiet = PREDEFINED_DIETARY_TAGS.includes(t);
+      return `<span class="tag-chip${isDiet ? ' tag-chip-dietary' : ''}">${isDiet ? getDietaryTagEmoji(t) + ' ' : ''}${escapeHtml(t)}</span>`;
+    }).join('')}
           </div>
         </div>
       </article>
@@ -8090,7 +8090,7 @@ class FoodAssistantApp {
     const sortedList = (this.fridgeIngredients && this.fridgeIngredients.length > 0)
       ? recipesList
       : this.getSortedRecipes(recipesList);
-    
+
     this.currentRenderedRecipesList = sortedList;
     const batchSize = this.recipesPageSize || 36;
     this.recipesRenderedCount = Math.min(sortedList.length, batchSize);
@@ -8755,7 +8755,7 @@ class FoodAssistantApp {
       // Si la receta / Modo Cocina se cerró mientras la petición estaba en vuelo, liberar inmediatamente
       if (!this.shouldKeepScreenAwake()) {
         if (sentinel && typeof sentinel.release === 'function') {
-          try { await sentinel.release(); } catch (e) {}
+          try { await sentinel.release(); } catch (e) { }
         }
         this.isWakeLockActive = false;
         this.updateWakeLockBadges();
@@ -9009,14 +9009,14 @@ class FoodAssistantApp {
           </div>
           <ul class="recipe-ingredients-list">
             ${(r.ingredients || []).map(ing => {
-              const adjustedAmount = ing.amount ? Math.round((ing.amount * scale) * 10) / 10 : null;
-              return `
+      const adjustedAmount = ing.amount ? Math.round((ing.amount * scale) * 10) / 10 : null;
+      return `
                 <li class="recipe-ingredient-item">
                   <span>${escapeHtml(ing.name)}</span>
                   <strong class="recipe-ingredient-amount">${adjustedAmount !== null ? `${adjustedAmount} ${ing.unit || ''}` : ''}</strong>
                 </li>
               `;
-            }).join('')}
+    }).join('')}
           </ul>
         </div>
 
@@ -9889,8 +9889,8 @@ class FoodAssistantApp {
     let tags = this.editorSelectedTags && this.editorSelectedTags.size > 0
       ? Array.from(this.editorSelectedTags)
       : (document.getElementById('edit-recipe-tags')?.value.trim()
-          ? document.getElementById('edit-recipe-tags').value.split(',').map(t => t.trim()).filter(Boolean)
-          : []);
+        ? document.getElementById('edit-recipe-tags').value.split(',').map(t => t.trim()).filter(Boolean)
+        : []);
     if (!tags) tags = [];
     tags = tags.filter(t => t && t.toLowerCase() !== 'general');
     tags.forEach(t => state.addCustomTag && state.addCustomTag(t));
@@ -10057,7 +10057,7 @@ class FoodAssistantApp {
   renderCookStep() {
     const r = this.activeRecipe;
     const step = r.instructions[this.cookStepIndex];
-    
+
     document.getElementById('cook-recipe-title').textContent = r.title;
     document.getElementById('cook-step-indicator').textContent = `Paso ${step.step} de ${r.instructions.length}`;
     document.getElementById('cook-step-text').textContent = step.text;
@@ -10103,7 +10103,7 @@ class FoodAssistantApp {
   updateTimerDisplay() {
     const mins = Math.floor(this.timerSecondsLeft / 60);
     const secs = this.timerSecondsLeft % 60;
-    document.getElementById('cook-timer-digits').textContent = 
+    document.getElementById('cook-timer-digits').textContent =
       `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   }
 
@@ -10142,7 +10142,7 @@ class FoodAssistantApp {
       gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.2);
       osc.start();
       osc.stop(audioCtx.currentTime + 1.2);
-    } catch (e) {}
+    } catch (e) { }
   }
 
   // PLANNER - US-05, US-22, BUG-07, BUG-08, BUG-17
@@ -11226,10 +11226,10 @@ class FoodAssistantApp {
                 ` : ''}
               </div>
               ${hasPreferences ? (
-                comp.compliant
-                  ? `<span class="dietary-ok-badge u-mt-3"><span class="material-symbols-outlined icon-12">check</span> Apta (${state.dietaryPreferences.join(', ')})</span>`
-                  : `<span class="dietary-warning-badge u-mt-3"><span class="material-symbols-outlined icon-12">warning</span> No cumple: ${comp.violations.join(', ')}</span>`
-              ) : ''}
+          comp.compliant
+            ? `<span class="dietary-ok-badge u-mt-3"><span class="material-symbols-outlined icon-12">check</span> Apta (${state.dietaryPreferences.join(', ')})</span>`
+            : `<span class="dietary-warning-badge u-mt-3"><span class="material-symbols-outlined icon-12">warning</span> No cumple: ${comp.violations.join(', ')}</span>`
+        ) : ''}
             </div>
           </div>
           <button type="button" class="btn btn-secondary btn-sm u-shrink-0" onclick="event.stopPropagation(); app.selectRecipeForSlot('${r.id}')">Elegir</button>
@@ -11536,7 +11536,7 @@ class FoodAssistantApp {
     if (typeof localStorage !== 'undefined') {
       try {
         localStorage.setItem('fa_shopping_view_mode', mode);
-      } catch (e) {}
+      } catch (e) { }
     }
     this.renderShoppingList();
   }
@@ -11672,10 +11672,10 @@ class FoodAssistantApp {
 
             <div>
               ${items.map(item => {
-                const aisleMeta = AISLE_METADATA[item.aisle || 'other'] || AISLE_METADATA.other;
-                const displayName = item.recipeSpecificName || item.name;
-                const displayAmt = formatDisplayAmount(item.amount, item.unit, item.recipeSpecificAmount || item.displayAmount);
-                return `
+          const aisleMeta = AISLE_METADATA[item.aisle || 'other'] || AISLE_METADATA.other;
+          const displayName = item.recipeSpecificName || item.name;
+          const displayAmt = formatDisplayAmount(item.amount, item.unit, item.recipeSpecificAmount || item.displayAmount);
+          return `
                   <div class="grocery-item-row ${item.isChecked ? 'checked' : ''}">
                     <div class="grocery-left" onclick="app.toggleGroceryCheck(${item.originalIndex})">
                       <input type="checkbox" class="grocery-checkbox" ${item.isChecked ? 'checked' : ''} onclick="event.stopPropagation(); app.toggleGroceryCheck(${item.originalIndex})">
@@ -11695,7 +11695,7 @@ class FoodAssistantApp {
                     </div>
                   </div>
                 `;
-              }).join('')}
+        }).join('')}
             </div>
           </div>
         `;
@@ -11728,40 +11728,40 @@ class FoodAssistantApp {
 
           <div>
             ${items.map(item => {
-              const displayAmt = formatDisplayAmount(item.amount, item.unit, item.displayAmount);
-              let subtextHtml = '';
-              let breakdown = Array.isArray(item.recipeBreakdown) && item.recipeBreakdown.length > 0 ? item.recipeBreakdown : null;
+        const displayAmt = formatDisplayAmount(item.amount, item.unit, item.displayAmount);
+        let subtextHtml = '';
+        let breakdown = Array.isArray(item.recipeBreakdown) && item.recipeBreakdown.length > 0 ? item.recipeBreakdown : null;
 
-              // Reconstruir desglose si no está en memoria pero recipeOrigin contiene múltiples recetas separadas por coma
-              if (!breakdown && item.recipeOrigin && item.recipeOrigin.includes(',')) {
-                const parts = parseRecipeOrigins(item.recipeOrigin, state.recipes || []);
-                if (parts.length > 1) {
-                  breakdown = parts.map(p => ({
-                    recipe: p,
-                    name: item.name,
-                    amount: null,
-                    unit: item.unit || ''
-                  }));
-                }
-              } else if (breakdown && breakdown.length === 1 && breakdown[0].recipe && breakdown[0].recipe.includes(',')) {
-                const parts = parseRecipeOrigins(breakdown[0].recipe, state.recipes || []);
-                if (parts.length > 1) {
-                  breakdown = parts.map(p => ({
-                    recipe: p,
-                    name: breakdown[0].name || item.name,
-                    amount: null,
-                    unit: item.unit || ''
-                  }));
-                }
-              }
+        // Reconstruir desglose si no está en memoria pero recipeOrigin contiene múltiples recetas separadas por coma
+        if (!breakdown && item.recipeOrigin && item.recipeOrigin.includes(',')) {
+          const parts = parseRecipeOrigins(item.recipeOrigin, state.recipes || []);
+          if (parts.length > 1) {
+            breakdown = parts.map(p => ({
+              recipe: p,
+              name: item.name,
+              amount: null,
+              unit: item.unit || ''
+            }));
+          }
+        } else if (breakdown && breakdown.length === 1 && breakdown[0].recipe && breakdown[0].recipe.includes(',')) {
+          const parts = parseRecipeOrigins(breakdown[0].recipe, state.recipes || []);
+          if (parts.length > 1) {
+            breakdown = parts.map(p => ({
+              recipe: p,
+              name: breakdown[0].name || item.name,
+              amount: null,
+              unit: item.unit || ''
+            }));
+          }
+        }
 
-              if (breakdown && breakdown.length > 1) {
-                subtextHtml = `
+        if (breakdown && breakdown.length > 1) {
+          subtextHtml = `
                   <div class="grocery-breakdown-list">
                     ${breakdown.map(b => {
-                      const qtyStr = (b.amount !== null && b.amount !== undefined) ? `${b.amount} ${b.unit || ''}`.trim() : '';
-                      const nameDiff = b.name && b.name.toLowerCase().trim() !== item.name.toLowerCase().trim() ? ` (${escapeHtml(b.name)})` : '';
-                      return `
+            const qtyStr = (b.amount !== null && b.amount !== undefined) ? `${b.amount} ${b.unit || ''}`.trim() : '';
+            const nameDiff = b.name && b.name.toLowerCase().trim() !== item.name.toLowerCase().trim() ? ` (${escapeHtml(b.name)})` : '';
+            return `
                         <div class="grocery-breakdown-row" title="${escapeHtml(b.recipe)}">
                           <span class="grocery-breakdown-dot">•</span>
                           <div class="grocery-breakdown-body">
@@ -11770,18 +11770,18 @@ class FoodAssistantApp {
                           </div>
                         </div>
                       `;
-                    }).join('')}
+          }).join('')}
                   </div>
                 `;
-              } else if (breakdown && breakdown.length === 1) {
-                const b = breakdown[0];
-                const nameDiff = b.name && b.name.toLowerCase().trim() !== item.name.toLowerCase().trim() ? ` (como "${escapeHtml(b.name)}")` : '';
-                subtextHtml = `<div class="grocery-origin-sub">Para: ${escapeHtml(b.recipe)}${nameDiff}</div>`;
-              } else if (item.recipeOrigin) {
-                subtextHtml = `<div class="grocery-origin-sub">Para: ${escapeHtml(item.recipeOrigin)}</div>`;
-              }
+        } else if (breakdown && breakdown.length === 1) {
+          const b = breakdown[0];
+          const nameDiff = b.name && b.name.toLowerCase().trim() !== item.name.toLowerCase().trim() ? ` (como "${escapeHtml(b.name)}")` : '';
+          subtextHtml = `<div class="grocery-origin-sub">Para: ${escapeHtml(b.recipe)}${nameDiff}</div>`;
+        } else if (item.recipeOrigin) {
+          subtextHtml = `<div class="grocery-origin-sub">Para: ${escapeHtml(item.recipeOrigin)}</div>`;
+        }
 
-              return `
+        return `
                 <div class="grocery-item-row ${item.isChecked ? 'checked' : ''}">
                   <div class="grocery-left" onclick="app.toggleGroceryCheck(${item.originalIndex})">
                     <input type="checkbox" class="grocery-checkbox" ${item.isChecked ? 'checked' : ''} onclick="event.stopPropagation(); app.toggleGroceryCheck(${item.originalIndex})">
@@ -11801,7 +11801,7 @@ class FoodAssistantApp {
                   </div>
                 </div>
               `;
-            }).join('')}
+      }).join('')}
           </div>
         </div>
       `;
@@ -11839,7 +11839,7 @@ class FoodAssistantApp {
     }
 
     const completed = state.shoppingList.filter(i => i.isChecked);
-    
+
     if (completed.length > 0) {
       const count = completed.length;
       const total = state.shoppingList.length;
@@ -12164,10 +12164,10 @@ class FoodAssistantApp {
           <!-- Recipe Ingredients List -->
           <div class="shopping-preview-items-col">
             ${group.items.map((ing, itemIdx) => {
-              const meta = AISLE_METADATA[ing.aisle] || AISLE_METADATA.other;
-              const isChecked = ing.checked !== false;
+        const meta = AISLE_METADATA[ing.aisle] || AISLE_METADATA.other;
+        const isChecked = ing.checked !== false;
 
-              return `
+        return `
                 <div class="shopping-preview-item-row ${isChecked ? 'is-checked' : ''}">
                   <label class="shopping-preview-item-label">
                     <input type="checkbox" class="grocery-checkbox u-shrink-0" ${isChecked ? 'checked' : ''} onchange="app.handleShoppingPreviewItemCheck(${groupIdx}, ${itemIdx}, this.checked)">
@@ -12191,7 +12191,7 @@ class FoodAssistantApp {
                   </div>
                 </div>
               `;
-            }).join('')}
+      }).join('')}
           </div>
         </div>
       `;
@@ -12263,7 +12263,7 @@ class FoodAssistantApp {
 
   confirmShoppingPreviewAdd() {
     if (!this.shoppingPreviewState) return;
-    
+
     const selectedItems = [];
     this.shoppingPreviewState.groups.forEach(group => {
       group.items.forEach(item => {
@@ -12795,9 +12795,9 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
     const historyTurns = Array.isArray(this.aiChatHistory)
       ? this.aiChatHistory.slice(-6).map(m => ({
-          role: m.role === 'model' ? 'model' : 'user',
-          parts: [{ text: String(m.text || '') }]
-        }))
+        role: m.role === 'model' ? 'model' : 'user',
+        parts: [{ text: String(m.text || '') }]
+      }))
       : [];
 
     const payload = {
@@ -12861,7 +12861,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       try {
         const err = await response.json();
         errMsg = err.error?.message || errMsg;
-      } catch (e) {}
+      } catch (e) { }
       lastErrMsg = errMsg;
 
       console.warn(`[FoodAssistant] Error devuelto por ${model} (${response.status}): ${errMsg}. Conmutando a siguiente modelo...`);
@@ -13134,13 +13134,13 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     if (/hall|halloween|calabaza|tem[aá]tic|oto[ñn]o|fiesta/i.test(prompt)) {
       return {
         text: `¡Por supuesto, Franky! Aquí tienes 3 ideas temáticas espectaculares, divertidas y saludables para **Halloween**:\n\n` +
-              `🎃 **1. Pimientos Monstruosos Rellenos de Arroz y Pavo**:\n` +
-              `Pimientos naranjas y amarillos vaciados, a los que les tallas ojos y sonrisa terrorífica. Los rellenas con carne picada de pavo, arroz integral salteado y tomate natural, gratinados con queso mozzarella fundido imitando telarañas.\n\n` +
-              `👻 **2. Momias de Hojaldre con Pechuga de Pollo y Espárragos**:\n` +
-              `Tiras jugosas de pollo marinadas con especias, envueltas en tiras finas de masa de hojaldre dejando huecos como vendas de momia, doradas al horno con dos gotas de salsa o granos de pimienta como ojos.\n\n` +
-              `🦇 **3. Crema Tenebrosa de Calabaza con Arañas de Champiñón y Sésamo Negro**:\n` +
-              `Crema suave de calabaza asada y puerro. Decora la superficie con un hilo de yogur griego en círculos concéntricos para formar una telaraña y pequeños champiñones salteados colocados con patitas de romero simulando arañas.\n\n` +
-              `¿Te apetece que guardemos alguna de estas recetas en tu recetario o que añadamos los ingredientes directamente a tu lista de la compra?`,
+          `🎃 **1. Pimientos Monstruosos Rellenos de Arroz y Pavo**:\n` +
+          `Pimientos naranjas y amarillos vaciados, a los que les tallas ojos y sonrisa terrorífica. Los rellenas con carne picada de pavo, arroz integral salteado y tomate natural, gratinados con queso mozzarella fundido imitando telarañas.\n\n` +
+          `👻 **2. Momias de Hojaldre con Pechuga de Pollo y Espárragos**:\n` +
+          `Tiras jugosas de pollo marinadas con especias, envueltas en tiras finas de masa de hojaldre dejando huecos como vendas de momia, doradas al horno con dos gotas de salsa o granos de pimienta como ojos.\n\n` +
+          `🦇 **3. Crema Tenebrosa de Calabaza con Arañas de Champiñón y Sésamo Negro**:\n` +
+          `Crema suave de calabaza asada y puerro. Decora la superficie con un hilo de yogur griego en círculos concéntricos para formar una telaraña y pequeños champiñones salteados colocados con patitas de romero simulando arañas.\n\n` +
+          `¿Te apetece que guardemos alguna de estas recetas en tu recetario o que añadamos los ingredientes directamente a tu lista de la compra?`,
         toolCalls: []
       };
     }
@@ -13149,10 +13149,10 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     if (/sustitu|cambiar|puedo usar|qu[eé] pongo en vez|consejo|truco|c[oó]mo cocino|c[oó]mo preparar/i.test(prompt)) {
       return {
         text: `¡Claro, Franky! En la cocina casi todo tiene alternativa saludable:\n\n` +
-              `• Si buscas sustituir **harinas refinadas**, la harina de avena integral o almendra molida funcionan de maravilla.\n` +
-              `• Para reemplazar la **nata o crema**, el queso batido 0%, yogur griego natural o bebida de soja sin azúcar aportan cremosidad sin grasas saturadas.\n` +
-              `• Si necesitas un sustituto del **huevo**, 1 cucharada de semillas de chía o lino molido hidratadas en 3 cucharadas de agua crean una textura ideal para repostería.\n\n` +
-              `Dime qué ingrediente concreto quieres cambiar o para qué plato lo necesitas y te doy la mejor proporción exacta.`,
+          `• Si buscas sustituir **harinas refinadas**, la harina de avena integral o almendra molida funcionan de maravilla.\n` +
+          `• Para reemplazar la **nata o crema**, el queso batido 0%, yogur griego natural o bebida de soja sin azúcar aportan cremosidad sin grasas saturadas.\n` +
+          `• Si necesitas un sustituto del **huevo**, 1 cucharada de semillas de chía o lino molido hidratadas en 3 cucharadas de agua crean una textura ideal para repostería.\n\n` +
+          `Dime qué ingrediente concreto quieres cambiar o para qué plato lo necesitas y te doy la mejor proporción exacta.`,
         toolCalls: []
       };
     }
@@ -13218,10 +13218,10 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
       return {
         text: `¡Listo, Franky! He planificado las comidas para tu **día de hoy (${capDay})** en tu Planificador:\n\n` +
-              `• **Desayuno**: ${findTitle(todayPlan.breakfast)}\n` +
-              `• **Almuerzo**: ${findTitle(todayPlan.lunch)}\n` +
-              `• **Merienda**: ${findTitle(todayPlan.snack)}\n` +
-              `• **Cena**: ${findTitle(todayPlan.dinner)}`,
+          `• **Desayuno**: ${findTitle(todayPlan.breakfast)}\n` +
+          `• **Almuerzo**: ${findTitle(todayPlan.lunch)}\n` +
+          `• **Merienda**: ${findTitle(todayPlan.snack)}\n` +
+          `• **Cena**: ${findTitle(todayPlan.dinner)}`,
         toolCalls: [
           {
             name: 'set_day_plan',
@@ -13337,9 +13337,9 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
       const filteredDays = noWeekend
         ? planArgs.days.filter(d => {
-            const dn = String(d.dayName || '').toLowerCase();
-            return !dn.includes('sáb') && !dn.includes('sab') && !dn.includes('dom');
-          })
+          const dn = String(d.dayName || '').toLowerCase();
+          return !dn.includes('sáb') && !dn.includes('sab') && !dn.includes('dom');
+        })
         : planArgs.days;
 
       const summaryLines = filteredDays.map(d => {
@@ -13513,7 +13513,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     if (!normRef) return null;
 
     const byTitle = state.recipes.find(r => normalizeIngredientText(r.title || '') === normRef) ||
-                    state.recipes.find(r => normalizeIngredientText(r.title || '').includes(normRef) || normRef.includes(normalizeIngredientText(r.title || '')));
+      state.recipes.find(r => normalizeIngredientText(r.title || '').includes(normRef) || normRef.includes(normalizeIngredientText(r.title || '')));
     if (byTitle) return byTitle.id;
 
     // 4. Limpieza de palabras vacías/conectores ("stop words" como "de", "del", "con", "al", "a", etc.)
@@ -13748,7 +13748,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       const weekDays = this.getPlannerWeekDates();
       const fallbackPlan = this.buildSimulatedWeeklyPlanArgs('replace', false, typeof prompt !== 'undefined' ? prompt : '');
       const shouldCompleteAllWeek = args.completeWeek === true;
-            const updatedDateKeys = new Set();
+      const updatedDateKeys = new Set();
 
       // Paso 1: Completar desayunos y meriendas faltantes en días planificados si el usuario no los excluyó explícitamente
       const isMultiMealRequest = daysInput.some(d => (d.lunch || d.dinner) && (d.breakfast === undefined || d.snack === undefined));
@@ -13775,9 +13775,9 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
         let lunchProt = getPrimaryProteinCategory(lunchRec);
 
         if (lunchProt === 'pollo' && totalChickenCount >= maxAllowedChicken) {
-          const altLunch = (state.recipes || []).find(r => 
-            r.id !== d.lunch && 
-            getPrimaryProteinCategory(r) !== 'pollo' && 
+          const altLunch = (state.recipes || []).find(r =>
+            r.id !== d.lunch &&
+            getPrimaryProteinCategory(r) !== 'pollo' &&
             (r.tags || []).some(t => /almuerzo|comida|cena/i.test(t))
           );
           if (altLunch) {
@@ -13794,10 +13794,10 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
         const isExcessChicken = dinnerProt === 'pollo' && (totalChickenCount >= maxAllowedChicken || lunchProt === 'pollo' || lastDinnerProtein === 'pollo');
 
         if (isSameAsLunch || isExcessChicken) {
-          const altDinner = (state.recipes || []).find(r => 
-            r.id !== d.lunch && 
-            r.id !== d.dinner && 
-            getPrimaryProteinCategory(r) !== lunchProt && 
+          const altDinner = (state.recipes || []).find(r =>
+            r.id !== d.lunch &&
+            r.id !== d.dinner &&
+            getPrimaryProteinCategory(r) !== lunchProt &&
             getPrimaryProteinCategory(r) !== 'pollo' &&
             (r.tags || []).some(t => /cena|almuerzo|comida/i.test(t))
           );
@@ -14009,7 +14009,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 
     const history = document.getElementById('chat-history-container');
     if (!history) return;
-    
+
     const userBubble = document.createElement('div');
     userBubble.className = 'ai-user-bubble';
     userBubble.textContent = text;
@@ -14317,7 +14317,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       return;
     }
     if (this.isListeningVoice) {
-      try { this.recognition.stop(); } catch (e) {}
+      try { this.recognition.stop(); } catch (e) { }
       this.isListeningVoice = false;
       this.updateVoiceUI(false);
     } else {
@@ -14406,7 +14406,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     this.stopSpeech();
     const modal = document.getElementById('modal-gemini-invoke');
     if (this.isListeningVoice) {
-      try { this.recognition.stop(); } catch (e) {}
+      try { this.recognition.stop(); } catch (e) { }
       this.isListeningVoice = false;
       this.updateVoiceUI(false);
     }
@@ -14430,7 +14430,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     if (input) input.value = '';
 
     if (this.isListeningVoice) {
-      try { this.recognition.stop(); } catch (e) {}
+      try { this.recognition.stop(); } catch (e) { }
       this.isListeningVoice = false;
       this.updateVoiceUI(false);
     }
@@ -14650,7 +14650,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       try {
         window.speechSynthesis.cancel();
-      } catch (e) {}
+      } catch (e) { }
     }
     this.updateTtsPlayingUI(false);
   }
@@ -14708,7 +14708,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
     }
   }
 
-// ==========================================================================
+  // ==========================================================================
   // US-30: MULTIMODAL AI RECIPE IMPORTER & GENERATOR (SCHEMA + IMAGE COMPRESSION + GEMINI)
   // ==========================================================================
   async compressImageToBase64(file, maxWidth = 1024, maxHeight = 1024, quality = 0.8) {
@@ -14807,7 +14807,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
         const res = await new Promise((resolve, reject) => {
           const img = new Image();
           const tId = setTimeout(() => {
-            try { URL.revokeObjectURL(objectUrl); } catch (e) {}
+            try { URL.revokeObjectURL(objectUrl); } catch (e) { }
             reject(new Error("Timeout cargando imagen"));
           }, 2500);
           img.onload = () => {
@@ -14829,18 +14829,18 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
               canvas.height = Math.max(1, height);
               const ctx = canvas.getContext('2d');
               ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-              try { URL.revokeObjectURL(objectUrl); } catch (e) {}
+              try { URL.revokeObjectURL(objectUrl); } catch (e) { }
               const dataUrl = canvas.toDataURL('image/jpeg', quality);
               const base64Data = (dataUrl.split(',')[1] || '').trim();
               resolve({ dataUrl, base64Data, mimeType: 'image/jpeg' });
             } catch (err) {
-              try { URL.revokeObjectURL(objectUrl); } catch (e) {}
+              try { URL.revokeObjectURL(objectUrl); } catch (e) { }
               reject(err);
             }
           };
           img.onerror = (err) => {
             clearTimeout(tId);
-            try { URL.revokeObjectURL(objectUrl); } catch (e) {}
+            try { URL.revokeObjectURL(objectUrl); } catch (e) { }
             reject(err);
           };
           img.src = objectUrl;
@@ -15108,7 +15108,7 @@ REGLAS CRÍTICAS:
         const sampleText = text || 'Receta extraída de foto';
         const isProteic = /prote[ií]n/i.test(sampleText);
         const parsedFromText = text ? RecipeParser.parseRecipeText(text) : null;
-        const recipeImage = imageBase64 
+        const recipeImage = imageBase64
           ? (imageBase64.startsWith('data:') ? imageBase64 : `data:${mimeType || 'image/jpeg'};base64,${imageBase64}`)
           : '';
 
@@ -15120,19 +15120,19 @@ REGLAS CRÍTICAS:
           cookTimeMinutes: parsedFromText?.cookTimeMinutes || 15,
           servings: parsedFromText?.servings || state.settings?.defaultServings || 2,
           tags: parsedFromText?.tags || ["Saludable", isProteic ? "Alta en Proteínas" : "Foto"],
-          ingredients: (parsedFromText?.ingredients && parsedFromText.ingredients.length > 0) 
-            ? parsedFromText.ingredients 
+          ingredients: (parsedFromText?.ingredients && parsedFromText.ingredients.length > 0)
+            ? parsedFromText.ingredients
             : [
-                { name: "Ingrediente principal de la foto", amount: 1, unit: "ud" },
-                { name: "Guarnición o verduras", amount: 150, unit: "g" },
-                { name: "Aceite de oliva virgen extra", amount: 15, unit: "ml" }
-              ],
+              { name: "Ingrediente principal de la foto", amount: 1, unit: "ud" },
+              { name: "Guarnición o verduras", amount: 150, unit: "g" },
+              { name: "Aceite de oliva virgen extra", amount: 15, unit: "ml" }
+            ],
           instructions: (parsedFromText?.instructions && parsedFromText.instructions.length > 0)
             ? parsedFromText.instructions
             : [
-                { step: 1, text: "Preparar los ingredientes mostrados en la imagen.", timerMinutes: 5 },
-                { step: 2, text: "Cocinar según la técnica habitual del plato.", timerMinutes: 10 }
-              ],
+              { step: 1, text: "Preparar los ingredientes mostrados en la imagen.", timerMinutes: 5 },
+              { step: 2, text: "Cocinar según la técnica habitual del plato.", timerMinutes: 10 }
+            ],
           nutrition: parsedFromText?.nutrition || { calories: 420, protein: 35, carbs: 35, fat: 12 }
         }, sourceUrl);
 
@@ -15366,7 +15366,7 @@ REGLAS CRÍTICAS:
                 fetchHeaders['X-Return-Format'] = 'html';
                 fetchHeaders['Accept'] = 'text/html';
               }
-              const resp = await fetch(proxyUrl, { 
+              const resp = await fetch(proxyUrl, {
                 signal: controller.signal,
                 headers: fetchHeaders
               });
@@ -15512,9 +15512,9 @@ REGLAS CRÍTICAS:
     // BUG-16: Detectar sourceUrl existente y ofrecer "Abrir existente" o "Guardar copia"
     if (!skipUrlDuplicateCheck && newRecipe.sourceUrl && (!newRecipe.id || !state.recipes.some(r => r.id === newRecipe.id))) {
       const cleanSourceUrl = newRecipe.sourceUrl.trim().replace(/\/+$/, '').toLowerCase();
-      const existingUrlRecipe = state.recipes.find(r => 
-        r.id !== newRecipe.id && 
-        r.sourceUrl && 
+      const existingUrlRecipe = state.recipes.find(r =>
+        r.id !== newRecipe.id &&
+        r.sourceUrl &&
         r.sourceUrl.trim().replace(/\/+$/, '').toLowerCase() === cleanSourceUrl
       );
 
@@ -15753,11 +15753,11 @@ REGLAS CRÍTICAS:
     const members = Array.isArray(hh.members) && hh.members.length > 0
       ? hh.members
       : [{
-          userId: currentUserId || hh.ownerId || 'local',
-          name: state.cloudUser?.name || 'Anfitrión',
-          email: state.cloudUser?.email || '',
-          role: 'owner'
-        }];
+        userId: currentUserId || hh.ownerId || 'local',
+        name: state.cloudUser?.name || 'Anfitrión',
+        email: state.cloudUser?.email || '',
+        role: 'owner'
+      }];
 
     if (activeNameEl) activeNameEl.textContent = hh.name || 'Mi Hogar';
     if (activeRoleEl) activeRoleEl.textContent = isOwner ? 'Anfitrión' : 'Miembro';
@@ -15947,7 +15947,7 @@ REGLAS CRÍTICAS:
     if (!state.cloudUser?.id) {
       try {
         localStorage.setItem('fa_pending_household_join', cleanCode);
-      } catch (e) {}
+      } catch (e) { }
       this.showToast(`Inicia sesión para unirte al Hogar con el código ${cleanCode}.`, 'info');
       this.openAuthModal();
       return { success: false, reason: 'auth_required', pendingCode: cleanCode };
@@ -16020,7 +16020,7 @@ REGLAS CRÍTICAS:
             joinedAt: m.joined_at || nowIso
           }));
         }
-      } catch (e) {}
+      } catch (e) { }
 
       const joinedHousehold = {
         id: remoteHousehold.id,
@@ -16035,7 +16035,7 @@ REGLAS CRÍTICAS:
       state.saveHousehold(joinedHousehold);
       try {
         localStorage.removeItem('fa_pending_household_join');
-      } catch (e) {}
+      } catch (e) { }
 
       // Limpiar plan y lista locales para adoptar el Planificador y Lista de Compra unificados del Hogar
       state.mealPlan = {};
@@ -16093,7 +16093,7 @@ REGLAS CRÍTICAS:
       }
       state.saveHousehold(state.household);
       this.renderHouseholdSettings();
-    } catch (e) {}
+    } catch (e) { }
   }
 
   async loadHouseholdByIdFromCloud(householdId) {
@@ -16108,12 +16108,12 @@ REGLAS CRÍTICAS:
 
       const members = Array.isArray(memRes?.data)
         ? memRes.data.map(m => ({
-            userId: m.user_id || m.userId,
-            name: m.display_name || m.name || (m.email ? m.email.split('@')[0] : 'Miembro'),
-            email: m.email || '',
-            role: m.role || (m.user_id === hhRow.owner_id ? 'owner' : 'member'),
-            joinedAt: m.joined_at
-          }))
+          userId: m.user_id || m.userId,
+          name: m.display_name || m.name || (m.email ? m.email.split('@')[0] : 'Miembro'),
+          email: m.email || '',
+          role: m.role || (m.user_id === hhRow.owner_id ? 'owner' : 'member'),
+          joinedAt: m.joined_at
+        }))
         : [];
 
       const loaded = {
@@ -16239,7 +16239,7 @@ REGLAS CRÍTICAS:
       }
       state.personalBackup = null;
       state.save('fa_personal_backup', null);
-      try { localStorage.removeItem('fa_personal_backup'); } catch (e) {}
+      try { localStorage.removeItem('fa_personal_backup'); } catch (e) { }
     }
 
     if (Array.isArray(state.recipes)) {
@@ -16253,7 +16253,7 @@ REGLAS CRÍTICAS:
     }
 
     state.saveHousehold(null);
-    try { localStorage.removeItem('fa_household'); } catch (e) {}
+    try { localStorage.removeItem('fa_household'); } catch (e) { }
     state.lastSyncedAt = null;
     state.save('fa_recipes', state.recipes);
     state.save('fa_mealplan', state.mealPlan);
@@ -16280,7 +16280,7 @@ REGLAS CRÍTICAS:
       if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(code);
       }
-    } catch (e) {}
+    } catch (e) { }
     this.showToast(`Código ${code} copiado al portapapeles.`, 'success');
     return true;
   }
@@ -16307,7 +16307,7 @@ REGLAS CRÍTICAS:
       if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(message);
       }
-    } catch (e) {}
+    } catch (e) { }
     this.showToast('Invitación copiada al portapapeles lista para pegar en WhatsApp.', 'success');
     return true;
   }
@@ -16330,7 +16330,7 @@ REGLAS CRÍTICAS:
         const cleanUrl = window.location.pathname + (window.location.hash || '');
         window.history.replaceState({}, '', cleanUrl);
       }
-    } catch (e) {}
+    } catch (e) { }
 
     setTimeout(() => {
       this.joinHouseholdByCode(cleanCode);
@@ -16342,11 +16342,11 @@ REGLAS CRÍTICAS:
     let pendingCode = '';
     try {
       pendingCode = localStorage.getItem('fa_pending_household_join') || '';
-    } catch (e) {}
+    } catch (e) { }
     if (!pendingCode || !state.cloudUser?.id) return false;
     try {
       localStorage.removeItem('fa_pending_household_join');
-    } catch (e) {}
+    } catch (e) { }
     setTimeout(() => {
       this.joinHouseholdByCode(pendingCode);
     }, 200);
@@ -16393,7 +16393,7 @@ REGLAS CRÍTICAS:
         } else if (typeof this.householdRealtimeChannel.unsubscribe === 'function') {
           this.householdRealtimeChannel.unsubscribe();
         }
-      } catch (e) {}
+      } catch (e) { }
       this.householdRealtimeChannel = null;
     }
   }
@@ -16496,7 +16496,7 @@ REGLAS CRÍTICAS:
     if (guide) {
       const tk = freshToken || 'fa_live_TU_TOKEN';
       guide.textContent =
-`# 1) Comando en lenguaje natural (Atajos de voz / HTTP Shortcuts / Telegram)
+        `# 1) Comando en lenguaje natural (Atajos de voz / HTTP Shortcuts / Telegram)
 POST ${endpoint}/command
 Authorization: Bearer ${tk}
 Content-Type: application/json
@@ -16910,7 +16910,7 @@ Autenticación: API Key → Bearer → ${tk}`;
         ? `<span class="bulk-badge bulk-badge-domain"><span class="material-symbols-outlined icon-12">public</span> ${c.sourceDomain}</span>`
         : '';
 
-      const warningsBadges = (c.warnings || []).map(w => 
+      const warningsBadges = (c.warnings || []).map(w =>
         `<span class="bulk-badge bulk-badge-warn"><span class="material-symbols-outlined icon-12">warning</span> ${w}</span>`
       ).join('');
 
@@ -16983,7 +16983,7 @@ Autenticación: API Key → Bearer → ${tk}`;
     const btnText = document.getElementById('btn-confirm-bulk-import-text');
     const btnConfirm = document.getElementById('btn-confirm-bulk-import');
     if (btnText) {
-      btnText.textContent = selectedCount > 0 
+      btnText.textContent = selectedCount > 0
         ? `Importar ${selectedCount} de ${totalCount} recetas`
         : 'Selecciona al menos 1 receta';
     }
@@ -17099,7 +17099,7 @@ Autenticación: API Key → Bearer → ${tk}`;
       state.save('fa_mealplan', state.mealPlan);
       state.save('fa_shopping', state.shoppingList);
       state.save('fa_deleted_records', state.deletedRecords);
-      try { localStorage.setItem('fa_recipes_seeded', 'v8'); } catch (e) {}
+      try { localStorage.setItem('fa_recipes_seeded', 'v8'); } catch (e) { }
       this.syncDataWithCloud(true);
       this.render();
       this.showToast("Datos restablecidos a los valores iniciales.", 'info');
@@ -17165,7 +17165,7 @@ Autenticación: API Key → Bearer → ${tk}`;
     if (typeof localStorage !== 'undefined') {
       try {
         localStorage.setItem('fa_onboarding_completed', 'true');
-      } catch (e) {}
+      } catch (e) { }
     }
     this.closeOnboardingModal();
     this.showToast('Puedes abrir la Guía inicial cuando quieras desde Ajustes.', 'info');
@@ -17396,7 +17396,7 @@ Autenticación: API Key → Bearer → ${tk}`;
       try {
         localStorage.setItem('fa_servings', String(servings));
         localStorage.setItem('fa_onboarding_completed', 'true');
-      } catch (e) {}
+      } catch (e) { }
     }
 
     this.closeOnboardingModal();
