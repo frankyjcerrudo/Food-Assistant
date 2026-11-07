@@ -386,6 +386,30 @@ drop policy if exists "Users own shopping delete" on public.shopping_items;
 create policy "Users own shopping delete" on public.shopping_items
   for delete using (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)));
 
+-- -----------------------------------------------------------------------------
+-- 7. CONFIGURACIÓN GLOBAL DE APLICACIÓN (CLAVE IA POR DEFECTO PARA CUENTAS)
+-- -----------------------------------------------------------------------------
+create table if not exists public.app_config (
+  key text primary key,
+  value text not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.app_config enable row level security;
+
+drop policy if exists "Authenticated users can read app_config" on public.app_config;
+create policy "Authenticated users can read app_config" on public.app_config
+  for select using (auth.uid() is not null);
+
+drop policy if exists "Authenticated users can insert app_config" on public.app_config;
+create policy "Authenticated users can insert app_config" on public.app_config
+  for insert with check (auth.uid() is not null);
+
+drop policy if exists "Authenticated users can update app_config" on public.app_config;
+create policy "Authenticated users can update app_config" on public.app_config
+  for update using (auth.uid() is not null)
+  with check (auth.uid() is not null);
+
 -- Recargar caché de esquema de PostgREST / Supabase API
 notify pgrst, 'reload schema';
 

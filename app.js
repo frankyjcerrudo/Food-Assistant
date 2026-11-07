@@ -4468,7 +4468,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.47';
+  window.APP_VERSION = 'v1.48';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4509,7 +4509,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.47';
+    this.appVersion = window.APP_VERSION || 'v1.48';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5489,6 +5489,10 @@ class FoodAssistantApp {
     }
     state.cloudUser = null;
     state.save('fa_cloud_user', null);
+    if (state.settings?.defaultGeminiApiKey) {
+      delete state.settings.defaultGeminiApiKey;
+      state.save('fa_settings', state.settings);
+    }
     this.updateUserAccountUI();
     this.closeAuthModal();
     this.showToast("Has cerrado sesión. Tus datos continúan disponibles localmente.", 'info');
@@ -6065,6 +6069,20 @@ class FoodAssistantApp {
           remoteDietary = hhPrefSlot.dietaryPreferences;
           remoteDietaryUpdatedAt = hhPrefSlot.updatedAt || remoteHouseholdPrefsRow.updated_at || remoteDietaryUpdatedAt;
         }
+        if (hhPrefSlot && typeof hhPrefSlot.sharedGeminiApiKey === 'string' && hhPrefSlot.sharedGeminiApiKey.trim()) {
+          const sharedKey = hhPrefSlot.sharedGeminiApiKey.trim();
+          if (state.household && state.household.sharedGeminiApiKey !== sharedKey) {
+            state.household.sharedGeminiApiKey = sharedKey;
+            state.saveHousehold(state.household);
+            stateChanged = true;
+          }
+          if (!state.settings) state.settings = {};
+          if (state.settings.defaultGeminiApiKey !== sharedKey) {
+            state.settings.defaultGeminiApiKey = sharedKey;
+            state.save('fa_settings', state.settings);
+            stateChanged = true;
+          }
+        }
       }
       if (!remoteCustomTags && Array.isArray(state.cloudUser?.user_metadata?.custom_tags)) {
         remoteCustomTags = state.cloudUser.user_metadata.custom_tags;
@@ -6122,6 +6140,22 @@ class FoodAssistantApp {
         state.settings.geminiApiKey = remoteGeminiKey;
         state.save('fa_settings', state.settings);
         stateChanged = true;
+      }
+
+      // Clave IA por defecto para usuarios autenticados sin clave propia (tabla public.app_config)
+      if (!this.getEffectiveGeminiApiKey() && this.supabaseClient?.from) {
+        try {
+          const cfgRes = await this.supabaseClient.from('app_config').select('*').eq('key', 'default_gemini_api_key');
+          const cfgRow = Array.isArray(cfgRes?.data) ? cfgRes.data[0] : cfgRes?.data;
+          if (cfgRow && typeof cfgRow.value === 'string' && cfgRow.value.trim()) {
+            if (!state.settings) state.settings = {};
+            state.settings.defaultGeminiApiKey = cfgRow.value.trim();
+            state.save('fa_settings', state.settings);
+            stateChanged = true;
+          }
+        } catch (cfgErr) {
+          // Ignorar silenciosamente si la tabla app_config aún no ha sido creada en Supabase
+        }
       }
 
       if (stateChanged) {
@@ -6447,7 +6481,20 @@ class FoodAssistantApp {
       });
 
       if (activeHouseholdId) {
+        const effectiveGeminiKey = this.getEffectiveGeminiApiKey();
+        if (effectiveGeminiKey && state.household && !state.household.sharedGeminiApiKey) {
+          state.household.sharedGeminiApiKey = effectiveGeminiKey;
+          state.saveHousehold(state.household);
+        }
         const hhDietaryUpdatedAt = state.dietaryUpdatedAt || state.household?.dietaryUpdatedAt || new Date().toISOString();
+        const hhPrefSlotPayload = {
+          type: 'household_prefs',
+          dietaryPreferences: Array.isArray(state.dietaryPreferences) ? [...state.dietaryPreferences] : [],
+          updatedAt: hhDietaryUpdatedAt
+        };
+        if (effectiveGeminiKey) {
+          hhPrefSlotPayload.sharedGeminiApiKey = effectiveGeminiKey;
+        }
         mealPlansPayload.push({
           id: '__household_prefs__',
           user_id: state.household?.ownerId || state.cloudUser.id,
@@ -6457,11 +6504,7 @@ class FoodAssistantApp {
           lunch_recipe_id: null,
           snack_recipe_id: null,
           dinner_recipe_id: null,
-          custom_slots: [{
-            type: 'household_prefs',
-            dietaryPreferences: Array.isArray(state.dietaryPreferences) ? [...state.dietaryPreferences] : [],
-            updatedAt: hhDietaryUpdatedAt
-          }],
+          custom_slots: [hhPrefSlotPayload],
           household_id: activeHouseholdId,
           updated_at: hhDietaryUpdatedAt
         });
@@ -6545,6 +6588,20 @@ class FoodAssistantApp {
         }
       } catch (tableErr) {
         // user_settings es opcional, user_metadata garantiza la persistencia multi-dispositivo
+      }
+
+      // Clave IA por defecto para usuarios autenticados (tabla public.app_config)
+      const personalGeminiKey = typeof state.settings?.geminiApiKey === 'string' ? state.settings.geminiApiKey.trim() : '';
+      if (personalGeminiKey && this.supabaseClient?.from) {
+        try {
+          await this.supabaseClient.from('app_config').upsert([{
+            key: 'default_gemini_api_key',
+            value: personalGeminiKey,
+            updated_at: new Date().toISOString()
+          }], { onConflict: 'key' });
+        } catch (appCfgErr) {
+          // Ignorar silenciosamente si la tabla app_config aún no ha sido creada en Supabase
+        }
       }
 
       // 6. Éxito confirmado: actualizar marca temporal
@@ -12700,6 +12757,16 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 9. CONCISIÓN OBLIGATORIA PARA VOZ HABLADA: Franky escucha tus respuestas mediante sintetizador de voz. Responde SIEMPRE de forma directa y sintética (máximo 1 a 3 frases claras y conversacionales). NUNCA recites monólogos largos ni enumeres listas eternas de ingredientes en el mensaje hablado si no se te pide expresamente. Confirma las acciones realizadas con agilidad y brevedad.`;
   }
 
+  getEffectiveGeminiApiKey() {
+    const ownKey = typeof state.settings?.geminiApiKey === 'string' ? state.settings.geminiApiKey.trim() : '';
+    if (ownKey) return ownKey;
+    const householdKey = typeof state.household?.sharedGeminiApiKey === 'string' ? state.household.sharedGeminiApiKey.trim() : '';
+    if (householdKey) return householdKey;
+    const defaultKey = typeof state.settings?.defaultGeminiApiKey === 'string' ? state.settings.defaultGeminiApiKey.trim() : '';
+    if (defaultKey) return defaultKey;
+    return '';
+  }
+
   async callGeminiAgent(prompt, systemInstruction = "", enableTools = true) {
     const provider = state.settings?.aiProvider || 'gemini';
     if (provider === 'openai') {
@@ -12709,7 +12776,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
       return this.callClaudeAgent(prompt, systemInstruction, enableTools);
     }
 
-    const apiKey = state.settings.geminiApiKey?.trim();
+    const apiKey = this.getEffectiveGeminiApiKey();
     if (!apiKey) {
       return this.simulateGeminiAgentResponse(prompt);
     }
@@ -12969,7 +13036,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
   }
 
   async callOpenAiAgent(prompt, systemInstruction = "", enableTools = true) {
-    const apiKey = state.settings.geminiApiKey?.trim();
+    const apiKey = this.getEffectiveGeminiApiKey();
     if (!apiKey) return this.simulateGeminiAgentResponse(prompt);
     try {
       const controller = new AbortController();
@@ -13015,7 +13082,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
   }
 
   async callClaudeAgent(prompt, systemInstruction = "", enableTools = true) {
-    const apiKey = state.settings.geminiApiKey?.trim();
+    const apiKey = this.getEffectiveGeminiApiKey();
     if (!apiKey) return this.simulateGeminiAgentResponse(prompt);
     try {
       const controller = new AbortController();
@@ -14917,7 +14984,7 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
   }
 
   async extractRecipeWithGemini({ text = '', imageBase64 = null, mimeType = 'image/jpeg', sourceUrl = '' } = {}) {
-    const apiKey = state.settings.geminiApiKey?.trim();
+    const apiKey = this.getEffectiveGeminiApiKey();
     if (!apiKey) {
       // Fallback simulado cuando el usuario no tiene clave
       const sampleText = text || 'Receta extraída de foto';
@@ -15568,9 +15635,11 @@ REGLAS CRÍTICAS:
     }
 
     if (status) {
+      const provName = currentProvider === 'openai' ? 'OpenAI ChatGPT' : (currentProvider === 'claude' ? 'Anthropic Claude' : 'Google Gemini');
       if (state.settings.geminiApiKey) {
-        const provName = currentProvider === 'openai' ? 'OpenAI ChatGPT' : (currentProvider === 'claude' ? 'Anthropic Claude' : 'Google Gemini');
         status.innerHTML = `<span class="u-text-brand-medium">✓ Clave configurada (${provName} activo)</span>`;
+      } else if (this.getEffectiveGeminiApiKey()) {
+        status.innerHTML = `<span class="u-text-brand-medium">✓ IA de Sabory activa automáticamente (${provName} · clave propia opcional)</span>`;
       } else {
         status.innerHTML = '<span class="u-text-muted">Modo Asistente Integrado activo (sin coste ni clave requerida)</span>';
       }
