@@ -1391,14 +1391,6 @@ textarea {
   }
 }
 
-@media (min-width: 640px) {
-  #shopping-aisles-container {
-    display: block;
-    column-count: 2;
-    column-gap: 16px;
-  }
-}
-
 .meal-slot {
   background-color: var(--m3-surface-container-low);
   border: 1px dashed var(--m3-outline);
@@ -1755,6 +1747,10 @@ textarea {
 }
 
 /* Shopping List */
+.shopping-column {
+  display: contents;
+}
+
 .aisle-card {
   background-color: var(--m3-surface);
   border: var(--border-subtle);
@@ -6870,9 +6866,25 @@ h2,
 
   /* Lista de la compra por pasillos en 3 columnas fluidas (masonry sin huecos vacíos) */
   #shopping-aisles-container {
-    display: block;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 18px;
     column-count: 3;
     column-gap: 18px;
+  }
+
+  .shopping-column {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-width: 0;
+    gap: 16px;
+  }
+
+  .shopping-column .aisle-card {
+    margin-bottom: 0;
+    width: 100%;
   }
 
   .pwa-smart-banner {

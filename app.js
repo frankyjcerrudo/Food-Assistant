@@ -2078,7 +2078,7 @@ class StateStore {
           migrated = true;
         }
         if ((!Array.isArray(item.recipeBreakdown) || item.recipeBreakdown.length <= 1) && item.recipeOrigin && item.recipeOrigin.includes(',')) {
-          const parts = item.recipeOrigin.split(',').map(s => s.trim()).filter(Boolean);
+          const parts = parseRecipeOrigins(item.recipeOrigin, this.recipes || []);
           if (parts.length > 1) {
             item.recipeBreakdown = parts.map(p => ({
               recipe: p,
@@ -4283,9 +4283,55 @@ isWrapperDomain(domainOrUrl) {
   }
 };
 
+function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
+  if (!rawOrigin || typeof rawOrigin !== 'string') return [];
+  const trimmed = rawOrigin.trim();
+  if (!trimmed) return [];
+  if (!trimmed.includes(',')) return [trimmed];
+
+  const knownTitles = (knownRecipes || []).map(r => (r && r.title ? r.title.trim().toLowerCase() : '')).filter(Boolean);
+
+  // 1. Si el string completo coincide exactamente con una receta del catálogo, es una sola receta con comas en su título
+  if (knownTitles.includes(trimmed.toLowerCase())) {
+    return [trimmed];
+  }
+
+  const candidateParts = trimmed.split(',').map(s => s.trim()).filter(Boolean);
+  if (candidateParts.length <= 1) return [trimmed];
+
+  // 2. Si no hay recetas conocidas para contrastar, devolver los candidatos separados por coma
+  if (knownTitles.length === 0) {
+    return candidateParts;
+  }
+
+  // 3. Reensamblar partes si pertenecen a un mismo título conocido con comas
+  const result = [];
+  let currentBuffer = '';
+
+  for (let i = 0; i < candidateParts.length; i++) {
+    const part = candidateParts[i];
+    const candidate = currentBuffer ? `${currentBuffer}, ${part}` : part;
+    const candidateLower = candidate.toLowerCase();
+    const isPrefix = knownTitles.some(t => t.startsWith(`${candidateLower},`));
+
+    if (isPrefix && i < candidateParts.length - 1) {
+      currentBuffer = candidate;
+    } else {
+      result.push(candidate);
+      currentBuffer = '';
+    }
+  }
+
+  if (currentBuffer) {
+    result.push(currentBuffer);
+  }
+
+  return result.length > 0 ? result : candidateParts;
+}
+
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.40';
+  window.APP_VERSION = 'v1.41';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4318,12 +4364,13 @@ if (typeof window !== 'undefined') {
   window.estimateRecipeNutrition = estimateRecipeNutrition;
   window.getRecipeNutrition = getRecipeNutrition;
   window.getPrimaryProteinCategory = getPrimaryProteinCategory;
+  window.parseRecipeOrigins = parseRecipeOrigins;
 }
 
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.40';
+    this.appVersion = window.APP_VERSION || 'v1.41';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5617,7 +5664,7 @@ class FoodAssistantApp {
           }
 
           if (!breakdown && remoteRow.recipe_origin && remoteRow.recipe_origin.includes(',')) {
-            const parts = remoteRow.recipe_origin.split(',').map(s => s.trim()).filter(Boolean);
+            const parts = parseRecipeOrigins(remoteRow.recipe_origin, state.recipes || []);
             if (parts.length > 1) {
               breakdown = parts.map(p => ({
                 recipe: p,
@@ -10808,6 +10855,36 @@ class FoodAssistantApp {
     this.renderShoppingList();
   }
 
+  _distributeShoppingCards(cardsWithWeights, numCols = 3) {
+    if (!cardsWithWeights || cardsWithWeights.length === 0) return '';
+    if (cardsWithWeights.length === 1) {
+      return `<div class="shopping-column">${cardsWithWeights[0].html}</div>`;
+    }
+
+    const actualCols = Math.min(numCols, cardsWithWeights.length);
+    const cols = Array.from({ length: actualCols }, () => []);
+    const colHeights = new Array(actualCols).fill(0);
+
+    // Ordenar de mayor a menor peso para balanceo greedy uniforme
+    const sorted = [...cardsWithWeights].sort((a, b) => b.weight - a.weight);
+
+    for (const card of sorted) {
+      let minColIdx = 0;
+      for (let c = 1; c < actualCols; c++) {
+        if (colHeights[c] < colHeights[minColIdx]) {
+          minColIdx = c;
+        }
+      }
+      cols[minColIdx].push(card.html);
+      colHeights[minColIdx] += card.weight;
+    }
+
+    return cols
+      .filter(col => col.length > 0)
+      .map(col => `<div class="shopping-column">${col.join('')}</div>`)
+      .join('');
+  }
+
   renderShoppingList() {
     const container = document.getElementById('shopping-aisles-container');
     if (!container) return;
@@ -10877,12 +10954,12 @@ class FoodAssistantApp {
         }
       });
 
-      container.innerHTML = Object.entries(groupedByRecipe).map(([recipeLabel, items]) => {
+      const cards = Object.entries(groupedByRecipe).map(([recipeLabel, items]) => {
         const pendingInRecipe = items.filter(i => !i.isChecked).length;
         const isManualGroup = /manualmente|otros|asistente/i.test(recipeLabel);
         const headerIcon = isManualGroup ? 'shopping_bag' : 'menu_book';
 
-        return `
+        const html = `
           <div class="aisle-card recipe-shopping-card" data-recipe-group="${escapeHtml(recipeLabel)}">
             <div class="aisle-header">
               <div class="u-flex-row-center-gap-8">
@@ -10921,7 +10998,9 @@ class FoodAssistantApp {
             </div>
           </div>
         `;
-      }).join('');
+        return { html, weight: 3 + items.length };
+      });
+      container.innerHTML = this._distributeShoppingCards(cards, 3);
       return;
     }
 
@@ -10932,11 +11011,11 @@ class FoodAssistantApp {
       grouped[aisle].push({ ...item, originalIndex: index });
     });
 
-    container.innerHTML = Object.entries(grouped).map(([aisleKey, items]) => {
+    const cards = Object.entries(grouped).map(([aisleKey, items]) => {
       const meta = AISLE_METADATA[aisleKey] || AISLE_METADATA.other;
       const pendingInAisle = items.filter(i => !i.isChecked).length;
 
-      return `
+      const html = `
         <div class="aisle-card">
           <div class="aisle-header">
             <div class="u-flex-row-center-gap-8">
@@ -10954,7 +11033,7 @@ class FoodAssistantApp {
 
               // Reconstruir desglose si no está en memoria pero recipeOrigin contiene múltiples recetas separadas por coma
               if (!breakdown && item.recipeOrigin && item.recipeOrigin.includes(',')) {
-                const parts = item.recipeOrigin.split(',').map(s => s.trim()).filter(Boolean);
+                const parts = parseRecipeOrigins(item.recipeOrigin, state.recipes || []);
                 if (parts.length > 1) {
                   breakdown = parts.map(p => ({
                     recipe: p,
@@ -10964,7 +11043,7 @@ class FoodAssistantApp {
                   }));
                 }
               } else if (breakdown && breakdown.length === 1 && breakdown[0].recipe && breakdown[0].recipe.includes(',')) {
-                const parts = breakdown[0].recipe.split(',').map(s => s.trim()).filter(Boolean);
+                const parts = parseRecipeOrigins(breakdown[0].recipe, state.recipes || []);
                 if (parts.length > 1) {
                   breakdown = parts.map(p => ({
                     recipe: p,
@@ -11025,7 +11104,10 @@ class FoodAssistantApp {
           </div>
         </div>
       `;
-    }).join('');
+      return { html, weight: 3 + items.length };
+    });
+
+    container.innerHTML = this._distributeShoppingCards(cards, 3);
   }
 
   toggleGroceryCheck(index) {
