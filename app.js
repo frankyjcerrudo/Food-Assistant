@@ -4273,7 +4273,7 @@ isWrapperDomain(domainOrUrl) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.37';
+  window.APP_VERSION = 'v1.38';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4311,7 +4311,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.37';
+    this.appVersion = window.APP_VERSION || 'v1.38';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -4324,6 +4324,7 @@ class FoodAssistantApp {
     this.copyWeekMode = 'replace'; // 'replace' | 'merge' (US-04)
     this.selectedRecipeTags = new Set();
     this.editorSelectedTags = new Set();
+    this.pickerSelectedTags = new Set();
     this.pickerOnlyDietary = false;
     this.shoppingViewMode = (typeof localStorage !== 'undefined' && localStorage.getItem('fa_shopping_view_mode') === 'recipe') ? 'recipe' : 'aisle'; // US-33: 'aisle' | 'recipe'
     this.wakeLockSentinel = null; // US-60: Screen Wake Lock Sentinel
@@ -10194,12 +10195,74 @@ class FoodAssistantApp {
 
   clearPickerSearch() {
     this.pickerSearchQuery = '';
+    if (this.pickerSelectedTags) {
+      this.pickerSelectedTags.clear();
+    }
     const input = document.getElementById('input-picker-search');
     const clearBtn = document.getElementById('btn-clear-picker-search');
     if (input) input.value = '';
     if (clearBtn) clearBtn.style.display = 'none';
+    this.initPickerTagFilters();
     this.renderPickerRecipesList();
     if (input) input.focus();
+  }
+
+  initPickerTagFilters() {
+    const container = document.getElementById('picker-tag-filters');
+    if (!container) return;
+
+    if (!this.pickerSelectedTags) {
+      this.pickerSelectedTags = new Set();
+    }
+
+    const availableTags = state.getAllTags ? state.getAllTags() : (typeof ALL_PREDEFINED_TAGS !== 'undefined' ? ALL_PREDEFINED_TAGS : []);
+    const isAllActive = this.pickerSelectedTags.size === 0;
+    const isFavSelected = this.pickerSelectedTags.has('Favoritas');
+    const favCount = Array.isArray(state.recipes) ? state.recipes.filter(r => r && r.isFavorite).length : 0;
+
+    let html = `
+      <button type="button" class="m3-filter-chip ${isAllActive ? 'active' : ''}" data-picker-tag="all">
+        ${isAllActive ? '<span class="material-symbols-outlined icon-14">done</span>' : ''}
+        Todas
+      </button>
+      <button type="button" class="m3-filter-chip m3-filter-chip-fav ${isFavSelected ? 'active' : ''}" data-picker-tag="Favoritas" aria-pressed="${isFavSelected ? 'true' : 'false'}">
+        <span class="material-symbols-outlined icon-14">favorite</span>
+        <span>Favoritas${favCount > 0 ? ` (${favCount})` : ''}</span>
+      </button>
+    `;
+
+    availableTags.forEach(tag => {
+      const isSelected = this.pickerSelectedTags.has(tag);
+      const isDietary = typeof PREDEFINED_DIETARY_TAGS !== 'undefined' && PREDEFINED_DIETARY_TAGS.includes(tag);
+      const emoji = typeof getDietaryTagEmoji === 'function' ? getDietaryTagEmoji(tag) : '';
+      html += `
+        <button type="button" class="m3-filter-chip ${isDietary ? 'dietary-chip' : ''} ${isSelected ? 'active' : ''}" data-picker-tag="${escapeHtml(tag)}">
+          ${isDietary && emoji ? `<span class="dietary-emoji">${emoji}</span>` : ''}
+          ${isSelected && !isDietary ? '<span class="material-symbols-outlined icon-14">done</span>' : ''}
+          ${escapeHtml(tag)}
+        </button>
+      `;
+    });
+
+    container.innerHTML = html;
+
+    container.querySelectorAll('.m3-filter-chip[data-picker-tag]').forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const tag = chip.dataset.pickerTag;
+        if (tag === 'all') {
+          this.pickerSelectedTags.clear();
+        } else {
+          if (this.pickerSelectedTags.has(tag)) {
+            this.pickerSelectedTags.delete(tag);
+          } else {
+            this.pickerSelectedTags.add(tag);
+          }
+        }
+        this.initPickerTagFilters();
+        this.renderPickerRecipesList();
+      });
+    });
   }
 
   openPickerModal(dateStr, slotKey, isCustom = false) {
@@ -10216,7 +10279,10 @@ class FoodAssistantApp {
       slotTitle = std ? std.label : slotKey;
     }
 
-    document.getElementById('picker-modal-title').textContent = `Elegir plato para ${slotTitle.toUpperCase()}`;
+    const titleElem = document.getElementById('picker-modal-title');
+    if (titleElem) {
+      titleElem.textContent = `Elegir plato para ${slotTitle.toUpperCase()}`;
+    }
 
     const hasPreferences = Array.isArray(state.dietaryPreferences) && state.dietaryPreferences.length > 0;
     if (filterBar) {
@@ -10226,8 +10292,15 @@ class FoodAssistantApp {
       toggleBtn.classList.toggle('active', this.pickerOnlyDietary);
     }
 
-    // US-71: Reset search on modal open
+    // US-71: Reset search and tag filters on modal open
     this.pickerSearchQuery = '';
+    if (!this.pickerSelectedTags) {
+      this.pickerSelectedTags = new Set();
+    } else {
+      this.pickerSelectedTags.clear();
+    }
+    this.initPickerTagFilters();
+
     const searchInput = document.getElementById('input-picker-search');
     const clearBtn = document.getElementById('btn-clear-picker-search');
     if (searchInput) searchInput.value = '';
@@ -10254,6 +10327,26 @@ class FoodAssistantApp {
       recipes = recipes.filter(r => checkDietaryCompliance(r, state.dietaryPreferences).compliant);
     }
 
+    // Filtro por etiquetas multi-selección (tipo pestaña Recetas)
+    if (this.pickerSelectedTags && this.pickerSelectedTags.size > 0) {
+      recipes = recipes.filter(r => {
+        const rTagsNorm = (r.tags || []).map(t => typeof normalizeIngredientText === 'function' ? normalizeIngredientText(String(t)) : String(t).toLowerCase().trim());
+        for (const selTag of this.pickerSelectedTags) {
+          const selTagNorm = typeof normalizeIngredientText === 'function' ? normalizeIngredientText(selTag) : selTag.toLowerCase().trim();
+          if (selTagNorm === 'favoritas' || selTagNorm === 'favorita') {
+            if (!r.isFavorite && !rTagsNorm.includes('favoritas')) {
+              return false;
+            }
+            continue;
+          }
+          if (!rTagsNorm.includes(selTagNorm)) {
+            return false;
+          }
+        }
+        return true;
+      });
+    }
+
     // US-71: Filtrado reactivo en tiempo real por término de búsqueda (título, descripción e ingredientes)
     const q = (this.pickerSearchQuery || '').trim();
     if (q) {
@@ -10268,6 +10361,18 @@ class FoodAssistantApp {
       }
     }
 
+    // Contador reactivo de recetas
+    const countElem = document.getElementById('picker-recipes-count');
+    if (countElem) {
+      const total = Array.isArray(state.recipes) ? state.recipes.length : 0;
+      const count = recipes.length;
+      if (q || (this.pickerSelectedTags && this.pickerSelectedTags.size > 0) || (this.pickerOnlyDietary && hasPreferences)) {
+        countElem.textContent = `${count} de ${total} recetas encontradas`;
+      } else {
+        countElem.textContent = `${total} recetas disponibles`;
+      }
+    }
+
     if (recipes.length === 0) {
       if (q) {
         list.innerHTML = `
@@ -10277,6 +10382,21 @@ class FoodAssistantApp {
             <div class="u-mt-10">
               <button type="button" class="btn btn-secondary btn-sm" onclick="app.clearPickerSearch()">
                 <span class="material-symbols-outlined icon-sm">backspace</span> Limpiar búsqueda
+              </button>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      if (this.pickerSelectedTags && this.pickerSelectedTags.size > 0) {
+        list.innerHTML = `
+          <div class="picker-empty-state">
+            <span class="material-symbols-outlined picker-empty-icon">filter_alt_off</span>
+            No se encontraron recetas con las etiquetas seleccionadas.
+            <div class="u-mt-10">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="app.clearPickerSearch()">
+                <span class="material-symbols-outlined icon-sm">backspace</span> Quitar filtros
               </button>
             </div>
           </div>
@@ -10305,6 +10425,10 @@ class FoodAssistantApp {
 
     list.innerHTML = recipes.map(r => {
       const comp = hasPreferences ? checkDietaryCompliance(r, state.dietaryPreferences) : { compliant: true, violations: [] };
+      const totalTime = (r.prepTimeMinutes || 0) + (r.cookTimeMinutes || 0);
+      const cal = r.nutritionPerServing?.calories || r.calories || null;
+      const tags = Array.isArray(r.tags) ? r.tags.filter(t => t && String(t).toLowerCase() !== 'general').slice(0, 3) : [];
+
       return `
         <div class="picker-recipe-row"
              onclick="app.selectRecipeForSlot('${r.id}')">
@@ -10316,10 +10440,19 @@ class FoodAssistantApp {
                 <img src="${this.getRecipePlaceholderSvg(r.title, 'thumb')}" alt="" class="img-cover-full">
               </div>
             `}
-            <div class="u-min-w-0">
-              <strong class="picker-recipe-title">${r.title}</strong>
+            <div class="picker-recipe-body">
+              <div class="picker-recipe-title-row">
+                <strong class="picker-recipe-title">${escapeHtml(r.title)}</strong>
+                ${r.isFavorite ? `<span class="material-symbols-outlined picker-fav-heart" title="Favorita">favorite</span>` : ''}
+              </div>
               <div class="picker-recipe-meta">
-                <span class="material-symbols-outlined icon-sm">schedule</span> ${r.prepTimeMinutes + r.cookTimeMinutes} min
+                ${totalTime > 0 ? `<span class="u-flex-row-center-gap-4"><span class="material-symbols-outlined icon-14">schedule</span> ${totalTime} min</span>` : ''}
+                ${cal ? `<span>•</span> <span class="u-flex-row-center-gap-4"><span class="material-symbols-outlined icon-14">local_fire_department</span> ${cal} kcal</span>` : ''}
+                ${tags.length > 0 ? `
+                  <span class="picker-recipe-tags-wrap">
+                    ${tags.map(t => `<span class="picker-recipe-mini-tag">${escapeHtml(t)}</span>`).join('')}
+                  </span>
+                ` : ''}
               </div>
               ${hasPreferences ? (
                 comp.compliant
@@ -10328,7 +10461,7 @@ class FoodAssistantApp {
               ) : ''}
             </div>
           </div>
-          <button class="btn btn-secondary btn-sm u-shrink-0">Elegir</button>
+          <button type="button" class="btn btn-secondary btn-sm u-shrink-0" onclick="event.stopPropagation(); app.selectRecipeForSlot('${r.id}')">Elegir</button>
         </div>
       `;
     }).join('');
@@ -10336,6 +10469,9 @@ class FoodAssistantApp {
 
   closePickerModal() {
     this.pickerSearchQuery = '';
+    if (this.pickerSelectedTags) {
+      this.pickerSelectedTags.clear();
+    }
     const input = document.getElementById('input-picker-search');
     const clearBtn = document.getElementById('btn-clear-picker-search');
     if (input) input.value = '';
@@ -10790,8 +10926,10 @@ class FoodAssistantApp {
                         return `
                           <div class="grocery-breakdown-row" title="${escapeHtml(b.recipe)}">
                             <span class="grocery-breakdown-dot">•</span>
-                            <span class="grocery-breakdown-recipe">${escapeHtml(b.recipe)}:</span>
-                            <span class="grocery-breakdown-qty">${escapeHtml(qtyStr)}${nameDiff}</span>
+                            <div class="grocery-breakdown-body">
+                              <span class="grocery-breakdown-recipe">${escapeHtml(b.recipe)}:</span>
+                              <span class="grocery-breakdown-qty">${escapeHtml(qtyStr)}${nameDiff}</span>
+                            </div>
                           </div>
                         `;
                       }).join('')}

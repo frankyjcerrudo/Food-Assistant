@@ -35,15 +35,15 @@
   <meta name="application-name" content="Sabory">
   <meta name="apple-mobile-web-app-title" content="Sabory">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <link rel="manifest" href="manifest.json?v=1.37">
+  <link rel="manifest" href="manifest.json?v=1.38">
   <meta name="theme-color" content="#FAF7F2">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=1.37">
-  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.37">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.37">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.37">
+  <link rel="stylesheet" href="styles.css?v=1.38">
+  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.38">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.38">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.38">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <!-- US-41: versión fija + Subresource Integrity (sha384) para el SDK de Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"
@@ -119,7 +119,7 @@
     <aside class="pwa-smart-banner" id="pwa-smart-banner" hidden aria-label="Instalación de la app en la pantalla de inicio">
       <div class="pwa-smart-banner-content">
         <div class="pwa-smart-banner-icon" aria-hidden="true">
-          <img src="icon-192.png?v=1.37" alt="" width="28" height="28" class="pwa-smart-banner-img">
+          <img src="icon-192.png?v=1.38" alt="" width="28" height="28" class="pwa-smart-banner-img">
         </div>
         <div class="pwa-smart-banner-texts">
           <strong class="pwa-smart-banner-title">Prueba Sabory como App</strong>
@@ -717,8 +717,8 @@
             </h3>
             <p
               style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-              Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.37</strong>
-              <span class="app-version-badge" id="app-version-badge">v1.37</span>
+              Versión instalada: <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.38</strong>
+              <span class="app-version-badge" id="app-version-badge">v1.38</span>
             </p>
             <div
               style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;">
@@ -1541,32 +1541,37 @@
   </dialog>
   <!-- MODAL: RECIPE PICKER FOR PLANNER SLOT -->
   <dialog class="modal-overlay" id="modal-recipe-picker" closedby="any" aria-labelledby="picker-modal-title">
-    <div class="modal-content" style="padding: 16px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-        <h3 style="font-size: 15px; font-weight: 500;" id="picker-modal-title">Elegir Plato</h3>
+    <div class="modal-content" style="padding: 18px; max-width: 520px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="font-size: 16px; font-weight: 600; margin: 0;" id="picker-modal-title">Elegir Plato</h3>
         <button class="btn btn-ghost btn-icon" id="btn-close-picker-modal">
           <span class="material-symbols-outlined">close</span>
         </button>
       </div>
-      <!-- US-71: Buscador en tiempo real de recetas en selector del planificador -->
-      <div class="picker-search-bar-wrap" style="position: relative; margin-bottom: 8px;">
-        <span class="material-symbols-outlined icon-sm"
-          style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--m3-on-surface-variant); pointer-events: none;">search</span>
-        <input type="search" id="input-picker-search" class="form-input"
-          placeholder="Buscar por título o ingrediente..."
-          style="padding-left: 34px; padding-right: 32px; width: 100%; height: 38px; font-size: 13px; border-radius: var(--radius-md);"
+      <!-- US-71: Buscador M3 idéntico a pestaña Recetas -->
+      <div class="m3-search-bar picker-search-bar-wrap" style="margin-bottom: 10px; padding: 6px 14px;">
+        <span class="material-symbols-outlined">search</span>
+        <input type="search" id="input-picker-search" class="m3-search-input"
+          placeholder="Buscar por plato, ingrediente o técnica..."
           autocomplete="off">
         <button type="button" id="btn-clear-picker-search" class="btn btn-ghost btn-icon"
-          style="position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: none; width: 28px; height: 28px; padding: 0;"
+          style="display: none; width: 28px; height: 28px; padding: 0; min-width: 28px;"
           title="Limpiar búsqueda">
           <span class="material-symbols-outlined icon-sm">close</span>
         </button>
+      </div>
+      <!-- Filtros por etiquetas tipo pestaña Recetas -->
+      <div class="chips-scroll-container" id="picker-tag-filters" style="margin-bottom: 8px; padding-bottom: 2px;">
+        <!-- Generado dinámicamente: Todas, Favoritas, Desayuno, Almuerzo, Cena, Rápidas, etc. -->
       </div>
       <div id="picker-dietary-filter-bar"
         style="display: none; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--m3-outline-variant);">
         <button type="button" class="m3-filter-chip dietary-chip" id="btn-toggle-picker-dietary-only">
           <span class="material-symbols-outlined icon-sm">eco</span> Solo aptas para mis dietas
         </button>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 11px; color: var(--m3-on-surface-variant);">
+        <span id="picker-recipes-count"></span>
       </div>
       <!-- US-65: Cook Double / Leftovers Toggle -->
       <div
@@ -1578,7 +1583,7 @@
         </label>
         <input type="checkbox" id="toggle-picker-cook-double" class="grocery-checkbox" style="margin: 0;">
       </div>
-      <div style="max-height: 56vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;"
+      <div style="max-height: 52vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;"
         id="picker-recipes-list"></div>
     </div>
   </dialog>
@@ -2394,8 +2399,8 @@
     </div>
   </div>
 
-  <script src="config.js?v=1.37"></script>
-  <script src="app.js?v=1.37"></script>
+  <script src="config.js?v=1.38"></script>
+  <script src="app.js?v=1.38"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

@@ -227,6 +227,38 @@ describe('US-20: Autocompletado Inteligente de Ingredientes e Iconos Distintivos
       expect(badges[1].innerHTML).toContain('nutrition');
     });
 
+    it('renderShoppingList renderiza desglose múltiple de recetas con estructura que evita desalineaciones', () => {
+      window.state.shoppingList = [
+        {
+          id: 'item-eggs',
+          name: 'Huevos',
+          amount: 8,
+          unit: 'ud',
+          aisle: 'dairy',
+          isChecked: false,
+          recipeBreakdown: [
+            { recipe: 'Tostadas con Revuelto de Huevo y Queso Fresco', name: 'Huevos', amount: 4, unit: 'ud' },
+            { recipe: 'Tortilla de espinacas', name: 'Huevos', amount: 4, unit: 'ud' }
+          ]
+        }
+      ];
+
+      appInstance.renderShoppingList();
+
+      const container = document.getElementById('shopping-aisles-container');
+      const breakdownRows = container.querySelectorAll('.grocery-breakdown-row');
+      expect(breakdownRows.length).toBe(2);
+
+      const firstRow = breakdownRows[0];
+      const dot = firstRow.querySelector('.grocery-breakdown-dot');
+      const body = firstRow.querySelector('.grocery-breakdown-body');
+      expect(dot).not.toBeNull();
+      expect(dot.textContent).toBe('•');
+      expect(body).not.toBeNull();
+      expect(body.querySelector('.grocery-breakdown-recipe').textContent).toContain('Tostadas con Revuelto');
+      expect(body.querySelector('.grocery-breakdown-qty').textContent).toContain('4 ud');
+    });
+
     it('addIngredientRow clasifica automáticamente el pasillo en el formulario de recetas al escribir', () => {
       appInstance.addIngredientRow();
 

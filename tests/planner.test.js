@@ -434,9 +434,11 @@ describe('US-71: Buscador en tiempo real en el selector de recetas del planifica
           <input type="search" id="input-picker-search">
           <button id="btn-clear-picker-search" style="display: none;"></button>
         </div>
+        <div class="chips-scroll-container" id="picker-tag-filters"></div>
         <div id="picker-dietary-filter-bar" style="display: none;">
           <button id="btn-toggle-picker-dietary-only"></button>
         </div>
+        <span id="picker-recipes-count"></span>
         <input type="checkbox" id="toggle-picker-cook-double">
         <div id="picker-recipes-list"></div>
       </dialog>
@@ -545,6 +547,57 @@ describe('US-71: Buscador en tiempo real en el selector de recetas del planifica
     expect(input.value).toBe('');
     expect(appInstance.pickerSearchQuery).toBe('');
     expect(list.children.length).toBe(3);
+  });
+
+  it('permite filtrar en el selector por chips de etiquetas (Favoritas, Vegetariano, etc.) y actualiza el contador', () => {
+    // Marcar una como favorita
+    window.state.recipes[0].isFavorite = true;
+
+    appInstance.openPickerModal('2026-11-02', 'lunch');
+    const tagFilters = document.getElementById('picker-tag-filters');
+    const favChip = tagFilters.querySelector('[data-picker-tag="Favoritas"]');
+    expect(favChip).not.toBeNull();
+
+    // Clic en Favoritas
+    favChip.click();
+
+    expect(appInstance.pickerSelectedTags.has('Favoritas')).toBe(true);
+    const list = document.getElementById('picker-recipes-list');
+    expect(list.children.length).toBe(1);
+    expect(list.textContent).toContain('Pasta al Pesto Genovés');
+
+    const count = document.getElementById('picker-recipes-count');
+    expect(count.textContent).toContain('1 de 3 recetas');
+
+    // Clic en Todas restaura
+    const allChip = tagFilters.querySelector('[data-picker-tag="all"]');
+    allChip.click();
+    expect(appInstance.pickerSelectedTags.size).toBe(0);
+    expect(list.children.length).toBe(3);
+    expect(count.textContent).toContain('3 recetas disponibles');
+  });
+
+  it('combina búsqueda de texto con filtrado de etiquetas en el selector del planificador', () => {
+    window.state.recipes[0].isFavorite = true;
+    appInstance.openPickerModal('2026-11-02', 'lunch');
+
+    const tagFilters = document.getElementById('picker-tag-filters');
+    const favChip = tagFilters.querySelector('[data-picker-tag="Favoritas"]');
+    favChip.click();
+
+    const input = document.getElementById('input-picker-search');
+    input.value = 'albahaca';
+    input.dispatchEvent(new Event('input'));
+
+    const list = document.getElementById('picker-recipes-list');
+    expect(list.children.length).toBe(1);
+    expect(list.textContent).toContain('Pasta al Pesto Genovés');
+
+    // Búsqueda incompatible con la favorita seleccionada
+    input.value = 'salmón';
+    input.dispatchEvent(new Event('input'));
+    expect(list.children.length).toBe(1);
+    expect(list.textContent).toContain('No se encontraron recetas para "salmón"');
   });
 });
 
