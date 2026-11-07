@@ -394,5 +394,122 @@ describe('US-77: Modo Familia / Espacio Colaborativo del Hogar (Family Mode)', (
       expect(state.recipes.some(r => r.id === 'rec-personal-laura')).toBe(true);
       expect(state.recipes.some(r => r.id === 'rec-shared-franky')).toBe(false);
     });
+
+    it('no pisa días planificados con días vacíos autogenerados y comparte Preferencias Dietéticas manteniendo Macros individuales', async () => {
+      state.cloudUser = { id: 'user-aroa-222', email: 'aroa@sabory.food', name: 'Aroa' };
+      state.saveHousehold({
+        id: 'hh-family-999',
+        name: 'Casa Sabory',
+        inviteCode: 'SAB-9K2M',
+        ownerId: 'user-franky-111',
+        role: 'member',
+        members: [
+          { userId: 'user-franky-111', name: 'Franky', role: 'owner' },
+          { userId: 'user-aroa-222', name: 'Aroa', role: 'member' }
+        ]
+      });
+
+      // Día vacío local autogenerado por getDayPlan() sin updatedAt
+      state.mealPlan = {};
+      state.getDayPlan('2026-11-07', 'Sábado');
+      expect(state.mealPlan['2026-11-07'].updatedAt).toBeUndefined();
+
+      // Objetivos nutricionales individuales de Aroa
+      state.saveNutritionGoals({ enabled: true, calories: 1750, protein: 120, carbs: 160, fat: 55 });
+
+      const remoteMealPlans = [
+        // Registro vacío más reciente de otro miembro vs registro planificado de Franky
+        {
+          id: '2026-11-07',
+          user_id: 'user-aroa-222',
+          household_id: 'hh-family-999',
+          plan_date: '2026-11-07',
+          day_name: 'Sábado',
+          breakfast_recipe_id: null,
+          lunch_recipe_id: null,
+          snack_recipe_id: null,
+          dinner_recipe_id: null,
+          custom_slots: [],
+          updated_at: '2026-11-07T18:00:00.000Z'
+        },
+        {
+          id: '2026-11-07',
+          user_id: 'user-franky-111',
+          household_id: 'hh-family-999',
+          plan_date: '2026-11-07',
+          day_name: 'Sábado',
+          breakfast_recipe_id: 'rec-avocado-toast',
+          lunch_recipe_id: 'rec-pesto-pasta',
+          snack_recipe_id: null,
+          dinner_recipe_id: 'rec-salmon-bowl',
+          custom_slots: [],
+          updated_at: '2026-11-07T12:00:00.000Z'
+        },
+        // Preferencias dietéticas compartidas del hogar
+        {
+          id: '__household_prefs__',
+          user_id: 'user-franky-111',
+          household_id: 'hh-family-999',
+          plan_date: '__household_prefs__',
+          day_name: 'Preferencias del Hogar',
+          custom_slots: [{
+            type: 'household_prefs',
+            dietaryPreferences: ['Sin Lactosa', 'Alta en Proteínas'],
+            updatedAt: '2026-11-07T18:01:00.000Z'
+          }],
+          updated_at: '2026-11-07T18:01:00.000Z'
+        }
+      ];
+
+      appInstance.supabaseClient = {
+        from: vi.fn((table) => {
+          if (table === 'meal_plans') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  limit: vi.fn().mockResolvedValue({ data: remoteMealPlans, error: null })
+                })
+              })
+            };
+          }
+          if (table === 'user_settings') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [{
+                    user_id: 'user-aroa-222',
+                    dietary_preferences: ['Vegetariano'],
+                    nutrition_goals: { enabled: true, calories: 1750, protein: 120, carbs: 160, fat: 55 },
+                    updated_at: '2026-11-07T10:00:00.000Z'
+                  }],
+                  error: null
+                })
+              })
+            };
+          }
+          return {
+            select: vi.fn().mockReturnValue({
+              or: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue({ data: [], error: null }) }),
+              eq: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue({ data: [], error: null }) })
+            })
+          };
+        })
+      };
+
+      const pullRes = await appInstance.pullFromCloud();
+      expect(pullRes.success).toBe(true);
+
+      // 1. El día planificado de Franky prevalece sobre el día vacío autogenerado
+      expect(state.mealPlan['2026-11-07'].lunch).toBe('rec-pesto-pasta');
+      expect(state.mealPlan['2026-11-07'].dinner).toBe('rec-salmon-bowl');
+      expect(state.mealPlan['__household_prefs__']).toBeUndefined();
+
+      // 2. Las preferencias dietéticas adoptan las compartidas del hogar
+      expect(state.dietaryPreferences).toEqual(['Sin Lactosa', 'Alta en Proteínas']);
+
+      // 3. Los objetivos nutricionales (macros) siguen siendo los individuales de Aroa
+      expect(state.settings.nutritionGoals.calories).toBe(1750);
+      expect(state.settings.nutritionGoals.protein).toBe(120);
+    });
   });
 });

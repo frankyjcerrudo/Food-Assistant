@@ -2274,6 +2274,11 @@ class StateStore {
     this.dietaryUpdatedAt = new Date().toISOString();
     this.save('fa_dietary_preferences', this.dietaryPreferences);
     this.save('fa_dietary_updated_at', this.dietaryUpdatedAt);
+    if (this.household && typeof this.household === 'object') {
+      this.household.dietaryPreferences = [...this.dietaryPreferences];
+      this.household.dietaryUpdatedAt = this.dietaryUpdatedAt;
+      this.save('fa_household', this.household);
+    }
   }
 
   addCustomTag(tag) {
@@ -4463,7 +4468,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.46';
+  window.APP_VERSION = 'v1.47';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4504,7 +4509,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.46';
+    this.appVersion = window.APP_VERSION || 'v1.47';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5808,13 +5813,40 @@ class FoodAssistantApp {
       }
 
       // 2. Fusión de Meal Plans (con desduplicación por fecha en Modo Familia US-77)
+      let remoteHouseholdPrefsRow = null;
+      const hasLocalDayMeals = (d) => !!(d && (d.breakfast || d.lunch || d.snack || d.dinner || (Array.isArray(d.customSlots) && d.customSlots.length > 0)));
+      const hasRemoteRowMeals = (r) => !!(r && (r.breakfast_recipe_id || r.lunch_recipe_id || r.snack_recipe_id || r.dinner_recipe_id || (Array.isArray(r.custom_slots) && r.custom_slots.length > 0)));
+
+      if (state.mealPlan && state.mealPlan['__household_prefs__']) {
+        delete state.mealPlan['__household_prefs__'];
+      }
+
       if (Array.isArray(planRes.data)) {
         const dedupedPlansMap = new Map();
         planRes.data.forEach(row => {
           const dKey = row?.plan_date || row?.id;
           if (!dKey) return;
+          if (dKey === '__household_prefs__') {
+            if (!remoteHouseholdPrefsRow || new Date(row.updated_at || 0).getTime() >= new Date(remoteHouseholdPrefsRow.updated_at || 0).getTime()) {
+              remoteHouseholdPrefsRow = row;
+            }
+            return;
+          }
           const prev = dedupedPlansMap.get(dKey);
-          if (!prev || new Date(row.updated_at || 0).getTime() >= new Date(prev.updated_at || 0).getTime()) {
+          if (!prev) {
+            dedupedPlansMap.set(dKey, row);
+            return;
+          }
+          const rowHasContent = hasRemoteRowMeals(row);
+          const prevHasContent = hasRemoteRowMeals(prev);
+          if (rowHasContent && !prevHasContent) {
+            dedupedPlansMap.set(dKey, row);
+          } else if (!rowHasContent && prevHasContent) {
+            // Un registro vacío de otro miembro nunca pisa un día planificado del hogar
+            if (row.user_id && prev.user_id && row.user_id === prev.user_id && new Date(row.updated_at || 0).getTime() > new Date(prev.updated_at || 0).getTime()) {
+              dedupedPlansMap.set(dKey, row);
+            }
+          } else if (new Date(row.updated_at || 0).getTime() >= new Date(prev.updated_at || 0).getTime()) {
             dedupedPlansMap.set(dKey, row);
           }
         });
@@ -5841,13 +5873,15 @@ class FoodAssistantApp {
 
         remotePlansList.forEach(remoteRow => {
           const dateKey = remoteRow.plan_date || remoteRow.id;
-          if (!dateKey || state.deletedRecords.mealPlans?.includes(dateKey)) return;
+          if (!dateKey || dateKey === '__household_prefs__' || state.deletedRecords.mealPlans?.includes(dateKey)) return;
 
           const localPlan = state.mealPlan[dateKey];
           const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
           const localDate = new Date(localPlan?.updatedAt || 0).getTime();
+          const localIsUntouchedEmpty = localPlan && !hasLocalDayMeals(localPlan) && !localPlan.updatedAt;
+          const remoteHasContent = hasRemoteRowMeals(remoteRow);
 
-          if (!localPlan || remoteDate >= localDate) {
+          if (!localPlan || localIsUntouchedEmpty || (remoteHasContent && !hasLocalDayMeals(localPlan) && !localPlan.updatedAt) || remoteDate >= localDate) {
             const mergedDay = {
               dayName: remoteRow.day_name || localPlan?.dayName || 'Día',
               breakfast: remoteRow.breakfast_recipe_id || null,
@@ -6019,6 +6053,18 @@ class FoodAssistantApp {
       if (!remoteDietary && Array.isArray(state.cloudUser?.user_metadata?.dietary_preferences)) {
         remoteDietary = state.cloudUser.user_metadata.dietary_preferences;
         remoteDietaryUpdatedAt = state.cloudUser.user_metadata.dietary_updated_at;
+      }
+
+      // US-77: En Modo Familia, las Preferencias Dietéticas son compartidas por todo el Hogar,
+      // mientras que los Objetivos Nutricionales (Macros) siguen siendo individuales de cada usuario.
+      if ((activeHouseholdId || state.household?.id) && remoteHouseholdPrefsRow) {
+        const hhPrefSlot = Array.isArray(remoteHouseholdPrefsRow.custom_slots)
+          ? remoteHouseholdPrefsRow.custom_slots.find(s => s && s.type === 'household_prefs')
+          : null;
+        if (hhPrefSlot && Array.isArray(hhPrefSlot.dietaryPreferences)) {
+          remoteDietary = hhPrefSlot.dietaryPreferences;
+          remoteDietaryUpdatedAt = hhPrefSlot.updatedAt || remoteHouseholdPrefsRow.updated_at || remoteDietaryUpdatedAt;
+        }
       }
       if (!remoteCustomTags && Array.isArray(state.cloudUser?.user_metadata?.custom_tags)) {
         remoteCustomTags = state.cloudUser.user_metadata.custom_tags;
@@ -6371,28 +6417,57 @@ class FoodAssistantApp {
       }
 
       // 3. Batch Upsert Meal Plans (BUG-23, BUG-24 & US-77 Modo Familia)
-      const planKeys = Object.keys(state.mealPlan || {});
-      if (planKeys.length > 0) {
-        const mealPlansPayload = planKeys.map(dateKey => {
-          const day = state.mealPlan[dateKey] || {};
-          const rowPayload = {
-            id: dateKey,
-            user_id: (activeHouseholdId && day.ownerUserId) ? day.ownerUserId : state.cloudUser.id,
-            plan_date: dateKey,
-            day_name: day.dayName || 'Día',
-            breakfast_recipe_id: day.breakfast || null,
-            lunch_recipe_id: day.lunch || null,
-            snack_recipe_id: day.snack || null,
-            dinner_recipe_id: day.dinner || null,
-            custom_slots: Array.isArray(day.customSlots) ? day.customSlots : [],
-            updated_at: day.updatedAt || new Date().toISOString()
-          };
-          if (activeHouseholdId) {
-            rowPayload.household_id = activeHouseholdId;
-          }
-          return rowPayload;
-        });
+      const planKeys = Object.keys(state.mealPlan || {}).filter(dateKey => {
+        if (!dateKey || dateKey === '__household_prefs__') return false;
+        const day = state.mealPlan[dateKey];
+        if (!day || typeof day !== 'object') return false;
+        const hasMeals = !!(day.breakfast || day.lunch || day.snack || day.dinner || (Array.isArray(day.customSlots) && day.customSlots.length > 0));
+        // Evitar subir días vacíos autogenerados por getDayPlan() que no tienen updatedAt explícito
+        return hasMeals || !!day.updatedAt;
+      });
 
+      const mealPlansPayload = planKeys.map(dateKey => {
+        const day = state.mealPlan[dateKey] || {};
+        const rowPayload = {
+          id: dateKey,
+          user_id: (activeHouseholdId && day.ownerUserId) ? day.ownerUserId : state.cloudUser.id,
+          plan_date: dateKey,
+          day_name: day.dayName || 'Día',
+          breakfast_recipe_id: day.breakfast || null,
+          lunch_recipe_id: day.lunch || null,
+          snack_recipe_id: day.snack || null,
+          dinner_recipe_id: day.dinner || null,
+          custom_slots: Array.isArray(day.customSlots) ? day.customSlots : [],
+          updated_at: day.updatedAt || new Date().toISOString()
+        };
+        if (activeHouseholdId) {
+          rowPayload.household_id = activeHouseholdId;
+        }
+        return rowPayload;
+      });
+
+      if (activeHouseholdId) {
+        const hhDietaryUpdatedAt = state.dietaryUpdatedAt || state.household?.dietaryUpdatedAt || new Date().toISOString();
+        mealPlansPayload.push({
+          id: '__household_prefs__',
+          user_id: state.household?.ownerId || state.cloudUser.id,
+          plan_date: '__household_prefs__',
+          day_name: 'Preferencias del Hogar',
+          breakfast_recipe_id: null,
+          lunch_recipe_id: null,
+          snack_recipe_id: null,
+          dinner_recipe_id: null,
+          custom_slots: [{
+            type: 'household_prefs',
+            dietaryPreferences: Array.isArray(state.dietaryPreferences) ? [...state.dietaryPreferences] : [],
+            updatedAt: hhDietaryUpdatedAt
+          }],
+          household_id: activeHouseholdId,
+          updated_at: hhDietaryUpdatedAt
+        });
+      }
+
+      if (mealPlansPayload.length > 0) {
         const mRes = await this.upsertWithSchemaFallback('meal_plans', mealPlansPayload);
         if (!mRes.success) throw mRes.error;
       }
@@ -15733,6 +15808,8 @@ REGLAS CRÍTICAS:
       ownerId: state.cloudUser.id,
       role: 'owner',
       createdAt: nowIso,
+      dietaryPreferences: Array.isArray(state.dietaryPreferences) ? [...state.dietaryPreferences] : [],
+      dietaryUpdatedAt: state.dietaryUpdatedAt || nowIso,
       members: [ownerMember]
     };
 
@@ -15752,7 +15829,9 @@ REGLAS CRÍTICAS:
     if (state.mealPlan && typeof state.mealPlan === 'object') {
       Object.keys(state.mealPlan).forEach(k => {
         const day = state.mealPlan[k];
-        if (day) {
+        if (!day || k === '__household_prefs__') return;
+        const hasMeals = !!(day.breakfast || day.lunch || day.snack || day.dinner || (Array.isArray(day.customSlots) && day.customSlots.length > 0));
+        if (hasMeals || day.updatedAt) {
           day.householdId = householdId;
           day.ownerUserId = day.ownerUserId || state.cloudUser.id;
           day.updatedAt = day.updatedAt || nowIso;
@@ -15826,11 +15905,13 @@ REGLAS CRÍTICAS:
         return { success: false, reason: 'not_found' };
       }
 
-      // Respaldar el plan semanal y lista de compra personal antes de adoptar el espacio familiar unificado
+      // Respaldar el plan semanal, lista de compra y preferencias dietéticas personales antes de adoptar el espacio familiar unificado
+      const preJoinDietary = Array.isArray(state.dietaryPreferences) ? [...state.dietaryPreferences] : [];
       if (!state.household?.id) {
         state.personalBackup = {
           mealPlan: typeof structuredClone === 'function' ? structuredClone(state.mealPlan || {}) : JSON.parse(JSON.stringify(state.mealPlan || {})),
           shoppingList: typeof structuredClone === 'function' ? structuredClone(state.shoppingList || []) : JSON.parse(JSON.stringify(state.shoppingList || [])),
+          dietaryPreferences: [...preJoinDietary],
           savedAt: new Date().toISOString()
         };
         state.save('fa_personal_backup', state.personalBackup);
@@ -15896,15 +15977,18 @@ REGLAS CRÍTICAS:
 
       if (codeInput) codeInput.value = '';
       await this.pullFromCloud();
-      // Si el hogar aún no tenía días en mealPlan, inicializar la semana actual
-      if (!state.mealPlan || Object.keys(state.mealPlan).length === 0) {
-        state.mealPlan = state.generateInitialMealPlan();
-        state.save('fa_mealplan', state.mealPlan);
+      // Combinar las preferencias dietéticas previas del miembro con las del Hogar compartido
+      if (preJoinDietary.length > 0) {
+        const mergedDietary = Array.from(new Set([...(state.dietaryPreferences || []), ...preJoinDietary]));
+        if (JSON.stringify(mergedDietary) !== JSON.stringify(state.dietaryPreferences || [])) {
+          state.saveDietaryPreferences(mergedDietary);
+        }
       }
       await this.pushToCloud(true);
 
       this.initHouseholdRealtimeSubscription();
       this.renderHouseholdSettings();
+      this.renderDietaryPreferencesSettings();
       this.render();
       this.showToast(`¡Te has unido a "${joinedHousehold.name}"! Menú, recetas y compra sincronizados.`, 'success');
       return { success: true, household: joinedHousehold };
@@ -16072,13 +16156,17 @@ REGLAS CRÍTICAS:
       }
     }
 
-    // Restaurar espacio individual (planificador y lista de compra previos) y conservar recetas propias
+    // Restaurar espacio individual (planificador, lista de compra y preferencias dietéticas previas) y conservar recetas propias
     if (state.personalBackup) {
       if (state.personalBackup.mealPlan) {
         state.mealPlan = state.personalBackup.mealPlan;
       }
       if (Array.isArray(state.personalBackup.shoppingList)) {
         state.shoppingList = state.personalBackup.shoppingList;
+      }
+      if (Array.isArray(state.personalBackup.dietaryPreferences)) {
+        state.dietaryPreferences = [...state.personalBackup.dietaryPreferences];
+        state.save('fa_dietary_preferences', state.dietaryPreferences);
       }
       state.personalBackup = null;
       state.save('fa_personal_backup', null);
