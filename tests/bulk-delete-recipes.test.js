@@ -189,6 +189,22 @@ describe('US-78: Selección Múltiple, Borrado en Lote y Filtros de Auditoría d
       expect(state.recipes).toHaveLength(4);
       expect(appInstance.selectedRecipeIds.size).toBe(1);
     });
+
+    it('el selector de selección se muestra correctamente en recetas sin imagen o con placeholder', () => {
+      appInstance.isRecipeSelectMode = true;
+      const recipeSinImagen = {
+        id: 'rec-placeholder-test',
+        title: 'Receta sin foto',
+        imageUrl: '',
+        prepTimeMinutes: 10,
+        cookTimeMinutes: 15
+      };
+
+      const cardHtml = appInstance.renderSingleRecipeCardHtml(recipeSinImagen, false);
+      expect(cardHtml).toContain('recipe-select-checkbox-badge');
+      expect(cardHtml).toContain('recipe-img-box');
+      expect(cardHtml).toContain('recipe-placeholder-art');
+    });
   });
 });
 

@@ -4436,7 +4436,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.43';
+  window.APP_VERSION = 'v1.44';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4477,7 +4477,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.43';
+    this.appVersion = window.APP_VERSION || 'v1.44';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -7646,11 +7646,13 @@ class FoodAssistantApp {
               <span class="material-symbols-outlined icon-18">${isSelected ? 'check' : ''}</span>
             </div>
           ` : ''}
-          ${isSafeUrl(rec.imageUrl) ? `
-            <img class="recipe-img" src="${sanitizeUrl(rec.imageUrl)}" alt="${escapeHtml(rec.title)}" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML=app.getRecipePlaceholderHtml('${safeRecipeId}', 'card');">
-          ` : `
-            ${this.getRecipePlaceholderHtml(rec, 'card')}
-          `}
+          <div class="recipe-img-box">
+            ${isSafeUrl(rec.imageUrl) ? `
+              <img class="recipe-img" src="${sanitizeUrl(rec.imageUrl)}" alt="${escapeHtml(rec.title)}" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML=app.getRecipePlaceholderHtml('${safeRecipeId}', 'card');">
+            ` : `
+              ${this.getRecipePlaceholderHtml(rec, 'card')}
+            `}
+          </div>
           <div class="recipe-time-badge">
             <span class="material-symbols-outlined icon-sm">schedule</span> ${rec.prepTimeMinutes + rec.cookTimeMinutes} min
           </div>
@@ -7882,9 +7884,17 @@ class FoodAssistantApp {
     if (card) {
       const isSelected = this.selectedRecipeIds.has(id);
       card.classList.toggle('is-selected', isSelected);
-      const badge = card.querySelector('.recipe-select-checkbox-badge');
-      if (badge) {
+      let badge = card.querySelector('.recipe-select-checkbox-badge');
+      if (!badge) {
+        badge = document.createElement('div');
+        badge.className = `recipe-select-checkbox-badge ${isSelected ? 'selected' : ''}`;
+        badge.setAttribute('aria-label', isSelected ? 'Deseleccionar' : 'Seleccionar');
+        badge.innerHTML = `<span class="material-symbols-outlined icon-18">${isSelected ? 'check' : ''}</span>`;
+        const wrap = card.querySelector('.recipe-image-wrap') || card;
+        wrap.prepend(badge);
+      } else {
         badge.classList.toggle('selected', isSelected);
+        badge.setAttribute('aria-label', isSelected ? 'Deseleccionar' : 'Seleccionar');
         badge.innerHTML = `<span class="material-symbols-outlined icon-18">${isSelected ? 'check' : ''}</span>`;
       }
     }
