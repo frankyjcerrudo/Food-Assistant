@@ -38,7 +38,7 @@ if (-not $Token) {
     if (-not $Token) {
         # Intentar extraer del remote origin de Git
         try {
-            $remoteUrl = git config --get remote.origin.url
+            $remoteUrl = git -C $PSScriptRoot config --get remote.origin.url
             if ($remoteUrl -match 'https://[^:]+:(ghp_[a-zA-Z0-9]+)@') {
                 $Token = $matches[1]
             }
@@ -170,7 +170,7 @@ foreach ($line in $lines) {
         }
 
         $projStatus = "To-Do"
-        if ($statusRaw -match 'Done') { $projStatus = "Done" }
+        if ($statusRaw -match 'Done|Descartada') { $projStatus = "Done" }
         elseif ($statusRaw -match 'In Progress|Ready for Dev') { $projStatus = "In Progress" }
 
         $epicInfo = Get-EpicInfo $currentEpicNum
@@ -235,7 +235,7 @@ $dodFormatted
         }
 
         $projStatus = "To-Do"
-        if ($statusRaw -match 'Done') { $projStatus = "Done" }
+        if ($statusRaw -match 'Done|Descartada') { $projStatus = "Done" }
         elseif ($statusRaw -match 'In Progress|Ready for Dev') { $projStatus = "In Progress" }
 
         $issueTitle = "[BUG] $($id): $desc"
@@ -289,6 +289,9 @@ Write-Host "Total issues ya registrados en GitHub: $($existingMap.Count)" -Foreg
 
 $missingItems = @($itemsToProcess | Where-Object { -not $existingMap.ContainsKey($_.ID) })
 Write-Host "Nuevos elementos pendientes de crear: $($missingItems.Count)" -ForegroundColor Magenta
+foreach ($m in $missingItems) {
+    Write-Host "   * [$($m.ID)] $($m.Title)" -ForegroundColor DarkMagenta
+}
 
 # 4. Asegurar que las etiquetas necesarias existan en el repositorio
 $labelsToEnsure = @{
@@ -326,8 +329,11 @@ if ($UpdateExisting) {
 
             $titleDiff = ($curTitle -ne $item.Title)
             $bodyDiff = ($normCurBody -ne $normTargetBody)
+            $targetClosed = ($item.RawStatus -match 'Done|Descartada')
+            $curClosed = ($existing.state -eq 'closed')
+            $stateDiff = ($targetClosed -ne $curClosed)
 
-            if ($titleDiff -or $bodyDiff) {
+            if ($titleDiff -or $bodyDiff -or $stateDiff) {
                 Write-Host "Actualizando Issue #$issueNum ($($item.ID))..." -NoNewline
                 if ($DryRun) {
                     Write-Host " [SIMULADO]" -ForegroundColor Yellow
@@ -337,8 +343,15 @@ if ($UpdateExisting) {
                         body   = $item.Body
                         labels = $item.Labels
                     }
-                    if ($item.RawStatus -eq 'Done') {
+                    if ($targetClosed) {
                         $patchPayload["state"] = "closed"
+                        if ($item.RawStatus -match 'Descartada') {
+                            $patchPayload["state_reason"] = "not_planned"
+                        } else {
+                            $patchPayload["state_reason"] = "completed"
+                        }
+                    } else {
+                        $patchPayload["state"] = "open"
                     }
                     $jsonBytes = [System.Text.Encoding]::UTF8.GetBytes(($patchPayload | ConvertTo-Json -Depth 5))
                     try {
@@ -436,9 +449,12 @@ if ($missingItems.Count -gt 0) {
                 $null = Invoke-RestMethod -Uri "https://api.github.com/graphql" -Method Post -Headers $headersGql -Body $updatePrioGql
             }
 
-            # E) Si el item ya estaba marcado como Done, cerramos el Issue en GitHub
-            if ($item.RawStatus -eq 'Done') {
-                $closePayload = @{ state = "closed" } | ConvertTo-Json
+            # E) Si el item ya estaba marcado como Done o Descartada, cerramos el Issue en GitHub
+            if ($item.RawStatus -eq 'Done' -or $item.RawStatus -match 'Descartada') {
+                $closePayload = @{ 
+                    state = "closed"
+                    state_reason = if ($item.RawStatus -match 'Descartada') { "not_planned" } else { "completed" }
+                } | ConvertTo-Json
                 $null = Invoke-RestMethod -Uri "https://api.github.com/repos/$Owner/$Repo/issues/$issueNum" `
                     -Method Patch -Headers $headersRest -Body $closePayload
             }
