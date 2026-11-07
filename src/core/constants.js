@@ -367,7 +367,15 @@ function getRecipeNutrition(recipe) {
     const protein = Number(raw.protein) || 0;
     const carbs = Number(raw.carbs) || 0;
     const fat = Number(raw.fat) || 0;
-    if (calories > 0 || protein > 0 || carbs > 0 || fat > 0) {
+
+    const hasIngs = Array.isArray(recipe.ingredients) && recipe.ingredients.some(i => i && (typeof i === 'string' ? i.trim().length > 0 : (i.name && String(i.name).trim().length > 0)));
+    const isFakeDefault = !hasIngs && (
+      (calories === 450 && Math.round(protein) === 28 && Math.round(carbs) === 45 && Math.round(fat) === 15) ||
+      (calories === 350 && Math.round(protein) === 14 && Math.round(carbs) === 48 && Math.round(fat) === 10) ||
+      (calories === 280 && Math.round(protein) === 12 && Math.round(carbs) === 35 && Math.round(fat) === 8)
+    );
+
+    if (!isFakeDefault && (calories > 0 || protein > 0 || carbs > 0 || fat > 0)) {
       const res = {
         calories: Math.round(calories),
         protein: Math.round(protein * 10) / 10,
@@ -614,7 +622,7 @@ function analyzeAndInferRecipeTags(recipe) {
         }
       }
 
-      if (qualifies) {
+      if (qualifies && hasExplicit) {
         inferred.add('Alta en Proteínas');
       }
       if (nutrition.carbs > 0 && nutrition.carbs <= 20) {

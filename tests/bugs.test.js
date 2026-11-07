@@ -678,6 +678,66 @@ describe('Verificación y Cobertura de Bugs Abiertos (v1.06)', () => {
       expect(html).not.toContain('450');
       expect(html).not.toContain('28<span class="card-macro-unit">g</span>');
     });
+
+    it('receta heredada con macros antiguos (450 kcal / 28g P) sin ingredientes muestra datos vacíos y no renderiza Alta en Proteínas', () => {
+      const legacyRecipe = {
+        id: 'rec-legacy-no-ing',
+        title: 'Receta importada antigua sin ingredientes',
+        description: 'Receta previa con macros guardados a fuego en IndexedDB',
+        prepTimeMinutes: 10,
+        cookTimeMinutes: 10,
+        nutrition: { calories: 450, protein: 28, carbs: 45, fat: 15 },
+        tags: ['Cena', 'Alta en Proteínas'],
+        ingredients: []
+      };
+
+      const html = appInstance.renderSingleRecipeCardHtml(legacyRecipe, true);
+      expect(html).toContain('recipe-card-macros');
+      expect(html).toContain('—');
+      expect(html).not.toContain('450<span class="card-macro-unit">kcal</span>');
+      expect(html).not.toContain('28<span class="card-macro-unit">g</span>');
+      expect(html).not.toContain('Alta en Proteínas');
+    });
+
+    it('sanitizeRecipeProteinTags sanea retroactivamente recetas existentes sin ingredientes en state.recipes', () => {
+      const legacyRecipe = {
+        id: 'rec-legacy-stored',
+        title: 'Tarta antigua sin desglose',
+        tags: ['Postre', 'Alta en Proteínas'],
+        nutrition: { calories: 450, protein: 28, carbs: 45, fat: 15 },
+        ingredients: []
+      };
+      state.recipes = [legacyRecipe];
+
+      appInstance.sanitizeRecipeProteinTags();
+
+      expect(legacyRecipe.tags).not.toContain('Alta en Proteínas');
+      expect(legacyRecipe.nutrition.calories).toBe(0);
+      expect(legacyRecipe.nutrition.protein).toBe(0);
+    });
+
+    it('renderRecipeModalContent muestra datos vacíos (—) en el modal de detalle para recetas sin ingredientes', () => {
+      const legacyRecipe = {
+        id: 'rec-detail-no-ing',
+        title: 'Receta Detalle Sin Ingredientes',
+        description: 'Probando modal de detalle',
+        prepTimeMinutes: 5,
+        cookTimeMinutes: 0,
+        servings: 2,
+        nutrition: { calories: 450, protein: 28, carbs: 45, fat: 15 },
+        tags: ['Almuerzo', 'Alta en Proteínas'],
+        ingredients: []
+      };
+      appInstance.activeRecipe = legacyRecipe;
+      appInstance.activeServings = 2;
+
+      appInstance.renderRecipeModalContent();
+
+      const calElem = document.getElementById('macro-detail-calories');
+      const proElem = document.getElementById('macro-detail-protein');
+      expect(calElem.textContent).toBe('—');
+      expect(proElem.textContent).toBe('—');
+    });
   });
 
   describe('BUG-28: Navegación horizontal en selector de etiquetas (Wheel & Grab-to-scroll)', () => {

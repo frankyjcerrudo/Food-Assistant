@@ -369,7 +369,15 @@ function getRecipeNutrition(recipe) {
     const protein = Number(raw.protein) || 0;
     const carbs = Number(raw.carbs) || 0;
     const fat = Number(raw.fat) || 0;
-    if (calories > 0 || protein > 0 || carbs > 0 || fat > 0) {
+
+    const hasIngs = Array.isArray(recipe.ingredients) && recipe.ingredients.some(i => i && (typeof i === 'string' ? i.trim().length > 0 : (i.name && String(i.name).trim().length > 0)));
+    const isFakeDefault = !hasIngs && (
+      (calories === 450 && Math.round(protein) === 28 && Math.round(carbs) === 45 && Math.round(fat) === 15) ||
+      (calories === 350 && Math.round(protein) === 14 && Math.round(carbs) === 48 && Math.round(fat) === 10) ||
+      (calories === 280 && Math.round(protein) === 12 && Math.round(carbs) === 35 && Math.round(fat) === 8)
+    );
+
+    if (!isFakeDefault && (calories > 0 || protein > 0 || carbs > 0 || fat > 0)) {
       const res = {
         calories: Math.round(calories),
         protein: Math.round(protein * 10) / 10,
@@ -637,7 +645,7 @@ function analyzeAndInferRecipeTags(recipe) {
         }
       }
 
-      if (qualifies) {
+      if (qualifies && hasExplicit) {
         inferred.add('Alta en Proteínas');
       }
       if (nutrition.carbs > 0 && nutrition.carbs <= 20) {
@@ -2157,6 +2165,25 @@ class StateStore {
         if (!r.createdAt && r.updatedAt) {
           r.createdAt = r.updatedAt;
         }
+        // BUG-27: Saneamiento de recetas sin ingredientes (limpiar macros falsos heredados y etiqueta 'Alta en Proteínas')
+        const hasIngs = Array.isArray(r.ingredients) && r.ingredients.some(i => i && (typeof i === 'string' ? i.trim().length > 0 : (i.name && String(i.name).trim().length > 0)));
+        if (!hasIngs && !r.isExplicitNutrition) {
+          if (Array.isArray(r.tags) && r.tags.includes('Alta en Proteínas')) {
+            r.tags = r.tags.filter(t => t !== 'Alta en Proteínas');
+            tagsCleaned = true;
+          }
+          if (r.nutrition && (
+            (r.nutrition.calories === 450 && Math.round(r.nutrition.protein || 0) === 28) ||
+            (r.nutrition.calories === 350 && Math.round(r.nutrition.protein || 0) === 14) ||
+            (r.nutrition.calories === 280 && Math.round(r.nutrition.protein || 0) === 12) ||
+            !r.isExplicitNutrition
+          )) {
+            r.nutrition = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+            r._cachedNutrition = null;
+            tagsCleaned = true;
+          }
+        }
+
         // Saneamiento v0.53: limpiar etiqueta 'Alta en Proteínas' si fue asignada erróneamente por ingredientes en lugar de por macros reales
         if (Array.isArray(r.tags) && r.tags.includes('Alta en Proteínas')) {
           const nut = (typeof getRecipeNutrition === 'function') ? getRecipeNutrition(r) : (r.nutrition || null);
@@ -4467,7 +4494,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.49';
+  window.APP_VERSION = 'v1.50';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4508,7 +4535,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.49';
+    this.appVersion = window.APP_VERSION || 'v1.50';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -4644,6 +4671,25 @@ class FoodAssistantApp {
       if (r.tags.some(t => t && String(t).trim().toLowerCase() === 'general')) {
         r.tags = r.tags.filter(t => t && String(t).trim().toLowerCase() !== 'general');
         changed = true;
+      }
+
+      // BUG-27: Saneamiento retroactivo de recetas sin ingredientes (limpiar macros falsos heredados y etiqueta 'Alta en Proteínas')
+      const hasIngs = Array.isArray(r.ingredients) && r.ingredients.some(i => i && (typeof i === 'string' ? i.trim().length > 0 : (i.name && String(i.name).trim().length > 0)));
+      if (!hasIngs && !r.isExplicitNutrition) {
+        if (r.tags.includes('Alta en Proteínas')) {
+          r.tags = r.tags.filter(t => t !== 'Alta en Proteínas');
+          changed = true;
+        }
+        if (r.nutrition && (
+          (r.nutrition.calories === 450 && Math.round(r.nutrition.protein || 0) === 28) ||
+          (r.nutrition.calories === 350 && Math.round(r.nutrition.protein || 0) === 14) ||
+          (r.nutrition.calories === 280 && Math.round(r.nutrition.protein || 0) === 12) ||
+          !r.isExplicitNutrition
+        )) {
+          r.nutrition = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+          r._cachedNutrition = null;
+          changed = true;
+        }
       }
 
       const inferred = (typeof analyzeAndInferRecipeTags === 'function') ? analyzeAndInferRecipeTags(r) : [];
@@ -7963,14 +8009,7 @@ class FoodAssistantApp {
 
   renderSingleRecipeCardHtml(rec, showCardMacros) {
     const nut = showCardMacros ? getRecipeNutrition(rec) : null;
-    const hasNutData = (Array.isArray(rec.ingredients) && rec.ingredients.length > 0) || (
-      rec.nutrition && (
-        (Number(rec.nutrition.calories) || 0) > 0 ||
-        (Number(rec.nutrition.protein) || 0) > 0 ||
-        (Number(rec.nutrition.carbs) || 0) > 0 ||
-        (Number(rec.nutrition.fat) || 0) > 0
-      )
-    );
+    const hasNutData = !!(nut && (nut.calories > 0 || nut.protein > 0));
     const fridgeMatch = (this.fridgeIngredients && this.fridgeIngredients.length > 0)
       ? this.getRecipeFridgeMatch(rec)
       : null;
@@ -8053,7 +8092,9 @@ class FoodAssistantApp {
                 <span class="material-symbols-outlined icon-13">link</span> ${rec.sourceDomain}
               </span>
             ` : ''}
-            ${(rec.tags || []).map(t => {
+            ${(rec.tags || [])
+              .filter(t => hasNutData || t !== 'Alta en Proteínas')
+              .map(t => {
       const isDiet = PREDEFINED_DIETARY_TAGS.includes(t);
       return `<span class="tag-chip${isDiet ? ' tag-chip-dietary' : ''}">${isDiet ? getDietaryTagEmoji(t) + ' ' : ''}${escapeHtml(t)}</span>`;
     }).join('')}
@@ -8980,6 +9021,7 @@ class FoodAssistantApp {
 
     const scale = this.activeServings / r.servings;
     const baseNutrition = getRecipeNutrition(r);
+    const hasNutData = !!(baseNutrition && (baseNutrition.calories > 0 || baseNutrition.protein > 0));
 
     body.innerHTML = `
       ${isSafeUrl(r.imageUrl) ? `
@@ -9013,7 +9055,7 @@ class FoodAssistantApp {
               Fuente: ${escapeHtml(r.sourceDomain || 'Web Original')}
             </a>
           ` : ''}
-          ${(r.tags || []).map(t => `<span class="tag-chip tag-chip-primary">${escapeHtml(t)}</span>`).join('')}
+          ${(r.tags || []).filter(t => hasNutData || t !== 'Alta en Proteínas').map(t => `<span class="tag-chip tag-chip-primary">${escapeHtml(t)}</span>`).join('')}
         </div>
         
         <h2 class="recipe-detail-title">${escapeHtml(r.title)}</h2>
@@ -9041,7 +9083,7 @@ class FoodAssistantApp {
           </div>
         </div>
 
-        <!-- NUTRITION BREAKDOWN CARD (US-01) -->
+        <!-- NUTRITION BREAKDOWN CARD (US-01 / BUG-27) -->
         <div class="recipe-nutrition-card" id="recipe-nutrition-breakdown">
           <div class="recipe-nutrition-header">
             <div class="recipe-nutrition-title">
@@ -9054,19 +9096,19 @@ class FoodAssistantApp {
           <div class="recipe-macros-grid">
             <div class="macro-chip macro-cal">
               <span class="macro-chip-label">Calorías</span>
-              <span class="macro-chip-val" id="macro-detail-calories">${baseNutrition.calories}<span class="macro-chip-unit">kcal</span></span>
+              <span class="macro-chip-val" id="macro-detail-calories">${hasNutData ? `${baseNutrition.calories}<span class="macro-chip-unit">kcal</span>` : '—'}</span>
             </div>
             <div class="macro-chip macro-prot">
               <span class="macro-chip-label">Proteínas</span>
-              <span class="macro-chip-val" id="macro-detail-protein">${baseNutrition.protein}<span class="macro-chip-unit">g</span></span>
+              <span class="macro-chip-val" id="macro-detail-protein">${hasNutData ? `${baseNutrition.protein}<span class="macro-chip-unit">g</span>` : '—'}</span>
             </div>
             <div class="macro-chip macro-carbs">
               <span class="macro-chip-label">Carbos</span>
-              <span class="macro-chip-val" id="macro-detail-carbs">${baseNutrition.carbs}<span class="macro-chip-unit">g</span></span>
+              <span class="macro-chip-val" id="macro-detail-carbs">${hasNutData ? `${baseNutrition.carbs}<span class="macro-chip-unit">g</span>` : '—'}</span>
             </div>
             <div class="macro-chip macro-fat">
               <span class="macro-chip-label">Grasas</span>
-              <span class="macro-chip-val" id="macro-detail-fat">${baseNutrition.fat}<span class="macro-chip-unit">g</span></span>
+              <span class="macro-chip-val" id="macro-detail-fat">${hasNutData ? `${baseNutrition.fat}<span class="macro-chip-unit">g</span>` : '—'}</span>
             </div>
           </div>
           <div class="nutrition-estimation-disclaimer" id="recipe-detail-nutrition-disclaimer">
