@@ -4436,7 +4436,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.42';
+  window.APP_VERSION = 'v1.43';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4477,7 +4477,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.42';
+    this.appVersion = window.APP_VERSION || 'v1.43';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -4507,6 +4507,11 @@ class FoodAssistantApp {
     this.recipesRenderedCount = 0;
     this.currentRenderedRecipesList = [];
     this.recipesScrollObserver = null;
+
+    // US-78: Recipe Bulk Delete & Cleanup Filters
+    this.isRecipeSelectMode = false;
+    this.selectedRecipeIds = new Set();
+    this.recipeAuditFilter = null; // 'no-ingredients' | 'no-instructions' | null
 
     // Cook mode state
     this.cookStepIndex = 0;
@@ -4805,6 +4810,8 @@ class FoodAssistantApp {
     this.planRecipeSelectedSlot = 'lunch';
     this.planRecipeIsCustomSlot = false;
     this.pickerSearchQuery = '';
+    this.recipesBulkToolbar = document.getElementById('recipes-bulk-toolbar');
+    this.btnToggleRecipeSelectMode = document.getElementById('btn-toggle-recipes-select-mode');
   }
 
   // ==========================================================================
@@ -6660,6 +6667,13 @@ class FoodAssistantApp {
     });
     document.getElementById('input-bulk-import-file')?.addEventListener('change', (e) => this.handleFileInputForBulkImport(e));
 
+    // US-78: Recipe Bulk Delete & Selection Mode Events
+    document.getElementById('btn-toggle-recipes-select-mode')?.addEventListener('click', () => this.toggleRecipeSelectMode());
+    document.getElementById('btn-recipes-bulk-select-all')?.addEventListener('click', () => this.selectVisibleRecipes());
+    document.getElementById('btn-recipes-bulk-deselect-all')?.addEventListener('click', () => this.deselectAllRecipes());
+    document.getElementById('btn-recipes-bulk-delete')?.addEventListener('click', () => this.deleteSelectedRecipes());
+    document.getElementById('btn-recipes-bulk-cancel')?.addEventListener('click', () => this.toggleRecipeSelectMode(false));
+
     // Recipe CRUD
     document.getElementById('btn-edit-switch-to-import')?.addEventListener('click', () => {
       this.closeEditModal();
@@ -6957,6 +6971,9 @@ class FoodAssistantApp {
 
   switchView(viewId) {
     this.stopSpeech();
+    if (this.isRecipeSelectMode && viewId !== 'view-recipes') {
+      this.toggleRecipeSelectMode(false);
+    }
     this.activeView = viewId;
     this.viewPanels.forEach(panel => {
       panel.classList.toggle('active', panel.id === viewId);
@@ -7616,9 +7633,19 @@ class FoodAssistantApp {
       : null;
 
     const safeRecipeId = escapeHtml(rec.id).replace(/'/g, "\\'");
+    const isSelected = !!(this.isRecipeSelectMode && this.selectedRecipeIds && this.selectedRecipeIds.has(rec.id));
+    const cardOnClick = this.isRecipeSelectMode
+      ? `app.toggleRecipeSelect('${safeRecipeId}')`
+      : `app.openRecipeDetail('${safeRecipeId}')`;
+
     return `
-      <article class="recipe-card" onclick="app.openRecipeDetail('${safeRecipeId}')" data-action="openRecipeDetail" data-recipe-id="${escapeHtml(rec.id)}">
+      <article class="recipe-card ${this.isRecipeSelectMode ? 'is-select-mode' : ''} ${isSelected ? 'is-selected' : ''}" onclick="${cardOnClick}" data-action="${this.isRecipeSelectMode ? 'toggleRecipeSelect' : 'openRecipeDetail'}" data-recipe-id="${escapeHtml(rec.id)}">
         <div class="recipe-image-wrap">
+          ${this.isRecipeSelectMode ? `
+            <div class="recipe-select-checkbox-badge ${isSelected ? 'selected' : ''}" aria-label="${isSelected ? 'Deseleccionar' : 'Seleccionar'}">
+              <span class="material-symbols-outlined icon-18">${isSelected ? 'check' : ''}</span>
+            </div>
+          ` : ''}
           ${isSafeUrl(rec.imageUrl) ? `
             <img class="recipe-img" src="${sanitizeUrl(rec.imageUrl)}" alt="${escapeHtml(rec.title)}" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML=app.getRecipePlaceholderHtml('${safeRecipeId}', 'card');">
           ` : `
@@ -7627,6 +7654,7 @@ class FoodAssistantApp {
           <div class="recipe-time-badge">
             <span class="material-symbols-outlined icon-sm">schedule</span> ${rec.prepTimeMinutes + rec.cookTimeMinutes} min
           </div>
+          ${!this.isRecipeSelectMode ? `
           <button type="button" class="recipe-fav-btn ${rec.isFavorite ? 'active' : ''}"
             onclick="event.stopPropagation(); app.toggleRecipeFavorite('${safeRecipeId}')"
             data-action="toggleRecipeFavorite" data-recipe-id="${escapeHtml(rec.id)}"
@@ -7635,6 +7663,7 @@ class FoodAssistantApp {
             title="${rec.isFavorite ? 'Quitar de favoritas' : 'Marcar como favorita'}">
             <span class="material-symbols-outlined icon-18">favorite</span>
           </button>
+          ` : ''}
           ${fridgeMatch && fridgeMatch.matchCount > 0 ? `
             <div class="fridge-match-overlay-badge">
               <span class="material-symbols-outlined icon-13">check_circle</span>
@@ -7806,17 +7835,176 @@ class FoodAssistantApp {
     this.recipesScrollObserver.observe(sentinel);
   }
 
-  // US-02 & US-73: Filtro múltiple combinado con el buscador de recetas + Chip de Mi Nevera
+  // US-78: Métodos de Auditoría y Limpieza de Recetas
+  hasNoIngredients(r) {
+    if (!r) return true;
+    if (!Array.isArray(r.ingredients) || r.ingredients.length === 0) return true;
+    return r.ingredients.every(item => {
+      if (!item) return true;
+      if (typeof item === 'string') return !item.trim();
+      const text = (item.rawText || item.name || item.ingredient || '').trim();
+      return !text;
+    });
+  }
+
+  hasNoInstructions(r) {
+    if (!r) return true;
+    if (!Array.isArray(r.instructions) || r.instructions.length === 0) return true;
+    return r.instructions.every(item => {
+      if (!item) return true;
+      if (typeof item === 'string') return !item.trim();
+      const text = (item.text || item.instruction || item.step || '').trim();
+      return !text;
+    });
+  }
+
+  // US-78: Modo Selección Múltiple y Borrado Masivo (Bulk Delete)
+  toggleRecipeSelectMode(forceState) {
+    const targetState = forceState !== undefined ? !!forceState : !this.isRecipeSelectMode;
+    if (this.isRecipeSelectMode === targetState) return;
+
+    this.isRecipeSelectMode = targetState;
+    if (!targetState) {
+      this.selectedRecipeIds.clear();
+    }
+    this.updateRecipeSelectModeUI();
+    this.renderRecipesGrid(this.currentRenderedRecipesList || state.recipes || []);
+  }
+
+  toggleRecipeSelect(id) {
+    if (!this.isRecipeSelectMode || !id) return;
+    if (this.selectedRecipeIds.has(id)) {
+      this.selectedRecipeIds.delete(id);
+    } else {
+      this.selectedRecipeIds.add(id);
+    }
+    const card = document.querySelector(`.recipe-card[data-recipe-id="${id}"]`);
+    if (card) {
+      const isSelected = this.selectedRecipeIds.has(id);
+      card.classList.toggle('is-selected', isSelected);
+      const badge = card.querySelector('.recipe-select-checkbox-badge');
+      if (badge) {
+        badge.classList.toggle('selected', isSelected);
+        badge.innerHTML = `<span class="material-symbols-outlined icon-18">${isSelected ? 'check' : ''}</span>`;
+      }
+    }
+    this.updateRecipeSelectModeUI();
+  }
+
+  selectVisibleRecipes() {
+    if (!this.isRecipeSelectMode) {
+      this.isRecipeSelectMode = true;
+    }
+    const visibleList = this.currentRenderedRecipesList || [];
+    visibleList.forEach(r => {
+      if (r && r.id) this.selectedRecipeIds.add(r.id);
+    });
+    this.updateRecipeSelectModeUI();
+    this.renderRecipesGrid(visibleList);
+  }
+
+  deselectAllRecipes() {
+    this.selectedRecipeIds.clear();
+    this.updateRecipeSelectModeUI();
+    this.renderRecipesGrid(this.currentRenderedRecipesList || []);
+  }
+
+  updateRecipeSelectModeUI() {
+    const btnToggle = document.getElementById('btn-toggle-recipes-select-mode');
+    const btnToggleText = document.getElementById('btn-toggle-recipes-select-text');
+    const toolbar = document.getElementById('recipes-bulk-toolbar');
+    const countLabel = document.getElementById('recipes-bulk-selected-count');
+    const btnDelete = document.getElementById('btn-recipes-bulk-delete');
+    const btnDeleteText = document.getElementById('btn-recipes-bulk-delete-text');
+
+    const count = this.selectedRecipeIds ? this.selectedRecipeIds.size : 0;
+
+    if (btnToggle) {
+      btnToggle.classList.toggle('active', this.isRecipeSelectMode);
+      btnToggle.title = this.isRecipeSelectMode ? 'Finalizar selección' : 'Seleccionar recetas para gestión masiva';
+    }
+    if (btnToggleText) {
+      btnToggleText.textContent = this.isRecipeSelectMode ? 'Listo' : 'Seleccionar';
+    }
+
+    if (toolbar) {
+      toolbar.style.display = this.isRecipeSelectMode ? 'flex' : 'none';
+    }
+
+    if (countLabel) {
+      countLabel.textContent = `${count} ${count === 1 ? 'seleccionada' : 'seleccionadas'}`;
+    }
+
+    if (btnDelete) {
+      btnDelete.disabled = (count === 0);
+    }
+    if (btnDeleteText) {
+      btnDeleteText.textContent = count > 0 ? `Eliminar (${count})` : 'Eliminar';
+    }
+  }
+
+  async deleteSelectedRecipes() {
+    if (!this.selectedRecipeIds || this.selectedRecipeIds.size === 0) {
+      this.showToast('Selecciona al menos una receta para eliminar.', 'warning');
+      return false;
+    }
+
+    const count = this.selectedRecipeIds.size;
+    const confirmed = await this.showConfirmDialog({
+      title: `¿Eliminar ${count} ${count === 1 ? 'receta' : 'recetas'}?`,
+      message: `Se eliminarán permanentemente ${count} ${count === 1 ? 'receta' : 'recetas'} del catálogo. Esta acción no se puede deshacer.`,
+      confirmText: `Eliminar ${count}`,
+      cancelText: 'Cancelar',
+      danger: true,
+      icon: 'delete_forever'
+    });
+
+    if (!confirmed) return false;
+
+    const toDeleteIds = Array.from(this.selectedRecipeIds);
+    const deleteSet = new Set(toDeleteIds);
+
+    // 1. Filtrar catálogo local
+    state.recipes = (state.recipes || []).filter(r => !deleteSet.has(r.id));
+    if (typeof state.save === 'function') {
+      state.save('fa_recipes', state.recipes);
+    }
+
+    // 2. Registrar en eliminaciones pendientes para sincronización Supabase
+    toDeleteIds.forEach(id => {
+      if (typeof state.trackDeletion === 'function') {
+        state.trackDeletion('recipes', id);
+      }
+    });
+
+    // 3. Limpiar selección y modo
+    this.selectedRecipeIds.clear();
+    this.isRecipeSelectMode = false;
+    this.updateRecipeSelectModeUI();
+
+    // 4. Refrescar UI del recetario
+    this.applyRecipeFilters();
+    this.showToast(`Se ${count === 1 ? 'ha eliminado 1 receta' : `han eliminado ${count} recetas`} correctamente.`, 'info');
+
+    // 5. Enviar cambios inmediatamente a Supabase
+    this.pushToCloud(true);
+    return true;
+  }
+
+  // US-02 & US-73: Filtro múltiple combinado con el buscador de recetas + Chip de Mi Nevera + US-78 Filtros de Auditoría
   initRecipeTagFilters() {
     const container = document.getElementById('recipes-tag-filters');
     if (!container) return;
 
     const availableTags = state.getAllTags ? state.getAllTags() : ALL_PREDEFINED_TAGS;
-    const isAllActive = this.selectedRecipeTags.size === 0;
+    const isAllActive = this.selectedRecipeTags.size === 0 && !this.recipeAuditFilter;
     const isFavSelected = this.selectedRecipeTags.has('Favoritas');
     const favCount = Array.isArray(state.recipes) ? state.recipes.filter(r => r && r.isFavorite).length : 0;
     const fridgePanel = document.getElementById('fridge-reverse-search-panel');
     const isFridgeActive = (this.fridgeIngredients && this.fridgeIngredients.length > 0) || (fridgePanel && fridgePanel.style.display === 'block');
+
+    const noIngActive = this.recipeAuditFilter === 'no-ingredients';
+    const noInstActive = this.recipeAuditFilter === 'no-instructions';
 
     let html = `
       <button type="button" class="m3-filter-chip m3-filter-chip-fridge ${isFridgeActive ? 'active' : ''}" id="btn-toggle-fridge-panel"
@@ -7831,6 +8019,14 @@ class FoodAssistantApp {
       <button type="button" class="m3-filter-chip m3-filter-chip-fav ${isFavSelected ? 'active' : ''}" id="btn-filter-favorites" data-tag="Favoritas" aria-pressed="${isFavSelected ? 'true' : 'false'}">
         <span class="material-symbols-outlined icon-15">favorite</span>
         <span>Favoritas${favCount > 0 ? ` (${favCount})` : ''}</span>
+      </button>
+      <button type="button" class="m3-filter-chip m3-filter-chip-audit ${noIngActive ? 'active' : ''}" data-audit="no-ingredients" title="Filtrar recetas sin ingredientes">
+        <span class="material-symbols-outlined icon-15">remove_shopping_cart</span>
+        <span>Sin ingredientes</span>
+      </button>
+      <button type="button" class="m3-filter-chip m3-filter-chip-audit ${noInstActive ? 'active' : ''}" data-audit="no-instructions" title="Filtrar recetas sin pasos ni elaboración">
+        <span class="material-symbols-outlined icon-15">format_list_bulleted</span>
+        <span>Sin pasos</span>
       </button>
     `;
 
@@ -7853,11 +8049,25 @@ class FoodAssistantApp {
       this.initRecipeTagFilters();
     });
 
+    container.querySelectorAll('.m3-filter-chip[data-audit]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const audit = chip.dataset.audit;
+        if (this.recipeAuditFilter === audit) {
+          this.recipeAuditFilter = null;
+        } else {
+          this.recipeAuditFilter = audit;
+        }
+        this.initRecipeTagFilters();
+        this.applyRecipeFilters();
+      });
+    });
+
     container.querySelectorAll('.m3-filter-chip[data-tag]').forEach(chip => {
       chip.addEventListener('click', () => {
         const tag = chip.dataset.tag;
         if (tag === 'all') {
           this.selectedRecipeTags.clear();
+          this.recipeAuditFilter = null;
         } else {
           if (this.selectedRecipeTags.has(tag)) {
             this.selectedRecipeTags.delete(tag);
@@ -7993,6 +8203,13 @@ class FoodAssistantApp {
     const term = (overrideTerm !== undefined ? overrideTerm : (searchInput?.value || '')).trim();
 
     const filtered = state.recipes.filter(r => {
+      // 0. US-78: Filtro de auditoría / limpieza (Sin ingredientes / Sin pasos)
+      if (this.recipeAuditFilter === 'no-ingredients') {
+        if (!this.hasNoIngredients(r)) return false;
+      } else if (this.recipeAuditFilter === 'no-instructions') {
+        if (!this.hasNoInstructions(r)) return false;
+      }
+
       // 1. Tag multi-selection (AND logic: debe contener todas las etiquetas seleccionadas + chip Favoritas US-70)
       if (this.selectedRecipeTags.size > 0) {
         const rTagsNorm = (r.tags || []).map(t => typeof normalizeIngredientText === 'function' ? normalizeIngredientText(String(t)) : String(t).toLowerCase().trim());
@@ -8045,15 +8262,17 @@ class FoodAssistantApp {
     const badge = document.getElementById('recipes-count-badge');
     const subtitle = document.getElementById('recipes-count-subtitle');
     if (badge) {
-      if (this.selectedRecipeTags.size > 0 || term || this.fridgeIngredients.length > 0) {
+      if (this.selectedRecipeTags.size > 0 || term || this.fridgeIngredients.length > 0 || this.recipeAuditFilter) {
         badge.textContent = `${filtered.length} de ${state.recipes.length}`;
       } else {
         badge.textContent = `${state.recipes.length}`;
       }
     }
     if (subtitle) {
-      if (this.selectedRecipeTags.size > 0 || term || this.fridgeIngredients.length > 0) {
+      if (this.selectedRecipeTags.size > 0 || term || this.fridgeIngredients.length > 0 || this.recipeAuditFilter) {
         const filtersDesc = [];
+        if (this.recipeAuditFilter === 'no-ingredients') filtersDesc.push('Sin ingredientes');
+        if (this.recipeAuditFilter === 'no-instructions') filtersDesc.push('Sin pasos');
         if (this.fridgeIngredients.length > 0) filtersDesc.push(`Nevera: ${this.fridgeIngredients.join(', ')}`);
         if (this.selectedRecipeTags.size > 0) filtersDesc.push(`etiquetas: ${Array.from(this.selectedRecipeTags).join(', ')}`);
         if (term) filtersDesc.push(`"${term}"`);

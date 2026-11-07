@@ -5864,6 +5864,94 @@ h2,
 }
 
 /* ==========================================================================
+   US-78: SELECCIÓN MÚLTIPLE Y BORRADO EN LOTE DE RECETAS (BULK DELETE & AUDIT)
+   ========================================================================== */
+.recipes-bulk-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 16px;
+  margin-bottom: 14px;
+  background-color: var(--m3-surface-container-high);
+  border: 1px solid var(--m3-outline-variant);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-1);
+}
+
+.recipes-bulk-toolbar-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--m3-on-surface);
+}
+
+.recipes-bulk-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.recipe-card.is-select-mode {
+  position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.recipe-card.is-selected {
+  border-color: var(--color-brand, #2D6A4F) !important;
+  box-shadow: 0 0 0 2px var(--color-brand, #2D6A4F), var(--elevation-2);
+}
+
+.recipe-select-checkbox-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background-color: rgba(25, 22, 19, 0.65);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 4;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  transition: transform var(--duration-fast) ease, background-color var(--duration-fast) ease, border-color var(--duration-fast) ease;
+  pointer-events: none;
+}
+
+.recipe-select-checkbox-badge.selected {
+  background-color: var(--color-brand, #2D6A4F);
+  border-color: var(--color-brand, #2D6A4F);
+  color: #ffffff;
+  transform: scale(1.1);
+}
+
+.m3-filter-chip.m3-filter-chip-audit {
+  border-color: rgba(200, 90, 50, 0.45);
+  color: var(--m3-on-surface);
+}
+
+.m3-filter-chip.m3-filter-chip-audit:hover {
+  background-color: rgba(200, 90, 50, 0.1);
+}
+
+.m3-filter-chip.m3-filter-chip-audit.active {
+  background-color: var(--color-brand, #C85A32);
+  color: #ffffff;
+  border-color: var(--color-brand, #C85A32);
+  box-shadow: 0 2px 8px rgba(200, 90, 50, 0.28);
+  font-weight: 700;
+}
+
+/* ==========================================================================
    US-68: ONBOARDING WIZARD MODAL
    ========================================================================== */
 .onboarding-modal-card {
