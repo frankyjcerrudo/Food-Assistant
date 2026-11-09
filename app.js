@@ -393,6 +393,70 @@ function getRecipeNutrition(recipe) {
   return estimated;
 }
 
+/**
+ * Detects whether a recipe's content is in Spanish or English based on keywords.
+ * Defaults to 'es' (the primary language of Sabory's initial catalog).
+ */
+function detectRecipeLanguage(recipe) {
+  if (!recipe) return 'es';
+  if (recipe.language === 'en' || recipe.language === 'es') return recipe.language;
+
+  const textParts = [
+    recipe.title || '',
+    recipe.description || ''
+  ];
+
+  if (Array.isArray(recipe.ingredients)) {
+    recipe.ingredients.forEach(i => {
+      if (typeof i === 'string') textParts.push(i);
+      else if (i && i.name) textParts.push(i.name);
+    });
+  }
+
+  if (Array.isArray(recipe.instructions)) {
+    recipe.instructions.forEach(step => {
+      if (typeof step === 'string') textParts.push(step);
+      else if (step && step.text) textParts.push(step.text);
+    });
+  }
+
+  const fullText = textParts.join(' ').toLowerCase();
+
+  const enWords = /\b(the|and|with|chicken|cheese|salad|toast|butter|garlic|onion|pepper|sauce|rice|baked|fried|minutes|tablespoon|teaspoon|cup|cups|sliced|chopped|serve|heat|pan|skillet|bowl|salt|oil|healthy|breakfast|lunch|dinner|snack|cook|boil|stir|oven|grill|mix|whisk|add|bake|roast|simmer|crispy|beef|pork|salmon|tuna|bread|egg|eggs)\b/g;
+  const esWords = /\b(el|la|los|las|con|de|del|en|para|y|pollo|queso|ensalada|tostadas|tostada|mantequilla|ajo|cebolla|pimienta|salsa|arroz|horno|minutos|cucharada|cucharadita|taza|tazas|cortar|servir|calentar|sartén|bol|sal|aceite|saludable|desayuno|almuerzo|cena|merienda|cocinar|hervir|mezclar|añadir|batir|hornear|dorar|crujiente|ternera|cerdo|salmón|atún|pan|huevo|huevos)\b/g;
+
+  const enMatches = (fullText.match(enWords) || []).length;
+  const esMatches = (fullText.match(esWords) || []).length;
+
+  if (enMatches > esMatches) return 'en';
+  return 'es';
+}
+
+function getRecipeLanguage(recipe) {
+  return (recipe && (recipe.language === 'en' || recipe.language === 'es'))
+    ? recipe.language
+    : detectRecipeLanguage(recipe);
+}
+
+function getRecipeLanguageMeta(recipe) {
+  const lang = getRecipeLanguage(recipe);
+  const isEnApp = typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() === 'en';
+  if (lang === 'en') {
+    return {
+      code: 'EN',
+      flag: '🇬🇧',
+      label: 'English',
+      ariaLabel: isEnApp ? 'Recipe language: English' : 'Idioma de la receta: Inglés'
+    };
+  }
+  return {
+    code: 'ES',
+    flag: '🇪🇸',
+    label: 'Español',
+    ariaLabel: isEnApp ? 'Recipe language: Spanish' : 'Idioma de la receta: Español'
+  };
+}
+
 // ==========================================================================
 // PREDEFINED TAGS & DIETARY CLASSIFIER (US-02)
 // ==========================================================================
@@ -4657,7 +4721,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.62';
+  window.APP_VERSION = 'v1.63';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4691,6 +4755,9 @@ if (typeof window !== 'undefined') {
   window.analyzeAndInferRecipeTags = analyzeAndInferRecipeTags;
   window.estimateRecipeNutrition = estimateRecipeNutrition;
   window.getRecipeNutrition = getRecipeNutrition;
+  window.detectRecipeLanguage = detectRecipeLanguage;
+  window.getRecipeLanguage = getRecipeLanguage;
+  window.getRecipeLanguageMeta = getRecipeLanguageMeta;
   window.getPrimaryProteinCategory = getPrimaryProteinCategory;
   window.parseRecipeOrigins = parseRecipeOrigins;
   window.reconcileShoppingItemBreakdown = reconcileShoppingItemBreakdown;
@@ -4701,7 +4768,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.62';
+    this.appVersion = window.APP_VERSION || 'v1.63';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -8314,6 +8381,7 @@ class FoodAssistantApp {
   renderSingleRecipeCardHtml(rec, showCardMacros) {
     const nut = showCardMacros ? getRecipeNutrition(rec) : null;
     const hasNutData = !!(nut && (nut.calories > 0 || nut.protein > 0));
+    const langMeta = getRecipeLanguageMeta(rec);
     const fridgeMatch = (this.fridgeIngredients && this.fridgeIngredients.length > 0)
       ? this.getRecipeFridgeMatch(rec)
       : null;
@@ -8338,6 +8406,10 @@ class FoodAssistantApp {
             ` : `
               ${this.getRecipePlaceholderHtml(rec, 'card')}
             `}
+          </div>
+          <div class="recipe-lang-badge" title="${escapeHtml(langMeta.ariaLabel)}" aria-label="${escapeHtml(langMeta.ariaLabel)}">
+            <span class="recipe-lang-flag" aria-hidden="true">${langMeta.flag}</span>
+            <span class="recipe-lang-code">${langMeta.code}</span>
           </div>
           <div class="recipe-time-badge">
             <span class="material-symbols-outlined icon-sm">schedule</span> ${rec.prepTimeMinutes + rec.cookTimeMinutes} min
@@ -8400,7 +8472,8 @@ class FoodAssistantApp {
         .filter(t => hasNutData || t !== 'Alta en Proteínas')
         .map(t => {
           const isDiet = PREDEFINED_DIETARY_TAGS.includes(t);
-          return `<span class="tag-chip${isDiet ? ' tag-chip-dietary' : ''}">${isDiet ? getDietaryTagEmoji(t) + ' ' : ''}${escapeHtml(t)}</span>`;
+          const displayTag = window.I18n ? window.I18n.getTagLabel(t) : t;
+          return `<span class="tag-chip${isDiet ? ' tag-chip-dietary' : ''}">${isDiet ? getDietaryTagEmoji(t) + ' ' : ''}${escapeHtml(displayTag)}</span>`;
         }).join('')}
           </div>
         </div>
@@ -9001,6 +9074,14 @@ class FoodAssistantApp {
             }
             continue;
           }
+          if (selTagNorm === 'es' || selTagNorm === 'español' || selTagNorm === 'spanish') {
+            if (getRecipeLanguage(r) !== 'es') return false;
+            continue;
+          }
+          if (selTagNorm === 'en' || selTagNorm === 'ingles' || selTagNorm === 'inglés' || selTagNorm === 'english') {
+            if (getRecipeLanguage(r) !== 'en') return false;
+            continue;
+          }
           if (!rTagsNorm.includes(selTagNorm)) {
             return false;
           }
@@ -9333,6 +9414,7 @@ class FoodAssistantApp {
     const scale = this.activeServings / r.servings;
     const baseNutrition = getRecipeNutrition(r);
     const hasNutData = !!(baseNutrition && (baseNutrition.calories > 0 || baseNutrition.protein > 0));
+    const langMeta = getRecipeLanguageMeta(r);
 
     body.innerHTML = `
       ${isSafeUrl(r.imageUrl) ? `
@@ -9351,19 +9433,23 @@ class FoodAssistantApp {
             <div class="u-flex-row-center-gap-8">
               <span class="material-symbols-outlined icon-brand icon-22">verified</span>
               <div>
-                <div class="import-review-title">Revisión de Receta Importada (Borrador)</div>
-                <div class="import-review-subtitle">Comprueba ingredientes y pasos antes de guardar o descártala.</div>
+                <div class="import-review-title">${window.I18n ? window.I18n.t('import.reviewTitle') : 'Revisión de Receta Importada (Borrador)'}</div>
+                <div class="import-review-subtitle">${window.I18n ? window.I18n.t('import.reviewSubtitle') : 'Comprueba ingredientes y pasos antes de guardar o descártala.'}</div>
               </div>
             </div>
-            <span class="badge import-review-badge">Borrador</span>
+            <span class="badge import-review-badge">${window.I18n ? window.I18n.t('import.draftBadge') : 'Borrador'}</span>
           </div>
         ` : ''}
 
         <div class="recipe-detail-tags-row">
+          <span class="tag-chip tag-chip-lang" title="${escapeHtml(langMeta.ariaLabel)}">
+            <span class="recipe-lang-flag" aria-hidden="true">${langMeta.flag}</span>
+            <span>${langMeta.label}</span>
+          </span>
           ${isSafeUrl(r.sourceUrl) ? `
-            <a href="${sanitizeUrl(r.sourceUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="tag-chip tag-chip-external-link" title="Abrir enlace original en nueva pestaña">
+            <a href="${sanitizeUrl(r.sourceUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="tag-chip tag-chip-external-link" title="${window.I18n ? window.I18n.t('import.openOriginalTooltip') : 'Abrir enlace original en nueva pestaña'}">
               <span class="material-symbols-outlined icon-14">open_in_new</span>
-              Fuente: ${escapeHtml(r.sourceDomain || 'Web Original')}
+              ${window.I18n ? window.I18n.t('import.sourcePrefix') : 'Fuente'}: ${escapeHtml(r.sourceDomain || 'Web Original')}
             </a>
           ` : ''}
           ${(r.tags || []).filter(t => hasNutData || t !== 'Alta en Proteínas').map(t => `<span class="tag-chip tag-chip-primary">${escapeHtml(window.I18n ? window.I18n.getTagLabel(t) : t)}</span>`).join('')}
@@ -9474,14 +9560,14 @@ class FoodAssistantApp {
         ${this.isReviewingImport ? `
           <div class="import-review-footer">
             <button class="btn btn-primary btn-save-import-full" id="btn-bottom-save-import-recipe" onclick="app.confirmSaveImportRecipe()">
-              <span class="material-symbols-outlined">check_circle</span> Guardar en Recetas
+              <span class="material-symbols-outlined">check_circle</span> ${window.I18n ? window.I18n.t('import.saveToRecipes') : 'Guardar en Recetas'}
             </button>
             <div class="u-flex-row-center-gap-8">
               <button class="btn btn-secondary btn-import-subaction" onclick="app.editImportReview()">
-                <span class="material-symbols-outlined icon-sm">edit</span> Editar receta
+                <span class="material-symbols-outlined icon-sm">edit</span> ${window.I18n ? window.I18n.t('import.editRecipe') : 'Editar receta'}
               </button>
               <button class="btn btn-ghost btn-import-cancel" onclick="app.cancelImportReview()">
-                <span class="material-symbols-outlined icon-sm">cancel</span> Cancelar importación
+                <span class="material-symbols-outlined icon-sm">cancel</span> ${window.I18n ? window.I18n.t('import.cancelImport') : 'Cancelar importación'}
               </button>
             </div>
           </div>
@@ -9540,7 +9626,10 @@ class FoodAssistantApp {
 
   // RECIPE EDITOR (CREATE & EDIT)
   openCreateRecipeModal() {
-    document.getElementById('recipe-edit-modal-title').textContent = "Nueva Receta";
+    const titleEl = document.getElementById('recipe-edit-modal-title');
+    if (titleEl) {
+      titleEl.innerHTML = `<span class="material-symbols-outlined icon-primary">edit_note</span> <span>${window.I18n ? window.I18n.t('recipes.newRecipeTitle') : 'Nueva Receta'}</span>`;
+    }
     const switchBtn = document.getElementById('btn-edit-switch-to-import');
     if (switchBtn) switchBtn.style.display = 'inline-flex';
     document.getElementById('edit-recipe-id').value = "";
@@ -9549,6 +9638,8 @@ class FoodAssistantApp {
     document.getElementById('edit-recipe-prep').value = "15";
     document.getElementById('edit-recipe-cook').value = "20";
     document.getElementById('edit-recipe-servings').value = state.settings.defaultServings || "2";
+    const langSelect = document.getElementById('edit-recipe-language');
+    if (langSelect) langSelect.value = (window.I18n && window.I18n.getLanguage() === 'en') ? 'en' : 'es';
     const imgEl = document.getElementById('edit-recipe-image');
     if (imgEl) imgEl.value = "";
     this.updateRecipeEditorImagePreview();
@@ -9572,6 +9663,9 @@ class FoodAssistantApp {
     this.addIngredientRow({ name: "", amount: "", unit: "", aisle: "produce" });
     this.addStepRow({ step: 1, text: "", timerMinutes: 0 });
 
+    if (window.I18n && typeof window.I18n.applyTranslations === 'function') {
+      window.I18n.applyTranslations(this.modalRecipeEdit);
+    }
     this.openDialogModal(this.modalRecipeEdit);
   }
 
@@ -9584,7 +9678,12 @@ class FoodAssistantApp {
     }
     if (!r) return;
 
-    document.getElementById('recipe-edit-modal-title').textContent = this.isReviewingImport ? "Editar y Revisar Receta Importada" : "Editar Receta";
+    const titleEl = document.getElementById('recipe-edit-modal-title');
+    if (titleEl) {
+      const titleKey = this.isReviewingImport ? 'recipes.reviewEditTitle' : 'recipes.editRecipeTitle';
+      const defaultText = this.isReviewingImport ? 'Editar y Revisar Receta Importada' : 'Editar Receta';
+      titleEl.innerHTML = `<span class="material-symbols-outlined icon-primary">edit_note</span> <span>${window.I18n ? window.I18n.t(titleKey) : defaultText}</span>`;
+    }
     const switchBtn = document.getElementById('btn-edit-switch-to-import');
     if (switchBtn) switchBtn.style.display = 'none';
     document.getElementById('edit-recipe-id').value = r.id || ('rec-' + Date.now());
@@ -9593,6 +9692,8 @@ class FoodAssistantApp {
     document.getElementById('edit-recipe-prep').value = r.prepTimeMinutes || 0;
     document.getElementById('edit-recipe-cook').value = r.cookTimeMinutes || 0;
     document.getElementById('edit-recipe-servings').value = r.servings || 2;
+    const editLangSelect = document.getElementById('edit-recipe-language');
+    if (editLangSelect) editLangSelect.value = getRecipeLanguage(r);
     const editImgEl = document.getElementById('edit-recipe-image');
     if (editImgEl) editImgEl.value = r.imageUrl || "";
     this.updateRecipeEditorImagePreview();
@@ -9619,6 +9720,9 @@ class FoodAssistantApp {
     stepContainer.innerHTML = "";
     (r.instructions || []).forEach(step => this.addStepRow(step));
 
+    if (window.I18n && typeof window.I18n.applyTranslations === 'function') {
+      window.I18n.applyTranslations(this.modalRecipeEdit);
+    }
     this.openDialogModal(this.modalRecipeEdit);
   }
 
@@ -9781,13 +9885,14 @@ class FoodAssistantApp {
     if (selectedContainer) {
       if (selectedArray.length === 0) {
         selectedContainer.className = 'recipe-editor-chips-box empty';
-        selectedContainer.innerHTML = '<span>Ninguna etiqueta seleccionada. Elige una abajo o crea una nueva.</span>';
+        selectedContainer.innerHTML = `<span>${window.I18n ? window.I18n.t('recipes.noTagsSelected') : 'Ninguna etiqueta seleccionada. Elige una abajo o crea una nueva.'}</span>`;
       } else {
         selectedContainer.className = 'recipe-editor-chips-box';
+        const removeTagTitle = window.I18n ? window.I18n.t('recipes.removeTagAria') : 'Quitar etiqueta';
         selectedContainer.innerHTML = selectedArray.map(tag => `
           <span class="editor-selected-chip">
-            <span>${tag}</span>
-            <button type="button" class="chip-remove-btn" onclick="app.removeEditorTag('${tag.replace(/'/g, "\\'")}')" title="Quitar etiqueta">
+            <span>${escapeHtml(window.I18n ? window.I18n.getTagLabel(tag) : tag)}</span>
+            <button type="button" class="chip-remove-btn" onclick="app.removeEditorTag('${tag.replace(/'/g, "\\'")}')" title="${escapeHtml(removeTagTitle)}">
               <span class="material-symbols-outlined icon-14">close</span>
             </button>
           </span>
@@ -9799,10 +9904,11 @@ class FoodAssistantApp {
       if (!container) return;
       container.innerHTML = tagList.map(t => {
         const isSelected = this.editorSelectedTags.has(t);
+        const displayTag = window.I18n ? window.I18n.getTagLabel(t) : t;
         return `
           <button type="button" class="editor-suggested-chip ${isSelected ? 'active' : ''}" onclick="app.toggleEditorTag('${t.replace(/'/g, "\\'")}')">
             ${PREDEFINED_DIETARY_TAGS.includes(t) ? `<span class="dietary-emoji">${getDietaryTagEmoji(t)}</span>` : `<span class="material-symbols-outlined icon-14">${isSelected ? 'check' : 'add'}</span>`}
-            <span>${t}</span>
+            <span>${escapeHtml(displayTag)}</span>
           </button>
         `;
       }).join('');
@@ -9999,11 +10105,12 @@ class FoodAssistantApp {
     const container = document.getElementById('edit-steps-container');
     if (!container) return;
     const stepRows = container.querySelectorAll('.edit-step-row');
+    const stepTitleTpl = window.I18n ? window.I18n.t('recipes.stepTitle') : 'Paso {num}';
     stepRows.forEach((row, idx) => {
       const numPill = row.querySelector('.step-num-pill');
       if (numPill) numPill.textContent = idx + 1;
       const title = row.querySelector('.step-title-text');
-      if (title) title.textContent = `Paso ${idx + 1}`;
+      if (title) title.textContent = stepTitleTpl.replace('{num}', idx + 1);
     });
   }
 
@@ -10015,39 +10122,57 @@ class FoodAssistantApp {
     const currentAisle = data.aisle || (data.name ? categorizeIngredientAisle(data.name) : 'other');
     const initialIcon = getIngredientIcon(data.name || '', currentAisle);
 
+    const namePlaceholder = window.I18n ? window.I18n.t('recipes.ingredientNamePlaceholder') : 'Nombre del ingrediente (ej. Castañas, Puerro...)';
+    const removeTitle = window.I18n ? window.I18n.t('recipes.removeIngredientTitle') : 'Eliminar ingrediente';
+    const amountLabel = window.I18n ? window.I18n.t('recipes.amountLabel') : 'Cantidad';
+    const amountPlaceholder = window.I18n ? window.I18n.t('recipes.amountPlaceholder') : 'Ej. 1';
+    const unitLabel = window.I18n ? window.I18n.t('recipes.unitLabel') : 'Unidad';
+    const unitPlaceholder = window.I18n ? window.I18n.t('recipes.unitPlaceholder') : 'ud, g, ml...';
+    const aisleLabel = window.I18n ? window.I18n.t('recipes.aisleLabel') : 'Pasillo / Sección';
+
+    const aisleList = [
+      { key: 'other', label: 'Otros / Varios' },
+      { key: 'produce', label: 'Verduras y Frutas' },
+      { key: 'meat', label: 'Carnes y Pescados' },
+      { key: 'dairy', label: 'Lácteos y Huevos' },
+      { key: 'bakery', label: 'Panadería y Masas' },
+      { key: 'pantry', label: 'Despensa y Básicos' },
+      { key: 'spices', label: 'Especias y Aceites' },
+      { key: 'frozen', label: 'Congelados' },
+      { key: 'beverages', label: 'Bebidas' }
+    ];
+
+    const aisleOptionsHtml = aisleList.map(a => {
+      const locLabel = window.I18n ? window.I18n.getAisleName(a.key) : a.label;
+      const isSelected = currentAisle === a.key ? 'selected' : '';
+      return `<option value="${a.key}" ${isSelected}>${escapeHtml(locLabel)}</option>`;
+    }).join('');
+
     row.innerHTML = `
       <div class="edit-ing-top-row">
         <div class="ing-name-wrap">
           <span class="material-symbols-outlined icon-sm ing-icon-badge">${initialIcon}</span>
-          <input type="text" class="form-input ing-name" placeholder="Nombre del ingrediente (ej. Castañas, Puerro...)" value="${data.name || ''}" autocomplete="off">
+          <input type="text" class="form-input ing-name" placeholder="${escapeHtml(namePlaceholder)}" value="${escapeHtml(data.name || '')}" autocomplete="off">
           <div class="ing-autocomplete-dropdown autocomplete-dropdown is-hidden"></div>
         </div>
-        <button type="button" class="btn-remove-item" title="Eliminar ingrediente">
+        <button type="button" class="btn-remove-item" title="${escapeHtml(removeTitle)}">
           <span class="material-symbols-outlined icon-sm">delete</span>
         </button>
       </div>
 
       <div class="edit-ing-bottom-row">
         <div class="ing-field-group ing-amount-group">
-          <label class="field-micro-label">Cantidad</label>
-          <input type="number" class="form-input ing-amount" placeholder="Ej. 1" value="${data.amount !== null && data.amount !== undefined ? data.amount : ''}" step="any">
+          <label class="field-micro-label">${escapeHtml(amountLabel)}</label>
+          <input type="number" class="form-input ing-amount" placeholder="${escapeHtml(amountPlaceholder)}" value="${data.amount !== null && data.amount !== undefined ? data.amount : ''}" step="any">
         </div>
         <div class="ing-field-group ing-unit-group">
-          <label class="field-micro-label">Unidad</label>
-          <input type="text" class="form-input ing-unit" placeholder="ud, g, ml..." value="${data.unit || ''}">
+          <label class="field-micro-label">${escapeHtml(unitLabel)}</label>
+          <input type="text" class="form-input ing-unit" placeholder="${escapeHtml(unitPlaceholder)}" value="${escapeHtml(data.unit || '')}">
         </div>
         <div class="ing-field-group ing-aisle-group">
-          <label class="field-micro-label">Pasillo / Sección</label>
+          <label class="field-micro-label">${escapeHtml(aisleLabel)}</label>
           <select class="form-select ing-aisle">
-            <option value="other" ${currentAisle === 'other' ? 'selected' : ''}>Otros / Varios</option>
-            <option value="produce" ${currentAisle === 'produce' ? 'selected' : ''}>Verduras y Frutas</option>
-            <option value="meat" ${currentAisle === 'meat' ? 'selected' : ''}>Carnes y Pescados</option>
-            <option value="dairy" ${currentAisle === 'dairy' ? 'selected' : ''}>Lácteos y Huevos</option>
-            <option value="bakery" ${currentAisle === 'bakery' ? 'selected' : ''}>Panadería y Masas</option>
-            <option value="pantry" ${currentAisle === 'pantry' ? 'selected' : ''}>Despensa y Básicos</option>
-            <option value="spices" ${currentAisle === 'spices' ? 'selected' : ''}>Especias y Aceites</option>
-            <option value="frozen" ${currentAisle === 'frozen' ? 'selected' : ''}>Congelados</option>
-            <option value="beverages" ${currentAisle === 'beverages' ? 'selected' : ''}>Bebidas</option>
+            ${aisleOptionsHtml}
           </select>
         </div>
       </div>
@@ -10129,18 +10254,28 @@ class FoodAssistantApp {
       }
     }
 
+    const stepTitleTpl = window.I18n ? window.I18n.t('recipes.stepTitle') : 'Paso {num}';
+    const stepTitle = stepTitleTpl.replace('{num}', currentStepNum);
+    const removeStepTitle = window.I18n ? window.I18n.t('recipes.removeStepTitle') : 'Eliminar paso';
+    const stepPlaceholder = window.I18n ? window.I18n.t('recipes.stepPlaceholder') : 'Instrucción del paso...';
+    const autoTimerBadge = window.I18n ? window.I18n.t('recipes.autoTimerBadge') : 'Auto';
+    const editTimerTitle = window.I18n ? window.I18n.t('recipes.editTimerTitle') : 'Cambiar minutos';
+    const removeTimerTitle = window.I18n ? window.I18n.t('recipes.removeTimerTitle') : 'Quitar temporizador';
+    const optionalTimerPrompt = window.I18n ? window.I18n.t('recipes.optionalTimerPrompt') : '+ Tiempo opcional';
+    const optionalTimerTooltip = window.I18n ? window.I18n.t('recipes.optionalTimerTooltip') : 'Añadir temporizador opcional';
+
     row.innerHTML = `
       <div class="edit-step-header">
         <div class="step-header-left">
           <span class="step-num-pill">${currentStepNum}</span>
-          <span class="step-title-text">Paso ${currentStepNum}</span>
+          <span class="step-title-text">${escapeHtml(stepTitle)}</span>
         </div>
-        <button type="button" class="btn-remove-item" title="Eliminar paso">
+        <button type="button" class="btn-remove-item" title="${escapeHtml(removeStepTitle)}">
           <span class="material-symbols-outlined icon-sm">delete</span>
         </button>
       </div>
 
-      <textarea class="form-textarea step-text" rows="2" placeholder="Instrucción del paso...">${text}</textarea>
+      <textarea class="form-textarea step-text" rows="2" placeholder="${escapeHtml(stepPlaceholder)}">${escapeHtml(text)}</textarea>
 
       <div class="edit-step-footer">
         <div class="step-timer-slot"></div>
@@ -10163,11 +10298,11 @@ class FoodAssistantApp {
           <div class="step-timer-badge">
             <span class="material-symbols-outlined icon-sm icon-15">timer</span>
             <span class="timer-display-text">${mins} min</span>
-            ${isAutoDetected ? '<span class="step-timer-auto-tag">Auto</span>' : ''}
-            <button type="button" class="btn-timer-edit btn-inline-icon-only" title="Cambiar minutos">
+            ${isAutoDetected ? `<span class="step-timer-auto-tag">${escapeHtml(autoTimerBadge)}</span>` : ''}
+            <button type="button" class="btn-timer-edit btn-inline-icon-only" title="${escapeHtml(editTimerTitle)}">
               <span class="material-symbols-outlined icon-14">edit</span>
             </button>
-            <button type="button" class="btn-timer-remove btn-inline-icon-only" title="Quitar temporizador">
+            <button type="button" class="btn-timer-remove btn-inline-icon-only" title="${escapeHtml(removeTimerTitle)}">
               <span class="material-symbols-outlined icon-15">close</span>
             </button>
           </div>
@@ -10185,9 +10320,9 @@ class FoodAssistantApp {
         });
       } else {
         timerSlot.innerHTML = `
-          <button type="button" class="btn-step-timer-prompt" title="Añadir temporizador opcional">
+          <button type="button" class="btn-step-timer-prompt" title="${escapeHtml(optionalTimerTooltip)}">
             <span class="material-symbols-outlined icon-sm icon-14">timer</span>
-            <span>+ Tiempo opcional</span>
+            <span>${escapeHtml(optionalTimerPrompt)}</span>
           </button>
         `;
 
@@ -10387,6 +10522,9 @@ class FoodAssistantApp {
     }
 
     const isPrivate = !!document.getElementById('edit-recipe-private')?.checked;
+    const languageEl = document.getElementById('edit-recipe-language');
+    const language = languageEl?.value || detectRecipeLanguage({ title, description, ingredients, instructions });
+
     const updatedRecipe = {
       id,
       title,
@@ -10396,6 +10534,7 @@ class FoodAssistantApp {
       cookTimeMinutes,
       servings,
       tags,
+      language,
       nutrition: nutrition || undefined,
       ingredients,
       instructions
@@ -11758,6 +11897,14 @@ class FoodAssistantApp {
             if (!r.isFavorite && !rTagsNorm.includes('favoritas')) {
               return false;
             }
+            continue;
+          }
+          if (selTagNorm === 'es' || selTagNorm === 'español' || selTagNorm === 'spanish') {
+            if (getRecipeLanguage(r) !== 'es') return false;
+            continue;
+          }
+          if (selTagNorm === 'en' || selTagNorm === 'ingles' || selTagNorm === 'inglés' || selTagNorm === 'english') {
+            if (getRecipeLanguage(r) !== 'en') return false;
             continue;
           }
           if (!rTagsNorm.includes(selTagNorm)) {
@@ -16146,15 +16293,15 @@ REGLAS CRÍTICAS:
     const isTextActive = !isUrlActive && !isAiActive;
 
     if (isUrlActive && !url) {
-      this.highlightInputError(document.getElementById('import-url-input'), "Por favor, introduce una URL de receta.");
+      this.highlightInputError(document.getElementById('import-url-input'), window.I18n ? window.I18n.t('import.urlRequired') : "Por favor, introduce una URL de receta.");
       return;
     }
     if (isTextActive && !text) {
-      this.highlightInputError(document.getElementById('import-text-input'), "Por favor, pega el texto de la receta.");
+      this.highlightInputError(document.getElementById('import-text-input'), window.I18n ? window.I18n.t('import.textRequired') : "Por favor, pega el texto de la receta.");
       return;
     }
     if (isAiActive && !aiPrompt && !imageFile) {
-      this.highlightInputError(document.getElementById('import-ai-prompt-input'), "Sube una foto o describe la receta que deseas.");
+      this.highlightInputError(document.getElementById('import-ai-prompt-input'), window.I18n ? window.I18n.t('import.aiPromptRequired') : "Sube una foto o describe la receta que deseas.");
       return;
     }
 
@@ -16162,7 +16309,8 @@ REGLAS CRÍTICAS:
     if (status) {
       status.style.display = 'block';
       status.style.color = 'var(--m3-primary)';
-      status.innerHTML = '<span class="material-symbols-outlined icon-sm icon-spin icon-valign-middle">sync</span> Analizando receta con IA y extrayendo ingredientes...';
+      const analyzingMsg = window.I18n ? window.I18n.t('import.analyzing') : 'Analizando receta con IA y extrayendo ingredientes...';
+      status.innerHTML = `<span class="material-symbols-outlined icon-sm icon-spin icon-valign-middle">sync</span> ${escapeHtml(analyzingMsg)}`;
     }
 
     try {
@@ -16334,6 +16482,10 @@ REGLAS CRÍTICAS:
         throw new Error("No se pudieron detectar ingredientes válidos en el contenido introducido. Comprueba que contenga la lista de ingredientes o prueba en la pestaña 'Foto / IA'.");
       }
 
+      if (extractedRecipe && !extractedRecipe.language) {
+        extractedRecipe.language = detectRecipeLanguage(extractedRecipe);
+      }
+
       // Store in memory for confirmation
       this.pendingImportRecipe = extractedRecipe;
 
@@ -16342,7 +16494,7 @@ REGLAS CRÍTICAS:
       this.openImportReview(extractedRecipe);
 
       if (extractedRecipe?._isHighDemandFallback) {
-        this.showToast('⚠️ Servidores de Gemini con alta demanda temporal. Se ha creado el borrador con tu foto adjunta para que no pierdas ningún dato.', 'info');
+        this.showToast(window.I18n ? window.I18n.t('import.geminiHighDemand') : '⚠️ Servidores de Gemini con alta demanda temporal. Se ha creado el borrador con tu foto adjunta para que no pierdas ningún dato.', 'info');
       }
 
     } catch (err) {
@@ -16351,7 +16503,7 @@ REGLAS CRÍTICAS:
         const rawMsg = err?.message || '';
         let cleanMsg = rawMsg;
         if (/is no longer available/i.test(rawMsg)) {
-          cleanMsg = 'Modelo de IA desactualizado. Se ha actualizado automáticamente a gemini-3.8-flash. Por favor, pulsa "Analizar e Importar" de nuevo.';
+          cleanMsg = window.I18n ? window.I18n.t('import.aiModelOutdated') : 'Modelo de IA desactualizado. Se ha actualizado automáticamente a gemini-3.8-flash. Por favor, pulsa "Analizar e Importar" de nuevo.';
         } else if (/high demand|overloaded|try again later|503/i.test(rawMsg)) {
           cleanMsg = 'Los servidores de Gemini están experimentando alta demanda global en este momento. Puedes reintentar en unos instantes o pulsar "Escribir a mano" para crear la receta con tu foto adjunta.';
         }
@@ -16365,6 +16517,9 @@ REGLAS CRÍTICAS:
   async confirmSaveImportRecipe(skipUrlDuplicateCheck = false) {
     const newRecipe = this.pendingImportRecipe || this.activeRecipe;
     if (!newRecipe) return;
+    if (!newRecipe.language) {
+      newRecipe.language = detectRecipeLanguage(newRecipe);
+    }
 
     // BUG-16: Detectar sourceUrl existente y ofrecer "Abrir existente" o "Guardar copia"
     if (!skipUrlDuplicateCheck && newRecipe.sourceUrl && (!newRecipe.id || !state.recipes.some(r => r.id === newRecipe.id))) {
@@ -16376,11 +16531,16 @@ REGLAS CRÍTICAS:
       );
 
       if (existingUrlRecipe) {
+        const modalTitle = window.I18n ? window.I18n.t('import.alreadyImportedTitle') : 'Receta ya importada';
+        const modalMsg = window.I18n ? window.I18n.t('import.alreadyImportedMsg', { title: existingUrlRecipe.title }) : `Esta receta ya existe en tu recetario como "${existingUrlRecipe.title}".\n\n¿Deseas abrir la receta existente en lugar de duplicarla?`;
+        const openText = window.I18n ? window.I18n.t('import.openExisting') : 'Abrir existente';
+        const copyText = window.I18n ? window.I18n.t('import.saveCopy') : 'Guardar copia';
+
         const openExisting = await this.showConfirmDialog({
-          title: 'Receta ya importada',
-          message: `Esta receta ya existe en tu recetario como "${existingUrlRecipe.title}".\n\n¿Deseas abrir la receta existente en lugar de duplicarla?`,
-          confirmText: 'Abrir existente',
-          cancelText: 'Guardar copia',
+          title: modalTitle,
+          message: modalMsg,
+          confirmText: openText,
+          cancelText: copyText,
           icon: 'content_copy'
         });
 
@@ -16392,7 +16552,7 @@ REGLAS CRÍTICAS:
           this.render();
           this.switchView('view-recipes');
           this.openRecipeDetail(existingUrlRecipe.id);
-          this.showToast(`Mostrando receta existente: "${existingUrlRecipe.title}".`, 'info');
+          this.showToast(window.I18n ? window.I18n.t('import.showingExisting', { title: existingUrlRecipe.title }) : `Mostrando receta existente: "${existingUrlRecipe.title}".`, 'info');
           return existingUrlRecipe;
         }
         newRecipe.id = generateId('rec-');

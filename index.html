@@ -35,15 +35,15 @@
   <meta name="application-name" content="Sabory">
   <meta name="apple-mobile-web-app-title" content="Sabory">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <link rel="manifest" href="manifest.json?v=1.62">
+  <link rel="manifest" href="manifest.json?v=1.63">
   <meta name="theme-color" content="#FAF7F2">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=1.62">
-  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.62">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.62">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.62">
+  <link rel="stylesheet" href="styles.css?v=1.63">
+  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.63">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.63">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.63">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <!-- US-41: versión fija + Subresource Integrity (sha384) para el SDK de Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"
@@ -125,7 +125,7 @@
     <aside class="pwa-smart-banner" id="pwa-smart-banner" hidden aria-label="Instalación de la app en la pantalla de inicio">
       <div class="pwa-smart-banner-content">
         <div class="pwa-smart-banner-icon" aria-hidden="true">
-          <img src="icon-192.png?v=1.62" alt="" width="28" height="28" class="pwa-smart-banner-img">
+          <img src="icon-192.png?v=1.63" alt="" width="28" height="28" class="pwa-smart-banner-img">
         </div>
         <div class="pwa-smart-banner-texts">
           <strong class="pwa-smart-banner-title" data-i18n="pwa.bannerTitle">Prueba Sabory como App</strong>
@@ -892,8 +892,8 @@
             </h3>
             <p
               style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-              <span data-i18n="settings.installedVersion">Versión instalada:</span> <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.62</strong>
-              <span class="app-version-badge" id="app-version-badge">v1.62</span>
+              <span data-i18n="settings.installedVersion">Versión instalada:</span> <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.63</strong>
+              <span class="app-version-badge" id="app-version-badge">v1.63</span>
             </p>
             <div
               style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;" data-i18n="settings.versionCacheNotice">
@@ -1325,19 +1325,19 @@
       <div class="modal-header-bar" style="padding: 14px 18px; flex-shrink: 0; background: var(--m3-surface);">
         <h3 style="font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin: 0;"
           id="recipe-edit-modal-title">
-          <span class="material-symbols-outlined" style="color: var(--m3-primary);">edit_note</span> Editar Receta
+          <span class="material-symbols-outlined" style="color: var(--m3-primary);">edit_note</span> <span data-i18n="recipes.editRecipeTitle">Editar Receta</span>
         </h3>
         <div style="display: flex; align-items: center; gap: 8px;">
           <button type="button" class="btn btn-ghost btn-sm" id="btn-edit-switch-to-import"
             style="font-size: 12px; color: var(--m3-primary); display: flex; align-items: center; gap: 4px; padding: 4px 8px;"
-            title="Importar por enlace web o texto">
-            <span class="material-symbols-outlined icon-sm">auto_awesome</span> Importar
+            title="Importar por enlace web o texto" data-i18n-title="recipeChoice.urlDesc">
+            <span class="material-symbols-outlined icon-sm">auto_awesome</span> <span data-i18n="recipes.importBtn">Importar</span>
           </button>
           <button class="btn btn-primary btn-sm" id="btn-save-recipe-edit-header"
             style="display: flex; align-items: center; gap: 4px; font-weight: 600;">
-            <span class="material-symbols-outlined icon-sm">save</span> Guardar
+            <span class="material-symbols-outlined icon-sm">save</span> <span data-i18n="common.save">Guardar</span>
           </button>
-          <button class="btn btn-ghost btn-icon" id="btn-close-recipe-edit" title="Cerrar">
+          <button class="btn btn-ghost btn-icon" id="btn-close-recipe-edit" title="Cerrar" data-i18n-title="common.close">
             <span class="material-symbols-outlined">close</span>
           </button>
         </div>
@@ -1348,29 +1348,36 @@
         <input type="hidden" id="edit-recipe-id">
 
         <div class="form-group">
-          <label class="form-label">Título de la Receta</label>
+          <label class="form-label" data-i18n="recipes.titleLabel">Título de la Receta</label>
           <input type="text" class="form-input" id="edit-recipe-title" placeholder="Ej. Salmón al Horno con Verduras"
-            required>
+            data-i18n-placeholder="recipes.titlePlaceholder" required>
         </div>
 
         <div class="form-group">
-          <label class="form-label">Descripción</label>
+          <label class="form-label" data-i18n="recipes.descLabel">Descripción</label>
           <textarea class="form-textarea" id="edit-recipe-desc" rows="2"
-            placeholder="Breve descripción del plato..."></textarea>
+            placeholder="Breve descripción del plato..." data-i18n-placeholder="recipes.descPlaceholder"></textarea>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px;">
           <div class="form-group">
-            <label class="form-label">Prep (min)</label>
+            <label class="form-label" data-i18n="recipes.prepMin">Prep (min)</label>
             <input type="number" class="form-input" id="edit-recipe-prep" value="10">
           </div>
           <div class="form-group">
-            <label class="form-label">Cocción (min)</label>
+            <label class="form-label" data-i18n="recipes.cookMin">Cocción (min)</label>
             <input type="number" class="form-input" id="edit-recipe-cook" value="15">
           </div>
           <div class="form-group">
-            <label class="form-label">Porciones</label>
+            <label class="form-label" data-i18n="recipes.servings">Porciones</label>
             <input type="number" class="form-input" id="edit-recipe-servings" value="2">
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-i18n="recipes.languageLabel">Idioma</label>
+            <select class="form-select" id="edit-recipe-language" style="height: 38px;">
+              <option value="es" data-i18n="recipes.recipeLanguageEs">🇪🇸 Español</option>
+              <option value="en" data-i18n="recipes.recipeLanguageEn">🇬🇧 English</option>
+            </select>
           </div>
         </div>
 
@@ -1380,10 +1387,9 @@
             style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
             <span style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
               <span class="material-symbols-outlined icon-sm" style="color: var(--m3-primary);">image</span>
-              Foto del Plato (Opcional)
+              <span data-i18n="recipes.photoLabel">Foto del Plato (Opcional)</span>
             </span>
-            <span style="font-size: 11px; color: var(--m3-on-surface-variant); font-weight: normal;">Avatar elegante si
-              se omite</span>
+            <span style="font-size: 11px; color: var(--m3-on-surface-variant); font-weight: normal;" data-i18n="recipes.photoAvatarHint">Avatar elegante si se omite</span>
           </label>
 
           <!-- Preview de la foto o patrón gráfico -->
@@ -1403,27 +1409,27 @@
 
             <button type="button" class="btn btn-secondary btn-sm" id="btn-edit-recipe-upload-file"
               style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 6px 12px;"
-              title="Seleccionar foto desde la galería o archivos de tu dispositivo">
-              <span class="material-symbols-outlined icon-sm">photo_library</span> Galería
+              title="Seleccionar foto desde la galería o archivos de tu dispositivo" data-i18n-title="recipes.galleryTooltip">
+              <span class="material-symbols-outlined icon-sm">photo_library</span> <span data-i18n="recipes.galleryBtn">Galería</span>
             </button>
 
             <button type="button" class="btn btn-secondary btn-sm" id="btn-edit-recipe-camera"
               style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 6px 12px;"
-              title="Tomar foto con la cámara del dispositivo">
-              <span class="material-symbols-outlined icon-sm">photo_camera</span> Cámara
+              title="Tomar foto con la cámara del dispositivo" data-i18n-title="recipes.cameraTooltip">
+              <span class="material-symbols-outlined icon-sm">photo_camera</span> <span data-i18n="recipes.cameraBtn">Cámara</span>
             </button>
 
             <button type="button" class="btn btn-ghost btn-sm" id="btn-edit-recipe-remove-image"
               style="display: none; align-items: center; gap: 4px; font-size: 12px; padding: 6px 10px; color: var(--m3-error);"
-              title="Eliminar foto actual y usar avatar gráfico">
-              <span class="material-symbols-outlined icon-sm">delete</span> Quitar foto
+              title="Eliminar foto actual y usar avatar gráfico" data-i18n-title="recipes.removePhotoTooltip">
+              <span class="material-symbols-outlined icon-sm">delete</span> <span data-i18n="recipes.removePhotoBtn">Quitar foto</span>
             </button>
           </div>
 
           <!-- Campo URL limpia -->
           <div style="position: relative;">
             <input type="url" class="form-input" id="edit-recipe-image"
-              placeholder="O pega una URL externa limpia (https://...)" style="font-size: 12px; padding-left: 32px;">
+              placeholder="O pega una URL externa limpia (https://...)" data-i18n-placeholder="recipes.cleanUrlPlaceholder" style="font-size: 12px; padding-left: 32px;">
             <span class="material-symbols-outlined"
               style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); font-size: 18px; color: var(--m3-on-surface-variant); pointer-events: none;">link</span>
           </div>
@@ -1433,32 +1439,32 @@
         <div class="form-group" style="margin-top: 14px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
             <div>
-              <label class="form-label" style="margin-bottom: 0;">Macronutrientes por porción</label>
-              <div style="font-size: 11px; color: var(--m3-on-surface-variant);">Kcal, P, C, G por ración</div>
+              <label class="form-label" style="margin-bottom: 0;" data-i18n="recipes.macrosPerServing">Macronutrientes por porción</label>
+              <div style="font-size: 11px; color: var(--m3-on-surface-variant);" data-i18n="recipes.macrosSubtext">Kcal, P, C, G por ración</div>
             </div>
             <button type="button" class="btn btn-secondary btn-sm" id="btn-recalculate-macros"
               data-action="recalculateEditorNutrition"
               style="font-size: 11px; padding: 4px 8px; display: inline-flex; align-items: center; gap: 4px;"
-              title="Estimar automáticamente Kcal y macros según los ingredientes y porciones actuales">
+              title="Estimar automáticamente Kcal y macros según los ingredientes y porciones actuales" data-i18n-title="recipes.recalculateTooltip">
               <span class="material-symbols-outlined"
-                style="font-size: 14px; color: var(--m3-primary);">calculate</span> Recalcular
+                style="font-size: 14px; color: var(--m3-primary);">calculate</span> <span data-i18n="recipes.recalculateBtn">Recalcular</span>
             </button>
           </div>
           <div class="nutrition-editor-grid">
             <div>
-              <label class="field-micro-label" style="color: #d9480f;">🔥 Kcal</label>
+              <label class="field-micro-label" style="color: #d9480f;" data-i18n="recipes.kcalLabel">🔥 Kcal</label>
               <input type="number" class="form-input" id="edit-recipe-calories" placeholder="Ej. 450" min="0" step="1">
             </div>
             <div>
-              <label class="field-micro-label" style="color: #1971c2;">🥩 Proteína (g)</label>
+              <label class="field-micro-label" style="color: #1971c2;" data-i18n="recipes.proteinLabel">🥩 Proteína (g)</label>
               <input type="number" class="form-input" id="edit-recipe-protein" placeholder="Ej. 30" min="0" step="0.5">
             </div>
             <div>
-              <label class="field-micro-label" style="color: #2f9e44;">🌾 Carbos (g)</label>
+              <label class="field-micro-label" style="color: #2f9e44;" data-i18n="recipes.carbsLabel">🌾 Carbos (g)</label>
               <input type="number" class="form-input" id="edit-recipe-carbs" placeholder="Ej. 45" min="0" step="0.5">
             </div>
             <div>
-              <label class="field-micro-label" style="color: #f59f00;">🥑 Grasas (g)</label>
+              <label class="field-micro-label" style="color: #f59f00;" data-i18n="recipes.fatLabel">🥑 Grasas (g)</label>
               <input type="number" class="form-input" id="edit-recipe-fat" placeholder="Ej. 14" min="0" step="0.5">
             </div>
           </div>
@@ -1466,8 +1472,8 @@
 
         <div class="form-group" style="margin-top: 14px;">
           <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
-            <span>Etiquetas y Categorías Dietéticas</span>
-            <span style="font-size: 11px; color: var(--m3-on-surface-variant); font-weight: normal;">Toca los chips para
+            <span data-i18n="recipes.tagsLabel">Etiquetas y Categorías Dietéticas</span>
+            <span style="font-size: 11px; color: var(--m3-on-surface-variant); font-weight: normal;" data-i18n="recipes.tagsTapHint">Toca los chips para
               seleccionar</span>
           </label>
 
@@ -1483,24 +1489,24 @@
               <span class="material-symbols-outlined"
                 style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 18px; color: var(--m3-on-surface-variant);">label</span>
               <input type="text" class="form-input" id="input-new-custom-tag"
-                placeholder="Nueva etiqueta (ej: Airfryer, Sin Soja...)"
+                placeholder="Nueva etiqueta (ej: Airfryer, Sin Soja...)" data-i18n-placeholder="recipes.newTagPlaceholder"
                 style="padding-left: 36px; height: 38px; font-size: 13px;">
             </div>
             <button type="button" class="btn btn-secondary btn-sm" id="btn-add-custom-tag"
               style="height: 38px; white-space: nowrap;">
-              <span class="material-symbols-outlined icon-sm">add</span> Añadir
+              <span class="material-symbols-outlined icon-sm">add</span> <span data-i18n="recipes.addTagBtn">Añadir</span>
             </button>
           </div>
 
           <!-- Suggested tags categorized -->
           <div class="editor-suggested-tags-wrapper">
-            <div class="tags-group-label">🌱 Dietéticas y Salud</div>
+            <div class="tags-group-label" data-i18n="recipes.catDietHealth">🌱 Dietéticas y Salud</div>
             <div class="chips-wrap" id="editor-dietary-chips"></div>
 
-            <div class="tags-group-label" style="margin-top: 10px;">🍽️ Momento del Día</div>
+            <div class="tags-group-label" style="margin-top: 10px;" data-i18n="recipes.catMealTime">🍽️ Momento del Día</div>
             <div class="chips-wrap" id="editor-occasion-chips"></div>
 
-            <div class="tags-group-label" style="margin-top: 10px;">⚡ Método y Práctico</div>
+            <div class="tags-group-label" style="margin-top: 10px;" data-i18n="recipes.catMethodPractical">⚡ Método y Práctico</div>
             <div class="chips-wrap" id="editor-practical-chips"></div>
           </div>
         </div>
@@ -1511,9 +1517,9 @@
             <div class="goals-switch-info">
               <label for="edit-recipe-private" class="goals-switch-label" style="cursor: pointer; display: flex; align-items: center; gap: 6px;">
                 <span class="material-symbols-outlined icon-sm" style="color: var(--m3-primary);">lock</span>
-                <span>Receta privada (solo para mí)</span>
+                <span data-i18n="recipes.privateRecipeLabel">Receta privada (solo para mí)</span>
               </label>
-              <span class="goals-switch-desc">Si activas esta opción, la receta no se compartirá en el recetario común de tu Hogar familiar.</span>
+              <span class="goals-switch-desc" data-i18n="recipes.privateRecipeDesc">Si activas esta opción, la receta no se compartirá en el recetario común de tu Hogar familiar.</span>
             </div>
             <label class="m3-switch" for="edit-recipe-private">
               <input type="checkbox" id="edit-recipe-private" name="is_private">
@@ -1528,12 +1534,12 @@
         <div class="form-group" style="margin-top: 18px;">
           <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;">
             <div>
-              <label class="form-label" style="margin: 0; font-weight: 700; font-size: 14px;">Ingredientes</label>
-              <span style="font-size: 12px; color: var(--m3-on-surface-variant);">Nombre, cantidades y sección del
+              <label class="form-label" style="margin: 0; font-weight: 700; font-size: 14px;" data-i18n="recipes.ingredients">Ingredientes</label>
+              <span style="font-size: 12px; color: var(--m3-on-surface-variant);" data-i18n="recipes.ingredientsSubtext">Nombre, cantidades y sección del
                 supermercado</span>
             </div>
             <button type="button" class="btn btn-secondary btn-sm" id="btn-add-ingredient-row">
-              <span class="material-symbols-outlined icon-sm">add</span> Añadir Ingrediente
+              <span class="material-symbols-outlined icon-sm">add</span> <span data-i18n="recipes.addIngredientBtn">Añadir Ingrediente</span>
             </button>
           </div>
           <div id="edit-ingredients-container" style="display: flex; flex-direction: column; gap: 8px;"></div>
@@ -1543,13 +1549,13 @@
         <div class="form-group" style="margin-top: 18px;">
           <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;">
             <div>
-              <label class="form-label" style="margin: 0; font-weight: 700; font-size: 14px;">Pasos de
+              <label class="form-label" style="margin: 0; font-weight: 700; font-size: 14px;" data-i18n="recipes.instructionsTitle">Pasos de
                 Preparación</label>
-              <span style="font-size: 12px; color: var(--m3-on-surface-variant);">Temporizadores detectados
+              <span style="font-size: 12px; color: var(--m3-on-surface-variant);" data-i18n="recipes.instructionsSubtext">Temporizadores detectados
                 automáticamente</span>
             </div>
             <button type="button" class="btn btn-secondary btn-sm" id="btn-add-step-row">
-              <span class="material-symbols-outlined icon-sm">add</span> Añadir Paso
+              <span class="material-symbols-outlined icon-sm">add</span> <span data-i18n="recipes.addStepBtn">Añadir Paso</span>
             </button>
           </div>
           <div id="edit-steps-container" style="display: flex; flex-direction: column; gap: 10px;"></div>
@@ -1559,10 +1565,10 @@
       <!-- Pinned Sticky Footer (Always visible without scrolling!) -->
       <div
         style="display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 18px; border-top: 1px solid var(--m3-outline-variant); background: var(--m3-surface); box-shadow: 0 -4px 12px rgba(0,0,0,0.05); flex-shrink: 0;">
-        <button class="btn btn-secondary" id="btn-cancel-recipe-edit">Cancelar</button>
+        <button class="btn btn-secondary" id="btn-cancel-recipe-edit" data-i18n="common.cancel">Cancelar</button>
         <button class="btn btn-primary" id="btn-save-recipe-edit"
           style="display: flex; align-items: center; gap: 6px; padding: 9px 20px; font-weight: 600;">
-          <span class="material-symbols-outlined icon-sm">save</span> Guardar Receta
+          <span class="material-symbols-outlined icon-sm">save</span> <span data-i18n="recipes.saveRecipeBtn">Guardar Receta</span>
         </button>
       </div>
     </div>
@@ -2592,9 +2598,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1.62"></script>
-  <script src="i18n.js?v=1.62"></script>
-  <script src="app.js?v=1.62"></script>
+  <script src="config.js?v=1.63"></script>
+  <script src="i18n.js?v=1.63"></script>
+  <script src="app.js?v=1.63"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

@@ -328,4 +328,110 @@ describe('US-12: Módulo Core de Internacionalización (i18n.js)', () => {
     expect(I18n.t('settings.deleteAccountAndData')).toBe('Eliminar mi cuenta y datos');
     expect(I18n.t('settings.viewPrivacyPolicy')).toBe('Consultar Política de Privacidad');
   });
+
+  it('detecta y visualiza distintivos de idioma en recetas (Fase 7 - US-83 Distintivo de Idioma para Comunidad)', () => {
+    const appPath = path.resolve(process.cwd(), 'app.js');
+    const appCode = fs.readFileSync(appPath, 'utf-8');
+    new Function(appCode)();
+
+    const { detectRecipeLanguage, getRecipeLanguage, getRecipeLanguageMeta } = window;
+    expect(typeof detectRecipeLanguage).toBe('function');
+    expect(typeof getRecipeLanguage).toBe('function');
+    expect(typeof getRecipeLanguageMeta).toBe('function');
+
+    // Spanish recipe
+    const esRecipe = {
+      id: 'rec-es-1',
+      title: 'Tostadas con Revuelto de Huevo y Queso Fresco',
+      description: 'Deliciosa receta mediterránea para el desayuno con aceite de oliva',
+      ingredients: [{ name: 'Huevos' }, { name: 'Queso fresco' }, { name: 'Aceite de oliva virgen extra' }],
+      instructions: [{ text: 'Batir los huevos en un bol con sal y cocinar a fuego lento en la sartén.' }]
+    };
+
+    // English recipe
+    const enRecipe = {
+      id: 'rec-en-1',
+      title: 'High-Protein Blueberry Oatmeal Bowl',
+      description: 'Quick healthy breakfast bowl packed with antioxidants and whey protein',
+      ingredients: [{ name: 'Rolled oats' }, { name: 'Blueberries' }, { name: 'Whey protein powder' }, { name: 'Almond milk' }],
+      instructions: [{ text: 'Combine oats and milk in a bowl. Heat in microwave and stir in protein powder.' }]
+    };
+
+    // Explicit language overrides
+    const explicitEn = { id: 'rec-3', title: 'Tortilla española', language: 'en' };
+    const explicitEs = { id: 'rec-4', title: 'Pancake bowl', language: 'es' };
+
+    expect(detectRecipeLanguage(esRecipe)).toBe('es');
+    expect(detectRecipeLanguage(enRecipe)).toBe('en');
+    expect(detectRecipeLanguage(explicitEn)).toBe('en');
+    expect(detectRecipeLanguage(explicitEs)).toBe('es');
+
+    expect(getRecipeLanguage(esRecipe)).toBe('es');
+    expect(getRecipeLanguage(enRecipe)).toBe('en');
+
+    const metaEs = getRecipeLanguageMeta(esRecipe);
+    expect(metaEs.code).toBe('ES');
+    expect(metaEs.flag).toBe('🇪🇸');
+    expect(metaEs.label).toBe('Español');
+
+    const metaEn = getRecipeLanguageMeta(enRecipe);
+    expect(metaEn.code).toBe('EN');
+    expect(metaEn.flag).toBe('🇬🇧');
+    expect(metaEn.label).toBe('English');
+
+    // Test card HTML rendering
+    const appInstance = new window.FoodAssistantApp();
+    const cardHtmlEs = appInstance.renderSingleRecipeCardHtml(esRecipe, false);
+    expect(cardHtmlEs).toContain('class="recipe-lang-badge"');
+    expect(cardHtmlEs).toContain('🇪🇸');
+    expect(cardHtmlEs).toContain('ES');
+
+    const cardHtmlEn = appInstance.renderSingleRecipeCardHtml(enRecipe, false);
+    expect(cardHtmlEn).toContain('class="recipe-lang-badge"');
+    expect(cardHtmlEn).toContain('🇬🇧');
+    expect(cardHtmlEn).toContain('EN');
+  });
+
+  it('traduce completamente la revisión de recetas importadas y el editor de recetas en ES y EN', () => {
+    // English verification
+    I18n.setPreference('en');
+    expect(I18n.t('import.analyzing')).toBe('Analyzing recipe with AI and extracting ingredients...');
+    expect(I18n.t('import.reviewTitle')).toBe('Imported Recipe Review (Draft)');
+    expect(I18n.t('import.draftBadge')).toBe('Draft');
+    expect(I18n.t('import.sourcePrefix')).toBe('Source');
+    expect(I18n.t('import.saveToRecipes')).toBe('Save to Recipes');
+    expect(I18n.t('import.editRecipe')).toBe('Edit recipe');
+    expect(I18n.t('import.cancelImport')).toBe('Cancel import');
+
+    expect(I18n.t('recipes.editRecipeTitle')).toBe('Edit Recipe');
+    expect(I18n.t('recipes.newRecipeTitle')).toBe('New Recipe');
+    expect(I18n.t('recipes.titleLabel')).toBe('Recipe Title');
+    expect(I18n.t('recipes.photoLabel')).toBe('Dish Photo (Optional)');
+    expect(I18n.t('recipes.galleryBtn')).toBe('Gallery');
+    expect(I18n.t('recipes.cameraBtn')).toBe('Camera');
+    expect(I18n.t('recipes.removePhotoBtn')).toBe('Remove photo');
+    expect(I18n.t('recipes.macrosPerServing')).toBe('Macronutrients per serving');
+    expect(I18n.t('recipes.recalculateBtn')).toBe('Recalculate');
+    expect(I18n.t('recipes.tagsLabel')).toBe('Tags & Dietary Categories');
+    expect(I18n.t('recipes.catDietHealth')).toBe('🌱 Diet & Health');
+    expect(I18n.t('recipes.catMealTime')).toBe('🍽️ Meal Time');
+    expect(I18n.t('recipes.catMethodPractical')).toBe('⚡ Method & Practical');
+    expect(I18n.t('recipes.saveRecipeBtn')).toBe('Save Recipe');
+    expect(I18n.t('recipes.addIngredientBtn')).toBe('Add Ingredient');
+    expect(I18n.t('recipes.instructionsTitle')).toBe('Preparation Steps');
+    expect(I18n.t('recipes.addStepBtn')).toBe('Add Step');
+
+    // Spanish verification
+    I18n.setPreference('es');
+    expect(I18n.t('import.analyzing')).toBe('Analizando receta con IA y extrayendo ingredientes...');
+    expect(I18n.t('import.reviewTitle')).toBe('Revisión de Receta Importada (Borrador)');
+    expect(I18n.t('import.draftBadge')).toBe('Borrador');
+    expect(I18n.t('import.sourcePrefix')).toBe('Fuente');
+    expect(I18n.t('import.saveToRecipes')).toBe('Guardar en Recetas');
+    expect(I18n.t('import.editRecipe')).toBe('Editar receta');
+    expect(I18n.t('import.cancelImport')).toBe('Cancelar importación');
+    expect(I18n.t('recipes.editRecipeTitle')).toBe('Editar Receta');
+    expect(I18n.t('recipes.newRecipeTitle')).toBe('Nueva Receta');
+    expect(I18n.t('recipes.titleLabel')).toBe('Título de la Receta');
+  });
 });
