@@ -649,6 +649,31 @@ describe('US-77: Modo Familia / Espacio Colaborativo del Hogar (Family Mode)', (
       expect(state.shoppingList.find(i => i.id === 'shop-realtime-1')).toBeUndefined();
     });
 
+    it('10b. US-81: handleHouseholdRealtimeEvent procesa cambios en modo personal sin hogar (multi-dispositivo PC/móvil)', () => {
+      state.household = null;
+      state.cloudUser = { id: 'user-franky-111', email: 'franky@sabory.food' };
+      state.shoppingList = [
+        { id: 'shop-personal-1', name: 'Manzanas', amount: 4, unit: 'ud', aisle: 'produce', isChecked: false }
+      ];
+
+      // UPDATE desde el otro dispositivo (móvil tacha las manzanas)
+      appInstance.handleHouseholdRealtimeEvent({
+        table: 'shopping_items',
+        eventType: 'UPDATE',
+        new: {
+          id: 'shop-personal-1',
+          name: 'Manzanas',
+          amount: 4,
+          unit: 'ud',
+          aisle: 'produce',
+          is_checked: true,
+          updated_at: new Date().toISOString()
+        }
+      });
+
+      expect(state.shoppingList[0].isChecked).toBe(true);
+    });
+
     it('11. US-81: broadcastRealtimeChange y suscripciones Broadcast WebSocket sincronizan compras instantáneamente', () => {
       appInstance.supabaseClient = {
         channel: vi.fn()

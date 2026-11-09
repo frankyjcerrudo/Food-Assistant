@@ -1478,7 +1478,9 @@ function mergeOrAddShoppingItem(shoppingList, newItem) {
     const origins = existing.recipeBreakdown.map(b => b.recipe).filter(Boolean);
     const uniqueOrigins = Array.from(new Set(origins));
     existing.recipeOrigin = uniqueOrigins.join(', ');
-    existing.updatedAt = nowIso;
+    existing.updatedAt = (newItem.updatedAt && new Date(newItem.updatedAt).getTime() > new Date(existing.updatedAt || 0).getTime())
+      ? newItem.updatedAt
+      : (existing.updatedAt || nowIso);
     return existing;
   }
 
@@ -4641,7 +4643,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.57';
+  window.APP_VERSION = 'v1.58';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4685,7 +4687,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.57';
+    this.appVersion = window.APP_VERSION || 'v1.58';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -6219,8 +6221,8 @@ class FoodAssistantApp {
           if (localIdx >= 0) {
             const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
             const localDate = new Date(local.updatedAt || 0).getTime();
-            if (remoteDate >= localDate) {
-              state.shoppingList[localIdx] = { ...local, ...remoteItem };
+            if (remoteDate >= localDate || remoteRow.is_checked !== local.isChecked) {
+              state.shoppingList[localIdx] = { ...local, ...remoteItem, isChecked: !!remoteRow.is_checked };
               stateChanged = true;
             }
           } else {
@@ -17167,6 +17169,9 @@ REGLAS CRÍTICAS:
 
   broadcastRealtimeChange(event, payload) {
     if (!this.supabaseClient) return;
+    if (!this.householdRealtimeChannel && !this.userRealtimeChannel && typeof this.initHouseholdRealtimeSubscription === 'function') {
+      this.initHouseholdRealtimeSubscription();
+    }
     const body = {
       ...payload,
       clientId: this.clientId,
@@ -17282,9 +17287,9 @@ REGLAS CRÍTICAS:
   }
 
   handleHouseholdRealtimeEvent(payload) {
-    if (!state.household?.id) return;
+    if (!state.household?.id && !state.cloudUser?.id) return;
 
-    // US-81: Sincronización instantánea de compras en Modo Familia vía Realtime WebSocket
+    // US-81: Sincronización instantánea de compras en Modo Familia / multi-dispositivo vía Realtime WebSocket
     if (payload && payload.table === 'shopping_items' && Array.isArray(state.shoppingList)) {
       try {
         const eventType = payload.eventType;
@@ -17295,7 +17300,7 @@ REGLAS CRÍTICAS:
             const local = state.shoppingList[localIdx];
             const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
             const localDate = new Date(local.updatedAt || 0).getTime();
-            if (remoteDate >= localDate) {
+            if (remoteDate >= localDate || remoteRow.is_checked !== local.isChecked) {
               local.isChecked = !!remoteRow.is_checked;
               local.updatedAt = remoteRow.updated_at;
               if (remoteRow.name) local.name = remoteRow.name;
