@@ -1873,9 +1873,61 @@ textarea {
 }
 
 #shopping-aisles-container,
+#shopping-completed-container,
 #planner-days-container,
 #recipes-cards-grid {
   padding-bottom: 48px;
+}
+
+/* US-81: Sección de artículos completados en el carrito */
+.shopping-completed-card {
+  margin-top: 20px;
+  background-color: var(--m3-surface);
+  border: var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2);
+  box-shadow: var(--elevation-1);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.shopping-completed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: var(--border-subtle);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.shopping-completed-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--m3-primary);
+  letter-spacing: 0.3px;
+}
+
+.shopping-completed-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--m3-on-surface-variant);
+}
+
+.shopping-completed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.shopping-all-done-card {
+  text-align: center;
+  padding: 32px 16px;
+  margin-bottom: 16px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Modals (Native <dialog> Top-Layer + Material 3 + Emil Kowalski Motion - US-18 / US-23 / US-55) */

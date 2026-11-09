@@ -137,3 +137,102 @@ describe('US-13: Modal de Previsualización y Selección de Ingredientes', () =>
     expect(item.amount).toBe(300);
   });
 });
+
+describe('US-81: Sección de Completados y Lista de Compra Compacta', () => {
+  let appInstance;
+
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = `
+      <section id="view-shopping">
+        <span id="shopping-summary-text">0 artículos pendientes</span>
+        <button id="btn-shopping-view-aisle"></button>
+        <button id="btn-shopping-view-recipe"></button>
+        <button id="btn-clear-completed" data-action="clearCompletedGroceries"></button>
+        <div id="shopping-aisles-container"></div>
+        <div id="shopping-completed-container"></div>
+      </section>
+    `;
+    window.state.shoppingList = [];
+    window.state.recipes = [];
+    window.state.deletedRecords = { shoppingItems: [] };
+    appInstance = new window.FoodAssistantApp();
+  });
+
+  it('separa los artículos pendientes de los completados en ambas secciones', () => {
+    window.state.shoppingList = [
+      { id: 'item-1', name: 'Manzanas', amount: 1, unit: 'kg', aisle: 'produce', isChecked: false },
+      { id: 'item-2', name: 'Leche entera', amount: 1, unit: 'L', aisle: 'dairy', isChecked: true }
+    ];
+
+    appInstance.renderShoppingList();
+
+    const aislesContainer = document.getElementById('shopping-aisles-container');
+    const completedContainer = document.getElementById('shopping-completed-container');
+
+    // En la lista activa (pasillos) solo aparece Manzanas (produce)
+    expect(aislesContainer.textContent).toContain('Manzanas');
+    expect(aislesContainer.textContent).not.toContain('Leche entera');
+
+    // En la sección de completados aparece Leche entera
+    expect(completedContainer.textContent).toContain('Leche entera');
+    expect(completedContainer.textContent).toContain('Completados');
+    expect(completedContainer.textContent).toContain('(1)');
+    expect(document.getElementById('shopping-summary-text').textContent).toContain('1 artículo pendiente');
+  });
+
+  it('muestra "¡Todo en el carrito!" en la lista activa cuando todos los artículos están completados', () => {
+    window.state.shoppingList = [
+      { id: 'item-1', name: 'Plátanos', amount: 4, unit: 'ud', aisle: 'produce', isChecked: true },
+      { id: 'item-2', name: 'Yogur', amount: 2, unit: 'ud', aisle: 'dairy', isChecked: true }
+    ];
+
+    appInstance.renderShoppingList();
+
+    const aislesContainer = document.getElementById('shopping-aisles-container');
+    const completedContainer = document.getElementById('shopping-completed-container');
+
+    expect(aislesContainer.textContent).toContain('¡Todo en el carrito!');
+    expect(completedContainer.textContent).toContain('Completados');
+    expect(completedContainer.textContent).toContain('(2)');
+    expect(completedContainer.textContent).toContain('Plátanos');
+    expect(completedContainer.textContent).toContain('Yogur');
+    expect(completedContainer.querySelector('.btn-clear-completed-section')).not.toBeNull();
+  });
+
+  it('desmarcar un artículo desde completados lo devuelve a su pasillo activo', async () => {
+    window.state.shoppingList = [
+      { id: 'item-1', name: 'Huevos', amount: 6, unit: 'ud', aisle: 'dairy', isChecked: true }
+    ];
+
+    appInstance.renderShoppingList();
+    expect(document.getElementById('shopping-completed-container').textContent).toContain('Huevos');
+
+    // Desmarcar el artículo (índice 0)
+    await appInstance.toggleGroceryCheck(0);
+
+    expect(window.state.shoppingList[0].isChecked).toBe(false);
+    const aislesContainer = document.getElementById('shopping-aisles-container');
+    expect(aislesContainer.textContent).toContain('Huevos');
+    expect(document.getElementById('shopping-completed-container').innerHTML).toBe('');
+  });
+
+  it('clearCompletedGroceries elimina solo los artículos completados manteniendo los pendientes', async () => {
+    window.state.shoppingList = [
+      { id: 'item-1', name: 'Pasta', amount: 500, unit: 'g', aisle: 'pantry', isChecked: false },
+      { id: 'item-2', name: 'Tomate frito', amount: 1, unit: 'bote', aisle: 'pantry', isChecked: true },
+      { id: 'item-3', name: 'Queso rallado', amount: 100, unit: 'g', aisle: 'dairy', isChecked: true }
+    ];
+
+    const result = await appInstance.clearCompletedGroceries(true); // skipConfirm = true
+    expect(result).toBe(true);
+
+    expect(window.state.shoppingList.length).toBe(1);
+    expect(window.state.shoppingList[0].name).toBe('Pasta');
+    expect(window.state.deletedRecords.shoppingItems).toContain('item-2');
+    expect(window.state.deletedRecords.shoppingItems).toContain('item-3');
+
+    const completedContainer = document.getElementById('shopping-completed-container');
+    expect(completedContainer.innerHTML).toBe('');
+  });
+});

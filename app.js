@@ -4494,7 +4494,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.50';
+  window.APP_VERSION = 'v1.51';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4535,7 +4535,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.50';
+    this.appVersion = window.APP_VERSION || 'v1.51';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -11916,12 +11916,18 @@ class FoodAssistantApp {
           </button>
         </div>
       `;
+      const completedContainer = document.getElementById('shopping-completed-container');
+      if (completedContainer) completedContainer.innerHTML = '';
       return;
     }
+
+    let cards = [];
 
     if (isRecipeView) {
       const groupedByRecipe = {};
       state.shoppingList.forEach((item, index) => {
+        // US-81: Los artículos completados se agrupan en su propia sección inferior
+        if (item.isChecked) return;
         if (Array.isArray(item.recipeBreakdown) && item.recipeBreakdown.length > 0) {
           item.recipeBreakdown.forEach(b => {
             const recipeLabel = b.recipe ? String(b.recipe).trim() : 'Añadido manualmente';
@@ -11950,7 +11956,7 @@ class FoodAssistantApp {
         }
       });
 
-      const cards = Object.entries(groupedByRecipe).map(([recipeLabel, items]) => {
+      cards = Object.entries(groupedByRecipe).map(([recipeLabel, items]) => {
         const pendingInRecipe = items.filter(i => !i.isChecked).length;
         const isManualGroup = /manualmente|otros|asistente/i.test(recipeLabel);
         const headerIcon = isManualGroup ? 'shopping_bag' : 'menu_book';
@@ -11996,96 +12002,167 @@ class FoodAssistantApp {
         `;
         return { html, weight: 3 + items.length };
       });
-      container.innerHTML = this._distributeShoppingCards(cards, 3);
-      return;
-    }
+    } else {
+      const grouped = {};
+      state.shoppingList.forEach((item, index) => {
+        // US-81: Los artículos completados se agrupan en su propia sección inferior
+        if (item.isChecked) return;
+        const aisle = item.aisle || 'other';
+        if (!grouped[aisle]) grouped[aisle] = [];
+        grouped[aisle].push({ ...item, originalIndex: index });
+      });
 
-    const grouped = {};
-    state.shoppingList.forEach((item, index) => {
-      const aisle = item.aisle || 'other';
-      if (!grouped[aisle]) grouped[aisle] = [];
-      grouped[aisle].push({ ...item, originalIndex: index });
-    });
+      cards = Object.entries(grouped).map(([aisleKey, items]) => {
+        const meta = AISLE_METADATA[aisleKey] || AISLE_METADATA.other;
+        const pendingInAisle = items.filter(i => !i.isChecked).length;
 
-    const cards = Object.entries(grouped).map(([aisleKey, items]) => {
-      const meta = AISLE_METADATA[aisleKey] || AISLE_METADATA.other;
-      const pendingInAisle = items.filter(i => !i.isChecked).length;
-
-      const html = `
-        <div class="aisle-card">
-          <div class="aisle-header">
-            <div class="u-flex-row-center-gap-8">
-              <span class="material-symbols-outlined icon-sm">${meta.icon}</span>
-              <span>${meta.label}</span>
+        const html = `
+          <div class="aisle-card">
+            <div class="aisle-header">
+              <div class="u-flex-row-center-gap-8">
+                <span class="material-symbols-outlined icon-sm">${meta.icon}</span>
+                <span>${meta.label}</span>
+              </div>
+              <span class="aisle-pending-count">${pendingInAisle} pendientes</span>
             </div>
-            <span class="aisle-pending-count">${pendingInAisle} pendientes</span>
-          </div>
 
-          <div>
-            ${items.map(item => {
-        const displayAmt = formatDisplayAmount(item.amount, item.unit, item.displayAmount);
-        let subtextHtml = '';
-        let breakdown = Array.isArray(item.recipeBreakdown) && item.recipeBreakdown.length > 0 ? item.recipeBreakdown : null;
+            <div>
+              ${items.map(item => {
+          const displayAmt = formatDisplayAmount(item.amount, item.unit, item.displayAmount);
+          let subtextHtml = '';
+          let breakdown = Array.isArray(item.recipeBreakdown) && item.recipeBreakdown.length > 0 ? item.recipeBreakdown : null;
 
-        // Reconstruir desglose si no está en memoria pero recipeOrigin contiene múltiples recetas separadas por coma
-        if (!breakdown && item.recipeOrigin && item.recipeOrigin.includes(',')) {
-          const parts = parseRecipeOrigins(item.recipeOrigin, state.recipes || []);
-          if (parts.length > 1) {
-            breakdown = parts.map(p => ({
-              recipe: p,
-              name: item.name,
-              amount: null,
-              unit: item.unit || ''
-            }));
+          // Reconstruir desglose si no está en memoria pero recipeOrigin contiene múltiples recetas separadas por coma
+          if (!breakdown && item.recipeOrigin && item.recipeOrigin.includes(',')) {
+            const parts = parseRecipeOrigins(item.recipeOrigin, state.recipes || []);
+            if (parts.length > 1) {
+              breakdown = parts.map(p => ({
+                recipe: p,
+                name: item.name,
+                amount: null,
+                unit: item.unit || ''
+              }));
+            }
+          } else if (breakdown && breakdown.length === 1 && breakdown[0].recipe && breakdown[0].recipe.includes(',')) {
+            const parts = parseRecipeOrigins(breakdown[0].recipe, state.recipes || []);
+            if (parts.length > 1) {
+              breakdown = parts.map(p => ({
+                recipe: p,
+                name: breakdown[0].name || item.name,
+                amount: null,
+                unit: item.unit || ''
+              }));
+            }
           }
-        } else if (breakdown && breakdown.length === 1 && breakdown[0].recipe && breakdown[0].recipe.includes(',')) {
-          const parts = parseRecipeOrigins(breakdown[0].recipe, state.recipes || []);
-          if (parts.length > 1) {
-            breakdown = parts.map(p => ({
-              recipe: p,
-              name: breakdown[0].name || item.name,
-              amount: null,
-              unit: item.unit || ''
-            }));
-          }
-        }
 
-        if (breakdown && breakdown.length > 1) {
-          subtextHtml = `
-                  <div class="grocery-breakdown-list">
-                    ${breakdown.map(b => {
-            const qtyStr = (b.amount !== null && b.amount !== undefined) ? `${b.amount} ${b.unit || ''}`.trim() : '';
-            const nameDiff = b.name && b.name.toLowerCase().trim() !== item.name.toLowerCase().trim() ? ` (${escapeHtml(b.name)})` : '';
-            return `
-                        <div class="grocery-breakdown-row" title="${escapeHtml(b.recipe)}">
-                          <span class="grocery-breakdown-dot">•</span>
-                          <div class="grocery-breakdown-body">
-                            <span class="grocery-breakdown-recipe">${escapeHtml(b.recipe)}${qtyStr ? ':' : ''}</span>
-                            ${qtyStr ? `<span class="grocery-breakdown-qty">${escapeHtml(qtyStr)}${nameDiff}</span>` : (nameDiff ? `<span class="grocery-breakdown-qty">${nameDiff}</span>` : '')}
+          if (breakdown && breakdown.length > 1) {
+            subtextHtml = `
+                    <div class="grocery-breakdown-list">
+                      ${breakdown.map(b => {
+              const qtyStr = (b.amount !== null && b.amount !== undefined) ? `${b.amount} ${b.unit || ''}`.trim() : '';
+              const nameDiff = b.name && b.name.toLowerCase().trim() !== item.name.toLowerCase().trim() ? ` (${escapeHtml(b.name)})` : '';
+              return `
+                          <div class="grocery-breakdown-row" title="${escapeHtml(b.recipe)}">
+                            <span class="grocery-breakdown-dot">•</span>
+                            <div class="grocery-breakdown-body">
+                              <span class="grocery-breakdown-recipe">${escapeHtml(b.recipe)}${qtyStr ? ':' : ''}</span>
+                              ${qtyStr ? `<span class="grocery-breakdown-qty">${escapeHtml(qtyStr)}${nameDiff}</span>` : (nameDiff ? `<span class="grocery-breakdown-qty">${nameDiff}</span>` : '')}
+                            </div>
                           </div>
-                        </div>
-                      `;
-          }).join('')}
+                        `;
+            }).join('')}
+                    </div>
+                  `;
+          } else if (breakdown && breakdown.length === 1) {
+            const b = breakdown[0];
+            const nameDiff = b.name && b.name.toLowerCase().trim() !== item.name.toLowerCase().trim() ? ` (como "${escapeHtml(b.name)}")` : '';
+            subtextHtml = `<div class="grocery-origin-sub">Para: ${escapeHtml(b.recipe)}${nameDiff}</div>`;
+          } else if (item.recipeOrigin) {
+            subtextHtml = `<div class="grocery-origin-sub">Para: ${escapeHtml(item.recipeOrigin)}</div>`;
+          }
+
+          return `
+                  <div class="grocery-item-row ${item.isChecked ? 'checked' : ''}">
+                    <div class="grocery-left" onclick="app.toggleGroceryCheck(${item.originalIndex})">
+                      <input type="checkbox" class="grocery-checkbox" ${item.isChecked ? 'checked' : ''} onclick="event.stopPropagation(); app.toggleGroceryCheck(${item.originalIndex})">
+                      <div class="grocery-item-icon-badge" title="${escapeHtml(item.name)}">
+                        <span class="material-symbols-outlined icon-sm">${getIngredientIcon(item.name, item.aisle)}</span>
+                      </div>
+                      <div class="u-flex-1-truncate">
+                        <div class="grocery-name">${escapeHtml(item.name)}</div>
+                        ${subtextHtml}
+                      </div>
+                    </div>
+                    <div class="u-flex-center-gap-8-shrink">
+                      ${displayAmt ? `<span class="grocery-amount">${escapeHtml(displayAmt)}</span>` : ''}
+                      <button type="button" class="btn btn-ghost btn-sm btn-grocery-remove btn-remove-circle" onclick="app.deleteGroceryItem(${item.originalIndex})" title="Eliminar artículo">
+                        <span class="material-symbols-outlined icon-sm">close</span>
+                      </button>
+                    </div>
                   </div>
                 `;
-        } else if (breakdown && breakdown.length === 1) {
-          const b = breakdown[0];
-          const nameDiff = b.name && b.name.toLowerCase().trim() !== item.name.toLowerCase().trim() ? ` (como "${escapeHtml(b.name)}")` : '';
-          subtextHtml = `<div class="grocery-origin-sub">Para: ${escapeHtml(b.recipe)}${nameDiff}</div>`;
-        } else if (item.recipeOrigin) {
-          subtextHtml = `<div class="grocery-origin-sub">Para: ${escapeHtml(item.recipeOrigin)}</div>`;
-        }
+        }).join('')}
+            </div>
+          </div>
+        `;
+        return { html, weight: 3 + items.length };
+      });
+    }
 
+    if (cards.length > 0) {
+      container.innerHTML = this._distributeShoppingCards(cards, 3);
+    } else {
+      // Todos los artículos están en el carrito / completados
+      container.innerHTML = `
+        <div class="card shopping-empty-card shopping-all-done-card">
+          <span class="material-symbols-outlined shopping-empty-icon u-text-success">task_alt</span>
+          <h3 class="shopping-empty-title">¡Todo en el carrito!</h3>
+          <p class="shopping-empty-desc">
+            Has completado todos los artículos de la lista. Puedes revisarlos abajo o limpiarlos cuando termines la compra.
+          </p>
+        </div>
+      `;
+    }
+
+    // US-81: Renderizado de sección de artículos completados
+    const completedItems = [];
+    state.shoppingList.forEach((item, index) => {
+      if (item.isChecked) {
+        completedItems.push({ ...item, originalIndex: index });
+      }
+    });
+
+    const completedContainer = document.getElementById('shopping-completed-container');
+    if (completedItems.length > 0) {
+      const completedHtml = `
+        <div class="card shopping-completed-card" id="shopping-completed-section">
+          <div class="shopping-completed-header">
+            <div class="u-flex-row-center-gap-8">
+              <span class="material-symbols-outlined icon-sm u-text-success">check_circle</span>
+              <span class="shopping-completed-title">Completados</span>
+              <span class="shopping-completed-count">(${completedItems.length})</span>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm btn-clear-completed-section" data-action="clearCompletedGroceries" title="Eliminar artículos completados">
+              <span class="material-symbols-outlined icon-sm">delete_sweep</span>
+              <span>Limpiar completados</span>
+            </button>
+          </div>
+          <div class="shopping-completed-list">
+            ${completedItems.map(item => {
+        const aisleMeta = AISLE_METADATA[item.aisle || 'other'] || AISLE_METADATA.other;
+        const displayName = item.name;
+        const displayAmt = formatDisplayAmount(item.amount, item.unit, item.displayAmount);
+        const originInfo = item.recipeOrigin ? `Para: ${escapeHtml(item.recipeOrigin)}` : aisleMeta.label;
         return `
-                <div class="grocery-item-row ${item.isChecked ? 'checked' : ''}">
+                <div class="grocery-item-row checked">
                   <div class="grocery-left" onclick="app.toggleGroceryCheck(${item.originalIndex})">
-                    <input type="checkbox" class="grocery-checkbox" ${item.isChecked ? 'checked' : ''} onclick="event.stopPropagation(); app.toggleGroceryCheck(${item.originalIndex})">
-                    <div class="grocery-item-icon-badge" title="${escapeHtml(item.name)}">
-                      <span class="material-symbols-outlined icon-sm">${getIngredientIcon(item.name, item.aisle)}</span>
+                    <input type="checkbox" class="grocery-checkbox" checked onclick="event.stopPropagation(); app.toggleGroceryCheck(${item.originalIndex})">
+                    <div class="grocery-item-icon-badge" title="${escapeHtml(displayName)}">
+                      <span class="material-symbols-outlined icon-sm">${getIngredientIcon(displayName, item.aisle)}</span>
                     </div>
                     <div class="u-flex-1-truncate">
-                      <div class="grocery-name">${escapeHtml(item.name)}</div>
-                      ${subtextHtml}
+                      <div class="grocery-name">${escapeHtml(displayName)}</div>
+                      <div class="grocery-origin-sub">${originInfo}</div>
                     </div>
                   </div>
                   <div class="u-flex-center-gap-8-shrink">
@@ -12100,19 +12177,59 @@ class FoodAssistantApp {
           </div>
         </div>
       `;
-      return { html, weight: 3 + items.length };
-    });
-
-    container.innerHTML = this._distributeShoppingCards(cards, 3);
+      if (completedContainer) {
+        completedContainer.innerHTML = completedHtml;
+      } else {
+        container.insertAdjacentHTML('beforeend', completedHtml);
+      }
+    } else {
+      if (completedContainer) {
+        completedContainer.innerHTML = '';
+      }
+    }
   }
 
-  toggleGroceryCheck(index) {
-    if (state.shoppingList[index]) {
-      state.shoppingList[index].isChecked = !state.shoppingList[index].isChecked;
-      state.shoppingList[index].updatedAt = new Date().toISOString();
+  async toggleGroceryCheck(index) {
+    if (state.shoppingList && state.shoppingList[index]) {
+      const item = state.shoppingList[index];
+      item.isChecked = !item.isChecked;
+      item.updatedAt = new Date().toISOString();
       state.save('fa_shopping', state.shoppingList);
-      this.scheduleSyncWithCloud();
       this.render();
+
+      // US-81: Sincronización instantánea en la nube / Modo Familia sin retardo
+      if (this.supabaseClient && state.cloudUser?.id) {
+        await this.syncShoppingItemInstant(item);
+      } else {
+        this.scheduleSyncWithCloud();
+      }
+    }
+  }
+
+  async syncShoppingItemInstant(item) {
+    if (!this.supabaseClient || !state.cloudUser?.id || !item) return;
+    try {
+      const activeHouseholdId = state.household?.id || null;
+      if (!item.id) item.id = generateId('shop-');
+      const rowPayload = {
+        id: item.id,
+        user_id: (activeHouseholdId && item.ownerUserId) ? item.ownerUserId : state.cloudUser.id,
+        name: item.name,
+        amount: item.amount !== null && !isNaN(item.amount) ? Number(item.amount) : null,
+        unit: item.unit || '',
+        aisle: item.aisle || 'other',
+        is_checked: !!item.isChecked,
+        recipe_origin: item.recipeOrigin || null,
+        recipe_breakdown: Array.isArray(item.recipeBreakdown) && item.recipeBreakdown.length > 0 ? item.recipeBreakdown : null,
+        updated_at: item.updatedAt || new Date().toISOString()
+      };
+      if (activeHouseholdId) {
+        rowPayload.household_id = activeHouseholdId;
+      }
+      await this.upsertWithSchemaFallback('shopping_items', [rowPayload]);
+    } catch (e) {
+      console.warn('[Sync] Fallo en syncShoppingItemInstant, delegando en scheduleSyncWithCloud:', e);
+      this.scheduleSyncWithCloud();
     }
   }
 
@@ -12124,6 +12241,7 @@ class FoodAssistantApp {
     state.shoppingList.splice(index, 1);
     state.save('fa_shopping', state.shoppingList);
     this.scheduleSyncWithCloud();
+    this.flushSync();
     this.render();
   }
 
@@ -12154,6 +12272,7 @@ class FoodAssistantApp {
           state.shoppingList = [];
           state.save('fa_shopping', state.shoppingList);
           this.scheduleSyncWithCloud();
+          this.flushSync();
           this.render();
           this.showToast("Lista de la compra vaciada.", 'info');
           return true;
@@ -12174,6 +12293,7 @@ class FoodAssistantApp {
           state.shoppingList = state.shoppingList.filter(i => !i.isChecked);
           state.save('fa_shopping', state.shoppingList);
           this.scheduleSyncWithCloud();
+          this.flushSync();
           this.render();
           this.showToast(`Se eliminaron ${count} artículos comprados.`, 'info');
           return true;
@@ -16695,6 +16815,93 @@ REGLAS CRÍTICAS:
 
   handleHouseholdRealtimeEvent(payload) {
     if (!state.household?.id) return;
+
+    // US-81: Sincronización instantánea de compras en Modo Familia vía Realtime WebSocket
+    if (payload && payload.table === 'shopping_items' && Array.isArray(state.shoppingList)) {
+      try {
+        const eventType = payload.eventType;
+        if (eventType === 'UPDATE' && payload.new) {
+          const remoteRow = payload.new;
+          const localIdx = state.shoppingList.findIndex(i => i.id === remoteRow.id);
+          if (localIdx >= 0) {
+            const local = state.shoppingList[localIdx];
+            const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
+            const localDate = new Date(local.updatedAt || 0).getTime();
+            if (remoteDate >= localDate) {
+              local.isChecked = !!remoteRow.is_checked;
+              local.updatedAt = remoteRow.updated_at;
+              if (remoteRow.name) local.name = remoteRow.name;
+              if (remoteRow.amount !== undefined) local.amount = (remoteRow.amount !== null && !isNaN(remoteRow.amount)) ? Number(remoteRow.amount) : null;
+              if (remoteRow.unit !== undefined) local.unit = remoteRow.unit || '';
+              if (remoteRow.aisle) local.aisle = remoteRow.aisle;
+              state.save('fa_shopping', state.shoppingList);
+              this.renderShoppingList();
+            }
+          } else {
+            let breakdown = null;
+            if (Array.isArray(remoteRow.recipe_breakdown)) {
+              breakdown = remoteRow.recipe_breakdown;
+            } else if (typeof remoteRow.recipe_breakdown === 'string') {
+              try { breakdown = JSON.parse(remoteRow.recipe_breakdown); } catch (e) { }
+            }
+            const remoteItem = {
+              id: remoteRow.id,
+              name: remoteRow.name,
+              amount: remoteRow.amount !== null && !isNaN(remoteRow.amount) ? Number(remoteRow.amount) : null,
+              unit: remoteRow.unit || '',
+              aisle: remoteRow.aisle || 'other',
+              isChecked: !!remoteRow.is_checked,
+              recipeOrigin: remoteRow.recipe_origin || '',
+              recipeBreakdown: breakdown,
+              updatedAt: remoteRow.updated_at
+            };
+            if (remoteRow.household_id) remoteItem.householdId = remoteRow.household_id;
+            if (remoteRow.user_id) remoteItem.ownerUserId = remoteRow.user_id;
+            state.shoppingList.push(remoteItem);
+            state.save('fa_shopping', state.shoppingList);
+            this.renderShoppingList();
+          }
+        } else if (eventType === 'INSERT' && payload.new) {
+          const remoteRow = payload.new;
+          const localIdx = state.shoppingList.findIndex(i => i.id === remoteRow.id);
+          if (localIdx < 0) {
+            let breakdown = null;
+            if (Array.isArray(remoteRow.recipe_breakdown)) {
+              breakdown = remoteRow.recipe_breakdown;
+            } else if (typeof remoteRow.recipe_breakdown === 'string') {
+              try { breakdown = JSON.parse(remoteRow.recipe_breakdown); } catch (e) { }
+            }
+            const remoteItem = {
+              id: remoteRow.id,
+              name: remoteRow.name,
+              amount: remoteRow.amount !== null && !isNaN(remoteRow.amount) ? Number(remoteRow.amount) : null,
+              unit: remoteRow.unit || '',
+              aisle: remoteRow.aisle || 'other',
+              isChecked: !!remoteRow.is_checked,
+              recipeOrigin: remoteRow.recipe_origin || '',
+              recipeBreakdown: breakdown,
+              updatedAt: remoteRow.updated_at
+            };
+            if (remoteRow.household_id) remoteItem.householdId = remoteRow.household_id;
+            if (remoteRow.user_id) remoteItem.ownerUserId = remoteRow.user_id;
+            state.shoppingList.push(remoteItem);
+            state.save('fa_shopping', state.shoppingList);
+            this.renderShoppingList();
+          }
+        } else if (eventType === 'DELETE' && payload.old?.id) {
+          const delId = payload.old.id;
+          const prevLen = state.shoppingList.length;
+          state.shoppingList = state.shoppingList.filter(i => i.id !== delId);
+          if (state.shoppingList.length !== prevLen) {
+            state.save('fa_shopping', state.shoppingList);
+            this.renderShoppingList();
+          }
+        }
+      } catch (err) {
+        console.warn('[Household Realtime] Error en procesamiento rápido de shopping_items:', err);
+      }
+    }
+
     if (this._householdRealtimeDebounce) {
       clearTimeout(this._householdRealtimeDebounce);
     }

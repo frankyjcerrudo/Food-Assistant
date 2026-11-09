@@ -555,5 +555,98 @@ describe('US-77: Modo Familia / Espacio Colaborativo del Hogar (Family Mode)', (
       state.settings.geminiApiKey = 'AIzaSyPersonalOverride999';
       expect(appInstance.getEffectiveGeminiApiKey()).toBe('AIzaSyPersonalOverride999');
     });
+
+    it('9. US-81: toggleGroceryCheck envía inmediatamente el upsert a Supabase sin esperar debounce', async () => {
+      appInstance.supabaseClient = {
+        from: vi.fn()
+      };
+      state.saveHousehold({
+        id: 'hh-family-999',
+        name: 'Casa Sabory',
+        inviteCode: 'SAB-9K2M',
+        ownerId: 'user-franky-111',
+        role: 'owner',
+        members: [{ userId: 'user-franky-111', name: 'Franky', role: 'owner' }]
+      });
+
+      state.shoppingList = [
+        { id: 'shop-test-1', name: 'Leche entera', amount: 1, unit: 'L', aisle: 'dairy', isChecked: false, updatedAt: '2026-11-09T08:00:00.000Z' }
+      ];
+
+      const upsertSpy = vi.fn().mockResolvedValue({ success: true });
+      appInstance.upsertWithSchemaFallback = upsertSpy;
+
+      await appInstance.toggleGroceryCheck(0);
+
+      expect(state.shoppingList[0].isChecked).toBe(true);
+      expect(upsertSpy).toHaveBeenCalledTimes(1);
+      const [table, payload] = upsertSpy.mock.calls[0];
+      expect(table).toBe('shopping_items');
+      expect(payload[0].id).toBe('shop-test-1');
+      expect(payload[0].is_checked).toBe(true);
+      expect(payload[0].household_id).toBe('hh-family-999');
+    });
+
+    it('10. US-81: handleHouseholdRealtimeEvent procesa instantáneamente eventos UPDATE, INSERT y DELETE de shopping_items', () => {
+      state.saveHousehold({
+        id: 'hh-family-999',
+        name: 'Casa Sabory',
+        inviteCode: 'SAB-9K2M',
+        ownerId: 'user-franky-111',
+        role: 'owner'
+      });
+
+      state.shoppingList = [
+        { id: 'shop-realtime-1', name: 'Huevos', amount: 6, unit: 'ud', aisle: 'dairy', isChecked: false, updatedAt: '2026-11-09T08:00:00.000Z' }
+      ];
+
+      const renderSpy = vi.spyOn(appInstance, 'renderShoppingList');
+
+      // 1. UPDATE en tiempo real: otro miembro tacha los huevos en el supermercado
+      appInstance.handleHouseholdRealtimeEvent({
+        table: 'shopping_items',
+        eventType: 'UPDATE',
+        new: {
+          id: 'shop-realtime-1',
+          name: 'Huevos',
+          amount: 6,
+          unit: 'ud',
+          aisle: 'dairy',
+          is_checked: true,
+          updated_at: '2026-11-09T08:05:00.000Z'
+        }
+      });
+
+      expect(state.shoppingList[0].isChecked).toBe(true);
+      expect(renderSpy).toHaveBeenCalled();
+
+      // 2. INSERT en tiempo real: otro miembro añade café a la lista
+      appInstance.handleHouseholdRealtimeEvent({
+        table: 'shopping_items',
+        eventType: 'INSERT',
+        new: {
+          id: 'shop-realtime-2',
+          name: 'Café molido',
+          amount: 250,
+          unit: 'g',
+          aisle: 'pantry',
+          is_checked: false,
+          updated_at: '2026-11-09T08:06:00.000Z'
+        }
+      });
+
+      expect(state.shoppingList.length).toBe(2);
+      expect(state.shoppingList.find(i => i.id === 'shop-realtime-2')?.name).toBe('Café molido');
+
+      // 3. DELETE en tiempo real: otro miembro borra los huevos
+      appInstance.handleHouseholdRealtimeEvent({
+        table: 'shopping_items',
+        eventType: 'DELETE',
+        old: { id: 'shop-realtime-1' }
+      });
+
+      expect(state.shoppingList.length).toBe(1);
+      expect(state.shoppingList.find(i => i.id === 'shop-realtime-1')).toBeUndefined();
+    });
   });
 });
