@@ -4723,7 +4723,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.68';
+  window.APP_VERSION = 'v1.69';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -9238,15 +9238,18 @@ class FoodAssistantApp {
     }
     if (subtitle) {
       if (this.selectedRecipeTags.size > 0 || term || this.fridgeIngredients.length > 0 || this.recipeAuditFilter) {
+        const isEn = window.I18n && window.I18n.getLanguage() === 'en';
         const filtersDesc = [];
-        if (this.recipeAuditFilter === 'no-ingredients') filtersDesc.push('Sin ingredientes');
-        if (this.recipeAuditFilter === 'no-instructions') filtersDesc.push('Sin pasos');
-        if (this.fridgeIngredients.length > 0) filtersDesc.push(`Nevera: ${this.fridgeIngredients.join(', ')}`);
-        if (this.selectedRecipeTags.size > 0) filtersDesc.push(`etiquetas: ${Array.from(this.selectedRecipeTags).join(', ')}`);
+        if (this.recipeAuditFilter === 'no-ingredients') filtersDesc.push(isEn ? 'No ingredients' : 'Sin ingredientes');
+        if (this.recipeAuditFilter === 'no-instructions') filtersDesc.push(isEn ? 'No instructions' : 'Sin pasos');
+        if (this.fridgeIngredients.length > 0) filtersDesc.push(`${isEn ? 'Fridge' : 'Nevera'}: ${this.fridgeIngredients.join(', ')}`);
+        if (this.selectedRecipeTags.size > 0) filtersDesc.push(`${isEn ? 'tags' : 'etiquetas'}: ${Array.from(this.selectedRecipeTags).map(t => window.I18n ? window.I18n.getTagLabel(t) : t).join(', ')}`);
         if (term) filtersDesc.push(`"${term}"`);
-        subtitle.textContent = `${filtered.length} receta${filtered.length === 1 ? '' : 's'} (${filtersDesc.join(' + ')}).`;
+        subtitle.textContent = isEn
+          ? `${filtered.length} ${filtered.length === 1 ? 'recipe' : 'recipes'} (${filtersDesc.join(' + ')}).`
+          : `${filtered.length} receta${filtered.length === 1 ? '' : 's'} (${filtersDesc.join(' + ')}).`;
       } else {
-        subtitle.textContent = 'Tu recetario personal.';
+        subtitle.textContent = window.I18n ? window.I18n.t('recipes.subtitle') : 'Tu recetario personal.';
       }
     }
   }
@@ -10917,7 +10920,13 @@ class FoodAssistantApp {
     const labelEl = document.getElementById('btn-toggle-all-planner-days-label');
     if (!labelEl || !Array.isArray(weekDays)) return;
     const allExpanded = this.plannerExpandedDays instanceof Set && weekDays.every(w => this.plannerExpandedDays.has(w.dateKey));
-    labelEl.textContent = allExpanded ? 'Plegar semana' : 'Expandir semana';
+    const key = allExpanded ? 'planner.collapseWeek' : 'planner.expandWeek';
+    labelEl.setAttribute('data-i18n', key);
+    if (window.I18n) {
+      labelEl.textContent = window.I18n.t(key);
+    } else {
+      labelEl.textContent = allExpanded ? 'Plegar semana' : 'Expandir semana';
+    }
   }
 
   buildDayCompactSummaryHtml(dayData) {
@@ -11017,7 +11026,7 @@ class FoodAssistantApp {
               <button type="button" class="btn btn-ghost btn-sm btn-add-custom-slot-header" onclick="event.stopPropagation(); app.openAddCustomSlotModal('${dateStr}')" title="${addMealTitle}">
                 <span class="material-symbols-outlined icon-sm">add</span> ${addMealText}
               </button>
-              <button type="button" class="btn-icon day-accordion-toggle" aria-label="Expandir o plegar día" title="Expandir o plegar día">
+              <button type="button" class="btn-icon day-accordion-toggle" aria-label="${isEn ? 'Expand or collapse day' : 'Expandir o plegar día'}" title="${isEn ? 'Expand or collapse day' : 'Expandir o plegar día'}">
                 <span class="material-symbols-outlined icon-sm">expand_more</span>
               </button>
             </div>
@@ -12610,7 +12619,7 @@ class FoodAssistantApp {
         if (item.isChecked) return;
         if (Array.isArray(item.recipeBreakdown) && item.recipeBreakdown.length > 0) {
           item.recipeBreakdown.forEach(b => {
-            const recipeLabel = b.recipe ? String(b.recipe).trim() : 'Añadido manualmente';
+            const recipeLabel = b.recipe ? String(b.recipe).trim() : (isEn ? 'Added manually' : 'Añadido manualmente');
             if (!groupedByRecipe[recipeLabel]) groupedByRecipe[recipeLabel] = [];
             groupedByRecipe[recipeLabel].push({
               ...item,
@@ -19025,6 +19034,9 @@ const AI_TOOLS_DECLARATIONS = [
 let app;
 function bootstrapApp() {
   if (typeof window !== 'undefined' && !window.app) {
+    if (window.I18n) {
+      window.I18n.applyTranslations();
+    }
     app = new FoodAssistantApp();
     window.app = app;
     if (Array.isArray(state.shoppingList) && state.shoppingList.length > 0) {

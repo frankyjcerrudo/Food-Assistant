@@ -200,6 +200,10 @@
         nextWeek: 'Siguiente',
         expandWeek: 'Expandir semana',
         collapseWeek: 'Plegar semana',
+        prevWeekTooltip: 'Semana anterior',
+        currentWeekTooltip: 'Ir a la semana actual',
+        nextWeekTooltip: 'Semana siguiente',
+        toggleAllDaysTooltip: 'Expandir o plegar todos los días de la semana',
         loadingWeek: 'Cargando semana...',
         autoPlanBtn: 'Autoplanificar',
         clearWeekBtn: 'Limpiar semana',
@@ -827,6 +831,10 @@
         nextWeek: 'Next',
         expandWeek: 'Expand week',
         collapseWeek: 'Collapse week',
+        prevWeekTooltip: 'Previous week',
+        currentWeekTooltip: 'Go to current week',
+        nextWeekTooltip: 'Next week',
+        toggleAllDaysTooltip: 'Expand or collapse all days of the week',
         loadingWeek: 'Loading week...',
         autoPlanBtn: 'Auto-plan',
         clearWeekBtn: 'Clear week',
@@ -1534,5 +1542,12 @@
   instance.MESSAGES = MESSAGES;
   instance.SUPPORTED_LANGUAGES = SUPPORTED_LANGUAGES;
   instance.detectSystemLanguage = detectSystemLanguage;
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => instance.applyTranslations(), { once: true });
+    } else {
+      instance.applyTranslations();
+    }
+  }
   return instance;
 });

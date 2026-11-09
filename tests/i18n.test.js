@@ -606,4 +606,45 @@ describe('US-12: Módulo Core de Internacionalización (i18n.js)', () => {
     const emptySlotHtmlEs = appInstance.renderSlotCard('2026-11-09', 'breakfast', 'Desayuno', 'wb_twilight', null);
     expect(emptySlotHtmlEs).toContain('Asignar plato');
   });
+
+  it('actualiza botón Expandir/Plegar semana respetando el idioma sin flash de español (v1.69)', () => {
+    const appPath = path.resolve(process.cwd(), 'app.js');
+    const appCode = fs.readFileSync(appPath, 'utf-8');
+    new Function(appCode)();
+
+    const appInstance = new window.FoodAssistantApp();
+    const btnLabel = document.getElementById('btn-toggle-all-planner-days-label') || (() => {
+      const el = document.createElement('span');
+      el.id = 'btn-toggle-all-planner-days-label';
+      document.body.appendChild(el);
+      return el;
+    })();
+
+    const mockWeek = [
+      { dateKey: '2026-11-09', date: new Date('2026-11-09') },
+      { dateKey: '2026-11-10', date: new Date('2026-11-10') }
+    ];
+
+    // 1. In English
+    I18n.setPreference('en');
+    appInstance.plannerExpandedDays = new Set(['2026-11-09']); // Not all expanded
+    appInstance.updateToggleAllPlannerButtonLabel(mockWeek);
+    expect(btnLabel.textContent).toBe('Expand week');
+    expect(btnLabel.getAttribute('data-i18n')).toBe('planner.expandWeek');
+
+    appInstance.plannerExpandedDays = new Set(['2026-11-09', '2026-11-10']); // All expanded
+    appInstance.updateToggleAllPlannerButtonLabel(mockWeek);
+    expect(btnLabel.textContent).toBe('Collapse week');
+    expect(btnLabel.getAttribute('data-i18n')).toBe('planner.collapseWeek');
+
+    // 2. In Spanish
+    I18n.setPreference('es');
+    appInstance.plannerExpandedDays = new Set(['2026-11-09']);
+    appInstance.updateToggleAllPlannerButtonLabel(mockWeek);
+    expect(btnLabel.textContent).toBe('Expandir semana');
+
+    appInstance.plannerExpandedDays = new Set(['2026-11-09', '2026-11-10']);
+    appInstance.updateToggleAllPlannerButtonLabel(mockWeek);
+    expect(btnLabel.textContent).toBe('Plegar semana');
+  });
 });
