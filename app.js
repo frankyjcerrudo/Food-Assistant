@@ -687,6 +687,13 @@ const AISLE_METADATA = {
   other: { label: "Otros / Varios", icon: "category" }
 };
 
+function getAisleLabel(aisleKey) {
+  if (typeof window !== 'undefined' && window.I18n && typeof window.I18n.getAisleName === 'function') {
+    return window.I18n.getAisleName(aisleKey);
+  }
+  return AISLE_METADATA[aisleKey]?.label || AISLE_METADATA.other.label;
+}
+
 // ==========================================================================
 // UNIFIED INGREDIENT CLASSIFIER, ICONS & AUTOCOMPLETE CATALOG (US-20, BUG-14)
 // ==========================================================================
@@ -1535,51 +1542,54 @@ function categorizeIngredientAisle(ingredientName) {
   }
 
   // 2. Carnes, Aves, Pescados, Mariscos y Embutidos (meat)
-  if (/\b(pollo|pollos|pechuga|pechugas|muslo|muslos|alita|alitas|pavo|pavos|ternera|terneras|vaca|buey|cerdo|cerdos|cochinillo|cordero|conejo|pato|carne|carnes|carne\s+picada|picada\s+de\s+(?:ternera|cerdo|pollo|pavo|vaca|buey)|filete|filetes|solomillo|solomillos|lomo|lomos|costilla|costillas|chuleta|chuletas|entrecot|hamburguesa|hamburguesas|salchicha|salchichas|chorizo|chorizos|morcilla|morcillas|jamon|jamones|panceta|bacon|beicon|lacon|cecina|embutido|embutidos|pescado|pescados|salmon|salmones|merluza|merluzas|atun|atunes|bonito|bacalao|dorada|doradas|lubina|lubinas|trucha|truchas|sardina|sardinas|boqueron|boquerones|anchoa|anchoas|pez\s+espada|emperador|gamba|gambas|langostino|langostinos|calamar|calamares|sepia|chipiron|chipirones|pulpo|pulpos|mejillon|mejillones|almeja|almejas|navaja|navajas|ostra|ostras|cangrejo|bogavante)\b/.test(text)) {
+  if (/\b(pollo|pollos|pechuga|pechugas|muslo|muslos|alita|alitas|pavo|pavos|ternera|terneras|vaca|buey|cerdo|cerdos|cochinillo|cordero|conejo|pato|carne|carnes|carne\s+picada|picada\s+de\s+(?:ternera|cerdo|pollo|pavo|vaca|buey)|filete|filetes|solomillo|solomillos|lomo|lomos|costilla|costillas|chuleta|chuletas|entrecot|hamburguesa|hamburguesas|salchicha|salchichas|chorizo|chorizos|morcilla|morcillas|jamon|jamones|panceta|bacon|beicon|lacon|cecina|embutido|embutidos|pescado|pescados|salmon|salmones|merluza|merluzas|atun|atunes|bonito|bacalao|dorada|doradas|lubina|lubinas|trucha|truchas|sardina|sardinas|boqueron|boquerones|anchoa|anchoas|pez\s+espada|emperador|gamba|gambas|langostino|langostinos|calamar|calamares|sepia|chipiron|chipirones|pulpo|pulpos|mejillon|mejillones|almeja|almejas|navaja|navajas|ostra|ostras|cangrejo|bogavante|chicken|beef|pork|turkey|duck|steak|steaks|salmon|tuna|cod|shrimp|shrimps|prawn|prawns|clam|clams|mussel|mussels|octopus|squid|sausage|sausages|meat|ribs|lamb)\b/.test(text)) {
     return 'meat';
   }
 
   // 3. Lácteos y Huevos (dairy)
-  if (/\b(leche|queso|quesos|yogur|yogurt|yogures|mantequilla|nata|crema\s+de\s+leche|huevo|huevos|clara|claras|yema|yemas|parmesano|mozzarella|ricotta|feta|mascarpone|gorgonzola|cheddar|gouda|brie|camembert|roquefort|cuajada|kefir)\b/.test(text)) {
+  if (/\b(ice\s+cream|helado|helados)\b/.test(text)) {
+    return 'frozen';
+  }
+  if (/\b(leche|queso|quesos|yogur|yogurt|yogures|mantequilla|nata|crema\s+de\s+leche|huevo|huevos|clara|claras|yema|yemas|parmesano|mozzarella|ricotta|feta|mascarpone|gorgonzola|cheddar|gouda|brie|camembert|roquefort|cuajada|kefir|milk|cheese|butter|yogurt|cream|egg|eggs|parmesan|cheddar)\b/.test(text)) {
     return 'dairy';
   }
 
   // 4. Frutas, Verduras, Hortalizas y Hierbas Frescas (produce)
-  if (/\b(tomate|tomates|cherry|cebolla|cebollas|cebolleta|cebolletas|ajo|ajos|patata|patatas|papa|papas|batata|batatas|boniato|boniatos|camote|camotes|aguacate|aguacates|espinaca|espinacas|lechuga|lechugas|zanahoria|zanahorias|limon|limones|lima|limas|manzana|manzanas|platano|platanos|banana|bananas|champinon|champinones|seta|setas|pimiento|pimientos|calabacin|calabacines|pepino|pepinos|fresa|fresas|fresones|arandano|arandanos|frambuesa|frambuesas|mora|moras|pera|peras|naranja|naranjas|mandarina|mandarinas|pomelo|uva|uvas|melon|sandia|melocoton|albaricoque|ciruela|ciruelas|mango|pina|kiwi|kiwis|brocoli|coliflor|col|repollo|lombarda|berenjena|berenjenas|judia|judias|guisante|guisantes|esparrago|esparragos|triguero|trigueros|apio|puerro|puerros|calabaza|calabazas|perejil|albahaca|cilantro|hierbabuena|menta|rucula|canonigos|alcachofa|alcachofas|remolacha|rabano|rabanos|nabo|brotes|endivia|endivias|castana|castanas)\b/.test(text)) {
-    if (/\b(vinagre|vinagres|aceite|aceites)\b/.test(text)) {
+  if (/\b(tomate|tomates|cherry|cebolla|cebollas|cebolleta|cebolletas|ajo|ajos|patata|patatas|papa|papas|batata|batatas|boniato|boniatos|camote|camotes|aguacate|aguacates|espinaca|espinacas|lechuga|lechugas|zanahoria|zanahorias|limon|limones|lima|limas|manzana|manzanas|platano|platanos|banana|bananas|champinon|champinones|seta|setas|pimiento|pimientos|calabacin|calabacines|pepino|pepinos|fresa|fresas|fresones|arandano|arandanos|frambuesa|frambuesas|mora|moras|pera|peras|naranja|naranjas|mandarina|mandarinas|pomelo|uva|uvas|melon|sandia|melocoton|albaricoque|ciruela|ciruelas|mango|pina|kiwi|kiwis|brocoli|coliflor|col|repollo|lombarda|berenjena|berenjenas|judia|judias|guisante|guisantes|esparrago|esparragos|triguero|trigueros|apio|puerro|puerros|calabaza|calabazas|perejil|albahaca|cilantro|hierbabuena|menta|rucula|canonigos|alcachofa|alcachofas|remolacha|rabano|rabanos|nabo|brotes|endivia|endivias|castana|castanas|tomato|tomatoes|onion|onions|garlic|potato|potatoes|spinach|lettuce|carrot|carrots|lemon|lemons|lime|limes|apple|apples|banana|bananas|pepper|peppers|cucumber|cucumbers|avocado|avocados|mushroom|mushrooms|broccoli|cauliflower|zucchini|parsley|basil|cilantro)\b/.test(text)) {
+    if (/\b(vinagre|vinagres|aceite|aceites|oil|vinegar)\b/.test(text)) {
       return 'spices';
     }
-    if (/\b(tomate\s+frito|salsa\s+de\s+tomate|conserva|en\s+lata|bote)\b/.test(text)) {
+    if (/\b(tomate\s+frito|salsa\s+de\s+tomate|conserva|en\s+lata|bote|canned)\b/.test(text)) {
       return 'pantry';
     }
-    if (/\b(congelado|congelados|congelada|congeladas)\b/.test(text)) {
+    if (/\b(congelado|congelados|congelada|congeladas|frozen)\b/.test(text)) {
       return 'frozen';
     }
     return 'produce';
   }
 
   // 5. Panadería, Bollería, Masas y Harinas (bakery)
-  if (/\b(pan|panes|baguette|barra|tostada|tostadas|molde|croissant|croissants|brioche|bollo|bollos|picos|colines|harina|harinas|levadura|masa|masas|hojaldre|placas|placa|galleta|galletas|bizcocho|bizcochos|magdalena|magdalenas|tartaleta)\b/.test(text)) {
+  if (/\b(pan|panes|baguette|barra|tostada|tostadas|molde|croissant|croissants|brioche|bollo|bollos|picos|colines|harina|harinas|levadura|masa|masas|hojaldre|placas|placa|galleta|galletas|bizcocho|bizcochos|magdalena|magdalenas|tartaleta|bread|flour|toast|baguette|bun|buns|rolls?|dough|pastry|yeast|cookies)\b/.test(text)) {
     return 'bakery';
   }
 
   // 6. Congelados (frozen)
-  if (/\b(helado|helados|congelado|congelados|congelada|congeladas|guisantes\s+congelados|pizza|pizzas|nuggets|hielo)\b/.test(text)) {
+  if (/\b(helado|helados|congelado|congelados|congelada|congeladas|guisantes\s+congelados|pizza|pizzas|nuggets|hielo|ice\s+cream|frozen)\b/.test(text)) {
     return 'frozen';
   }
 
   // 7. Especias, Condimentos, Aceites y Vinagres (spices) -> Pasillo: "Especias y Aceites"
-  if (/\b(sal|pimienta|oregano|comino|pimenton|curry|canela|romero|tomillo|nuez\s+moscada|azafran|laurel|eneldo|vainilla|clavo|jengibre|curcuma|cardamomo|cayena|guindilla|pizca|aceite|aceites|oliva|virgen\s+extra|aove|girasol|sesamo|vinagre|vinagres|balsamico|modena)\b/.test(text)) {
+  if (/\b(sal|pimienta|oregano|comino|pimenton|curry|canela|romero|tomillo|nuez\s+moscada|azafran|laurel|eneldo|vainilla|clavo|jengibre|curcuma|cardamomo|cayena|guindilla|pizca|aceite|aceites|oliva|virgen\s+extra|aove|girasol|sesamo|vinagre|vinagres|balsamico|modena|salt|pepper|black\s+pepper|oregano|cumin|paprika|curry|cinnamon|rosemary|thyme|oil|olive\s+oil|vinegar|soy\s+sauce)\b/.test(text)) {
     return 'spices';
   }
 
   // 8. Bebidas, Destilados y Licores (beverages)
-  if (/\b(agua|cafe|cafes|te|infusion|infusiones|refresco|refrescos|cerveza|cervezas|vino|vinos|zumo|zumos|sidra|licor|licores|bebida|bebidas|champan|cava|tonica|whiskey|whisky|ron|vodka|ginebra|gin|tequila|vermut|vermouth|brandy|cognac|bourbon)\b/.test(text)) {
+  if (/\b(agua|cafe|cafes|te|infusion|infusiones|refresco|refrescos|cerveza|cervezas|vino|vinos|zumo|zumos|sidra|licor|licores|bebida|bebidas|champan|cava|tonica|whiskey|whisky|ron|vodka|ginebra|gin|tequila|vermut|vermouth|brandy|cognac|bourbon|water|coffee|teas?|juice|beer|wine|soda)\b/.test(text)) {
     return 'beverages';
   }
 
   // 9. Despensa, Pastas, Arroces, Legumbres, Salsas y Dulces (pantry)
-  if (/\b(pasta|pastas|espaguetis|espagueti|macarrones|fideos|tallarines|raviolis|tortellini|lasana|gnocchi|arroz|arroces|basmati|quinoa|cuscus|cous\s*cous|avena|legumbre|legumbres|garbanzo|garbanzos|lenteja|lentejas|alubia|alubias|frijol|frijoles|azucar|miel|sirope|chocolate|chocolates|cacao|bombones|tomate\s+frito|tomate\s+triturado|conserva|conservas|lata|latas|caldo|caldos|salsa|salsas|soja|mayonesa|ketchup|mostaza|tabasco|pesto|mermelada|mermeladas|frutos\s+secos|nueces|nuez|almendras|almendra|avellanas|avellana|cacahuetes|cacahuete|pistachos|pistacho|anacardos|anacardo|pinones|pinon)\b/.test(text)) {
+  if (/\b(pasta|pastas|espaguetis|espagueti|macarrones|fideos|tallarines|raviolis|tortellini|lasana|gnocchi|arroz|arroces|basmati|quinoa|cuscus|cous\s*cous|avena|legumbre|legumbres|garbanzo|garbanzos|lenteja|lentejas|alubia|alubias|frijol|frijoles|azucar|miel|sirope|chocolate|chocolates|cacao|bombones|tomate\s+frito|tomate\s+triturado|conserva|conservas|lata|latas|caldo|caldos|salsa|salsas|soja|mayonesa|ketchup|mostaza|tabasco|pesto|mermelada|mermeladas|frutos\s+secos|nueces|nuez|almendras|almendra|avellanas|avellana|cacahuetes|cacahuete|pistachos|pistacho|anacardos|anacardo|pinones|pinon|pasta|rice|spaghetti|noodles|beans|lentils|chickpeas|oats|cereal|sugar|honey|syrup)\b/.test(text)) {
     return 'pantry';
   }
 
@@ -4643,7 +4653,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.58';
+  window.APP_VERSION = 'v1.59';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4687,7 +4697,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.58';
+    this.appVersion = window.APP_VERSION || 'v1.59';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -4738,6 +4748,7 @@ class FoodAssistantApp {
     this.initElements();
     this.initVersion();
     this.initTheme();
+    this.initLanguage();
     this.initSupabaseClient();
     this.initEvents();
     this.updateUserAccountUI();
@@ -5338,6 +5349,37 @@ class FoodAssistantApp {
       next = isSysDark ? 'light' : 'dark';
     }
     this.applyTheme(next);
+  }
+
+  // ==========================================================================
+  // US-12: MULTILINGUAL & I18N SUPPORT (AUTO / ES / EN)
+  // ==========================================================================
+  initLanguage() {
+    if (!window.I18n) return;
+    this.updateLanguageUI(window.I18n.getPreference());
+
+    // Listen to changes from any source
+    window.I18n.onChange((resolvedLang, preference) => {
+      this.updateLanguageUI(preference);
+    });
+  }
+
+  applyLanguage(langMode, notify = true) {
+    if (!window.I18n) return;
+    window.I18n.setPreference(langMode);
+    this.updateLanguageUI(langMode);
+    if (notify) {
+      this.showToast(window.I18n.t('settings.languageUpdated'), 'info');
+    }
+  }
+
+  updateLanguageUI(langMode) {
+    document.querySelectorAll('#language-segmented-group .segmented-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.langVal === langMode);
+    });
+    if (window.I18n) {
+      window.I18n.applyTranslations();
+    }
   }
 
   async forceUpdateApp() {
@@ -7162,6 +7204,14 @@ class FoodAssistantApp {
       btn.addEventListener('click', () => {
         const theme = btn.dataset.themeVal;
         this.applyTheme(theme);
+      });
+    });
+
+    // Language controls (US-12)
+    document.querySelectorAll('#language-segmented-group .segmented-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const langMode = btn.dataset.langVal;
+        this.applyLanguage(langMode, true);
       });
     });
 
@@ -12282,7 +12332,7 @@ class FoodAssistantApp {
             <div class="aisle-header">
               <div class="u-flex-row-center-gap-8">
                 <span class="material-symbols-outlined icon-sm">${meta.icon}</span>
-                <span>${meta.label}</span>
+                <span>${getAisleLabel(aisleKey)}</span>
               </div>
               <span class="aisle-pending-count">${pendingInAisle} pendientes</span>
             </div>
@@ -18548,6 +18598,7 @@ if (typeof window !== 'undefined') {
   window.SEED_RECIPES = SEED_RECIPES;
   window.STANDARD_SLOTS = STANDARD_SLOTS;
   window.AISLE_METADATA = AISLE_METADATA;
+  window.getAisleLabel = getAisleLabel;
   window.COMMON_INGREDIENTS = COMMON_INGREDIENTS;
   window.normalizeIngredientText = normalizeIngredientText;
   window.normalizeSearchText = normalizeSearchText;
@@ -18593,6 +18644,7 @@ if (typeof module !== 'undefined' && module.exports) {
     SEED_RECIPES,
     STANDARD_SLOTS,
     AISLE_METADATA,
+    getAisleLabel,
     COMMON_INGREDIENTS,
     cleanInvisibleChars,
     escapeHtml,
