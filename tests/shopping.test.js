@@ -9,6 +9,7 @@ new Function(appCode)();
 const {
   AISLE_METADATA,
   RecipeParser,
+  cleanInvisibleChars,
   parseCookingAmount,
   normalizeAndConvertUnit,
   mergeShoppingQuantities,
@@ -510,6 +511,55 @@ describe('US-64: Conversión y normalización de unidades en la compra', () => {
       expect(container.textContent).toContain('2 ud');
       expect(container.textContent).toContain('Crema de calabaza');
       expect(container.textContent).toContain('CREMA DE CHAMPIÑONES');
+    });
+
+    it('consolida ingredientes con caracteres invisibles Unicode (ej: Word Joiner \\u2060, Zero-Width Space)', () => {
+      // Caso idéntico al detectado en producción: una receta contiene "Puerro\u2060" y otra "Puerro"
+      const keyNormal = getCanonicalIngredientKey('Puerro');
+      const keyInvisible = getCanonicalIngredientKey('Puerro\u2060');
+      expect(keyInvisible).toBe('puerro');
+      expect(keyInvisible).toBe(keyNormal);
+
+      window.state.shoppingList = [
+        {
+          id: 'shop-item-clean',
+          name: 'Puerro',
+          amount: 1,
+          unit: 'ud',
+          aisle: 'produce',
+          isChecked: false,
+          recipeOrigin: 'Crema de calabaza con pipas tostadas con picatostes caseros especiados'
+        },
+        {
+          id: 'shop-item-invisible',
+          name: 'Puerro\u2060',
+          amount: 1,
+          unit: 'ud',
+          aisle: 'produce',
+          isChecked: false,
+          recipeOrigin: 'CREMA DE CHAMPIÑONES'
+        }
+      ];
+
+      appInstance.renderShoppingList();
+
+      expect(window.state.shoppingList).toHaveLength(1);
+      expect(window.state.shoppingList[0].name).toBe('Puerro');
+      expect(window.state.shoppingList[0].amount).toBe(2);
+      expect(window.state.shoppingList[0].unit).toBe('ud');
+      expect(window.state.deletedRecords.shoppingItems).toContain('shop-item-invisible');
+
+      const container = document.getElementById('shopping-aisles-container');
+      const puerroRows = container.querySelectorAll('.grocery-item-row');
+      expect(puerroRows).toHaveLength(1);
+      expect(container.textContent).toContain('Puerro');
+      expect(container.textContent).toContain('2 ud');
+    });
+
+    it('cleanInvisibleChars elimina caracteres de ancho cero y marcas invisibles', () => {
+      expect(cleanInvisibleChars('Puerro\u2060')).toBe('Puerro');
+      expect(cleanInvisibleChars('\uFEFFPuerro\u200B')).toBe('Puerro');
+      expect(cleanInvisibleChars(' Cebolla \u200D ')).toBe('Cebolla');
     });
   });
 });

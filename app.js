@@ -700,9 +700,15 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+function cleanInvisibleChars(str) {
+  if (!str) return '';
+  return String(str).replace(/[\u200B-\u200D\u2060\uFEFF\u00AD\u180E]/g, '').trim();
+}
+
 function normalizeIngredientText(str) {
   if (!str) return '';
   return str.toString()
+    .replace(/[\u200B-\u200D\u2060\uFEFF\u00AD\u180E]/g, '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
@@ -712,6 +718,7 @@ function normalizeIngredientText(str) {
 function normalizeSearchText(str) {
   if (!str) return '';
   return str.toString()
+    .replace(/[\u200B-\u200D\u2060\uFEFF\u00AD\u180E]/g, '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
@@ -1339,11 +1346,12 @@ function mergeOrAddShoppingItem(shoppingList, newItem) {
   if (!targetKey) return null;
 
   const nowIso = new Date().toISOString();
+  const cleanName = cleanInvisibleChars(newItem.name);
   const incomingBreakdown = Array.isArray(newItem.recipeBreakdown) && newItem.recipeBreakdown.length > 0
-    ? newItem.recipeBreakdown
+    ? newItem.recipeBreakdown.map(b => ({ ...b, name: cleanInvisibleChars(b.name) }))
     : [{
       recipe: newItem.recipeOrigin ? String(newItem.recipeOrigin).trim() : 'Añadido manualmente',
-      name: String(newItem.name).trim(),
+      name: cleanName,
       amount: parseCookingAmount(newItem.amount),
       unit: newItem.unit || ''
     }];
@@ -1354,11 +1362,14 @@ function mergeOrAddShoppingItem(shoppingList, newItem) {
     const existingKey = getCanonicalIngredientKey(existing.name);
     if (existingKey !== targetKey) continue;
 
+    // Asegurar nombre limpio sin caracteres invisibles preexistentes
+    existing.name = cleanInvisibleChars(existing.name);
+
     // 1. Inicializar breakdown si no existía en el item previo
     if (!Array.isArray(existing.recipeBreakdown) || existing.recipeBreakdown.length === 0) {
       existing.recipeBreakdown = [{
         recipe: existing.recipeOrigin ? String(existing.recipeOrigin).trim() : 'Añadido manualmente',
-        name: String(existing.name).trim(),
+        name: existing.name,
         amount: parseCookingAmount(existing.amount),
         unit: existing.unit || ''
       }];
@@ -1384,11 +1395,11 @@ function mergeOrAddShoppingItem(shoppingList, newItem) {
 
     // 5. Normalizar título si el nuevo es más limpio/canónico (sin adjetivos o más corto)
     const existingHasMod = Array.from(INGREDIENT_MODIFIERS).some(m => new RegExp(`\\b${m}\\b`, 'i').test(existing.name));
-    const newHasMod = Array.from(INGREDIENT_MODIFIERS).some(m => new RegExp(`\\b${m}\\b`, 'i').test(newItem.name));
+    const newHasMod = Array.from(INGREDIENT_MODIFIERS).some(m => new RegExp(`\\b${m}\\b`, 'i').test(cleanName));
     if (existingHasMod && !newHasMod) {
-      existing.name = String(newItem.name).trim();
-    } else if (!existingHasMod && !newHasMod && newItem.name.length < existing.name.length) {
-      existing.name = String(newItem.name).trim();
+      existing.name = cleanName;
+    } else if (!existingHasMod && !newHasMod && cleanName.length < existing.name.length) {
+      existing.name = cleanName;
     }
 
     // 6. Actualizar recipeOrigin acumulativo
@@ -1402,11 +1413,11 @@ function mergeOrAddShoppingItem(shoppingList, newItem) {
   const isItemChecked = Boolean(newItem.isChecked || newItem.checked);
   const created = {
     id: newItem.id || generateId('shop-'),
-    name: String(newItem.name).trim(),
+    name: cleanName,
     amount: parseCookingAmount(newItem.amount),
     unit: newItem.unit || '',
     displayAmount: '',
-    aisle: newItem.aisle || categorizeIngredientAisle(newItem.name),
+    aisle: newItem.aisle || categorizeIngredientAisle(cleanName),
     isChecked: isItemChecked,
     recipeOrigin: newItem.recipeOrigin ? String(newItem.recipeOrigin).trim() : '',
     recipeBreakdown: incomingBreakdown,
@@ -4556,7 +4567,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.55';
+  window.APP_VERSION = 'v1.56';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4569,6 +4580,7 @@ if (typeof window !== 'undefined') {
   window.formatWeekRange = formatWeekRange;
   window.DAYS_OF_WEEK_ES = DAYS_OF_WEEK_ES;
   window.escapeHtml = escapeHtml;
+  window.cleanInvisibleChars = cleanInvisibleChars;
   window.normalizeIngredientText = normalizeIngredientText;
   window.categorizeIngredientAisle = categorizeIngredientAisle;
   window.getIngredientIcon = getIngredientIcon;
@@ -4598,7 +4610,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.55';
+    this.appVersion = window.APP_VERSION || 'v1.56';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -18487,6 +18499,7 @@ if (typeof module !== 'undefined' && module.exports) {
     STANDARD_SLOTS,
     AISLE_METADATA,
     COMMON_INGREDIENTS,
+    cleanInvisibleChars,
     escapeHtml,
     normalizeIngredientText,
     normalizeSearchText,
