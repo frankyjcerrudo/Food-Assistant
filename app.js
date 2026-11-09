@@ -4723,7 +4723,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.66';
+  window.APP_VERSION = 'v1.67';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -8235,9 +8235,11 @@ class FoodAssistantApp {
         const totalTime = (Number(recipe.prepTimeMinutes) || 0) + (Number(recipe.cookTimeMinutes) || 0);
 
         const comp = checkDietaryCompliance(recipe, state.dietaryPreferences);
+        const isEn = window.I18n && window.I18n.getLanguage() === 'en';
+        const violationsLabel = comp.violations.map(v => window.I18n ? window.I18n.getTagLabel(v) : v).join(', ');
         const warningBadgeHtml = !comp.compliant ? `
-          <div class="dietary-warning-badge" title="Incumple preferencias dietéticas: ${comp.violations.join(', ')}">
-            <span class="material-symbols-outlined icon-13">warning</span> No cumple: ${comp.violations.join(', ')}
+          <div class="dietary-warning-badge" title="${isEn ? `Violates dietary preferences: ${violationsLabel}` : `Incumple preferencias dietéticas: ${violationsLabel}`}">
+            <span class="material-symbols-outlined icon-13">warning</span> ${isEn ? 'Does not comply' : 'No cumple'}: ${violationsLabel}
           </div>
         ` : '';
 
@@ -11037,9 +11039,11 @@ class FoodAssistantApp {
 
     if (recipe) {
       const comp = checkDietaryCompliance(recipe, state.dietaryPreferences);
+      const isEn = window.I18n && window.I18n.getLanguage() === 'en';
+      const violationsLabel = comp.violations.map(v => window.I18n ? window.I18n.getTagLabel(v) : v).join(', ');
       const warningHtml = !comp.compliant ? `
-        <div class="dietary-warning-badge" title="Incumple preferencias dietéticas: ${comp.violations.join(', ')}">
-          <span class="material-symbols-outlined icon-13">warning</span> No cumple: ${comp.violations.join(', ')}
+        <div class="dietary-warning-badge" title="${isEn ? `Violates dietary preferences: ${violationsLabel}` : `Incumple preferencias dietéticas: ${violationsLabel}`}">
+          <span class="material-symbols-outlined icon-13">warning</span> ${isEn ? 'Does not comply' : 'No cumple'}: ${violationsLabel}
         </div>
       ` : '';
 
@@ -11052,7 +11056,7 @@ class FoodAssistantApp {
           ondragleave="app.handlePlannerSlotDragLeave(event)"
           ondrop="app.handlePlannerSlotDrop(event, '${dateStr}', '${slotType}', false)"
           onclick="app.openRecipeDetail('${safeRecipeId}')"
-          title="Arrastra para mover o intercambiar a otro día o momento">
+          title="${isEn ? 'Drag to move or swap to another day or slot' : 'Arrastra para mover o intercambiar a otro día o momento'}">
           <div class="u-flex-between-center">
             <span class="slot-label">
               <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
@@ -11094,7 +11098,7 @@ class FoodAssistantApp {
             <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
           </span>
           <div class="slot-action-text">
-            <span class="material-symbols-outlined icon-sm">add</span> Asignar plato
+            <span class="material-symbols-outlined icon-sm">add</span> ${window.I18n ? window.I18n.t('planner.assignDish') : 'Asignar plato'}
           </div>
         </div>
       `;
@@ -11104,13 +11108,15 @@ class FoodAssistantApp {
   renderCustomSlotCard(dateStr, customSlot) {
     const recipe = customSlot.recipeId ? state.recipes.find(r => r.id === customSlot.recipeId) : null;
     const iconName = customSlot.icon || 'lunch_dining';
-    const slotLabel = customSlot.name || 'Momento Extra';
+    const isEn = window.I18n && window.I18n.getLanguage() === 'en';
+    const slotLabel = customSlot.name || (window.I18n ? window.I18n.t('planner.extraMeal') : 'Momento Extra');
 
     if (recipe) {
       const comp = checkDietaryCompliance(recipe, state.dietaryPreferences);
+      const violationsLabel = comp.violations.map(v => window.I18n ? window.I18n.getTagLabel(v) : v).join(', ');
       const warningHtml = !comp.compliant ? `
-        <div class="dietary-warning-badge" title="Incumple preferencias dietéticas: ${comp.violations.join(', ')}">
-          <span class="material-symbols-outlined icon-13">warning</span> No cumple: ${comp.violations.join(', ')}
+        <div class="dietary-warning-badge" title="${isEn ? `Violates dietary preferences: ${violationsLabel}` : `Incumple preferencias dietéticas: ${violationsLabel}`}">
+          <span class="material-symbols-outlined icon-13">warning</span> ${isEn ? 'Does not comply' : 'No cumple'}: ${violationsLabel}
         </div>
       ` : '';
 
@@ -11123,16 +11129,16 @@ class FoodAssistantApp {
           ondragleave="app.handlePlannerSlotDragLeave(event)"
           ondrop="app.handlePlannerSlotDrop(event, '${dateStr}', '${customSlot.id}', true)"
           onclick="app.openRecipeDetail('${safeRecipeId}')"
-          title="Arrastra para mover o intercambiar a otro día o momento">
+          title="${isEn ? 'Drag to move or swap to another day or slot' : 'Arrastra para mover o intercambiar a otro día o momento'}">
           <div class="u-flex-between-center">
             <span class="slot-label slot-label-custom">
               <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
             </span>
             <div class="u-flex-gap-2">
-              <button type="button" class="btn btn-ghost btn-sm btn-slot-clear btn-remove-circle" onclick="event.stopPropagation(); app.clearCustomSlotRecipe('${dateStr}', '${customSlot.id}')" title="Quitar receta">
+              <button type="button" class="btn btn-ghost btn-sm btn-slot-clear btn-remove-circle" onclick="event.stopPropagation(); app.clearCustomSlotRecipe('${dateStr}', '${customSlot.id}')" title="${window.I18n ? window.I18n.t('planner.removeRecipe') : 'Quitar receta'}">
                 <span class="material-symbols-outlined icon-sm">close</span>
               </button>
-              <button type="button" class="btn btn-ghost btn-sm btn-slot-delete btn-remove-circle" onclick="event.stopPropagation(); app.deleteCustomSlot('${dateStr}', '${customSlot.id}')" title="Eliminar este momento">
+              <button type="button" class="btn btn-ghost btn-sm btn-slot-delete btn-remove-circle" onclick="event.stopPropagation(); app.deleteCustomSlot('${dateStr}', '${customSlot.id}')" title="${window.I18n ? window.I18n.t('planner.deleteSlotTooltip') : 'Eliminar este momento'}">
                 <span class="material-symbols-outlined icon-sm">delete</span>
               </button>
             </div>
@@ -11163,12 +11169,12 @@ class FoodAssistantApp {
             <span class="slot-label slot-label-custom">
               <span class="material-symbols-outlined icon-sm">${iconName}</span> ${slotLabel}
             </span>
-            <button type="button" class="btn btn-ghost btn-sm btn-slot-delete btn-remove-circle" onclick="event.stopPropagation(); app.deleteCustomSlot('${dateStr}', '${customSlot.id}')" title="Eliminar este momento">
+            <button type="button" class="btn btn-ghost btn-sm btn-slot-delete btn-remove-circle" onclick="event.stopPropagation(); app.deleteCustomSlot('${dateStr}', '${customSlot.id}')" title="${window.I18n ? window.I18n.t('planner.deleteSlotTooltip') : 'Eliminar este momento'}">
               <span class="material-symbols-outlined icon-sm">delete</span>
             </button>
           </div>
           <div class="slot-action-text">
-            <span class="material-symbols-outlined icon-sm">add</span> Asignar plato
+            <span class="material-symbols-outlined icon-sm">add</span> ${window.I18n ? window.I18n.t('planner.assignDish') : 'Asignar plato'}
           </div>
         </div>
       `;
@@ -11948,15 +11954,25 @@ class FoodAssistantApp {
     let slotTitle = slotKey;
     if (isCustom) {
       const cs = (state.mealPlan[dateStr]?.customSlots || []).find(c => c.id === slotKey);
-      slotTitle = cs ? cs.name : 'Momento Extra';
+      slotTitle = cs ? cs.name : (window.I18n ? window.I18n.t('planner.extraMeal') : 'Momento Extra');
     } else {
-      const std = STANDARD_SLOTS.find(s => s.key === slotKey);
-      slotTitle = std ? std.label : slotKey;
+      if (window.I18n && typeof window.I18n.getSlotLabel === 'function') {
+        slotTitle = window.I18n.getSlotLabel(slotKey);
+      } else {
+        const std = STANDARD_SLOTS.find(s => s.key === slotKey);
+        slotTitle = std ? std.label : slotKey;
+      }
     }
 
     const titleElem = document.getElementById('picker-modal-title');
     if (titleElem) {
-      titleElem.textContent = `Elegir plato para ${slotTitle.toUpperCase()}`;
+      titleElem.textContent = window.I18n
+        ? window.I18n.t('picker.titleForSlot', { slot: slotTitle.toUpperCase() })
+        : `Elegir plato para ${slotTitle.toUpperCase()}`;
+    }
+
+    if (window.I18n && typeof window.I18n.applyTranslations === 'function' && this.modalRecipePicker) {
+      window.I18n.applyTranslations(this.modalRecipePicker);
     }
 
     const hasPreferences = Array.isArray(state.dietaryPreferences) && state.dietaryPreferences.length > 0;
@@ -12046,13 +12062,18 @@ class FoodAssistantApp {
 
     // Contador reactivo de recetas
     const countElem = document.getElementById('picker-recipes-count');
+    const isEn = window.I18n && window.I18n.getLanguage() === 'en';
     if (countElem) {
       const total = Array.isArray(state.recipes) ? state.recipes.length : 0;
       const count = recipes.length;
       if (q || (this.pickerSelectedTags && this.pickerSelectedTags.size > 0) || (this.pickerOnlyDietary && hasPreferences)) {
-        countElem.textContent = `${count} de ${total} recetas encontradas`;
+        countElem.textContent = window.I18n
+          ? window.I18n.t('picker.recipesFound', { count, total })
+          : `${count} de ${total} recetas encontradas`;
       } else {
-        countElem.textContent = `${total} recetas disponibles`;
+        countElem.textContent = window.I18n
+          ? window.I18n.t('picker.recipesAvailable', { count: total })
+          : `${total} recetas disponibles`;
       }
     }
 
@@ -12061,10 +12082,10 @@ class FoodAssistantApp {
         list.innerHTML = `
           <div class="picker-empty-state">
             <span class="material-symbols-outlined picker-empty-icon">search_off</span>
-            No se encontraron recetas para "<strong>${escapeHtml(q)}</strong>".
+            ${isEn ? `No recipes found for "<strong>${escapeHtml(q)}</strong>".` : `No se encontraron recetas para "<strong>${escapeHtml(q)}</strong>".`}
             <div class="u-mt-10">
               <button type="button" class="btn btn-secondary btn-sm" onclick="app.clearPickerSearch()">
-                <span class="material-symbols-outlined icon-sm">backspace</span> Limpiar búsqueda
+                <span class="material-symbols-outlined icon-sm">backspace</span> ${isEn ? 'Clear search' : 'Limpiar búsqueda'}
               </button>
             </div>
           </div>
@@ -12076,10 +12097,10 @@ class FoodAssistantApp {
         list.innerHTML = `
           <div class="picker-empty-state">
             <span class="material-symbols-outlined picker-empty-icon">filter_alt_off</span>
-            No se encontraron recetas con las etiquetas seleccionadas.
+            ${isEn ? 'No recipes found with the selected tags.' : 'No se encontraron recetas con las etiquetas seleccionadas.'}
             <div class="u-mt-10">
               <button type="button" class="btn btn-secondary btn-sm" onclick="app.clearPickerSearch()">
-                <span class="material-symbols-outlined icon-sm">backspace</span> Quitar filtros
+                <span class="material-symbols-outlined icon-sm">backspace</span> ${isEn ? 'Clear filters' : 'Quitar filtros'}
               </button>
             </div>
           </div>
@@ -12091,7 +12112,7 @@ class FoodAssistantApp {
         list.innerHTML = `
           <div class="picker-empty-state">
             <span class="material-symbols-outlined picker-empty-icon">eco</span>
-            No hay recetas que cumplan con los filtros dietéticos seleccionados.
+            ${isEn ? 'No recipes comply with the selected dietary preferences.' : 'No hay recetas que cumplan con los filtros dietéticos seleccionados.'}
           </div>
         `;
         return;
@@ -12100,7 +12121,7 @@ class FoodAssistantApp {
       list.innerHTML = `
         <div class="picker-empty-state">
           <span class="material-symbols-outlined picker-empty-icon">menu_book</span>
-          Aún no tienes recetas guardadas en tu recetario.
+          ${isEn ? 'You have no recipes in your cookbook yet.' : 'Aún no tienes recetas guardadas en tu recetario.'}
         </div>
       `;
       return;
@@ -12126,25 +12147,30 @@ class FoodAssistantApp {
             <div class="picker-recipe-body">
               <div class="picker-recipe-title-row">
                 <strong class="picker-recipe-title">${escapeHtml(r.title)}</strong>
-                ${r.isFavorite ? `<span class="material-symbols-outlined picker-fav-heart" title="Favorita">favorite</span>` : ''}
+                ${r.isFavorite ? `<span class="material-symbols-outlined picker-fav-heart" title="${isEn ? 'Favorite' : 'Favorita'}">favorite</span>` : ''}
               </div>
               <div class="picker-recipe-meta">
                 ${totalTime > 0 ? `<span class="u-flex-row-center-gap-4"><span class="material-symbols-outlined icon-14">schedule</span> ${totalTime} min</span>` : ''}
                 ${cal ? `<span>•</span> <span class="u-flex-row-center-gap-4"><span class="material-symbols-outlined icon-14">local_fire_department</span> ${cal} kcal</span>` : ''}
                 ${tags.length > 0 ? `
                   <span class="picker-recipe-tags-wrap">
-                    ${tags.map(t => `<span class="picker-recipe-mini-tag">${escapeHtml(t)}</span>`).join('')}
+                    ${tags.map(t => {
+                      const tagLabel = window.I18n ? window.I18n.getTagLabel(t) : t;
+                      return `<span class="picker-recipe-mini-tag">${escapeHtml(tagLabel)}</span>`;
+                    }).join('')}
                   </span>
                 ` : ''}
               </div>
-              ${hasPreferences ? (
-          comp.compliant
-            ? `<span class="dietary-ok-badge u-mt-3"><span class="material-symbols-outlined icon-12">check</span> Apta (${state.dietaryPreferences.join(', ')})</span>`
-            : `<span class="dietary-warning-badge u-mt-3"><span class="material-symbols-outlined icon-12">warning</span> No cumple: ${comp.violations.join(', ')}</span>`
-        ) : ''}
+              ${hasPreferences ? (() => {
+                const prefsLabel = state.dietaryPreferences.map(p => window.I18n ? window.I18n.getTagLabel(p) : p).join(', ');
+                const violationsLabel = comp.violations.map(v => window.I18n ? window.I18n.getTagLabel(v) : v).join(', ');
+                return comp.compliant
+                  ? `<span class="dietary-ok-badge u-mt-3"><span class="material-symbols-outlined icon-12">check</span> ${isEn ? 'Compliant' : 'Apta'} (${escapeHtml(prefsLabel)})</span>`
+                  : `<span class="dietary-warning-badge u-mt-3"><span class="material-symbols-outlined icon-12">warning</span> ${isEn ? 'Does not comply' : 'No cumple'}: ${escapeHtml(violationsLabel)}</span>`;
+              })() : ''}
             </div>
           </div>
-          <button type="button" class="btn btn-secondary btn-sm u-shrink-0" onclick="event.stopPropagation(); app.selectRecipeForSlot('${r.id}')">Elegir</button>
+          <button type="button" class="btn btn-secondary btn-sm u-shrink-0" onclick="event.stopPropagation(); app.selectRecipeForSlot('${r.id}')">${isEn ? 'Select' : 'Elegir'}</button>
         </div>
       `;
     }).join('');
@@ -12183,12 +12209,15 @@ class FoodAssistantApp {
     this.planRecipeTarget = r;
 
     // Actualizar snippet resumen
+    const isEn = window.I18n && window.I18n.getLanguage() === 'en';
     const titleEl = document.getElementById('plan-recipe-target-title');
     const metaEl = document.getElementById('plan-recipe-target-meta');
     if (titleEl) titleEl.textContent = r.title;
     if (metaEl) {
       const totalTime = (r.prepTimeMinutes || 0) + (r.cookTimeMinutes || 0);
-      metaEl.textContent = `${totalTime > 0 ? `${totalTime} min • ` : ''}${r.servings || 2} personas`;
+      const servings = r.servings || 2;
+      const servingsLabel = isEn ? (servings === 1 ? '1 person' : `${servings} people`) : `${servings} personas`;
+      metaEl.textContent = `${totalTime > 0 ? `${totalTime} min • ` : ''}${servingsLabel}`;
     }
 
     // Inicializar fecha (hoy por defecto)
@@ -12211,12 +12240,12 @@ class FoodAssistantApp {
         const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
         const k = toLocalDateKey(d);
         let label = '';
-        if (i === 0) label = 'Hoy';
-        else if (i === 1) label = 'Mañana';
+        if (i === 0) label = isEn ? 'Today' : 'Hoy';
+        else if (i === 1) label = isEn ? 'Tomorrow' : 'Mañana';
         else {
           const dayIdx = d.getDay() === 0 ? 6 : d.getDay() - 1;
-          const dayName = DAYS_OF_WEEK_ES[dayIdx] || '';
-          label = `${dayName.slice(0, 3)} ${d.getDate()}`;
+          const dayName = isEn ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][dayIdx] : (DAYS_OF_WEEK_ES[dayIdx] || '').slice(0, 3);
+          label = `${dayName} ${d.getDate()}`;
         }
         dates.push({ key: k, label });
       }
@@ -12233,6 +12262,10 @@ class FoodAssistantApp {
     this.planRecipeIsCustomSlot = false;
     this.renderPlanRecipeSlots();
     this.updatePlanRecipeConflict();
+
+    if (window.I18n && typeof window.I18n.applyTranslations === 'function' && this.modalPlanRecipe) {
+      window.I18n.applyTranslations(this.modalPlanRecipe);
+    }
 
     this.openDialogModal(this.modalPlanRecipe);
   }
@@ -12255,12 +12288,18 @@ class FoodAssistantApp {
     const container = document.getElementById('plan-recipe-slots-container');
     if (!container) return;
 
+    const isEn = window.I18n && window.I18n.getLanguage() === 'en';
     const dateInput = document.getElementById('plan-recipe-date-input');
     const dateKey = dateInput?.value || toLocalDateKey(new Date());
     const dayData = state.getDayPlan(dateKey);
 
     const slots = [
-      ...STANDARD_SLOTS.map(s => ({ key: s.key, label: s.label, icon: s.icon, isCustom: false })),
+      ...STANDARD_SLOTS.map(s => ({
+        key: s.key,
+        label: window.I18n ? window.I18n.getSlotLabel(s.key, s.label) : s.label,
+        icon: s.icon,
+        isCustom: false
+      })),
       ...(dayData.customSlots || []).map(cs => ({ key: cs.id, label: cs.name, icon: 'restaurant', isCustom: true }))
     ];
 
@@ -12282,7 +12321,7 @@ class FoodAssistantApp {
             <span class="material-symbols-outlined icon-sm plan-slot-choice-icon">${s.icon}</span>
             <span>${s.label}</span>
           </div>
-          ${hasCurrent ? '<span class="material-symbols-outlined icon-sm icon-warning" title="Ya tiene plato asignado">warning</span>' : ''}
+          ${hasCurrent ? `<span class="material-symbols-outlined icon-sm icon-warning" title="${isEn ? 'Already has an assigned dish' : 'Ya tiene plato asignado'}">warning</span>` : ''}
         </button>
       `;
     }).join('');
@@ -12299,6 +12338,7 @@ class FoodAssistantApp {
     const warningBox = document.getElementById('plan-recipe-conflict-warning');
     if (!warningBox) return;
 
+    const isEn = window.I18n && window.I18n.getLanguage() === 'en';
     const dateInput = document.getElementById('plan-recipe-date-input');
     const dateKey = dateInput?.value || toLocalDateKey(new Date());
     const dayData = state.getDayPlan(dateKey);
@@ -12310,16 +12350,16 @@ class FoodAssistantApp {
     if (this.planRecipeIsCustomSlot) {
       const cs = (dayData.customSlots || []).find(c => c.id === slotKey);
       currentRecipeId = cs?.recipeId;
-      slotLabel = cs?.name || 'Momento extra';
+      slotLabel = cs?.name || (isEn ? 'Extra meal' : 'Momento extra');
     } else {
       currentRecipeId = dayData[slotKey];
       const std = STANDARD_SLOTS.find(s => s.key === slotKey);
-      slotLabel = std ? std.label : slotKey;
+      slotLabel = window.I18n ? window.I18n.getSlotLabel(slotKey, std ? std.label : slotKey) : (std ? std.label : slotKey);
     }
 
     if (currentRecipeId) {
       const existing = (state.recipes || []).find(r => r.id === currentRecipeId);
-      const existingTitle = existing ? existing.title : 'Otro plato';
+      const existingTitle = existing ? existing.title : (isEn ? 'Another dish' : 'Otro plato');
       warningBox.style.display = 'block';
       warningBox.style.background = 'var(--m3-surface-container-high)';
       warningBox.style.borderColor = '#f59e0b';
@@ -12328,9 +12368,9 @@ class FoodAssistantApp {
         <div class="plan-overwrite-row">
           <span class="material-symbols-outlined icon-sm plan-overwrite-icon">warning</span>
           <div>
-            <strong>Momento ocupado:</strong> Ya hay asignado "<em>${escapeHtml(existingTitle)}</em>" en ${slotLabel}.
+            <strong>${isEn ? 'Slot occupied:' : 'Momento ocupado:'}</strong> ${isEn ? `Already assigned "<em>${escapeHtml(existingTitle)}</em>" for ${slotLabel}.` : `Ya hay asignado "<em>${escapeHtml(existingTitle)}</em>" en ${slotLabel}.`}
             <div class="plan-overwrite-sub">
-              Al confirmar, se sustituirá por "${escapeHtml(this.planRecipeTarget?.title || '')}".
+              ${isEn ? `Upon confirming, it will be replaced with "${escapeHtml(this.planRecipeTarget?.title || '')}".` : `Al confirmar, se sustituirá por "${escapeHtml(this.planRecipeTarget?.title || '')}".`}
             </div>
           </div>
         </div>
@@ -12343,7 +12383,7 @@ class FoodAssistantApp {
       warningBox.innerHTML = `
         <div class="u-flex-row-center-gap-8">
           <span class="material-symbols-outlined icon-sm icon-primary">check_circle</span>
-          <span>Hueco libre en <strong>${slotLabel}</strong>.</span>
+          <span>${isEn ? `Available slot in <strong>${slotLabel}</strong>.` : `Hueco libre en <strong>${slotLabel}</strong>.`}</span>
         </div>
       `;
     }

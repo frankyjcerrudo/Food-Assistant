@@ -577,4 +577,33 @@ describe('US-12: Módulo Core de Internacionalización (i18n.js)', () => {
     expect(guideEl.textContent).toContain('# 1) Comando en lenguaje natural');
     expect(guideEl.textContent).toContain('Añade leche y aguacates a la compra');
   });
+
+  it('traduce slots vacíos del planificador y modal selector de recetas (v1.67)', () => {
+    const appPath = path.resolve(process.cwd(), 'app.js');
+    const appCode = fs.readFileSync(appPath, 'utf-8');
+    new Function(appCode)();
+
+    const appInstance = new window.FoodAssistantApp();
+
+    // 1. In English
+    I18n.setPreference('en');
+    expect(I18n.t('planner.assignDish')).toBe('Assign dish');
+    expect(I18n.t('picker.chooseBtn')).toBe('Select');
+    expect(I18n.t('picker.recipesAvailable', { count: 832 })).toBe('832 recipes available');
+    expect(I18n.t('picker.titleForSlot', { slot: 'BREAKFAST' })).toBe('Select dish for BREAKFAST');
+
+    const emptySlotHtmlEn = appInstance.renderSlotCard('2026-11-09', 'breakfast', 'Breakfast', 'wb_twilight', null);
+    expect(emptySlotHtmlEn).toContain('Assign dish');
+    expect(emptySlotHtmlEn).not.toContain('Asignar plato');
+
+    // 2. In Spanish
+    I18n.setPreference('es');
+    expect(I18n.t('planner.assignDish')).toBe('Asignar plato');
+    expect(I18n.t('picker.chooseBtn')).toBe('Elegir');
+    expect(I18n.t('picker.recipesAvailable', { count: 832 })).toBe('832 recetas disponibles');
+    expect(I18n.t('picker.titleForSlot', { slot: 'DESAYUNO' })).toBe('Elegir plato para DESAYUNO');
+
+    const emptySlotHtmlEs = appInstance.renderSlotCard('2026-11-09', 'breakfast', 'Desayuno', 'wb_twilight', null);
+    expect(emptySlotHtmlEs).toContain('Asignar plato');
+  });
 });

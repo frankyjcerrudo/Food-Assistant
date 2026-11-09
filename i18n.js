@@ -237,7 +237,37 @@
         optCoffee: '☕ Café',
         optSweet: '🍪 Dulce',
         optMeal: '🍽️ Plato',
-        optNight: '🌙 Noche'
+        optNight: '🌙 Noche',
+        assignDish: 'Asignar plato',
+        deleteSlotTooltip: 'Eliminar este momento'
+      },
+      picker: {
+        titleForSlot: 'Elegir plato para {slot}',
+        searchPlaceholder: 'Buscar por plato, ingrediente o técnica...',
+        clearSearchTooltip: 'Limpiar búsqueda',
+        dietaryOnly: 'Solo aptas para mis dietas',
+        cookDouble: '🍱 Cocinar doble para sobras (asignar también mañana)',
+        recipesAvailable: '{count} recetas disponibles',
+        recipesFound: '{count} de {total} recetas encontradas',
+        noRecipesFound: 'No se encontraron recetas para "<strong>{query}</strong>".',
+        clearSearch: 'Limpiar búsqueda',
+        chooseBtn: 'Elegir',
+        compliant: 'Apta',
+        doesNotComply: 'No cumple',
+        favorite: 'Favorita'
+      },
+      planRecipe: {
+        title: 'Añadir al Plan',
+        dateLabel: 'Fecha:',
+        slotLabel: 'Momento del día:',
+        confirmBtn: 'Confirmar y Planificar',
+        cancelBtn: 'Cancelar',
+        today: 'Hoy',
+        tomorrow: 'Mañana',
+        occupied: 'Momento ocupado:',
+        alreadyAssigned: 'Ya hay asignado "<em>{title}</em>" en {slot}.',
+        willReplace: 'Al confirmar, se sustituirá por "{title}".',
+        freeSlot: 'Hueco libre en <strong>{slot}</strong>.'
       },
       recipes: {
         title: 'Recetario',
@@ -834,7 +864,37 @@
         optCoffee: '☕ Coffee',
         optSweet: '🍪 Sweet',
         optMeal: '🍽️ Meal',
-        optNight: '🌙 Night'
+        optNight: '🌙 Night',
+        assignDish: 'Assign dish',
+        deleteSlotTooltip: 'Delete this meal slot'
+      },
+      picker: {
+        titleForSlot: 'Select dish for {slot}',
+        searchPlaceholder: 'Search by dish, ingredient or technique...',
+        clearSearchTooltip: 'Clear search',
+        dietaryOnly: 'Suitable for my diets only',
+        cookDouble: '🍱 Cook extra for leftovers (also assign tomorrow)',
+        recipesAvailable: '{count} recipes available',
+        recipesFound: '{count} of {total} recipes found',
+        noRecipesFound: 'No recipes found for "<strong>{query}</strong>".',
+        clearSearch: 'Clear search',
+        chooseBtn: 'Select',
+        compliant: 'Compliant',
+        doesNotComply: 'Does not comply',
+        favorite: 'Favorite'
+      },
+      planRecipe: {
+        title: 'Add to Plan',
+        dateLabel: 'Date:',
+        slotLabel: 'Meal slot:',
+        confirmBtn: 'Confirm & Plan',
+        cancelBtn: 'Cancel',
+        today: 'Today',
+        tomorrow: 'Tomorrow',
+        occupied: 'Slot occupied:',
+        alreadyAssigned: 'Already assigned "<em>{title}</em>" for {slot}.',
+        willReplace: 'Upon confirming, it will be replaced with "{title}".',
+        freeSlot: 'Available slot in <strong>{slot}</strong>.'
       },
       recipes: {
         title: 'Recipes',
