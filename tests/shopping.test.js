@@ -6,7 +6,16 @@ const appPath = path.resolve(process.cwd(), 'app.js');
 const appCode = fs.readFileSync(appPath, 'utf-8');
 new Function(appCode)();
 
-const { AISLE_METADATA } = window;
+const {
+  AISLE_METADATA,
+  RecipeParser,
+  parseCookingAmount,
+  normalizeAndConvertUnit,
+  mergeShoppingQuantities,
+  mergeOrAddShoppingItem,
+  getCanonicalIngredientKey,
+  recalculateShoppingItemQuantities
+} = window;
 
 describe('Shopping Engine & Ingredient Calculations', () => {
   it('debe contener metadatos completos para todos los pasillos estándar', () => {
@@ -234,5 +243,177 @@ describe('US-81: Sección de Completados y Lista de Compra Compacta', () => {
 
     const completedContainer = document.getElementById('shopping-completed-container');
     expect(completedContainer.innerHTML).toBe('');
+  });
+});
+
+describe('US-64: Conversión y normalización de unidades en la compra', () => {
+  describe('DoD 1: Sumar cantidades compatibles (500 g + 1 kg = 1,5 kg; ml/cl/dl/l)', () => {
+    it('suma cantidades de masa compatibles y muestra la unidad más legible (g ↔ kg)', () => {
+      const res = mergeShoppingQuantities(500, 'g', 1, 'kg');
+      expect(res.compatible).toBe(true);
+      expect(res.amount).toBe(1.5);
+      expect(res.unit).toBe('kg');
+
+      const resGrams = mergeShoppingQuantities(250, 'g', 350, 'g');
+      expect(resGrams.compatible).toBe(true);
+      expect(resGrams.amount).toBe(600);
+      expect(resGrams.unit).toBe('g');
+
+      const resKilos = mergeShoppingQuantities(750, 'g', 250, 'g');
+      expect(resKilos.compatible).toBe(true);
+      expect(resKilos.amount).toBe(1);
+      expect(resKilos.unit).toBe('kg');
+    });
+
+    it('suma cantidades de volumen compatibles (ml / cl / dl / l)', () => {
+      const resMl = mergeShoppingQuantities(250, 'ml', 1, 'l');
+      expect(resMl.compatible).toBe(true);
+      expect(resMl.amount).toBe(1.25);
+      expect(resMl.unit).toBe('l');
+
+      const resCl = mergeShoppingQuantities(50, 'cl', 500, 'ml');
+      expect(resCl.compatible).toBe(true);
+      expect(resCl.amount).toBe(1);
+      expect(resCl.unit).toBe('l');
+
+      const resDl = mergeShoppingQuantities(3, 'dl', 400, 'ml');
+      expect(resDl.compatible).toBe(true);
+      expect(resDl.amount).toBe(700);
+      expect(resDl.unit).toBe('ml');
+    });
+
+    it('soporta cantidades numéricas expresadas con coma decimal o fracciones', () => {
+      const resComma = mergeShoppingQuantities('1,5', 'kg', 500, 'g');
+      expect(resComma.compatible).toBe(true);
+      expect(resComma.amount).toBe(2);
+      expect(resComma.unit).toBe('kg');
+
+      const resFrac = mergeShoppingQuantities('1/2', 'kg', 500, 'g');
+      expect(resFrac.compatible).toBe(true);
+      expect(resFrac.amount).toBe(1);
+      expect(resFrac.unit).toBe('kg');
+
+      const resUnicode = mergeShoppingQuantities('½', 'l', 500, 'ml');
+      expect(resUnicode.compatible).toBe(true);
+      expect(resUnicode.amount).toBe(1);
+      expect(resUnicode.unit).toBe('l');
+    });
+  });
+
+  describe('DoD 2: Unificar singular/plural y acentos al fusionar ("Tomate" = "Tomates")', () => {
+    it('obtiene la misma clave canónica ignorando plurales y acentos', () => {
+      expect(getCanonicalIngredientKey('Tomate')).toBe(getCanonicalIngredientKey('Tomates'));
+      expect(getCanonicalIngredientKey('Limón')).toBe(getCanonicalIngredientKey('limones'));
+      expect(getCanonicalIngredientKey('Pechuga de pollo')).toBe(getCanonicalIngredientKey('Pechugas de pollo'));
+      expect(getCanonicalIngredientKey('Nuez')).toBe(getCanonicalIngredientKey('Nueces'));
+    });
+
+    it('mergeOrAddShoppingItem fusiona singular y plural en una sola entrada sumando cantidades', () => {
+      const list = [
+        { name: 'Tomate', amount: 500, unit: 'g', isChecked: false, recipeOrigin: 'Ensalada' }
+      ];
+
+      mergeOrAddShoppingItem(list, {
+        name: 'Tomates',
+        amount: 1,
+        unit: 'kg',
+        isChecked: false,
+        recipeOrigin: 'Gazpacho'
+      });
+
+      expect(list).toHaveLength(1);
+      expect(list[0].name).toBe('Tomate');
+      expect(list[0].amount).toBe(1.5);
+      expect(list[0].unit).toBe('kg');
+      expect(list[0].recipeOrigin).toContain('Ensalada');
+      expect(list[0].recipeOrigin).toContain('Gazpacho');
+    });
+
+    it('mergeOrAddShoppingItem unifica ingredientes con o sin tildes', () => {
+      const list = [
+        { name: 'Limón', amount: 2, unit: 'ud', isChecked: false, recipeOrigin: 'Postre' }
+      ];
+
+      mergeOrAddShoppingItem(list, {
+        name: 'limones',
+        amount: 3,
+        unit: 'ud',
+        isChecked: false,
+        recipeOrigin: 'Pescado'
+      });
+
+      expect(list).toHaveLength(1);
+      expect(list[0].amount).toBe(5);
+      expect(list[0].unit).toBe('ud');
+      expect(list[0].recipeBreakdown).toHaveLength(2);
+    });
+  });
+
+  describe('DoD 3: Mostrar la unidad más legible (1500 g → 1,5 kg)', () => {
+    it('convierte automáticamente gramos mayores a 1000 en kg', () => {
+      const norm = normalizeAndConvertUnit(1500, 'g');
+      expect(norm.amount).toBe(1.5);
+      expect(norm.unit).toBe('kg');
+    });
+
+    it('convierte automáticamente kilos menores a 1 en gramos', () => {
+      const norm = normalizeAndConvertUnit(0.25, 'kg');
+      expect(norm.amount).toBe(250);
+      expect(norm.unit).toBe('g');
+    });
+
+    it('convierte mililitros mayores a 1000 en litros', () => {
+      const norm = normalizeAndConvertUnit(2500, 'ml');
+      expect(norm.amount).toBe(2.5);
+      expect(norm.unit).toBe('l');
+    });
+
+    it('convierte litros menores a 1 en mililitros', () => {
+      const norm = normalizeAndConvertUnit(0.33, 'l');
+      expect(norm.amount).toBe(330);
+      expect(norm.unit).toBe('ml');
+    });
+  });
+
+  describe('DoD 4: Fusión multi-unidad inteligente y desglose', () => {
+    it('combina unidades no convertibles directamente (800 g + 6 ud) con desglose de recetas', () => {
+      const list = [];
+      mergeOrAddShoppingItem(list, {
+        name: 'Patatas',
+        amount: 800,
+        unit: 'g',
+        recipeOrigin: 'Guiso'
+      });
+      mergeOrAddShoppingItem(list, {
+        name: 'Patatas',
+        amount: 6,
+        unit: 'ud',
+        recipeOrigin: 'Horno'
+      });
+
+      expect(list).toHaveLength(1);
+      expect(list[0].displayAmount).toBe('800 g + 6 ud');
+      expect(list[0].recipeBreakdown).toHaveLength(2);
+      expect(list[0].recipeBreakdown[0].recipe).toBe('Guiso');
+      expect(list[0].recipeBreakdown[1].recipe).toBe('Horno');
+    });
+  });
+
+  describe('Entrada manual rápida con unidades y formatos culinarios', () => {
+    it('parseIngredientLine extrae correctamente cantidades decimales con coma en la entrada rápida', () => {
+      const parsed = RecipeParser.parseIngredientLine('1,5 kg patatas');
+      expect(parsed).not.toBeNull();
+      expect(parsed.name).toBe('Patatas');
+      expect(parsed.amount).toBe(1.5);
+      expect(parsed.unit).toBe('kg');
+    });
+
+    it('parseIngredientLine extrae fracciones en la entrada rápida', () => {
+      const parsed = RecipeParser.parseIngredientLine('1/2 kg carne picada');
+      expect(parsed).not.toBeNull();
+      expect(parsed.amount).toBe(0.5);
+      expect(parsed.unit).toBe('kg');
+      expect(parsed.name).toBe('Carne picada');
+    });
   });
 });

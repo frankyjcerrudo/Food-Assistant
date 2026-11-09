@@ -888,11 +888,47 @@ function getCanonicalIngredientKey(name) {
     .join(' ');
 }
 
+function parseCookingAmount(amount) {
+  if (amount === null || amount === undefined || amount === '') return null;
+  if (typeof amount === 'number') {
+    return isNaN(amount) ? null : amount;
+  }
+  const clean = String(amount).trim().replace(',', '.');
+  if (!clean) return null;
+  const unicodeFractions = {
+    '\u00BD': 0.5,
+    '\u00BC': 0.25,
+    '\u00BE': 0.75,
+    '\u2153': 0.33,
+    '\u2154': 0.67,
+    '\u215B': 0.125,
+    '\u215C': 0.375,
+    '\u215D': 0.625,
+    '\u215E': 0.875
+  };
+  for (const [char, val] of Object.entries(unicodeFractions)) {
+    if (clean.includes(char)) {
+      const parts = clean.split(char);
+      const whole = parts[0].trim() ? parseFloat(parts[0]) : 0;
+      return Math.round((whole + val) * 100) / 100;
+    }
+  }
+  const fracMatch = clean.match(/^(\d+)?\s*(\d+)\/(\d+)$/);
+  if (fracMatch) {
+    const whole = fracMatch[1] ? parseInt(fracMatch[1], 10) : 0;
+    const num = parseInt(fracMatch[2], 10);
+    const denom = parseInt(fracMatch[3], 10) || 1;
+    return Math.round((whole + num / denom) * 100) / 100;
+  }
+  const val = parseFloat(clean);
+  return isNaN(val) ? null : val;
+}
+
 function normalizeAndConvertUnit(amount, unit) {
   const rawUnit = (unit === null || unit === undefined) ? '' : String(unit).trim();
   const cleanUnit = normalizeIngredientText(rawUnit).replace(/\.+$/g, '').trim();
-  const hasNumericAmount = amount !== null && amount !== undefined && amount !== '' && !isNaN(Number(amount));
-  const numAmount = hasNumericAmount ? Number(amount) : null;
+  const numAmount = parseCookingAmount(amount);
+  const hasNumericAmount = numAmount !== null;
 
   let dimension = 'custom';
   let canonicalUnit = cleanUnit;
@@ -973,6 +1009,24 @@ function normalizeAndConvertUnit(amount, unit) {
     canonicalUnit = 'filete';
   } else if (/^(manojo|manojos)$/.test(cleanUnit)) {
     canonicalUnit = 'manojo';
+  } else if (/^(rodaja|rodajas)$/.test(cleanUnit)) {
+    canonicalUnit = 'rodaja';
+  } else if (/^(pellizco|pellizcos)$/.test(cleanUnit)) {
+    canonicalUnit = 'pizca';
+  } else if (/^(punado|punados|puñado|puñados)$/.test(cleanUnit)) {
+    canonicalUnit = 'puñado';
+  } else if (/^(chorrito|chorritos|chorro|chorros)$/.test(cleanUnit)) {
+    canonicalUnit = 'chorro';
+  } else if (/^(copa|copas|copita|copitas)$/.test(cleanUnit)) {
+    canonicalUnit = 'copa';
+  } else if (/^(trozo|trozos)$/.test(cleanUnit)) {
+    canonicalUnit = 'trozo';
+  } else if (/^(tira|tiras)$/.test(cleanUnit)) {
+    canonicalUnit = 'tira';
+  } else if (/^(porcion|porciones)$/.test(cleanUnit)) {
+    canonicalUnit = 'porcion';
+  } else if (/^(cubito|cubitos)$/.test(cleanUnit)) {
+    canonicalUnit = 'cubito';
   }
 
   if (numAmount === null) {
@@ -1290,7 +1344,7 @@ function mergeOrAddShoppingItem(shoppingList, newItem) {
     : [{
       recipe: newItem.recipeOrigin ? String(newItem.recipeOrigin).trim() : 'Añadido manualmente',
       name: String(newItem.name).trim(),
-      amount: newItem.amount !== undefined && newItem.amount !== null && !isNaN(Number(newItem.amount)) ? Number(newItem.amount) : null,
+      amount: parseCookingAmount(newItem.amount),
       unit: newItem.unit || ''
     }];
 
@@ -1305,7 +1359,7 @@ function mergeOrAddShoppingItem(shoppingList, newItem) {
       existing.recipeBreakdown = [{
         recipe: existing.recipeOrigin ? String(existing.recipeOrigin).trim() : 'Añadido manualmente',
         name: String(existing.name).trim(),
-        amount: existing.amount !== undefined && existing.amount !== null && !isNaN(Number(existing.amount)) ? Number(existing.amount) : null,
+        amount: parseCookingAmount(existing.amount),
         unit: existing.unit || ''
       }];
     }
@@ -1315,7 +1369,7 @@ function mergeOrAddShoppingItem(shoppingList, newItem) {
       existing.recipeBreakdown.push({
         recipe: inc.recipe,
         name: inc.name,
-        amount: inc.amount,
+        amount: parseCookingAmount(inc.amount),
         unit: inc.unit
       });
     });
@@ -1349,7 +1403,7 @@ function mergeOrAddShoppingItem(shoppingList, newItem) {
   const created = {
     id: newItem.id || generateId('shop-'),
     name: String(newItem.name).trim(),
-    amount: newItem.amount !== undefined && newItem.amount !== null && !isNaN(Number(newItem.amount)) ? Number(newItem.amount) : null,
+    amount: parseCookingAmount(newItem.amount),
     unit: newItem.unit || '',
     displayAmount: '',
     aisle: newItem.aisle || categorizeIngredientAisle(newItem.name),
@@ -3106,11 +3160,11 @@ const RecipeParser = {
     const unitMatch = clean.match(startWithUnitRegex);
     const noUnitMatch = !unitMatch ? clean.match(startNoUnitRegex) : null;
 
-    if (unitMatch && (isNaN(unitMatch[1]) === false || new RegExp(`[\\/${fracChars}]`).test(unitMatch[1]))) {
+    if (unitMatch && (isNaN(Number(unitMatch[1].replace(',', '.'))) === false || new RegExp(`[\\/${fracChars}]`).test(unitMatch[1]))) {
       amount = this.parseNumber(unitMatch[1]);
       unit = this.normalizeUnit(unitMatch[2]);
       name = (unitMatch[3] || '').trim();
-    } else if (noUnitMatch && (isNaN(noUnitMatch[1]) === false || new RegExp(`[\\/${fracChars}]`).test(noUnitMatch[1]))) {
+    } else if (noUnitMatch && (isNaN(Number(noUnitMatch[1].replace(',', '.'))) === false || new RegExp(`[\\/${fracChars}]`).test(noUnitMatch[1]))) {
       amount = this.parseNumber(noUnitMatch[1]);
       unit = 'ud';
       name = (noUnitMatch[2] || '').trim();
@@ -4494,7 +4548,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.53';
+  window.APP_VERSION = 'v1.54';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4536,7 +4590,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.53';
+    this.appVersion = window.APP_VERSION || 'v1.54';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -18367,6 +18421,7 @@ if (typeof window !== 'undefined') {
   window.matchRecipeSearch = matchRecipeSearch;
   window.matchFridgeIngredient = matchFridgeIngredient;
   window.singularizeSpanishToken = singularizeSpanishToken;
+  window.parseCookingAmount = parseCookingAmount;
   window.getCanonicalIngredientKey = getCanonicalIngredientKey;
   window.normalizeAndConvertUnit = normalizeAndConvertUnit;
   window.mergeShoppingQuantities = mergeShoppingQuantities;
@@ -18412,6 +18467,7 @@ if (typeof module !== 'undefined' && module.exports) {
     matchRecipeSearch,
     matchFridgeIngredient,
     singularizeSpanishToken,
+    parseCookingAmount,
     getCanonicalIngredientKey,
     normalizeAndConvertUnit,
     mergeShoppingQuantities,
