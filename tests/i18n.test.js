@@ -501,4 +501,80 @@ describe('US-12: Módulo Core de Internacionalización (i18n.js)', () => {
     expect(labelEl.textContent).toBe('Español');
     expect(selectEl.value).toBe('es');
   });
+
+  it('traduce las etiquetas dietéticas en ajustes y onboarding, proveedor de IA, estado del agente y sincronización', () => {
+    const appPath = path.resolve(process.cwd(), 'app.js');
+    const appCode = fs.readFileSync(appPath, 'utf-8');
+    new Function(appCode)();
+
+    const appInstance = new window.FoodAssistantApp();
+
+    // 1. Dietary chips in English
+    I18n.setPreference('en');
+    const settingsDietaryContainer = document.getElementById('settings-dietary-chips') || (() => {
+      const el = document.createElement('div');
+      el.id = 'settings-dietary-chips';
+      document.body.appendChild(el);
+      return el;
+    })();
+
+    appInstance.renderDietaryPreferencesSettings();
+    expect(settingsDietaryContainer.textContent).toContain('Vegan');
+    expect(settingsDietaryContainer.textContent).toContain('Vegetarian');
+    expect(settingsDietaryContainer.textContent).toContain('Gluten-Free');
+    expect(settingsDietaryContainer.textContent).toContain('Lactose-Free');
+    expect(settingsDietaryContainer.textContent).toContain('Low Carb');
+    expect(settingsDietaryContainer.textContent).toContain('High Protein');
+
+    // Onboarding chips in English
+    const onboardingDietaryContainer = document.getElementById('onboarding-dietary-chips') || (() => {
+      const el = document.createElement('div');
+      el.id = 'onboarding-dietary-chips';
+      document.body.appendChild(el);
+      return el;
+    })();
+
+    appInstance.renderOnboardingDietaryChips();
+    expect(onboardingDietaryContainer.textContent).toContain('Vegan');
+    expect(onboardingDietaryContainer.textContent).toContain('Gluten-Free');
+
+    // 2. In Spanish
+    I18n.setPreference('es');
+    appInstance.renderDietaryPreferencesSettings();
+    expect(settingsDietaryContainer.textContent).toContain('Vegano');
+    expect(settingsDietaryContainer.textContent).toContain('Sin Gluten');
+
+    appInstance.renderOnboardingDietaryChips();
+    expect(onboardingDietaryContainer.textContent).toContain('Vegano');
+    expect(onboardingDietaryContainer.textContent).toContain('Sin Gluten');
+
+    // 3. AI Provider translations
+    expect(I18n.t('settings.aiOptGemini')).toBe('Google Gemini (Gratuito hasta 1.500 req/día)');
+    I18n.setPreference('en');
+    expect(I18n.t('settings.aiOptGemini')).toBe('Google Gemini (Free up to 1,500 req/day)');
+    expect(I18n.t('settings.syncedAt')).toBe('Synced at');
+
+    // 4. External Agent Guide in English
+    const guideEl = document.getElementById('external-agent-guide') || (() => {
+      const el = document.createElement('pre');
+      el.id = 'external-agent-guide';
+      document.body.appendChild(el);
+      return el;
+    })();
+    const statusEl = document.getElementById('external-agent-status') || (() => {
+      const el = document.createElement('div');
+      el.id = 'external-agent-status';
+      document.body.appendChild(el);
+      return el;
+    })();
+
+    appInstance.renderExternalAgentSettings();
+    expect(guideEl.textContent).toContain('# 1) Natural language command');
+    expect(guideEl.textContent).toContain('Add milk and avocados to the shopping list');
+
+    I18n.setPreference('es');
+    appInstance.renderExternalAgentSettings();
+    expect(guideEl.textContent).toContain('# 1) Comando en lenguaje natural');
+    expect(guideEl.textContent).toContain('Añade leche y aguacates a la compra');
+  });
 });

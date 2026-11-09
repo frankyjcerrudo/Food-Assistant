@@ -4723,7 +4723,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.65';
+  window.APP_VERSION = 'v1.66';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4770,7 +4770,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.65';
+    this.appVersion = window.APP_VERSION || 'v1.66';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5450,6 +5450,12 @@ class FoodAssistantApp {
     if (typeof this.renderHouseholdSettings === 'function') {
       this.renderHouseholdSettings();
     }
+    if (typeof this.renderSettings === 'function') {
+      this.renderSettings();
+    }
+    if (this.onboardingStep === 2 && typeof this.renderOnboardingDietaryChips === 'function') {
+      this.renderOnboardingDietaryChips();
+    }
     if (this.activeRecipe && this.modalRecipeDetail && (this.modalRecipeDetail.open || this.modalRecipeDetail.classList.contains('active'))) {
       this.renderRecipeModalContent();
     }
@@ -5639,11 +5645,11 @@ class FoodAssistantApp {
     // US-35: Resiliencia Local-First y recuperación de conexión offline
     if (typeof window !== 'undefined') {
       window.addEventListener('online', () => {
-        this.updateSyncIndicator('Conexión reanudada. Sincronizando...', 'syncing');
+        this.updateSyncIndicator(window.I18n ? window.I18n.t('settings.syncReconnecting') : 'Conexión reanudada. Sincronizando...', 'syncing');
         this.syncDataWithCloud(true);
       });
       window.addEventListener('offline', () => {
-        this.updateSyncIndicator('Sin conexión (modo local)', 'warning');
+        this.updateSyncIndicator(window.I18n ? window.I18n.t('settings.syncOffline') : 'Sin conexión (modo local)', 'warning');
       });
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
@@ -6003,7 +6009,7 @@ class FoodAssistantApp {
   // BUG-24: Sincronización diferida con debounce para mutaciones frecuentes
   scheduleSyncWithCloud(delay = 800) {
     if (!this.supabaseClient || !state.cloudUser?.id) return;
-    this.updateSyncIndicator('Guardando cambios...', 'syncing');
+    this.updateSyncIndicator(window.I18n ? window.I18n.t('settings.syncSaving') : 'Guardando cambios...', 'syncing');
     if (this.syncDebounceTimer) {
       clearTimeout(this.syncDebounceTimer);
     }
@@ -6025,7 +6031,7 @@ class FoodAssistantApp {
   async pullFromCloud() {
     if (!this.supabaseClient || !state.cloudUser?.id) return { success: false, reason: 'no_session' };
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      this.updateSyncIndicator('Sin conexión (modo local)', 'warning');
+      this.updateSyncIndicator(window.I18n ? window.I18n.t('settings.syncOffline') : 'Sin conexión (modo local)', 'warning');
       return { success: false, reason: 'offline' };
     }
 
@@ -6746,7 +6752,7 @@ class FoodAssistantApp {
       return { success: false, reason: 'no_session' };
     }
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      this.updateSyncIndicator('Sin conexión (modo local)', 'warning');
+      this.updateSyncIndicator(window.I18n ? window.I18n.t('settings.syncOffline') : 'Sin conexión (modo local)', 'warning');
       return { success: false, reason: 'offline' };
     }
 
@@ -6758,7 +6764,7 @@ class FoodAssistantApp {
     }
     this.isPushingToCloud = true;
 
-    this.updateSyncIndicator('Sincronizando con la nube...', 'syncing');
+    this.updateSyncIndicator(window.I18n ? window.I18n.t('settings.syncingCloud') : 'Sincronizando con la nube...', 'syncing');
 
     try {
       let activeHouseholdId = state.household?.id || null;
@@ -7085,18 +7091,20 @@ class FoodAssistantApp {
       state.lastSyncedAt = new Date().toISOString();
       localStorage.setItem('fa_last_sync', state.lastSyncedAt);
       this.updateUserAccountUI();
-      this.updateSyncIndicator(`Sincronizado a las ${new Date(state.lastSyncedAt).toLocaleTimeString()}`, 'success');
+      this.updateSyncIndicator(`${window.I18n ? window.I18n.t('settings.syncedAt') : 'Sincronizado a las'} ${new Date(state.lastSyncedAt).toLocaleTimeString()}`, 'success');
 
       if (!silent) {
-        this.showToast("¡Datos sincronizados correctamente con la nube!", 'success');
+        this.showToast(window.I18n ? window.I18n.t('notifications.syncSuccess') : "¡Datos sincronizados correctamente con la nube!", 'success');
       }
       return { success: true };
     } catch (err) {
       // BUG-21: No marcar como sincronizado si Supabase devolvió error
       console.warn("Error durante la sincronización con Supabase:", err);
-      this.updateSyncIndicator(`Error de sincronización: ${err.message || 'Error de conexión'}`, 'error');
+      const syncErrMsg = window.I18n ? window.I18n.t('settings.syncError') : 'Error de sincronización';
+      const syncNetErrMsg = window.I18n ? window.I18n.t('settings.syncNetworkError') : 'Error de conexión';
+      this.updateSyncIndicator(`${syncErrMsg}: ${err.message || syncNetErrMsg}`, 'error');
       if (!silent) {
-        this.showToast("Error al sincronizar con la nube: " + (err.message || 'Fallo de conexión'), 'error');
+        this.showToast((window.I18n ? window.I18n.t('settings.syncError') : 'Error al sincronizar con la nube') + ": " + (err.message || syncNetErrMsg), 'error');
       }
       return { success: false, error: err };
     } finally {
@@ -7117,7 +7125,7 @@ class FoodAssistantApp {
       return { success: false, reason: 'no_session' };
     }
 
-    this.updateSyncIndicator("Sincronizando con la nube...", 'syncing');
+    this.updateSyncIndicator(window.I18n ? window.I18n.t('settings.syncingCloud') : "Sincronizando con la nube...", 'syncing');
     const pullRes = await this.pullFromCloud();
     this.sanitizeRecipeProteinTags();
     this.render();
@@ -16747,25 +16755,26 @@ REGLAS CRÍTICAS:
       };
     }
 
+    const isEn = window.I18n && window.I18n.getLanguage() === 'en';
     if (inputKey) {
       inputKey.value = state.settings.geminiApiKey || '';
       if (currentProvider === 'openai') {
-        inputKey.placeholder = 'sk-proj-... (Clave de OpenAI)';
+        inputKey.placeholder = isEn ? 'sk-proj-... (OpenAI Key)' : 'sk-proj-... (Clave de OpenAI)';
       } else if (currentProvider === 'claude') {
-        inputKey.placeholder = 'sk-ant-... (Clave de Anthropic Claude)';
+        inputKey.placeholder = isEn ? 'sk-ant-... (Anthropic Claude Key)' : 'sk-ant-... (Clave de Anthropic Claude)';
       } else {
-        inputKey.placeholder = 'AIzaSy... (Clave de Google Gemini)';
+        inputKey.placeholder = isEn ? 'AIzaSy... (Google Gemini Key)' : 'AIzaSy... (Clave de Google Gemini)';
       }
     }
 
     if (status) {
       const provName = currentProvider === 'openai' ? 'OpenAI ChatGPT' : (currentProvider === 'claude' ? 'Anthropic Claude' : 'Google Gemini');
       if (state.settings.geminiApiKey) {
-        status.innerHTML = `<span class="u-text-brand-medium">✓ Clave configurada (${provName} activo)</span>`;
+        status.innerHTML = `<span class="u-text-brand-medium">✓ ${window.I18n ? window.I18n.t('settings.apiKeyConfigured', { provider: provName }) : `Clave configurada (${provName} activo)`}</span>`;
       } else if (this.getEffectiveGeminiApiKey()) {
-        status.innerHTML = `<span class="u-text-brand-medium">✓ IA de Sabory activa automáticamente (${provName} · clave propia opcional)</span>`;
+        status.innerHTML = `<span class="u-text-brand-medium">✓ ${window.I18n ? window.I18n.t('settings.apiKeySharedActive', { provider: provName }) : `IA de Sabory activa automáticamente (${provName} · clave propia opcional)`}</span>`;
       } else {
-        status.innerHTML = '<span class="u-text-muted">Modo Asistente Integrado activo (sin coste ni clave requerida)</span>';
+        status.innerHTML = `<span class="u-text-muted">${window.I18n ? window.I18n.t('settings.apiKeyIntegrated') : 'Modo Asistente Integrado activo (sin coste ni clave requerida)'}</span>`;
       }
     }
 
@@ -17863,9 +17872,13 @@ REGLAS CRÍTICAS:
     }
 
     const endpoint = this.getExternalAgentEndpoint();
+    const isEn = window.I18n && window.I18n.getLanguage() === 'en';
+    const activeLabel = isEn ? '✓ External access active' : '✓ Acceso externo activo';
+    const pausedLabel = isEn ? 'External access paused' : 'Acceso externo en pausa';
+    const noTokenLabel = isEn ? 'No token. Generate one to connect external assistants.' : 'Sin token. Genera uno para conectar asistentes externos.';
     statusEl.innerHTML = hasToken
-      ? `<span class="${enabled ? 'u-text-brand-medium' : 'u-text-muted-medium'}">${enabled ? '✓ Acceso externo activo' : 'Acceso externo en pausa'} · token fa_live_••••${state.settings.agentTokenHint || ''}</span>`
-      : '<span class="u-text-muted">Sin token. Genera uno para conectar asistentes externos.</span>';
+      ? `<span class="${enabled ? 'u-text-brand-medium' : 'u-text-muted-medium'}">${enabled ? activeLabel : pausedLabel} · token fa_live_••••${state.settings.agentTokenHint || ''}</span>`
+      : `<span class="u-text-muted">${noTokenLabel}</span>`;
 
     const reveal = document.getElementById('external-agent-token-reveal');
     const tokenInput = document.getElementById('external-agent-token');
@@ -17876,9 +17889,23 @@ REGLAS CRÍTICAS:
 
     const guide = document.getElementById('external-agent-guide');
     if (guide) {
-      const tk = freshToken || 'fa_live_TU_TOKEN';
-      guide.textContent =
-        `# 1) Comando en lenguaje natural (Atajos de voz / HTTP Shortcuts / Telegram)
+      const tk = freshToken || (isEn ? 'fa_live_YOUR_TOKEN' : 'fa_live_TU_TOKEN');
+      guide.textContent = isEn
+        ? `# 1) Natural language command (Voice shortcuts / HTTP Shortcuts / Telegram)
+POST ${endpoint}/command
+Authorization: Bearer ${tk}
+Content-Type: application/json
+{"command": "Add milk and avocados to the shopping list"}
+→ responds {"ok":true,"speech":"..."} (read "speech" out loud)
+
+# 2) Claude / MCP clients (remote MCP server)
+URL:  ${endpoint}/mcp
+Header: Authorization: Bearer ${tk}
+
+# 3) ChatGPT (Custom GPT → Actions)
+Import schema from: ${endpoint}/openapi.json
+Authentication: API Key → Bearer → ${tk}`
+        : `# 1) Comando en lenguaje natural (Atajos de voz / HTTP Shortcuts / Telegram)
 POST ${endpoint}/command
 Authorization: Bearer ${tk}
 Content-Type: application/json
@@ -17902,10 +17929,11 @@ Autenticación: API Key → Bearer → ${tk}`;
 
     container.innerHTML = PREDEFINED_DIETARY_TAGS.map(pref => {
       const isSelected = (state.dietaryPreferences || []).includes(pref);
+      const displayPref = window.I18n ? window.I18n.getTagLabel(pref) : pref;
       return `
         <button type="button" class="m3-filter-chip dietary-chip ${isSelected ? 'active' : ''}" onclick="app.toggleDietaryPreference('${pref}')">
           ${isSelected ? '<span class="material-symbols-outlined icon-14">check_circle</span>' : `<span class="dietary-emoji">${getDietaryTagEmoji(pref)}</span>`}
-          <span>${pref}</span>
+          <span>${escapeHtml(displayPref)}</span>
         </button>
       `;
     }).join('');
@@ -18586,12 +18614,13 @@ Autenticación: API Key → Bearer → ${tk}`;
     container.innerHTML = PREDEFINED_DIETARY_TAGS.map(tag => {
       const isSelected = this.onboardingDietary.has(tag);
       const emoji = getDietaryTagEmoji(tag);
+      const displayTag = window.I18n ? window.I18n.getTagLabel(tag) : tag;
       return `
         <button type="button" class="m3-filter-chip dietary-chip ${isSelected ? 'active' : ''}"
           data-action="toggleOnboardingDietaryTag" data-tag="${escapeHtml(tag)}"
           aria-pressed="${isSelected ? 'true' : 'false'}">
           <span class="dietary-emoji">${emoji}</span>
-          <span>${escapeHtml(tag)}</span>
+          <span>${escapeHtml(displayTag)}</span>
         </button>
       `;
     }).join('');
@@ -18721,7 +18750,7 @@ Autenticación: API Key → Bearer → ${tk}`;
       const summaryBox = document.getElementById('onboarding-summary-box');
       if (summaryBox) {
         const isEn = window.I18n && window.I18n.getLanguage() === 'en';
-        const dietList = Array.from(this.onboardingDietary);
+        const dietList = Array.from(this.onboardingDietary).map(t => window.I18n ? window.I18n.getTagLabel(t) : t);
         const dietText = dietList.length > 0 ? dietList.join(', ') : (isEn ? 'Omnivore / No restrictions' : 'Omnívoro / Sin restricciones');
         const goalsEnabled = document.getElementById('onboarding-goals-enabled')?.checked !== false;
         const cal = parseInt(document.getElementById('onboarding-goal-calories')?.value, 10) || 2000;
