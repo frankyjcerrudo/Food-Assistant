@@ -6,6 +6,8 @@
    - Si un test falla en CI, se debe inspeccionar el log de Vitest y corregir inmediatamente.
 
 2. **Gestión de Backlog y Tareas**:
+   - **Sincronización inmediata de Backlog**: Cada vez que se modifique BACKLOG.md, hacer commit y git push origin main de inmediato para que Franky vea reflejados los cambios en su board de GitHub al instante.
+   - **Modificación sin pestañas**: Modificar BACKLOG.md y archivos de documentación/gestión directamente desde terminal/scripts para evitar la apertura automática de pestañas en el editor de Franky.
    - Las tareas permanecen en `In Progress` hasta que el usuario las pruebe y dé su aprobación explícita.
    - Las versiones previas a publicación deben seguir el formato `0.x` (ejemplo: `v0.12`). En cada avance, cambio o nueva funcionalidad completada, el agente debe incrementar proactivamente la versión (ej. de `v0.22` a `v0.23`) en todos los archivos del proyecto (`package.json`, `app.js`, `index.html`, `sw.js`, tests).
 
