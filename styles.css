@@ -6060,7 +6060,8 @@ h2,
   white-space: nowrap;
 }
 
-.wake-lock-badge.is-hidden {
+.wake-lock-badge.is-hidden,
+#recipe-wake-lock-badge {
   display: none !important;
 }
 

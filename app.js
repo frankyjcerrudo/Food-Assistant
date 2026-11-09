@@ -4723,7 +4723,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.67';
+  window.APP_VERSION = 'v1.68';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
