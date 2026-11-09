@@ -648,5 +648,123 @@ describe('US-77: Modo Familia / Espacio Colaborativo del Hogar (Family Mode)', (
       expect(state.shoppingList.length).toBe(1);
       expect(state.shoppingList.find(i => i.id === 'shop-realtime-1')).toBeUndefined();
     });
+
+    it('11. US-81: broadcastRealtimeChange y suscripciones Broadcast WebSocket sincronizan compras instantáneamente', () => {
+      appInstance.supabaseClient = {
+        channel: vi.fn()
+      };
+      const mockChannel = {
+        send: vi.fn(),
+        on: vi.fn().mockReturnThis(),
+        subscribe: vi.fn().mockReturnThis()
+      };
+      appInstance.householdRealtimeChannel = mockChannel;
+      appInstance.userRealtimeChannel = mockChannel;
+
+      state.shoppingList = [
+        { id: 'shop-bc-1', name: 'Manzanas', amount: 4, unit: 'ud', aisle: 'produce', isChecked: false }
+      ];
+
+      // Emitir broadcast toggle
+      appInstance.broadcastRealtimeChange('shopping_change', {
+        action: 'toggle',
+        item: { id: 'shop-bc-1', isChecked: true, updatedAt: new Date().toISOString() }
+      });
+
+      expect(mockChannel.send).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'broadcast',
+        event: 'shopping_change',
+        payload: expect.objectContaining({ action: 'toggle' })
+      }));
+
+      // Recepción de broadcast en el otro dispositivo
+      const renderSpy = vi.spyOn(appInstance, 'renderShoppingList');
+      appInstance.handleRealtimeShoppingBroadcast({
+        action: 'toggle',
+        senderId: 'other-user-999',
+        item: { id: 'shop-bc-1', isChecked: true, updatedAt: new Date().toISOString() }
+      });
+
+      expect(state.shoppingList[0].isChecked).toBe(true);
+      expect(renderSpy).toHaveBeenCalled();
+    });
+
+    it('12. US-81: handleRealtimePlannerBroadcast actualiza instantáneamente el planificador entre dispositivos y miembros', () => {
+      state.mealPlan = {
+        '2026-11-10': { dayName: 'Martes', lunch: null, dinner: null }
+      };
+
+      const renderPlannerSpy = vi.spyOn(appInstance, 'renderPlanner');
+      const renderTodaySpy = vi.spyOn(appInstance, 'renderTodayView');
+
+      appInstance.handleRealtimePlannerBroadcast({
+        senderId: 'other-user-999',
+        dateStr: '2026-11-10',
+        dayPlan: { dayName: 'Martes', lunch: 'rec-pasta-1', dinner: 'rec-tortilla-2' }
+      });
+
+      expect(state.mealPlan['2026-11-10'].lunch).toBe('rec-pasta-1');
+      expect(state.mealPlan['2026-11-10'].dinner).toBe('rec-tortilla-2');
+      expect(renderPlannerSpy).toHaveBeenCalled();
+      expect(renderTodaySpy).toHaveBeenCalled();
+    });
+
+    it('13. US-81: pullFromCloud pre-resuelve el Hogar activo desde user_settings antes de consultar tablas', async () => {
+      // Simular nuevo dispositivo donde state.household está vacío
+      state.household = null;
+      state.cloudUser = { id: 'user-franky-111', email: 'franky@sabory.food' };
+
+      const queryLog = [];
+
+      appInstance.supabaseClient = {
+        from: vi.fn().mockImplementation((table) => {
+          queryLog.push(table);
+          if (table === 'user_settings') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [{ active_household_id: 'hh-cerrudo-pre-resolved' }],
+                  error: null
+                })
+              })
+            };
+          }
+          if (table === 'households') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [{ id: 'hh-cerrudo-pre-resolved', name: 'Casa Franky', owner_id: 'user-franky-111' }],
+                  error: null
+                })
+              })
+            };
+          }
+          if (table === 'household_members') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [{ household_id: 'hh-cerrudo-pre-resolved', user_id: 'user-franky-111', role: 'owner' }],
+                  error: null
+                })
+              })
+            };
+          }
+          const chain = {
+            select: vi.fn().mockReturnThis(),
+            or: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockResolvedValue({ data: [], error: null })
+          };
+          return chain;
+        })
+      };
+
+      await appInstance.pullFromCloud();
+
+      // Debe consultar user_settings PRIMERO para resolver el hogar activo antes de recetas/planes/compras
+      expect(queryLog[0]).toBe('user_settings');
+      expect(state.household).toBeDefined();
+      expect(state.household.id).toBe('hh-cerrudo-pre-resolved');
+    });
   });
 });

@@ -410,6 +410,27 @@ create policy "Authenticated users can update app_config" on public.app_config
   for update using (auth.uid() is not null)
   with check (auth.uid() is not null);
 
+-- -----------------------------------------------------------------------------
+-- 8. SUPABASE REALTIME (PUBLICACIÓN Y REPLICA IDENTITY PARA CDC)
+-- -----------------------------------------------------------------------------
+alter table public.shopping_items replica identity full;
+alter table public.meal_plans replica identity full;
+alter table public.recipes replica identity full;
+alter table public.household_members replica identity full;
+
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    alter publication supabase_realtime add table public.shopping_items;
+    alter publication supabase_realtime add table public.meal_plans;
+    alter publication supabase_realtime add table public.recipes;
+    alter publication supabase_realtime add table public.household_members;
+  end if;
+exception when others then
+  null;
+end;
+$$;
+
 -- Recargar caché de esquema de PostgREST / Supabase API
 notify pgrst, 'reload schema';
 

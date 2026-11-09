@@ -4494,7 +4494,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.51';
+  window.APP_VERSION = 'v1.52';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4535,7 +4535,7 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.51';
+    this.appVersion = window.APP_VERSION || 'v1.52';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5293,9 +5293,9 @@ class FoodAssistantApp {
           this.sanitizeRecipeProteinTags();
           this.render();
           if (this.supabaseClient && state.cloudUser?.id) {
-            // US-69: refresco reactivo al volver a la app (debounce 15 s)
+            // US-69 & US-81: refresco reactivo al volver a la app (debounce de 2 s para multi-dispositivo y PWA)
             const nowMs = Date.now();
-            if (!this._lastVisibilitySyncAt || nowMs - this._lastVisibilitySyncAt > 15000) {
+            if (!this._lastVisibilitySyncAt || nowMs - this._lastVisibilitySyncAt > 2000) {
               this._lastVisibilitySyncAt = nowMs;
               this.syncDataWithCloud(true);
             }
@@ -5655,7 +5655,27 @@ class FoodAssistantApp {
     }
 
     try {
-      const activeHouseholdId = state.household?.id || null;
+      // US-81: Resolver y adoptar el Hogar activo ANTES de consultar recetas, plan y compra
+      let activeHouseholdId = state.household?.id || null;
+      if (!activeHouseholdId && state.cloudUser?.id && this.supabaseClient?.from) {
+        try {
+          const sRes = await this.supabaseClient.from('user_settings').select('active_household_id').eq('user_id', state.cloudUser.id);
+          if (Array.isArray(sRes?.data) && sRes.data[0]?.active_household_id) {
+            const hId = sRes.data[0].active_household_id;
+            if (typeof this.loadHouseholdByIdFromCloud === 'function') {
+              await this.loadHouseholdByIdFromCloud(hId);
+              activeHouseholdId = state.household?.id || hId;
+            } else {
+              activeHouseholdId = hId;
+            }
+          }
+        } catch (e) { }
+      }
+
+      // Asegurar que la suscripción en tiempo real está activa para el hogar o el usuario
+      if (!this.householdRealtimeChannel && !this.userRealtimeChannel && typeof this.initHouseholdRealtimeSubscription === 'function') {
+        this.initHouseholdRealtimeSubscription();
+      }
 
       // US-77: Si hay un hogar activo, refrescar la lista de miembros en segundo plano
       if (activeHouseholdId && typeof this.refreshHouseholdMembersFromCloud === 'function') {
@@ -5678,15 +5698,29 @@ class FoodAssistantApp {
       if (typeof recQuery.limit === 'function') recQuery = recQuery.limit(5000);
 
       let planBase = this.supabaseClient.from('meal_plans').select('*');
-      let planQuery = activeHouseholdId
-        ? planBase.eq('household_id', activeHouseholdId)
-        : planBase.eq('user_id', state.cloudUser.id);
+      let planQuery;
+      if (activeHouseholdId) {
+        if (typeof planBase.or === 'function') {
+          planQuery = planBase.or(`household_id.eq.${activeHouseholdId},user_id.eq.${state.cloudUser.id}`);
+        } else {
+          planQuery = planBase.eq('household_id', activeHouseholdId);
+        }
+      } else {
+        planQuery = planBase.eq('user_id', state.cloudUser.id);
+      }
       if (typeof planQuery.limit === 'function') planQuery = planQuery.limit(5000);
 
       let shopBase = this.supabaseClient.from('shopping_items').select('*');
-      let shopQuery = activeHouseholdId
-        ? shopBase.eq('household_id', activeHouseholdId)
-        : shopBase.eq('user_id', state.cloudUser.id);
+      let shopQuery;
+      if (activeHouseholdId) {
+        if (typeof shopBase.or === 'function') {
+          shopQuery = shopBase.or(`household_id.eq.${activeHouseholdId},user_id.eq.${state.cloudUser.id}`);
+        } else {
+          shopQuery = shopBase.eq('household_id', activeHouseholdId);
+        }
+      } else {
+        shopQuery = shopBase.eq('user_id', state.cloudUser.id);
+      }
       if (typeof shopQuery.limit === 'function') shopQuery = shopQuery.limit(5000);
 
       const [recRes, planRes, shopRes] = await Promise.all([
@@ -6343,7 +6377,21 @@ class FoodAssistantApp {
     this.updateSyncIndicator('Sincronizando con la nube...', 'syncing');
 
     try {
-      const activeHouseholdId = state.household?.id || null;
+      let activeHouseholdId = state.household?.id || null;
+      if (!activeHouseholdId && state.cloudUser?.id && this.supabaseClient?.from) {
+        try {
+          const sRes = await this.supabaseClient.from('user_settings').select('active_household_id').eq('user_id', state.cloudUser.id);
+          if (Array.isArray(sRes?.data) && sRes.data[0]?.active_household_id) {
+            const hId = sRes.data[0].active_household_id;
+            if (typeof this.loadHouseholdByIdFromCloud === 'function') {
+              await this.loadHouseholdByIdFromCloud(hId);
+              activeHouseholdId = state.household?.id || hId;
+            } else {
+              activeHouseholdId = hId;
+            }
+          }
+        } catch (e) { }
+      }
       const deleteScopeCol = activeHouseholdId ? 'household_id' : 'user_id';
       const deleteScopeVal = activeHouseholdId || state.cloudUser.id;
 
@@ -7324,7 +7372,7 @@ class FoodAssistantApp {
     // US-77: Modo Familia — Enlace de invitación (?join=SAB-XXXX) y formularios en Ajustes
     this.initHouseholdEvents();
     this.handleHouseholdJoinUrlLaunch();
-    if (state.household?.id) {
+    if (state.household?.id || state.cloudUser?.id) {
       this.initHouseholdRealtimeSubscription();
     }
 
@@ -10603,7 +10651,12 @@ class FoodAssistantApp {
       state.mealPlan[dateStr][slotType] = null;
       state.mealPlan[dateStr].updatedAt = new Date().toISOString();
       state.save('fa_mealplan', state.mealPlan);
+      this.broadcastRealtimeChange('planner_change', {
+        dateStr: dateStr,
+        dayPlan: state.mealPlan[dateStr]
+      });
       this.scheduleSyncWithCloud();
+      this.flushSync();
       this.render();
     }
   }
@@ -10615,7 +10668,12 @@ class FoodAssistantApp {
         cs.recipeId = null;
         state.mealPlan[dateStr].updatedAt = new Date().toISOString();
         state.save('fa_mealplan', state.mealPlan);
+        this.broadcastRealtimeChange('planner_change', {
+          dateStr: dateStr,
+          dayPlan: state.mealPlan[dateStr]
+        });
         this.scheduleSyncWithCloud();
+        this.flushSync();
         this.render();
       }
     }
@@ -10626,7 +10684,12 @@ class FoodAssistantApp {
       state.mealPlan[dateStr].customSlots = state.mealPlan[dateStr].customSlots.filter(c => c.id !== customSlotId);
       state.mealPlan[dateStr].updatedAt = new Date().toISOString();
       state.save('fa_mealplan', state.mealPlan);
+      this.broadcastRealtimeChange('planner_change', {
+        dateStr: dateStr,
+        dayPlan: state.mealPlan[dateStr]
+      });
       this.scheduleSyncWithCloud();
+      this.flushSync();
       this.render();
     }
   }
@@ -10768,7 +10831,14 @@ class FoodAssistantApp {
     srcDay.updatedAt = nowIso;
     tgtDay.updatedAt = nowIso;
     state.save('fa_mealplan', state.mealPlan);
+    this.broadcastRealtimeChange('planner_change', {
+      dateStr: targetDate,
+      dayPlan: tgtDay,
+      sourceDateStr: sourceDate,
+      sourceDayPlan: srcDay
+    });
     this.scheduleSyncWithCloud();
+    this.flushSync();
     this.renderPlanner();
     this.renderTodayView();
 
@@ -11815,7 +11885,12 @@ class FoodAssistantApp {
 
       state.save('fa_mealplan', state.mealPlan);
       this.closePickerModal();
+      this.broadcastRealtimeChange('planner_change', {
+        dateStr: dateStr,
+        dayPlan: state.mealPlan[dateStr]
+      });
       this.scheduleSyncWithCloud();
+      this.flushSync();
       this.render();
       if (shouldCookDouble) {
         this.showToast("¡Plato asignado para hoy y programado como sobras para mañana!", "success");
@@ -12226,6 +12301,20 @@ class FoodAssistantApp {
       if (activeHouseholdId) {
         rowPayload.household_id = activeHouseholdId;
       }
+      // Broadcast WebSocket ultra-rápido a otros miembros / dispositivos
+      this.broadcastRealtimeChange('shopping_change', {
+        action: 'toggle',
+        item: {
+          id: item.id,
+          name: item.name,
+          amount: rowPayload.amount,
+          unit: item.unit,
+          aisle: item.aisle,
+          isChecked: !!item.isChecked,
+          recipeOrigin: item.recipeOrigin || '',
+          updatedAt: rowPayload.updated_at
+        }
+      });
       await this.upsertWithSchemaFallback('shopping_items', [rowPayload]);
     } catch (e) {
       console.warn('[Sync] Fallo en syncShoppingItemInstant, delegando en scheduleSyncWithCloud:', e);
@@ -12237,6 +12326,10 @@ class FoodAssistantApp {
     const item = state.shoppingList[index];
     if (item && item.id) {
       state.trackDeletion('shoppingItems', item.id);
+      this.broadcastRealtimeChange('shopping_change', {
+        action: 'delete',
+        itemId: item.id
+      });
     }
     state.shoppingList.splice(index, 1);
     state.save('fa_shopping', state.shoppingList);
@@ -12271,6 +12364,9 @@ class FoodAssistantApp {
           });
           state.shoppingList = [];
           state.save('fa_shopping', state.shoppingList);
+          this.broadcastRealtimeChange('shopping_change', {
+            action: 'clear_completed'
+          });
           this.scheduleSyncWithCloud();
           this.flushSync();
           this.render();
@@ -12292,6 +12388,9 @@ class FoodAssistantApp {
           });
           state.shoppingList = state.shoppingList.filter(i => !i.isChecked);
           state.save('fa_shopping', state.shoppingList);
+          this.broadcastRealtimeChange('shopping_change', {
+            action: 'clear_completed'
+          });
           this.scheduleSyncWithCloud();
           this.flushSync();
           this.render();
@@ -12315,7 +12414,11 @@ class FoodAssistantApp {
         });
         state.shoppingList = [];
         state.save('fa_shopping', state.shoppingList);
+        this.broadcastRealtimeChange('shopping_change', {
+          action: 'clear_completed'
+        });
         this.scheduleSyncWithCloud();
+        this.flushSync();
         this.render();
         this.showToast("Lista de la compra vaciada.", 'info');
         return true;
@@ -12351,7 +12454,7 @@ class FoodAssistantApp {
       name = text.charAt(0).toUpperCase() + text.slice(1);
     }
 
-    mergeOrAddShoppingItem(state.shoppingList, {
+    const newItem = {
       id: generateId('shop-'),
       name: name,
       amount: amount,
@@ -12360,10 +12463,17 @@ class FoodAssistantApp {
       isChecked: false,
       recipeOrigin: "Añadido manualmente",
       updatedAt: new Date().toISOString()
-    });
+    };
+
+    mergeOrAddShoppingItem(state.shoppingList, newItem);
 
     state.save('fa_shopping', state.shoppingList);
+    this.broadcastRealtimeChange('shopping_change', {
+      action: 'add',
+      item: newItem
+    });
     this.scheduleSyncWithCloud();
+    this.flushSync();
     input.value = '';
     this.renderShoppingList();
   }
@@ -16770,30 +16880,62 @@ REGLAS CRÍTICAS:
 
   initHouseholdRealtimeSubscription() {
     this.teardownHouseholdRealtimeSubscription();
+    if (!this.supabaseClient || typeof this.supabaseClient.channel !== 'function') {
+      return null;
+    }
+
     const householdId = state.household?.id;
-    if (!householdId || !this.supabaseClient || typeof this.supabaseClient.channel !== 'function') {
+    const userId = state.cloudUser?.id;
+
+    if (!householdId && !userId) {
       return null;
     }
 
-    try {
-      const channel = this.supabaseClient.channel(`household-${householdId}`);
-      const onRealtimeChange = (payload) => {
-        this.handleHouseholdRealtimeEvent(payload);
-      };
+    const setupChannel = (channelName, filterScope) => {
+      try {
+        const channel = this.supabaseClient.channel(channelName, {
+          config: {
+            broadcast: { self: false }
+          }
+        });
 
-      channel
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_items', filter: `household_id=eq.${householdId}` }, onRealtimeChange)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'meal_plans', filter: `household_id=eq.${householdId}` }, onRealtimeChange)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'recipes', filter: `household_id=eq.${householdId}` }, onRealtimeChange)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'household_members', filter: `household_id=eq.${householdId}` }, onRealtimeChange)
-        .subscribe();
+        // 1. Broadcast ultra-rápido por WebSocket directo (15-30ms) sin depender de CDC en Postgres
+        channel
+          .on('broadcast', { event: 'shopping_change' }, (msg) => {
+            this.handleRealtimeShoppingBroadcast(msg?.payload);
+          })
+          .on('broadcast', { event: 'planner_change' }, (msg) => {
+            this.handleRealtimePlannerBroadcast(msg?.payload);
+          });
 
-      this.householdRealtimeChannel = channel;
-      return channel;
-    } catch (err) {
-      console.warn('[Household Realtime] No se pudo suscribir al canal en tiempo real:', err);
-      return null;
+        // 2. CDC fallback (postgres_changes)
+        if (filterScope) {
+          const onRealtimeChange = (payload) => {
+            this.handleHouseholdRealtimeEvent(payload);
+          };
+          channel
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_items', filter: filterScope }, onRealtimeChange)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'meal_plans', filter: filterScope }, onRealtimeChange)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'recipes', filter: filterScope }, onRealtimeChange)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'household_members', filter: filterScope }, onRealtimeChange);
+        }
+
+        channel.subscribe();
+        return channel;
+      } catch (err) {
+        console.warn(`[Household Realtime] No se pudo suscribir al canal ${channelName}:`, err);
+        return null;
+      }
+    };
+
+    if (householdId) {
+      this.householdRealtimeChannel = setupChannel(`household-${householdId}`, `household_id=eq.${householdId}`);
     }
+    if (userId) {
+      this.userRealtimeChannel = setupChannel(`user-${userId}`, `user_id=eq.${userId}`);
+    }
+
+    return this.householdRealtimeChannel || this.userRealtimeChannel;
   }
 
   teardownHouseholdRealtimeSubscription() {
@@ -16801,16 +16943,133 @@ REGLAS CRÍTICAS:
       clearTimeout(this._householdRealtimeDebounce);
       this._householdRealtimeDebounce = null;
     }
-    if (this.householdRealtimeChannel) {
+    const cleanChan = (ch) => {
+      if (!ch) return;
       try {
         if (this.supabaseClient && typeof this.supabaseClient.removeChannel === 'function') {
-          this.supabaseClient.removeChannel(this.householdRealtimeChannel);
-        } else if (typeof this.householdRealtimeChannel.unsubscribe === 'function') {
-          this.householdRealtimeChannel.unsubscribe();
+          this.supabaseClient.removeChannel(ch);
+        } else if (typeof ch.unsubscribe === 'function') {
+          ch.unsubscribe();
         }
       } catch (e) { }
-      this.householdRealtimeChannel = null;
+    };
+    cleanChan(this.householdRealtimeChannel);
+    cleanChan(this.userRealtimeChannel);
+    this.householdRealtimeChannel = null;
+    this.userRealtimeChannel = null;
+  }
+
+  broadcastRealtimeChange(event, payload) {
+    if (!this.supabaseClient) return;
+    const body = {
+      ...payload,
+      senderId: state.cloudUser?.id,
+      timestamp: Date.now()
+    };
+    const sendToChan = (ch) => {
+      if (ch && typeof ch.send === 'function') {
+        try {
+          ch.send({
+            type: 'broadcast',
+            event: event,
+            payload: body
+          });
+        } catch (e) {
+          console.warn('[Realtime Broadcast] Error enviando broadcast:', e);
+        }
+      }
+    };
+    sendToChan(this.householdRealtimeChannel);
+    sendToChan(this.userRealtimeChannel);
+  }
+
+  handleRealtimeShoppingBroadcast(payload) {
+    if (!payload || !Array.isArray(state.shoppingList)) return;
+    if (payload.senderId && state.cloudUser?.id && payload.senderId === state.cloudUser.id) {
+      return;
     }
+
+    const action = payload.action;
+    let modified = false;
+
+    if (action === 'toggle' || action === 'update') {
+      const item = payload.item;
+      if (!item || !item.id) return;
+      const localIdx = state.shoppingList.findIndex(i => i.id === item.id);
+      if (localIdx >= 0) {
+        const local = state.shoppingList[localIdx];
+        local.isChecked = !!item.isChecked;
+        local.updatedAt = item.updatedAt || new Date().toISOString();
+        if (item.name) local.name = item.name;
+        if (item.amount !== undefined) local.amount = item.amount;
+        if (item.unit !== undefined) local.unit = item.unit;
+        if (item.aisle) local.aisle = item.aisle;
+        modified = true;
+      } else {
+        state.shoppingList.push({
+          id: item.id,
+          name: item.name,
+          amount: item.amount !== undefined ? item.amount : null,
+          unit: item.unit || '',
+          aisle: item.aisle || 'other',
+          isChecked: !!item.isChecked,
+          recipeOrigin: item.recipeOrigin || '',
+          updatedAt: item.updatedAt || new Date().toISOString()
+        });
+        modified = true;
+      }
+    } else if (action === 'delete') {
+      if (payload.itemId) {
+        const prevLen = state.shoppingList.length;
+        state.shoppingList = state.shoppingList.filter(i => i.id !== payload.itemId);
+        if (state.shoppingList.length !== prevLen) modified = true;
+      }
+    } else if (action === 'clear_completed') {
+      const prevLen = state.shoppingList.length;
+      state.shoppingList = state.shoppingList.filter(i => !i.isChecked);
+      if (state.shoppingList.length !== prevLen) modified = true;
+    } else if (action === 'add') {
+      if (payload.item && payload.item.id) {
+        const exists = state.shoppingList.some(i => i.id === payload.item.id);
+        if (!exists) {
+          state.shoppingList.push(payload.item);
+          modified = true;
+        }
+      }
+    }
+
+    if (modified) {
+      state.save('fa_shopping', state.shoppingList);
+      this.renderShoppingList();
+    }
+  }
+
+  handleRealtimePlannerBroadcast(payload) {
+    if (!payload) return;
+    if (payload.senderId && state.cloudUser?.id && payload.senderId === state.cloudUser.id) {
+      return;
+    }
+    let modified = false;
+    if (payload.dateStr && payload.dayPlan) {
+      state.mealPlan[payload.dateStr] = payload.dayPlan;
+      modified = true;
+    }
+    if (payload.sourceDateStr && payload.sourceDayPlan) {
+      state.mealPlan[payload.sourceDateStr] = payload.sourceDayPlan;
+      modified = true;
+    }
+    if (modified) {
+      state.save('fa_mealplan', state.mealPlan);
+      this.renderPlanner();
+      this.renderTodayView();
+    }
+    if (this._householdRealtimeDebounce) {
+      clearTimeout(this._householdRealtimeDebounce);
+    }
+    this._householdRealtimeDebounce = setTimeout(async () => {
+      this._householdRealtimeDebounce = null;
+      await this.pullFromCloud();
+    }, 500);
   }
 
   handleHouseholdRealtimeEvent(payload) {
