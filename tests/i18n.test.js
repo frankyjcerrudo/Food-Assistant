@@ -118,7 +118,7 @@ describe('US-12: Módulo Core de Internacionalización (i18n.js)', () => {
     I18n.applyTranslations(document.getElementById('test-container'));
 
     expect(document.querySelector('h1').textContent).toBe('Today');
-    expect(document.querySelector('input').getAttribute('placeholder')).toBe('Search by name, ingredient or tag...');
+    expect(document.querySelector('input').getAttribute('placeholder')).toBe('Search by dish, ingredient or technique...');
     expect(document.querySelector('button').getAttribute('title')).toBe('Save');
     expect(document.querySelector('button span[data-i18n]').textContent).toBe('Save');
   });
@@ -159,5 +159,30 @@ describe('US-12: Módulo Core de Internacionalización (i18n.js)', () => {
     I18n.setPreference('en');
     expect(getAisleLabel('produce')).toBe('Produce & Veggies');
     expect(getAisleLabel('meat')).toBe('Meat & Seafood');
+  });
+
+  it('traduce las vistas principales en index.html al alternar a inglés (Fase 2)', () => {
+    const htmlPath = path.resolve(process.cwd(), 'index.html');
+    let htmlContent = fs.readFileSync(htmlPath, 'utf-8');
+    // Strip scripts and stylesheet links to prevent happy-dom network requests
+    htmlContent = htmlContent.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<link[\s\S]*?>/gi, '');
+    document.body.innerHTML = htmlContent;
+
+    I18n.setPreference('en');
+    I18n.applyTranslations(document.body);
+
+    // Today
+    expect(document.querySelector('.today-title').textContent).toBe("Today's Menu");
+    // Recipes
+    expect(document.querySelector('#view-recipes .section-title span[data-i18n]').textContent).toBe("Recipes");
+    expect(document.querySelector('#recipes-search-input').getAttribute('placeholder')).toBe("Search by dish, ingredient or technique...");
+    // Planner
+    expect(document.querySelector('#view-planner .section-title').textContent).toBe("Weekly Planner");
+    // Shopping
+    expect(document.querySelector('#view-shopping .section-title').textContent).toBe("Shopping List");
+    expect(document.querySelector('#input-quick-grocery').getAttribute('placeholder')).toBe("Add item (e.g. Bananas, 1L Milk, Eggs...)");
+    // Settings
+    expect(document.querySelector('#view-settings .section-title').textContent).toBe("Settings");
+    expect(document.querySelector('#card-language-settings [data-i18n="settings.languageTitle"]').textContent).toBe("Language");
   });
 });

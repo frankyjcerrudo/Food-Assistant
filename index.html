@@ -96,8 +96,7 @@
           <span class="material-symbols-outlined icon-sm">shopping_cart</span>
           <span>Compra</span>
         </button>
-        <button type="button" class="header-nav-btn header-nav-btn-chef" id="btn-desktop-gemini-invoke"
-          title="Hablar con el Asistente de Cocina">
+        <button type="button" class="header-nav-btn header-nav-btn-chef" id="btn-desktop-gemini-invoke" title="Hablar con el Asistente de Cocina">
           <span class="material-symbols-outlined icon-sm">auto_awesome</span>
           <span>Asistente IA</span>
         </button>
@@ -105,8 +104,7 @@
 
       <div class="header-actions">
         <!-- US-77: Active Household Header Pill -->
-        <button type="button" class="household-header-pill" id="header-household-badge" hidden
-          data-action="openHouseholdSettings" title="Modo Familia activo — Pulsa para gestionar tu Hogar">
+        <button type="button" class="household-header-pill" id="header-household-badge" hidden data-action="openHouseholdSettings" title="Modo Familia activo — Pulsa para gestionar tu Hogar">
           <span class="material-symbols-outlined icon-sm">home</span>
           <span class="household-header-pill-text" id="header-household-name">Mi Hogar</span>
         </button>
@@ -124,24 +122,22 @@
     </header>
 
     <!-- US-76: Smart Install Banner PWA para Web Móvil -->
-    <aside class="pwa-smart-banner" id="pwa-smart-banner" hidden
-      aria-label="Instalación de la app en la pantalla de inicio">
+    <aside class="pwa-smart-banner" id="pwa-smart-banner" hidden aria-label="Instalación de la app en la pantalla de inicio">
       <div class="pwa-smart-banner-content">
         <div class="pwa-smart-banner-icon" aria-hidden="true">
           <img src="icon-192.png?v=1.59" alt="" width="28" height="28" class="pwa-smart-banner-img">
         </div>
         <div class="pwa-smart-banner-texts">
-          <strong class="pwa-smart-banner-title">Prueba Sabory como App</strong>
-          <span class="pwa-smart-banner-sub">Acceso rápido desde tu pantalla de inicio y modo offline.</span>
+          <strong class="pwa-smart-banner-title" data-i18n="pwa.bannerTitle">Prueba Sabory como App</strong>
+          <span class="pwa-smart-banner-sub" data-i18n="pwa.bannerSub">Acceso rápido desde tu pantalla de inicio y modo offline.</span>
         </div>
       </div>
       <div class="pwa-smart-banner-actions">
         <button type="button" class="btn btn-primary btn-sm pwa-smart-banner-install-btn" id="btn-smart-install-pwa">
           <span class="material-symbols-outlined icon-sm">download</span>
-          <span>Instalar</span>
+          <span data-i18n="common.install">Instalar</span>
         </button>
-        <button type="button" class="btn btn-ghost btn-icon pwa-smart-banner-dismiss-btn" id="btn-smart-dismiss-pwa"
-          aria-label="Descartar banner de instalación" title="Descartar aviso">
+        <button type="button" class="btn btn-ghost btn-icon pwa-smart-banner-dismiss-btn" id="btn-smart-dismiss-pwa" aria-label="Descartar banner de instalación" title="Descartar aviso">
           <span class="material-symbols-outlined icon-sm">close</span>
         </button>
       </div>
@@ -153,10 +149,10 @@
         <div class="today-header-info">
           <div class="today-date-badge">
             <span class="material-symbols-outlined icon-sm">calendar_today</span>
-            <span id="today-date-text">Hoy</span>
+            <span id="today-date-text" data-i18n="nav.today">Hoy</span>
           </div>
-          <h2 class="today-title">Menú de Hoy</h2>
-          <p class="today-subtitle" id="today-summary-text">Tus comidas organizadas para el día.</p>
+          <h2 class="today-title" data-i18n="today.menuTitle">Menú de Hoy</h2>
+          <p class="today-subtitle" id="today-summary-text" data-i18n="today.menuSubtitle">Tus comidas organizadas para el día.</p>
         </div>
 
         <!-- STYLIZED DISCREET MACROS WIDGET ON THE RIGHT OF TODAY HEADER (US-01 / US-73) -->
@@ -176,44 +172,41 @@
       <div class="section-header">
         <div>
           <h2 class="section-title">
-            Recetario
+            <span data-i18n="recipes.title">Recetario</span>
             <span class="recipes-header-count-pill" id="recipes-count-badge">0</span>
           </h2>
-          <p class="section-subtitle" id="recipes-count-subtitle">Tu colección culinaria personal.</p>
+          <p class="section-subtitle" id="recipes-count-subtitle" data-i18n="recipes.subtitle">Tu colección culinaria personal.</p>
         </div>
         <div class="section-header-actions" style="display: flex; gap: 8px; align-items: center;">
-          <button type="button" class="btn btn-secondary btn-sm" id="btn-toggle-recipes-select-mode"
-            title="Seleccionar recetas para gestión o borrado masivo">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-toggle-recipes-select-mode" title="Seleccionar recetas para gestión o borrado masivo">
             <span class="material-symbols-outlined icon-sm">checklist</span>
-            <span id="btn-toggle-recipes-select-text">Seleccionar</span>
+            <span id="btn-toggle-recipes-select-text" data-i18n="recipes.select">Seleccionar</span>
           </button>
           <button class="btn btn-primary btn-sm" id="btn-open-create-recipe">
             <span class="material-symbols-outlined icon-sm">add</span>
-            <span>Añadir</span>
+            <span data-i18n="recipes.newRecipeBtn">Añadir</span>
           </button>
         </div>
       </div>
 
       <!-- Bulk Selection Toolbar (US-78: Bulk Delete Recipes) -->
-      <div class="recipes-bulk-toolbar" id="recipes-bulk-toolbar" style="display: none;" role="toolbar"
-        aria-label="Acciones por lotes de recetas">
+      <div class="recipes-bulk-toolbar" id="recipes-bulk-toolbar" style="display: none;" role="toolbar" aria-label="Acciones por lotes de recetas">
         <div class="recipes-bulk-toolbar-info">
           <span class="material-symbols-outlined icon-sm">check_circle</span>
           <span id="recipes-bulk-selected-count">0 seleccionadas</span>
         </div>
         <div class="recipes-bulk-toolbar-actions">
-          <button type="button" class="btn btn-ghost btn-sm" id="btn-recipes-bulk-select-all">
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-recipes-bulk-select-all" data-i18n="recipes.selectAll">
             Seleccionar todas
           </button>
-          <button type="button" class="btn btn-ghost btn-sm" id="btn-recipes-bulk-deselect-all">
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-recipes-bulk-deselect-all" data-i18n="recipes.deselectAll">
             Deseleccionar
           </button>
           <button type="button" class="btn btn-danger btn-sm" id="btn-recipes-bulk-delete" disabled>
             <span class="material-symbols-outlined icon-sm">delete</span>
-            <span id="btn-recipes-bulk-delete-text">Eliminar</span>
+            <span id="btn-recipes-bulk-delete-text" data-i18n="common.delete">Eliminar</span>
           </button>
-          <button type="button" class="btn btn-ghost btn-sm btn-icon" id="btn-recipes-bulk-cancel"
-            title="Salir de selección">
+          <button type="button" class="btn btn-ghost btn-sm btn-icon" id="btn-recipes-bulk-cancel" title="Salir de selección">
             <span class="material-symbols-outlined icon-sm">close</span>
           </button>
         </div>
@@ -223,7 +216,8 @@
       <div class="m3-search-bar">
         <span class="material-symbols-outlined">search</span>
         <input type="text" class="m3-search-input" id="recipes-search-input"
-          placeholder="Buscar por plato, ingrediente o técnica...">
+          placeholder="Buscar por plato, ingrediente o técnica..."
+          data-i18n-placeholder="recipes.searchPlaceholder">
       </div>
 
       <!-- US-34: Fridge Reverse Search Panel ("¿Qué cocino con mi nevera?") -->
@@ -233,18 +227,18 @@
           <div
             style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; color: var(--m3-on-surface);">
             <span class="material-symbols-outlined icon-sm" style="color: var(--m3-primary);">kitchen</span>
-            <span>¿Qué cocino con lo que tengo en la nevera?</span>
+            <span data-i18n="recipes.fridgeTitle">¿Qué cocino con lo que tengo en la nevera?</span>
           </div>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-clear-fridge-ingredients"
-            style="font-size: 11px; padding: 2px 6px; display: none;">
+            style="font-size: 11px; padding: 2px 6px; display: none;" data-i18n="common.clear">
             Limpiar
           </button>
         </div>
         <div style="display: flex; gap: 6px; margin-bottom: 8px;">
           <input type="text" class="form-input" id="input-fridge-ingredient"
-            placeholder="Ej. pollo, calabacín, huevos..." style="font-size: 12px; padding: 6px 10px;">
+            placeholder="Ej. pollo, calabacín, huevos..." data-i18n-placeholder="recipes.fridgePlaceholder" style="font-size: 12px; padding: 6px 10px;">
           <button type="button" class="btn btn-secondary btn-sm" id="btn-add-fridge-ingredient" style="flex-shrink: 0;">
-            <span class="material-symbols-outlined icon-sm">add</span> Añadir
+            <span class="material-symbols-outlined icon-sm">add</span> <span data-i18n="common.add">Añadir</span>
           </button>
         </div>
         <div id="fridge-chips-container" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;"></div>
@@ -254,15 +248,15 @@
         <button type="button" class="m3-filter-chip m3-filter-chip-fridge" id="btn-toggle-fridge-panel"
           title="Buscar recetas con ingredientes de tu nevera">
           <span class="material-symbols-outlined icon-sm">kitchen</span>
-          <span>Mi Nevera</span>
+          <span data-i18n="recipes.myFridge">Mi Nevera</span>
         </button>
-        <button class="m3-filter-chip active" data-tag="all">Todas</button>
-        <button class="m3-filter-chip" data-tag="Desayuno">Desayunos</button>
-        <button class="m3-filter-chip" data-tag="Almuerzo">Almuerzos</button>
-        <button class="m3-filter-chip" data-tag="Merienda">Meriendas</button>
-        <button class="m3-filter-chip" data-tag="Cena">Cenas</button>
-        <button class="m3-filter-chip" data-tag="Rápida">Rápidas</button>
-        <button class="m3-filter-chip" data-tag="Saludable">Saludable</button>
+        <button class="m3-filter-chip active" data-tag="all" data-i18n="recipes.all">Todas</button>
+        <button class="m3-filter-chip" data-tag="Desayuno" data-i18n="recipes.tagBreakfast">Desayunos</button>
+        <button class="m3-filter-chip" data-tag="Almuerzo" data-i18n="recipes.tagLunch">Almuerzos</button>
+        <button class="m3-filter-chip" data-tag="Merienda" data-i18n="recipes.tagSnack">Meriendas</button>
+        <button class="m3-filter-chip" data-tag="Cena" data-i18n="recipes.tagDinner">Cenas</button>
+        <button class="m3-filter-chip" data-tag="Rápida" data-i18n="recipes.tagQuick">Rápidas</button>
+        <button class="m3-filter-chip" data-tag="Saludable" data-i18n="recipes.tagHealthy">Saludable</button>
         <button class="m3-filter-chip" data-tag="Pasta">Pasta</button>
         <button class="m3-filter-chip" data-tag="Pollo">Pollo</button>
       </div>
@@ -276,18 +270,18 @@
     <section class="view-panel" id="view-planner">
       <div class="section-header" style="flex-wrap: wrap; gap: 10px;">
         <div>
-          <h2 class="section-title">Planificador Semanal</h2>
-          <p class="section-subtitle">Organiza tus menús de Lunes a Domingo.</p>
+          <h2 class="section-title" data-i18n="planner.title">Planificador Semanal</h2>
+          <p class="section-subtitle" data-i18n="planner.subtitle">Organiza tus menús de Lunes a Domingo.</p>
         </div>
         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
           <button type="button" class="btn btn-secondary btn-sm" id="btn-open-copy-week" data-action="openCopyWeekModal"
             title="Copiar plan de la semana anterior o de cualquier otra semana">
             <span class="material-symbols-outlined icon-sm">content_copy</span>
-            <span>Copiar semana</span>
+            <span data-i18n="planner.copyWeek">Copiar semana</span>
           </button>
           <button class="btn btn-tonal btn-sm" id="btn-send-plan-to-shopping">
             <span class="material-symbols-outlined icon-sm">add_shopping_cart</span>
-            <span>Enviar a la Compra</span>
+            <span data-i18n="planner.sendToShopping">Enviar a la Compra</span>
           </button>
         </div>
       </div>
@@ -298,16 +292,16 @@
           <button type="button" class="btn btn-ghost btn-sm" id="btn-prev-week" title="Semana anterior"
             data-action="navigateWeek" data-dir="-1">
             <span class="material-symbols-outlined icon-sm">chevron_left</span>
-            <span>Anterior</span>
+            <span data-i18n="planner.prevWeek">Anterior</span>
           </button>
           <button type="button" class="btn btn-tonal btn-sm" id="btn-current-week" title="Ir a la semana actual"
             data-action="navigateWeek" data-dir="0">
             <span class="material-symbols-outlined icon-sm">today</span>
-            <span>Esta semana</span>
+            <span data-i18n="planner.currentWeek">Esta semana</span>
           </button>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-next-week" title="Semana siguiente"
             data-action="navigateWeek" data-dir="1">
-            <span>Siguiente</span>
+            <span data-i18n="planner.nextWeek">Siguiente</span>
             <span class="material-symbols-outlined icon-sm">chevron_right</span>
           </button>
         </div>
@@ -317,7 +311,7 @@
           <button type="button" class="btn btn-ghost btn-sm" id="btn-toggle-all-planner-days"
             data-action="toggleAllPlannerDays" title="Expandir o plegar todos los días de la semana">
             <span class="material-symbols-outlined icon-sm">unfold_more</span>
-            <span id="btn-toggle-all-planner-days-label">Expandir semana</span>
+            <span id="btn-toggle-all-planner-days-label" data-i18n="planner.expandWeek">Expandir semana</span>
           </button>
         </div>
       </div>
@@ -331,19 +325,19 @@
     <section class="view-panel" id="view-shopping">
       <div class="section-header">
         <div>
-          <h2 class="section-title">Lista de la Compra</h2>
+          <h2 class="section-title" data-i18n="shopping.title">Lista de la Compra</h2>
           <p class="section-subtitle" id="shopping-summary-text">0 artículos pendientes</p>
         </div>
         <div style="display: flex; gap: 6px;">
           <button class="btn btn-secondary btn-sm" id="btn-copy-shopping" data-action="copyShoppingList"
             title="Copiar lista al portapapeles">
             <span class="material-symbols-outlined icon-sm">content_copy</span>
-            <span>Copiar</span>
+            <span data-i18n="common.copy">Copiar</span>
           </button>
           <button class="btn btn-ghost btn-sm" id="btn-clear-completed" data-action="clearCompletedGroceries"
             title="Limpiar comprados o vaciar lista">
             <span class="material-symbols-outlined icon-sm">delete_sweep</span>
-            <span>Limpiar</span>
+            <span data-i18n="common.clear">Limpiar</span>
           </button>
         </div>
       </div>
@@ -354,12 +348,12 @@
         <button type="button" class="shopping-view-btn active" id="btn-shopping-view-aisle"
           data-action="setShoppingViewMode" data-mode="aisle" aria-pressed="true">
           <span class="material-symbols-outlined icon-sm">storefront</span>
-          <span>Por Pasillos</span>
+          <span data-i18n="shopping.byAisles">Por Pasillos</span>
         </button>
         <button type="button" class="shopping-view-btn" id="btn-shopping-view-recipe" data-action="setShoppingViewMode"
           data-mode="recipe" aria-pressed="false">
           <span class="material-symbols-outlined icon-sm">menu_book</span>
-          <span>Por Receta</span>
+          <span data-i18n="shopping.byRecipe">Por Receta</span>
         </button>
       </div>
 
@@ -367,12 +361,13 @@
       <div style="display: flex; gap: 8px; margin-bottom: 16px; position: relative;">
         <div style="flex: 1; position: relative;">
           <input type="text" class="form-input" id="input-quick-grocery"
-            placeholder="Añadir artículo (ej. Plátanos, 1L Leche, Huevos...)" autocomplete="off">
+            placeholder="Añadir artículo (ej. Plátanos, 1L Leche, Huevos...)"
+            data-i18n-placeholder="shopping.inputPlaceholder" autocomplete="off">
           <div id="quick-grocery-autocomplete" class="autocomplete-dropdown" style="display: none;"></div>
         </div>
         <button class="btn btn-primary" id="btn-add-grocery">
           <span class="material-symbols-outlined icon-sm">add</span>
-          <span>Añadir</span>
+          <span data-i18n="common.add">Añadir</span>
         </button>
       </div>
 
@@ -389,13 +384,13 @@
     <section class="view-panel" id="view-settings">
       <div class="section-header">
         <div>
-          <h2 class="section-title">Ajustes</h2>
-          <p class="section-subtitle">Mis preferencias culinarias y configuración.</p>
+          <h2 class="section-title" data-i18n="settings.title">Ajustes</h2>
+          <p class="section-subtitle" data-i18n="settings.subtitle">Mis preferencias culinarias y configuración.</p>
         </div>
         <button type="button" class="btn btn-secondary btn-sm" id="btn-relaunch-onboarding"
           data-action="openOnboardingModal" title="Abrir asistente de bienvenida paso a paso">
           <span class="material-symbols-outlined icon-sm">waving_hand</span>
-          <span>Guía inicial</span>
+          <span data-i18n="settings.onboardingBtn">Guía inicial</span>
         </button>
       </div>
 
@@ -404,10 +399,10 @@
       <div class="card">
         <h3
           style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-          <span class="material-symbols-outlined" style="color: var(--m3-primary);">account_circle</span> Cuenta de
-          Usuario
+          <span class="material-symbols-outlined" style="color: var(--m3-primary);">account_circle</span>
+          <span data-i18n="settings.accountTitle">Cuenta de Usuario</span>
         </h3>
-        <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;">
+        <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;" data-i18n="settings.accountDesc">
           Inicia sesión para tener tus recetas, planes semanales y listas de la compra sincronizados automáticamente en
           cualquier dispositivo.
         </p>
@@ -418,17 +413,17 @@
               <span class="material-symbols-outlined" id="settings-user-icon">account_circle</span>
             </div>
             <div class="cloud-account-info">
-              <div class="cloud-account-name" id="settings-user-name">Modo Local (Invitado)</div>
-              <div class="cloud-account-status" id="settings-user-status">Datos guardados en este dispositivo</div>
+              <div class="cloud-account-name" id="settings-user-name" data-i18n="settings.localMode">Modo Local (Invitado)</div>
+              <div class="cloud-account-status" id="settings-user-status" data-i18n="settings.localModeDesc">Datos guardados en este dispositivo</div>
               <div class="cloud-sync-pill" id="sync-status-indicator"></div>
             </div>
           </div>
           <div class="cloud-account-actions">
             <button class="btn btn-secondary btn-sm" id="btn-sync-now" style="display: none;"
               title="Sincronizar ahora con la nube">
-              <span class="material-symbols-outlined icon-sm">sync</span> Sincronizar
+              <span class="material-symbols-outlined icon-sm">sync</span> <span data-i18n="settings.syncNow">Sincronizar</span>
             </button>
-            <button class="btn btn-primary btn-sm" id="btn-settings-auth-action">Iniciar Sesión</button>
+            <button class="btn btn-primary btn-sm" id="btn-settings-auth-action" data-i18n="settings.signIn">Iniciar Sesión</button>
           </div>
         </div>
       </div>
@@ -439,11 +434,10 @@
           <div class="household-card-title-group">
             <h3 style="font-size: 14px; font-weight: 500; margin: 0; display: flex; align-items: center; gap: 6px;">
               <span class="material-symbols-outlined" style="color: var(--color-brand);">diversity_3</span>
-              <span>Modo Familia / Hogar Compartido</span>
+              <span data-i18n="settings.householdTitle">Modo Familia / Espacio del Hogar</span>
             </h3>
-            <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin: 4px 0 0 0;">
-              Comparte un único menú semanal, recetario común y lista de la compra en tiempo real con tu pareja o
-              convivientes.
+            <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin: 4px 0 0 0;" data-i18n="settings.householdDesc">
+              Planifica comidas y comparte la lista de la compra en tiempo real con tu pareja o familia.
             </p>
           </div>
           <span class="household-mode-badge" id="household-status-badge">Modo Personal</span>
@@ -453,31 +447,28 @@
         <div id="household-empty-view" class="household-empty-view">
           <div class="household-forms-grid">
             <form id="form-create-household" class="household-subcard" action="#settings" method="POST" novalidate>
-              <label for="input-create-household-name" class="household-form-label">Crear un Hogar nuevo</label>
-              <span id="create-household-help" class="household-form-hint">Tu plan y lista actuales serán el punto de
-                partida familiar.</span>
+              <label for="input-create-household-name" class="household-form-label" data-i18n="settings.createHousehold">Crear un Hogar nuevo</label>
+              <span id="create-household-help" class="household-form-hint">Tu plan y lista actuales serán el punto de partida familiar.</span>
               <div class="household-input-row">
                 <input type="text" class="form-input" id="input-create-household-name" name="household_name"
                   placeholder="Ej. Casa Cerrudo" maxlength="50" aria-describedby="create-household-help" required>
                 <button type="submit" class="btn btn-primary btn-sm" id="btn-create-household">
                   <span class="material-symbols-outlined icon-sm">add_home</span>
-                  <span>Crear Hogar</span>
+                  <span data-i18n="settings.createHousehold">Crear Hogar</span>
                 </button>
               </div>
             </form>
 
             <form id="form-join-household" class="household-subcard" action="#settings" method="POST" novalidate>
-              <label for="input-join-household-code" class="household-form-label">Unirse con código de
-                invitación</label>
-              <span id="join-household-help" class="household-form-hint">Introduce el código compartido por tu familiar
-                o pareja.</span>
+              <label for="input-join-household-code" class="household-form-label" data-i18n="settings.joinHousehold">Unirse con código de invitación</label>
+              <span id="join-household-help" class="household-form-hint">Introduce el código compartido por tu familiar o pareja.</span>
               <div class="household-input-row">
-                <input type="text" class="form-input household-code-input" id="input-join-household-code"
-                  name="invite_code" placeholder="SAB-XXXX" maxlength="16" autocorrect="off" autocapitalize="off"
-                  spellcheck="false" aria-describedby="join-household-help" required>
+                <input type="text" class="form-input household-code-input" id="input-join-household-code" name="invite_code"
+                  placeholder="SAB-XXXX" maxlength="16" autocorrect="off" autocapitalize="off" spellcheck="false"
+                  aria-describedby="join-household-help" required>
                 <button type="submit" class="btn btn-secondary btn-sm" id="btn-join-household">
                   <span class="material-symbols-outlined icon-sm">group_add</span>
-                  <span>Unirse</span>
+                  <span data-i18n="settings.joinHousehold">Unirse</span>
                 </button>
               </div>
             </form>
@@ -505,14 +496,11 @@
                 <code id="household-invite-code-display" class="household-invite-code">SAB-0000</code>
               </div>
               <div class="household-invite-actions">
-                <button type="button" class="btn btn-secondary btn-sm" id="btn-copy-household-code"
-                  data-action="copyHouseholdInviteCode" title="Copiar código de invitación">
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-copy-household-code" data-action="copyHouseholdInviteCode" title="Copiar código de invitación">
                   <span class="material-symbols-outlined icon-sm">content_copy</span>
                   <span>Código</span>
                 </button>
-                <button type="button" class="btn btn-primary btn-sm" id="btn-share-household-link"
-                  data-action="shareHouseholdInviteLink"
-                  title="Compartir enlace de invitación por WhatsApp o mensajería">
+                <button type="button" class="btn btn-primary btn-sm" id="btn-share-household-link" data-action="shareHouseholdInviteLink" title="Compartir enlace de invitación por WhatsApp o mensajería">
                   <span class="material-symbols-outlined icon-sm">share</span>
                   <span>Invitar</span>
                 </button>
@@ -528,13 +516,11 @@
           </div>
 
           <div class="household-footer-actions">
-            <button type="button" class="btn btn-secondary btn-sm" id="btn-refresh-household"
-              data-action="refreshHouseholdSync">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-refresh-household" data-action="refreshHouseholdSync">
               <span class="material-symbols-outlined icon-sm">sync</span>
               <span>Sincronizar hogar</span>
             </button>
-            <button type="button" class="btn btn-ghost btn-sm household-leave-btn" id="btn-leave-household"
-              data-action="leaveHousehold">
+            <button type="button" class="btn btn-ghost btn-sm household-leave-btn" id="btn-leave-household" data-action="leaveHousehold">
               <span class="material-symbols-outlined icon-sm">logout</span>
               <span id="btn-leave-household-text">Abandonar hogar</span>
             </button>
@@ -546,23 +532,24 @@
       <div class="card">
         <h3
           style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-          <span class="material-symbols-outlined" style="color: var(--m3-primary);">palette</span> Aspecto
+          <span class="material-symbols-outlined" style="color: var(--m3-primary);">palette</span>
+          <span data-i18n="settings.appearanceTitle">Aspecto</span>
         </h3>
-        <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;">
+        <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;" data-i18n="settings.appearanceDesc">
           Elige cómo prefieres ver Sabory en tu dispositivo.
         </p>
         <div class="m3-segmented-button" id="theme-segmented-group">
           <button class="segmented-btn" data-theme-val="system">
             <span class="material-symbols-outlined icon-sm">brightness_auto</span>
-            <span>Sistema</span>
+            <span data-i18n="settings.themeSystem">Sistema</span>
           </button>
           <button class="segmented-btn" data-theme-val="light">
             <span class="material-symbols-outlined icon-sm">light_mode</span>
-            <span>Claro</span>
+            <span data-i18n="settings.themeLight">Claro</span>
           </button>
           <button class="segmented-btn" data-theme-val="dark">
             <span class="material-symbols-outlined icon-sm">dark_mode</span>
-            <span>Oscuro</span>
+            <span data-i18n="settings.themeDark">Oscuro</span>
           </button>
         </div>
       </div>
@@ -574,8 +561,7 @@
           <span class="material-symbols-outlined" style="color: var(--m3-primary);">language</span>
           <span data-i18n="settings.languageTitle">Idioma</span>
         </h3>
-        <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;"
-          data-i18n="settings.languageDesc">
+        <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;" data-i18n="settings.languageDesc">
           Elige el idioma de la aplicación o sigue el idioma de tu dispositivo.
         </p>
         <div class="m3-segmented-button" id="language-segmented-group">
@@ -598,9 +584,10 @@
       <div class="card" id="card-dietary-preferences">
         <h3
           style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-          <span class="material-symbols-outlined" style="color: var(--color-brand);">eco</span> Preferencias Dietéticas
+          <span class="material-symbols-outlined" style="color: var(--color-brand);">eco</span>
+          <span data-i18n="settings.dietaryTitle">Preferencias Dietéticas</span>
         </h3>
-        <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 10px;">
+        <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 10px;" data-i18n="settings.dietaryDesc">
           Selecciona las dietas que sigues. Te avisaremos con un distintivo si una comida asignada al plan semanal
           incumple tus preferencias.
         </p>
@@ -617,9 +604,9 @@
               <span class="material-symbols-outlined" style="font-size: 18px;">flag</span>
             </div>
             <div>
-              <h3 style="font-size: 14px; font-weight: 600; margin: 0; color: var(--m3-on-surface);">Objetivos
+              <h3 style="font-size: 14px; font-weight: 600; margin: 0; color: var(--m3-on-surface);" data-i18n="settings.nutritionTitle">Objetivos
                 Nutricionales Diarios</h3>
-              <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin: 2px 0 0 0;">
+              <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin: 2px 0 0 0;" data-i18n="settings.nutritionDesc">
                 Compara el menú de cada día con tus metas recomendadas.
               </p>
             </div>
@@ -706,7 +693,8 @@
       <div class="card">
         <h3
           style="font-size: 14px; font-weight: 500; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-          <span class="material-symbols-outlined" style="color: var(--m3-primary);">group</span> Porciones por defecto
+          <span class="material-symbols-outlined" style="color: var(--m3-primary);">group</span>
+          <span data-i18n="settings.servingsTitle">Porciones por defecto</span>
         </h3>
         <select class="form-select" id="select-default-servings">
           <option value="1">1 persona</option>
@@ -721,23 +709,22 @@
       <div class="card" id="card-legal-privacy">
         <h3
           style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-          <span class="material-symbols-outlined" style="color: var(--m3-primary);">policy</span> Privacidad y Control
-          de Datos
+          <span class="material-symbols-outlined" style="color: var(--m3-primary);">policy</span>
+          <span data-i18n="settings.privacyTitle">Privacidad y Control de Datos</span>
         </h3>
-        <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;">
-          Sabory funciona offline de forma predeterminada y solo sincroniza tus datos si decides iniciar sesión. Puedes
-          consultar nuestras condiciones o solicitar el borrado permanente de tu cuenta y datos.
+        <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;" data-i18n="settings.privacyDesc">
+          Sabory funciona offline de forma predeterminada y solo sincroniza tus datos si decides iniciar sesión. Puedes consultar nuestras condiciones o solicitar el borrado permanente de tu cuenta y datos.
         </p>
         <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
-          <a href="privacy.html" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm"
-            id="link-privacy-policy"
-            style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-            <span class="material-symbols-outlined icon-sm">description</span> Política de Privacidad
+          <a href="privacy.html" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" id="link-privacy-policy" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+            <span class="material-symbols-outlined icon-sm">description</span>
+            <span data-i18n="settings.privacyBtn">Política de Privacidad</span>
           </a>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-settings-delete-account"
             style="color: var(--m3-error); display: inline-flex; align-items: center; gap: 6px;"
             title="Eliminar permanentemente tu cuenta y datos de la nube">
-            <span class="material-symbols-outlined icon-sm">delete_forever</span> Eliminar cuenta y datos
+            <span class="material-symbols-outlined icon-sm">delete_forever</span>
+            <span data-i18n="settings.deleteAccountBtn">Eliminar cuenta y datos</span>
           </button>
         </div>
       </div>
@@ -747,7 +734,7 @@
         <summary class="settings-advanced-summary">
           <div class="settings-advanced-summary-title">
             <span class="material-symbols-outlined icon-sm">tune</span>
-            <span>Configuración avanzada y sistema</span>
+            <span data-i18n="settings.advancedTitle">Configuración avanzada y sistema</span>
           </div>
           <span class="material-symbols-outlined icon-sm settings-advanced-chevron">expand_more</span>
         </summary>
@@ -756,23 +743,26 @@
           <div class="card">
             <h3
               style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-              <span class="material-symbols-outlined" style="color: var(--m3-primary);">save</span> Copia de Seguridad
-              Local
+              <span class="material-symbols-outlined" style="color: var(--m3-primary);">save</span>
+              <span data-i18n="settings.backupTitle">Copia de Seguridad Local</span>
             </h3>
-            <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;">
+            <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 12px;" data-i18n="settings.backupDesc">
               Exporta o restaura tus recetas y planes en un archivo JSON local.
             </p>
             <div style="display: flex; gap: 8px;">
               <button class="btn btn-secondary btn-sm" id="btn-export-backup">
-                <span class="material-symbols-outlined icon-sm">download</span> Exportar
+                <span class="material-symbols-outlined icon-sm">download</span>
+                <span data-i18n="settings.exportBtn">Exportar</span>
               </button>
               <label class="btn btn-secondary btn-sm" style="cursor: pointer; margin: 0;">
-                <span class="material-symbols-outlined icon-sm">upload</span> Importar
+                <span class="material-symbols-outlined icon-sm">upload</span>
+                <span data-i18n="settings.importBtn">Importar</span>
                 <input type="file" id="input-import-backup" accept=".json" style="display: none;">
               </label>
               <button class="btn btn-ghost btn-sm" id="btn-reset-demo"
                 style="color: var(--m3-error); margin-left: auto;">
-                <span class="material-symbols-outlined icon-sm">restart_alt</span> Restablecer
+                <span class="material-symbols-outlined icon-sm">restart_alt</span>
+                <span data-i18n="settings.resetBtn">Restablecer</span>
               </button>
             </div>
           </div>
@@ -1156,8 +1146,7 @@
         <div
           style="margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--m3-outline-variant); font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
           <p style="margin: 0;">Tus recetas y planes se sincronizan de forma segura.</p>
-          <a href="privacy.html" target="_blank" rel="noopener noreferrer" id="link-auth-privacy"
-            style="color: var(--m3-primary); font-weight: 500; text-decoration: underline; white-space: nowrap;">Privacidad</a>
+          <a href="privacy.html" target="_blank" rel="noopener noreferrer" id="link-auth-privacy" style="color: var(--m3-primary); font-weight: 500; text-decoration: underline; white-space: nowrap;">Privacidad</a>
         </div>
       </div>
 
@@ -1186,9 +1175,7 @@
             <span class="material-symbols-outlined icon-sm">delete_forever</span> Eliminar mi cuenta y datos
           </button>
           <div style="text-align: center; margin-top: 6px;">
-            <a href="privacy.html" target="_blank" rel="noopener noreferrer"
-              style="font-size: 11px; color: var(--m3-on-surface-variant); text-decoration: underline;">Consultar
-              Política de Privacidad</a>
+            <a href="privacy.html" target="_blank" rel="noopener noreferrer" style="font-size: 11px; color: var(--m3-on-surface-variant); text-decoration: underline;">Consultar Política de Privacidad</a>
           </div>
         </div>
       </div>
@@ -1522,13 +1509,11 @@
         <div class="form-group" id="editor-household-privacy-group" style="margin-top: 14px;">
           <div class="goals-switch-card" style="margin: 0; padding: 10px 12px;">
             <div class="goals-switch-info">
-              <label for="edit-recipe-private" class="goals-switch-label"
-                style="cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <label for="edit-recipe-private" class="goals-switch-label" style="cursor: pointer; display: flex; align-items: center; gap: 6px;">
                 <span class="material-symbols-outlined icon-sm" style="color: var(--m3-primary);">lock</span>
                 <span>Receta privada (solo para mí)</span>
               </label>
-              <span class="goals-switch-desc">Si activas esta opción, la receta no se compartirá en el recetario común
-                de tu Hogar familiar.</span>
+              <span class="goals-switch-desc">Si activas esta opción, la receta no se compartirá en el recetario común de tu Hogar familiar.</span>
             </div>
             <label class="m3-switch" for="edit-recipe-private">
               <input type="checkbox" id="edit-recipe-private" name="is_private">
@@ -1761,9 +1746,11 @@
       <div class="m3-search-bar picker-search-bar-wrap" style="margin-bottom: 10px; padding: 6px 14px;">
         <span class="material-symbols-outlined">search</span>
         <input type="search" id="input-picker-search" class="m3-search-input"
-          placeholder="Buscar por plato, ingrediente o técnica..." autocomplete="off">
+          placeholder="Buscar por plato, ingrediente o técnica..."
+          autocomplete="off">
         <button type="button" id="btn-clear-picker-search" class="btn btn-ghost btn-icon"
-          style="display: none; width: 28px; height: 28px; padding: 0; min-width: 28px;" title="Limpiar búsqueda">
+          style="display: none; width: 28px; height: 28px; padding: 0; min-width: 28px;"
+          title="Limpiar búsqueda">
           <span class="material-symbols-outlined icon-sm">close</span>
         </button>
       </div>
@@ -1777,8 +1764,7 @@
           <span class="material-symbols-outlined icon-sm">eco</span> Solo aptas para mis dietas
         </button>
       </div>
-      <div
-        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 11px; color: var(--m3-on-surface-variant);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 11px; color: var(--m3-on-surface-variant);">
         <span id="picker-recipes-count"></span>
       </div>
       <!-- US-65: Cook Double / Leftovers Toggle -->
@@ -2114,8 +2100,7 @@
           </div>
           <div>
             <h3 class="modal-goals-title" id="nutrition-breakdown-modal-title">Desglose Nutricional de Hoy</h3>
-            <p class="modal-goals-subtitle" id="nutrition-breakdown-modal-subtitle">Resumen de calorías y
-              macronutrientes del menú diario.</p>
+            <p class="modal-goals-subtitle" id="nutrition-breakdown-modal-subtitle">Resumen de calorías y macronutrientes del menú diario.</p>
           </div>
         </div>
         <button type="button" class="btn btn-icon btn-sm" data-action="closeNutritionBreakdownModal" title="Cerrar">
@@ -2128,12 +2113,10 @@
       </div>
 
       <div class="modal-footer modal-nutrition-footer">
-        <button type="button" class="btn btn-outline btn-sm"
-          onclick="app.closeNutritionBreakdownModal(); app.openNutritionGoalsModal();">
+        <button type="button" class="btn btn-outline btn-sm" onclick="app.closeNutritionBreakdownModal(); app.openNutritionGoalsModal();">
           <span class="material-symbols-outlined icon-sm">tune</span> Configurar Objetivos
         </button>
-        <button type="button" class="btn btn-primary btn-sm"
-          data-action="closeNutritionBreakdownModal">Entendido</button>
+        <button type="button" class="btn btn-primary btn-sm" data-action="closeNutritionBreakdownModal">Entendido</button>
       </div>
     </div>
   </dialog>

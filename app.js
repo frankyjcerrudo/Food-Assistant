@@ -7638,6 +7638,9 @@ class FoodAssistantApp {
 
     window.scrollTo({ top: 0, behavior: 'instant' });
     this.renderView(viewId);
+    if (window.I18n) {
+      window.I18n.applyTranslations(document.getElementById(viewId) || document);
+    }
   }
 
   renderView(viewId = this.activeView) {
@@ -7670,6 +7673,9 @@ class FoodAssistantApp {
     this.renderPlanner();
     this.renderShoppingList();
     this.renderSettings();
+    if (window.I18n) {
+      window.I18n.applyTranslations();
+    }
   }
 
   calculateTodayNutrition(todayPlan) {
