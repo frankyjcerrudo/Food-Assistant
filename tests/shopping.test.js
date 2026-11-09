@@ -127,7 +127,7 @@ describe('US-13: Modal de Previsualización y Selección de Ingredientes', () =>
 
   it('permite modificar la cantidad de un ingrediente antes de volcarlo a la compra', () => {
     const previewItem = { name: 'Arroz', baseAmount: 200, amount: 200, unit: 'g', checked: true };
-    
+
     // Usuario modifica manualmente la cantidad a 350g
     const userManualAmount = 350;
     previewItem.amount = userManualAmount;
@@ -414,6 +414,102 @@ describe('US-64: Conversión y normalización de unidades en la compra', () => {
       expect(parsed.amount).toBe(0.5);
       expect(parsed.unit).toBe('kg');
       expect(parsed.name).toBe('Carne picada');
+    });
+  });
+
+  describe('Auto-consolidación reactiva de duplicados (Puerro de múltiples recetas)', () => {
+    let appInstance;
+
+    beforeEach(() => {
+      localStorage.clear();
+      document.body.innerHTML = `
+        <section id="view-shopping">
+          <span id="shopping-summary-text">0 artículos pendientes</span>
+          <button id="btn-shopping-view-aisle"></button>
+          <button id="btn-shopping-view-recipe"></button>
+          <div id="shopping-aisles-container"></div>
+          <div id="shopping-completed-container"></div>
+        </section>
+      `;
+      window.state.shoppingList = [];
+      window.state.recipes = [];
+      window.state.deletedRecords = { shoppingItems: [] };
+      appInstance = new window.FoodAssistantApp();
+    });
+
+    it('consolidateShoppingList fusiona artículos equivalentes y marca el ID absorbido en deletedRecords', () => {
+      const list = [
+        {
+          id: 'shop-puerro-1',
+          name: 'Puerro',
+          amount: 1,
+          unit: 'ud',
+          aisle: 'produce',
+          isChecked: false,
+          recipeOrigin: 'Crema de calabaza con pipas tostadas con picatostes caseros especiados'
+        },
+        {
+          id: 'shop-puerro-2',
+          name: 'Puerro',
+          amount: 1,
+          unit: 'ud',
+          aisle: 'produce',
+          isChecked: false,
+          recipeOrigin: 'CREMA DE CHAMPIÑONES'
+        }
+      ];
+
+      const consolidated = window.consolidateShoppingList(list);
+
+      expect(consolidated).toHaveLength(1);
+      expect(consolidated[0].name).toBe('Puerro');
+      expect(consolidated[0].amount).toBe(2);
+      expect(consolidated[0].unit).toBe('ud');
+      expect(consolidated[0].displayAmount).toBe('2 ud');
+      expect(consolidated[0].recipeBreakdown).toHaveLength(2);
+      expect(consolidated[0].recipeOrigin).toContain('Crema de calabaza');
+      expect(consolidated[0].recipeOrigin).toContain('CREMA DE CHAMPIÑONES');
+      expect(window.state.deletedRecords.shoppingItems).toContain('shop-puerro-2');
+    });
+
+    it('renderShoppingList consolida automáticamente artículos existentes al renderizar', () => {
+      window.state.shoppingList = [
+        {
+          id: 'shop-item-a',
+          name: 'Puerro',
+          amount: 1,
+          unit: 'ud',
+          aisle: 'produce',
+          isChecked: false,
+          recipeOrigin: 'Crema de calabaza con pipas tostadas con picatostes caseros especiados'
+        },
+        {
+          id: 'shop-item-b',
+          name: 'Puerro',
+          amount: 1,
+          unit: 'ud',
+          aisle: 'produce',
+          isChecked: false,
+          recipeOrigin: 'CREMA DE CHAMPIÑONES'
+        }
+      ];
+
+      appInstance.renderShoppingList();
+
+      // En el estado interno queda un único artículo fusionado
+      expect(window.state.shoppingList).toHaveLength(1);
+      expect(window.state.shoppingList[0].amount).toBe(2);
+      expect(window.state.shoppingList[0].unit).toBe('ud');
+      expect(window.state.deletedRecords.shoppingItems).toContain('shop-item-b');
+
+      // En el DOM solo se renderiza 1 fila para Puerro mostrando "2 ud" y el desglose de recetas
+      const container = document.getElementById('shopping-aisles-container');
+      const puerroRows = container.querySelectorAll('.grocery-item-row');
+      expect(puerroRows).toHaveLength(1);
+      expect(container.textContent).toContain('Puerro');
+      expect(container.textContent).toContain('2 ud');
+      expect(container.textContent).toContain('Crema de calabaza');
+      expect(container.textContent).toContain('CREMA DE CHAMPIÑONES');
     });
   });
 });

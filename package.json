@@ -1,6 +1,6 @@
 {
   "name": "food-assistant",
-  "version": "1.5.4",
+  "version": "1.5.5",
   "description": "Sabory — Planificador culinario y recetario inteligente con IA",
   "type": "module",
   "scripts": {

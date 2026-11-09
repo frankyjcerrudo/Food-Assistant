@@ -1417,14 +1417,22 @@ function mergeOrAddShoppingItem(shoppingList, newItem) {
   return created;
 }
 
-function consolidateShoppingList(list) {
+function consolidateShoppingList(list, trackDeletionFn = null) {
   if (!Array.isArray(list) || list.length <= 1) return list;
   const result = [];
   list.forEach(item => {
+    if (!item) return;
     if (item.isChecked || item.checked) {
       result.push(item);
     } else {
-      mergeOrAddShoppingItem(result, item);
+      const merged = mergeOrAddShoppingItem(result, item);
+      if (merged && item.id && merged.id !== item.id) {
+        if (typeof trackDeletionFn === 'function') {
+          trackDeletionFn(item.id);
+        } else if (typeof state !== 'undefined' && state && typeof state.trackDeletion === 'function') {
+          state.trackDeletion('shoppingItems', item.id);
+        }
+      }
     }
   });
   return result;
@@ -4548,7 +4556,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.54';
+  window.APP_VERSION = 'v1.55';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4590,7 +4598,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.54';
+    this.appVersion = window.APP_VERSION || 'v1.55';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -6133,6 +6141,16 @@ class FoodAssistantApp {
             stateChanged = true;
           }
         });
+
+        // Auto-consolidar artículos de compra equivalentes procedentes de la nube o multi-dispositivo (US-64)
+        if (Array.isArray(state.shoppingList) && state.shoppingList.length > 1) {
+          const prevLen = state.shoppingList.length;
+          state.shoppingList = consolidateShoppingList(state.shoppingList);
+          if (state.shoppingList.length !== prevLen) {
+            stateChanged = true;
+            this.scheduleSyncWithCloud();
+          }
+        }
       }
 
       // 4. Fusión de Preferencias Dietéticas, Tags Personalizados, Objetivos Nutricionales (US-03) y Clave Gemini
@@ -8209,11 +8227,11 @@ class FoodAssistantApp {
               </span>
             ` : ''}
             ${(rec.tags || [])
-              .filter(t => hasNutData || t !== 'Alta en Proteínas')
-              .map(t => {
-      const isDiet = PREDEFINED_DIETARY_TAGS.includes(t);
-      return `<span class="tag-chip${isDiet ? ' tag-chip-dietary' : ''}">${isDiet ? getDietaryTagEmoji(t) + ' ' : ''}${escapeHtml(t)}</span>`;
-    }).join('')}
+        .filter(t => hasNutData || t !== 'Alta en Proteínas')
+        .map(t => {
+          const isDiet = PREDEFINED_DIETARY_TAGS.includes(t);
+          return `<span class="tag-chip${isDiet ? ' tag-chip-dietary' : ''}">${isDiet ? getDietaryTagEmoji(t) + ' ' : ''}${escapeHtml(t)}</span>`;
+        }).join('')}
           </div>
         </div>
       </article>
@@ -10776,7 +10794,7 @@ class FoodAssistantApp {
       e.dataTransfer.effectAllowed = 'move';
       try {
         e.dataTransfer.setData('text/plain', JSON.stringify(this._draggingPlannerSlot));
-      } catch (err) {}
+      } catch (err) { }
     }
     const targetSlot = e.currentTarget && e.currentTarget.closest ? e.currentTarget.closest('.meal-slot') : e.currentTarget;
     if (targetSlot) {
@@ -10821,7 +10839,7 @@ class FoodAssistantApp {
       try {
         const raw = e.dataTransfer.getData('text/plain');
         if (raw) source = JSON.parse(raw);
-      } catch (err) {}
+      } catch (err) { }
     }
 
     this._draggingPlannerSlot = null;
@@ -12025,6 +12043,16 @@ class FoodAssistantApp {
       });
       if (listHealed) {
         state.save('fa_shopping', state.shoppingList);
+      }
+    }
+
+    // US-64: Auto-consolidar en vivo ingredientes compatibles (ej. puerros de diferentes recetas)
+    if (Array.isArray(state.shoppingList) && state.shoppingList.length > 1) {
+      const prevLen = state.shoppingList.length;
+      state.shoppingList = consolidateShoppingList(state.shoppingList);
+      if (state.shoppingList.length !== prevLen) {
+        state.save('fa_shopping', state.shoppingList);
+        this.scheduleSyncWithCloud();
       }
     }
 
