@@ -2045,7 +2045,9 @@ function extractTimerFromStepText(text) {
 // DATE & CALENDAR UTILS (ISO 8601 & LOCAL DATES) - US-05, US-22, BUG-07
 // ==========================================================================
 const DAYS_OF_WEEK_ES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+const DAYS_OF_WEEK_EN = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const MONTHS_SHORT_ES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const MONTHS_SHORT_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function toLocalDateKey(date) {
   const d = date ? (date instanceof Date ? date : new Date(date)) : new Date();
@@ -2096,16 +2098,18 @@ function getWeekDates(referenceDate) {
 }
 
 /**
- * Formats a week range in Spanish, e.g. "19 oct – 25 oct 2026"
+ * Formats a week range in localized language, e.g. "19 oct – 25 oct 2026" or "19 Oct – 25 Oct 2026"
  */
 function formatWeekRange(weekDays) {
   if (!weekDays || weekDays.length !== 7) return '';
+  const isEn = typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() === 'en';
+  const monthsArr = isEn ? MONTHS_SHORT_EN : MONTHS_SHORT_ES;
   const start = weekDays[0].date;
   const end = weekDays[6].date;
   const startDay = start.getDate();
-  const startMonth = MONTHS_SHORT_ES[start.getMonth()];
+  const startMonth = monthsArr[start.getMonth()];
   const endDay = end.getDate();
-  const endMonth = MONTHS_SHORT_ES[end.getMonth()];
+  const endMonth = monthsArr[end.getMonth()];
   const startYear = start.getFullYear();
   const endYear = end.getFullYear();
 
@@ -4653,7 +4657,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.60';
+  window.APP_VERSION = 'v1.61';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4697,7 +4701,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.60';
+    this.appVersion = window.APP_VERSION || 'v1.61';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5372,6 +5376,18 @@ class FoodAssistantApp {
     if (!window.I18n) return;
     window.I18n.setPreference(langMode);
     this.updateLanguageUI(langMode);
+    this.render();
+    this.updateUserAccountUI();
+    if (typeof this.renderHouseholdSettings === 'function') {
+      this.renderHouseholdSettings();
+    }
+    if (this.activeRecipe && this.modalRecipeDetail && (this.modalRecipeDetail.open || this.modalRecipeDetail.classList.contains('active'))) {
+      this.renderRecipeModalContent();
+    }
+    const nutModal = document.getElementById('modal-nutrition-breakdown');
+    if (nutModal && nutModal.open) {
+      this.renderNutritionBreakdownModal();
+    }
     if (notify) {
       this.showToast(window.I18n.t('settings.languageUpdated'), 'info');
     }
@@ -5576,16 +5592,16 @@ class FoodAssistantApp {
       if (settingsName) settingsName.textContent = user.name || user.email.split('@')[0];
       if (settingsStatus) {
         settingsStatus.textContent = !this.supabaseClient
-          ? 'Perfil local (Demo) - Supabase no configurado'
-          : `Sincronizado con Supabase (${user.provider || 'email'})`;
+          ? (window.I18n ? window.I18n.t('settings.localProfileDemo') : 'Perfil local (Demo) - Supabase no configurado')
+          : `${window.I18n ? window.I18n.t('settings.syncedWith') : 'Sincronizado con'} Supabase (${user.provider || 'email'})`;
       }
-      if (settingsAuthBtn) settingsAuthBtn.textContent = 'Ver Cuenta';
+      if (settingsAuthBtn) settingsAuthBtn.textContent = window.I18n ? window.I18n.t('settings.viewAccount') : 'Ver Cuenta';
       if (syncNowBtn) syncNowBtn.style.display = 'inline-flex';
       if (state.lastSyncedAt && syncIndicator && !syncIndicator.textContent) {
-        this.updateSyncIndicator(`Sincronizado a las ${new Date(state.lastSyncedAt).toLocaleTimeString()}`, 'success');
+        this.updateSyncIndicator(`${window.I18n ? window.I18n.t('settings.syncedAt') : 'Sincronizado a las'} ${new Date(state.lastSyncedAt).toLocaleTimeString()}`, 'success');
       }
 
-      if (authModalTitle) authModalTitle.textContent = 'Mi Cuenta en la Nube';
+      if (authModalTitle) authModalTitle.textContent = window.I18n ? window.I18n.t('settings.myCloudAccountTitle') : 'Mi Cuenta en la Nube';
       if (authTabs) authTabs.style.display = 'none';
       if (authForms) authForms.style.display = 'none';
       if (authLoggedIn) {
@@ -5597,16 +5613,16 @@ class FoodAssistantApp {
       // Guest / Local state
       if (pillBtn) pillBtn.classList.remove('logged-in');
       if (pillIcon) pillIcon.textContent = 'account_circle';
-      if (pillText) pillText.textContent = 'Iniciar sesión';
+      if (pillText) pillText.textContent = window.I18n ? window.I18n.t('settings.signIn') : 'Iniciar sesión';
 
       if (settingsIcon) settingsIcon.textContent = 'account_circle';
-      if (settingsName) settingsName.textContent = 'Modo Local (Invitado)';
-      if (settingsStatus) settingsStatus.textContent = 'Datos almacenados solo en este dispositivo';
-      if (settingsAuthBtn) settingsAuthBtn.textContent = 'Iniciar Sesión';
+      if (settingsName) settingsName.textContent = window.I18n ? window.I18n.t('settings.localMode') : 'Modo Local (Invitado)';
+      if (settingsStatus) settingsStatus.textContent = window.I18n ? window.I18n.t('settings.dataOnlyDevice') : 'Datos almacenados solo en este dispositivo';
+      if (settingsAuthBtn) settingsAuthBtn.textContent = window.I18n ? window.I18n.t('settings.signIn') : 'Iniciar Sesión';
       if (syncNowBtn) syncNowBtn.style.display = 'none';
       this.updateSyncIndicator('');
 
-      if (authModalTitle) authModalTitle.textContent = 'Cuenta en la Nube';
+      if (authModalTitle) authModalTitle.textContent = window.I18n ? window.I18n.t('settings.cloudAccountTitle') : 'Cuenta en la Nube';
       if (authTabs) authTabs.style.display = 'flex';
       if (authForms) authForms.style.display = 'block';
       if (authLoggedIn) authLoggedIn.style.display = 'none';
@@ -7755,10 +7771,12 @@ class FoodAssistantApp {
       customSlots: []
     };
 
-    // Header dynamic date formatting (e.g., "Sábado, 24 de octubre")
+    const isEn = typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() === 'en';
+
+    // Header dynamic date formatting (e.g., "Sábado, 24 de octubre" vs "Saturday, October 24")
     const dateOptions = { weekday: 'long', day: 'numeric', month: 'long' };
-    const dateFormatted = today.toLocaleDateString('es-ES', dateOptions);
-    const dateCapitalized = dateFormatted ? (dateFormatted.charAt(0).toUpperCase() + dateFormatted.slice(1)) : 'Hoy';
+    const dateFormatted = today.toLocaleDateString(isEn ? 'en-US' : 'es-ES', dateOptions);
+    const dateCapitalized = dateFormatted ? (dateFormatted.charAt(0).toUpperCase() + dateFormatted.slice(1)) : (isEn ? 'Today' : 'Hoy');
 
     const dateElem = document.getElementById('today-date-text');
     if (dateElem) {
@@ -7778,11 +7796,11 @@ class FoodAssistantApp {
     const summaryElem = document.getElementById('today-summary-text');
     if (summaryElem) {
       if (assignedCount === 0) {
-        summaryElem.textContent = 'Ninguna comida asignada para hoy. Toca un momento para empezar.';
+        summaryElem.textContent = window.I18n ? window.I18n.t('today.noMealsPlanned') : 'Ninguna comida asignada para hoy. Toca un momento para empezar.';
       } else if (assignedCount === totalSlotsCount) {
-        summaryElem.textContent = `Todas las comidas planificadas (${assignedCount} de ${totalSlotsCount}). ¡Listo para cocinar!`;
+        summaryElem.textContent = window.I18n ? window.I18n.t('today.allMealsPlanned', { count: assignedCount, total: totalSlotsCount }) : `Todas las comidas planificadas (${assignedCount} de ${totalSlotsCount}). ¡Listo para cocinar!`;
       } else {
-        summaryElem.textContent = `${assignedCount} de ${totalSlotsCount} comidas planificadas para hoy.`;
+        summaryElem.textContent = window.I18n ? window.I18n.t('today.someMealsPlanned', { count: assignedCount, total: totalSlotsCount }) : `${assignedCount} de ${totalSlotsCount} comidas planificadas para hoy.`;
       }
     }
 
@@ -7797,14 +7815,14 @@ class FoodAssistantApp {
       const headerGoalsBtn = `
         <button type="button" class="btn-today-goals-trigger" id="btn-today-quick-goals" onclick="app.openNutritionGoalsModal()" title="Configurar metas nutricionales diarias">
           <span class="material-symbols-outlined icon-14 icon-primary">tune</span>
-          <span>${goalsEnabled ? 'Objetivos' : 'Configurar / Activar'}</span>
+          <span>${goalsEnabled ? (window.I18n ? window.I18n.t('today.goalsBtn') : 'Objetivos') : (window.I18n ? window.I18n.t('today.setupOrActivate') : 'Configurar / Activar')}</span>
         </button>
       `;
 
       if (!goalsEnabled) {
         nutritionContainer.innerHTML = `
           <div class="today-header-macros-zen">
-            <span class="today-header-macros-zen-label">Seguimiento nutricional desactivado</span>
+            <span class="today-header-macros-zen-label">${window.I18n ? window.I18n.t('today.trackingDisabled') : 'Seguimiento nutricional desactivado'}</span>
             ${headerGoalsBtn}
           </div>
         `;
@@ -7813,7 +7831,7 @@ class FoodAssistantApp {
           <div class="today-header-macros-empty">
             <div class="today-header-macros-top">
               <span class="today-nutrition-pill-kcal"><span class="material-symbols-outlined icon-14 icon-primary">local_fire_department</span> 0 kcal</span>
-              <span class="today-nutrition-meta">0 comidas</span>
+              <span class="today-nutrition-meta">0 ${window.I18n ? window.I18n.t('nutrition.mealPlural') : 'comidas'}</span>
               ${headerGoalsBtn}
             </div>
             <div class="today-nutrition-empty">
@@ -7841,15 +7859,15 @@ class FoodAssistantApp {
           const percent = Math.round((currentVal / targetVal) * 100);
           const diff = currentNum - Math.round(targetVal);
           let statusClass = 'goal-ok';
-          let statusText = 'En rango';
+          let statusText = window.I18n ? window.I18n.t('nutrition.inRange') : 'En rango';
 
           if (percent < 85) {
             statusClass = 'goal-under';
-            statusText = `Faltan ${Math.abs(diff)}${unit}`;
+            statusText = window.I18n ? window.I18n.t('nutrition.remaining', { amount: Math.abs(diff), unit }) : `Faltan ${Math.abs(diff)}${unit}`;
           } else if (percent > 110) {
             if (isProtein && percent <= 130) {
               statusClass = 'goal-super';
-              statusText = '+ Superado';
+              statusText = window.I18n ? window.I18n.t('nutrition.exceeded') : '+ Superado';
             } else {
               statusClass = 'goal-over';
               statusText = `+${diff}${unit}`;
@@ -7867,7 +7885,7 @@ class FoodAssistantApp {
               <div class="macro-chip-val macro-chip-val-expanded" id="today-macro-${macroKey}">
                 ${currentNum}<span class="macro-chip-unit">${unit}</span>
               </div>
-              <span class="macro-goal-subtext">de ${targetVal}${unit} (${percent}%)</span>
+              <span class="macro-goal-subtext">${window.I18n ? window.I18n.t('nutrition.ofTarget', { target: targetVal, unit, percent }) : `de ${targetVal}${unit} (${percent}%)`}</span>
               <div class="goal-progress-track">
                 <div class="goal-progress-fill ${statusClass}" style="--bar-pct: ${barPercent}%;"></div>
               </div>
@@ -7893,7 +7911,7 @@ class FoodAssistantApp {
             goalBannerHtml = `
               <div class="today-goal-banner banner-over">
                 <span class="material-symbols-outlined icon-sm">warning</span>
-                <span>Aviso: El menú planificado para hoy supera tu objetivo diario en <strong>+${excess} kcal</strong> (${Math.round((calCurrent / calGoal) * 100)}%).</span>
+                <span>${isEn ? `Notice: Today's menu exceeds your daily goal by <strong>+${excess} kcal</strong> (${Math.round((calCurrent / calGoal) * 100)}%).` : `Aviso: El menú planificado para hoy supera tu objetivo diario en <strong>+${excess} kcal</strong> (${Math.round((calCurrent / calGoal) * 100)}%).`}</span>
               </div>
             `;
           } else if (calGoal > 0 && calCurrent < calGoal * 0.85) {
@@ -7901,7 +7919,7 @@ class FoodAssistantApp {
             goalBannerHtml = `
               <div class="today-goal-banner banner-under">
                 <span class="material-symbols-outlined icon-sm">trending_up</span>
-                <span>Plan actual: Faltan <strong>${missing} kcal</strong> para alcanzar tu meta diaria.</span>
+                <span>${isEn ? `Current plan: <strong>${missing} kcal</strong> to reach your daily goal.` : `Plan actual: Faltan <strong>${missing} kcal</strong> para alcanzar tu meta diaria.`}</span>
               </div>
             `;
           } else {
@@ -7911,25 +7929,25 @@ class FoodAssistantApp {
 
             if (protGoal > 0) {
               if (protCurrent < protGoal * 0.85) {
-                underMacros.push(`faltan ${protGoal - protCurrent}g de proteína`);
+                underMacros.push(isEn ? `${protGoal - protCurrent}g protein remaining` : `faltan ${protGoal - protCurrent}g de proteína`);
               } else if (protCurrent > protGoal * 1.3) {
-                overMacros.push(`+${protCurrent - protGoal}g de proteína`);
+                overMacros.push(`+${protCurrent - protGoal}g ${isEn ? 'protein' : 'de proteína'}`);
               }
             }
 
             if (carbsGoal > 0) {
               if (carbsCurrent < carbsGoal * 0.85) {
-                underMacros.push(`faltan ${carbsGoal - carbsCurrent}g de carbos`);
+                underMacros.push(isEn ? `${carbsGoal - carbsCurrent}g carbs remaining` : `faltan ${carbsGoal - carbsCurrent}g de carbos`);
               } else if (carbsCurrent > carbsGoal * 1.1) {
-                overMacros.push(`+${carbsCurrent - carbsGoal}g de carbos`);
+                overMacros.push(`+${carbsCurrent - carbsGoal}g ${isEn ? 'carbs' : 'de carbos'}`);
               }
             }
 
             if (fatGoal > 0) {
               if (fatCurrent < fatGoal * 0.85) {
-                underMacros.push(`faltan ${fatGoal - fatCurrent}g de grasas`);
+                underMacros.push(isEn ? `${fatGoal - fatCurrent}g fats remaining` : `faltan ${fatGoal - fatCurrent}g de grasas`);
               } else if (fatCurrent > fatGoal * 1.1) {
-                overMacros.push(`+${fatCurrent - fatGoal}g de grasas`);
+                overMacros.push(`+${fatCurrent - fatGoal}g ${isEn ? 'fats' : 'de grasas'}`);
               }
             }
 
@@ -7945,7 +7963,7 @@ class FoodAssistantApp {
                   goalBannerHtml = `
                     <div class="today-goal-banner ${bannerClass}">
                       <span class="material-symbols-outlined icon-sm">${icon}</span>
-                      <span>Plan actual: ${item.charAt(0).toUpperCase() + item.slice(1)} para alcanzar tu meta.</span>
+                      <span>${isEn ? `Current plan: ${item} to reach your goal.` : `Plan actual: ${item.charAt(0).toUpperCase() + item.slice(1)} para alcanzar tu meta.`}</span>
                     </div>
                   `;
                 } else {
@@ -7953,19 +7971,19 @@ class FoodAssistantApp {
                   goalBannerHtml = `
                     <div class="today-goal-banner ${bannerClass}">
                       <span class="material-symbols-outlined icon-sm">${icon}</span>
-                      <span>Aviso de macros: Exceso de <strong>${item.replace('+', '')}</strong> respecto a tu objetivo diario.</span>
+                      <span>${isEn ? `Macro alert: Excess of <strong>${item.replace('+', '')}</strong> relative to your daily target.` : `Aviso de macros: Exceso de <strong>${item.replace('+', '')}</strong> respecto a tu objetivo diario.`}</span>
                     </div>
                   `;
                 }
               } else {
                 const parts = [
-                  ...overMacros.map(o => `exceso de ${o.replace('+', '')}`),
+                  ...overMacros.map(o => isEn ? `excess of ${o.replace('+', '')}` : `exceso de ${o.replace('+', '')}`),
                   ...underMacros
                 ];
                 goalBannerHtml = `
                   <div class="today-goal-banner ${bannerClass}">
                     <span class="material-symbols-outlined icon-sm">${icon}</span>
-                    <span>Distribución descompensada: ${parts.join(' y ')}.</span>
+                    <span>${isEn ? `Imbalanced distribution: ${parts.join(' and ')}.` : `Distribución descompensada: ${parts.join(' y ')}.`}</span>
                   </div>
                 `;
               }
@@ -7973,7 +7991,7 @@ class FoodAssistantApp {
               goalBannerHtml = `
                 <div class="today-goal-banner banner-ok">
                   <span class="material-symbols-outlined icon-sm">check_circle</span>
-                  <span>¡Menú equilibrado! Tu plan de comidas de hoy cumple con los objetivos nutricionales configurados.</span>
+                  <span>${isEn ? 'Balanced menu! Your meals planned for today meet your configured nutritional goals.' : '¡Menú equilibrado! Tu plan de comidas de hoy cumple con los objetivos nutricionales configurados.'}</span>
                 </div>
               `;
             }
@@ -8002,30 +8020,30 @@ class FoodAssistantApp {
               <span class="today-header-macro-badge macro-badge-carbs"><em>C</em> ${Math.round(todayNutrition.totalCarbs)}g</span>
               <span class="today-header-macro-badge macro-badge-fat"><em>G</em> ${Math.round(todayNutrition.totalFat)}g</span>
             </div>
-            <div class="today-header-macro-action desktop-only-action" onclick="event.stopPropagation(); app.openNutritionBreakdownModal();" title="Ver desglose nutricional completo en ventana modal">
+            <div class="today-header-macro-action desktop-only-action" onclick="event.stopPropagation(); app.openNutritionBreakdownModal();" title="${window.I18n ? window.I18n.t('today.breakdownAria') : 'Ver desglose nutricional completo en ventana modal'}">
               ${headerGoalsBtn}
-              <span class="today-header-macro-action-label">Ver desglose</span>
+              <span class="today-header-macro-action-label">${this.todayNutritionExpanded ? (window.I18n ? window.I18n.t('today.hideBreakdown') : 'Ocultar desglose') : (window.I18n ? window.I18n.t('today.viewBreakdown') : 'Ver desglose')}</span>
               <span class="material-symbols-outlined icon-16">open_in_new</span>
             </div>
           </div>
           <div class="today-nutrition-details-body" id="today-nutrition-details-body">
             <div class="today-nutrition-header">
               <div class="today-nutrition-title">
-                <span class="material-symbols-outlined icon-sm icon-primary">local_fire_department</span> Resumen Nutricional Diario
+                <span class="material-symbols-outlined icon-sm icon-primary">local_fire_department</span> ${window.I18n ? window.I18n.t('today.dailySummaryTitle') : 'Resumen Nutricional Diario'}
               </div>
               <div class="u-flex-row-center-gap-6">
                 ${headerGoalsBtn}
-                <span class="today-nutrition-meta">${todayNutrition.mealCount} ${todayNutrition.mealCount === 1 ? 'comida' : 'comidas'}</span>
+                <span class="today-nutrition-meta">${todayNutrition.mealCount} ${todayNutrition.mealCount === 1 ? (window.I18n ? window.I18n.t('nutrition.mealSingle') : 'comida') : (window.I18n ? window.I18n.t('nutrition.mealPlural') : 'comidas')}</span>
                 <button type="button" class="btn btn-ghost btn-icon btn-sm popover-close-btn desktop-only-close" onclick="event.stopPropagation(); app.toggleTodayNutritionDetails();" aria-label="Cerrar desglose" title="Cerrar">
                   <span class="material-symbols-outlined icon-sm">close</span>
                 </button>
               </div>
             </div>
             <div class="today-macros-grid ${goalsEnabled ? 'has-goals' : ''}">
-              ${formatChipWithGoal('cal', 'Calorías', todayNutrition.totalCalories, 'kcal', goals.calories)}
-              ${formatChipWithGoal('prot', 'Proteínas', todayNutrition.totalProtein, 'g', goals.protein, true)}
-              ${formatChipWithGoal('carbs', 'Carbos', todayNutrition.totalCarbs, 'g', goals.carbs)}
-              ${formatChipWithGoal('fat', 'Grasas', todayNutrition.totalFat, 'g', goals.fat)}
+              ${formatChipWithGoal('cal', window.I18n ? window.I18n.t('goals.calories') : 'Calorías', todayNutrition.totalCalories, 'kcal', goals.calories)}
+              ${formatChipWithGoal('prot', window.I18n ? window.I18n.t('goals.protein') : 'Proteínas', todayNutrition.totalProtein, 'g', goals.protein, true)}
+              ${formatChipWithGoal('carbs', window.I18n ? window.I18n.t('goals.carbs') : 'Carbos', todayNutrition.totalCarbs, 'g', goals.carbs)}
+              ${formatChipWithGoal('fat', window.I18n ? window.I18n.t('goals.fat') : 'Grasas', todayNutrition.totalFat, 'g', goals.fat)}
             </div>
             <div class="macro-ratio-bar" title="Distribución: ${protPercent}% P / ${carbsPercent}% C / ${fatPercent}% G">
               <div class="ratio-segment ratio-prot" style="--seg-pct: ${protPercent}%;" title="Proteína: ${protPercent}%"></div>
@@ -8035,7 +8053,7 @@ class FoodAssistantApp {
             ${goalBannerHtml}
             <div class="nutrition-estimation-disclaimer" id="today-nutrition-disclaimer">
               <span class="material-symbols-outlined">info</span>
-              <span>Valores orientativos calculados a partir de recetas creadas a mano o importadas; úsalos solo como una estimación aproximada.</span>
+              <span>${window.I18n ? window.I18n.t('recipes.nutritionDisclaimer') : 'Valores orientativos calculados a partir de recetas creadas a mano o importadas; úsalos solo como una estimación aproximada.'}</span>
             </div>
           </div>
         `;
@@ -8050,6 +8068,7 @@ class FoodAssistantApp {
       const recId = todayPlan[s.key];
       const isLeftover = todayPlan.leftoverSlots && todayPlan.leftoverSlots[s.key];
       const recipe = state.recipes.find(r => r.id === recId);
+      const slotLabel = window.I18n ? window.I18n.getSlotLabel(s.key, s.label) : s.label;
 
       if (recipe) {
         const nut = typeof getRecipeNutrition === 'function' ? getRecipeNutrition(recipe) : null;
@@ -8070,15 +8089,15 @@ class FoodAssistantApp {
           <div class="meal-slot has-meal today-meal-slot-card" onclick="app.openRecipeDetail('${safeRecipeId}')">
             <div class="u-flex-between-center today-meal-slot-top">
               <span class="slot-label">
-                <span class="material-symbols-outlined icon-sm">${s.icon}</span> ${s.label}
+                <span class="material-symbols-outlined icon-sm">${s.icon}</span> ${slotLabel}
               </span>
               <div class="u-flex-row-center-gap-4">
                 ${isLeftover ? `
                   <span class="leftover-pill-badge">
-                    <span class="material-symbols-outlined icon-12">takeout_dining</span> Sobras
+                    <span class="material-symbols-outlined icon-12">takeout_dining</span> ${window.I18n ? window.I18n.t('today.leftovers') : 'Sobras'}
                   </span>
                 ` : ''}
-                <button type="button" class="btn btn-ghost btn-sm btn-slot-clear btn-remove-circle" onclick="event.stopPropagation(); app.clearSlot('${todayStr}', '${s.key}')" title="Quitar plato">
+                <button type="button" class="btn btn-ghost btn-sm btn-slot-clear btn-remove-circle" onclick="event.stopPropagation(); app.clearSlot('${todayStr}', '${s.key}')" title="${window.I18n ? window.I18n.t('today.removeDish') : 'Quitar plato'}">
                   <span class="material-symbols-outlined icon-sm">close</span>
                 </button>
               </div>
@@ -8111,14 +8130,14 @@ class FoodAssistantApp {
                 </div>
                 ${(protNum > 0 || firstTag) ? `
                   <div class="today-meal-pills-row">
-                    ${protNum > 0 ? `<span class="today-meal-macro-pill">${protNum}g proteína</span>` : ''}
-                    ${firstTag ? `<span class="today-meal-tag-pill">${escapeHtml(firstTag)}</span>` : ''}
+                    ${protNum > 0 ? `<span class="today-meal-macro-pill">${protNum}g ${window.I18n ? window.I18n.t('goals.protein') : 'proteína'}</span>` : ''}
+                    ${firstTag ? `<span class="today-meal-tag-pill">${escapeHtml(window.I18n ? window.I18n.getTagLabel(firstTag) : firstTag)}</span>` : ''}
                   </div>
                 ` : ''}
               </div>
             </div>
             <div class="today-meal-desktop-action">
-              <span>Ver receta</span>
+              <span>${window.I18n ? window.I18n.t('today.viewRecipe') : 'Ver receta'}</span>
               <span class="material-symbols-outlined icon-14">arrow_forward</span>
             </div>
           </div>
@@ -8127,10 +8146,10 @@ class FoodAssistantApp {
         return `
           <div class="meal-slot today-meal-slot-empty" onclick="app.openPickerModal('${todayStr}', '${s.key}')">
             <span class="slot-label">
-              <span class="material-symbols-outlined icon-sm">${s.icon}</span> ${s.label}
+              <span class="material-symbols-outlined icon-sm">${s.icon}</span> ${slotLabel}
             </span>
             <div class="slot-action-text">
-              <span class="material-symbols-outlined icon-sm">add_circle</span> Asignar plato
+              <span class="material-symbols-outlined icon-sm">add_circle</span> ${window.I18n ? window.I18n.t('today.assignDish') : 'Asignar plato'}
             </div>
           </div>
         `;
@@ -8143,7 +8162,7 @@ class FoodAssistantApp {
       <div class="today-add-slot-wrap">
         <button type="button" class="btn today-add-slot-btn" onclick="app.openAddCustomSlotModal('${todayStr}')">
           <span class="material-symbols-outlined icon-sm">add</span>
-          <span>Añadir otra comida</span>
+          <span>${window.I18n ? window.I18n.t('today.addAnotherMeal') : 'Añadir otra comida'}</span>
         </button>
       </div>
     `;
@@ -8191,7 +8210,8 @@ class FoodAssistantApp {
 
     const subtitleElem = document.getElementById('nutrition-breakdown-modal-subtitle');
     if (subtitleElem) {
-      subtitleElem.textContent = `Plan para hoy (${todayNutrition.mealCount} ${todayNutrition.mealCount === 1 ? 'comida' : 'comidas'}).`;
+      const mealWord = todayNutrition.mealCount === 1 ? (window.I18n ? window.I18n.t('nutrition.mealSingle') : 'comida') : (window.I18n ? window.I18n.t('nutrition.mealPlural') : 'comidas');
+      subtitleElem.textContent = window.I18n ? window.I18n.t('nutrition.breakdownSubtitle', { count: todayNutrition.mealCount, meals: mealWord }) : `Plan para hoy (${todayNutrition.mealCount} ${mealWord}).`;
     }
 
     const totalMacroGrams = (todayNutrition.totalProtein + todayNutrition.totalCarbs + todayNutrition.totalFat) || 1;
@@ -8212,13 +8232,13 @@ class FoodAssistantApp {
       const percent = Math.round((currentVal / targetVal) * 100);
       const diff = currentNum - Math.round(targetVal);
       let statusClass = 'goal-ok';
-      let statusText = 'En rango';
+      let statusText = window.I18n ? window.I18n.t('nutrition.inRange') : 'En rango';
       if (percent < 85) {
         statusClass = 'goal-under';
-        statusText = `Faltan ${Math.abs(diff)}${unit}`;
+        statusText = window.I18n ? window.I18n.t('nutrition.remaining', { amount: Math.abs(diff), unit }) : `Faltan ${Math.abs(diff)}${unit}`;
       } else if (percent > 110) {
         statusClass = isProtein && percent <= 130 ? 'goal-super' : 'goal-over';
-        statusText = isProtein && percent <= 130 ? '+ Superado' : `+${diff}${unit}`;
+        statusText = isProtein && percent <= 130 ? (window.I18n ? window.I18n.t('nutrition.exceeded') : '+ Superado') : `+${diff}${unit}`;
       }
       const barPercent = Math.min(100, Math.max(0, percent));
       return `
@@ -8228,7 +8248,7 @@ class FoodAssistantApp {
             <span class="goal-status-badge ${statusClass}">${statusText}</span>
           </div>
           <div class="macro-chip-val macro-chip-val-expanded">${currentNum}<span class="macro-chip-unit">${unit}</span></div>
-          <span class="macro-goal-subtext">de ${targetVal}${unit} (${percent}%)</span>
+          <span class="macro-goal-subtext">${window.I18n ? window.I18n.t('nutrition.ofTarget', { target: targetVal, unit, percent }) : `de ${targetVal}${unit} (${percent}%)`}</span>
           <div class="goal-progress-track">
             <div class="goal-progress-fill ${statusClass}" style="--bar-pct: ${barPercent}%;"></div>
           </div>
@@ -8241,17 +8261,17 @@ class FoodAssistantApp {
       goalBannerHtml = `
         <div class="today-goal-banner banner-ok modal-goal-banner">
           <span class="material-symbols-outlined icon-sm">check_circle</span>
-          <span>Valores nutricionales sincronizados con tus objetivos diarios configurados.</span>
+          <span>${window.I18n ? window.I18n.t('nutrition.syncedWithGoals') : 'Valores nutricionales sincronizados con tus objetivos diarios configurados.'}</span>
         </div>
       `;
     }
 
     body.innerHTML = `
       <div class="today-macros-grid has-goals modal-macros-grid">
-        ${formatChip('cal', 'Calorías', todayNutrition.totalCalories, 'kcal', goals.calories)}
-        ${formatChip('prot', 'Proteínas', todayNutrition.totalProtein, 'g', goals.protein, true)}
-        ${formatChip('carbs', 'Carbos', todayNutrition.totalCarbs, 'g', goals.carbs)}
-        ${formatChip('fat', 'Grasas', todayNutrition.totalFat, 'g', goals.fat)}
+        ${formatChip('cal', window.I18n ? window.I18n.t('goals.calories') : 'Calorías', todayNutrition.totalCalories, 'kcal', goals.calories)}
+        ${formatChip('prot', window.I18n ? window.I18n.t('goals.protein') : 'Proteínas', todayNutrition.totalProtein, 'g', goals.protein, true)}
+        ${formatChip('carbs', window.I18n ? window.I18n.t('goals.carbs') : 'Carbos', todayNutrition.totalCarbs, 'g', goals.carbs)}
+        ${formatChip('fat', window.I18n ? window.I18n.t('goals.fat') : 'Grasas', todayNutrition.totalFat, 'g', goals.fat)}
       </div>
       <div class="macro-ratio-bar modal-ratio-bar" title="Distribución: ${protPercent}% P / ${carbsPercent}% C / ${fatPercent}% G">
         <div class="ratio-segment ratio-prot" style="--seg-pct: ${protPercent}%;"></div>
@@ -8259,14 +8279,14 @@ class FoodAssistantApp {
         <div class="ratio-segment ratio-fat" style="--seg-pct: ${fatPercent}%;"></div>
       </div>
       <div class="modal-macro-ratio-labels">
-        <span>Proteínas: ${protPercent}%</span>
-        <span>Carbohidratos: ${carbsPercent}%</span>
-        <span>Grasas: ${fatPercent}%</span>
+        <span>${window.I18n ? window.I18n.t('nutrition.ratioProt', { percent: protPercent }) : `Proteínas: ${protPercent}%`}</span>
+        <span>${window.I18n ? window.I18n.t('nutrition.ratioCarbs', { percent: carbsPercent }) : `Carbohidratos: ${carbsPercent}%`}</span>
+        <span>${window.I18n ? window.I18n.t('nutrition.ratioFat', { percent: fatPercent }) : `Grasas: ${fatPercent}%`}</span>
       </div>
       ${goalBannerHtml}
       <div class="nutrition-estimation-disclaimer modal-nutrition-disclaimer">
         <span class="material-symbols-outlined">info</span>
-        <span>Valores orientativos calculados a partir de recetas creadas o importadas; úsalos como guía general.</span>
+        <span>${window.I18n ? window.I18n.t('nutrition.disclaimer') : 'Valores orientativos calculados a partir de recetas creadas o importadas; úsalos como guía general.'}</span>
       </div>
     `;
   }
@@ -8689,38 +8709,45 @@ class FoodAssistantApp {
     const noIngActive = this.recipeAuditFilter === 'no-ingredients';
     const noInstActive = this.recipeAuditFilter === 'no-instructions';
 
+    const myFridgeText = window.I18n ? window.I18n.t('recipes.myFridge') : 'Mi Nevera';
+    const allText = window.I18n ? window.I18n.t('recipes.all') : 'Todas';
+    const favText = window.I18n ? window.I18n.t('recipes.favorites') : 'Favoritas';
+    const noIngText = window.I18n ? window.I18n.t('recipes.noIngredients') : 'Sin ingredientes';
+    const noInstText = window.I18n ? window.I18n.t('recipes.noInstructions') : 'Sin pasos';
+
     let html = `
       <button type="button" class="m3-filter-chip m3-filter-chip-fridge ${isFridgeActive ? 'active' : ''}" id="btn-toggle-fridge-panel"
-        title="Buscar recetas según lo que tienes en la nevera">
+        title="${window.I18n ? window.I18n.t('recipes.myFridgeTooltip') : 'Buscar recetas según lo que tienes en la nevera'}">
         <span class="material-symbols-outlined icon-15">kitchen</span>
-        <span>Mi Nevera${this.fridgeIngredients && this.fridgeIngredients.length > 0 ? ` (${this.fridgeIngredients.length})` : ''}</span>
+        <span>${myFridgeText}${this.fridgeIngredients && this.fridgeIngredients.length > 0 ? ` (${this.fridgeIngredients.length})` : ''}</span>
       </button>
       <button type="button" class="m3-filter-chip ${isAllActive ? 'active' : ''}" data-tag="all">
         ${isAllActive ? '<span class="material-symbols-outlined icon-15">done</span>' : ''}
-        Todas
+        ${allText}
       </button>
       <button type="button" class="m3-filter-chip m3-filter-chip-fav ${isFavSelected ? 'active' : ''}" id="btn-filter-favorites" data-tag="Favoritas" aria-pressed="${isFavSelected ? 'true' : 'false'}">
         <span class="material-symbols-outlined icon-15">favorite</span>
-        <span>Favoritas${favCount > 0 ? ` (${favCount})` : ''}</span>
+        <span>${favText}${favCount > 0 ? ` (${favCount})` : ''}</span>
       </button>
-      <button type="button" class="m3-filter-chip m3-filter-chip-audit ${noIngActive ? 'active' : ''}" data-audit="no-ingredients" title="Filtrar recetas sin ingredientes">
+      <button type="button" class="m3-filter-chip m3-filter-chip-audit ${noIngActive ? 'active' : ''}" data-audit="no-ingredients" title="${window.I18n ? window.I18n.t('recipes.noIngredientsTooltip') : 'Filtrar recetas sin ingredientes'}">
         <span class="material-symbols-outlined icon-15">remove_shopping_cart</span>
-        <span>Sin ingredientes</span>
+        <span>${noIngText}</span>
       </button>
-      <button type="button" class="m3-filter-chip m3-filter-chip-audit ${noInstActive ? 'active' : ''}" data-audit="no-instructions" title="Filtrar recetas sin pasos ni elaboración">
+      <button type="button" class="m3-filter-chip m3-filter-chip-audit ${noInstActive ? 'active' : ''}" data-audit="no-instructions" title="${window.I18n ? window.I18n.t('recipes.noInstructionsTooltip') : 'Filtrar recetas sin pasos ni elaboración'}">
         <span class="material-symbols-outlined icon-15">format_list_bulleted</span>
-        <span>Sin pasos</span>
+        <span>${noInstText}</span>
       </button>
     `;
 
     availableTags.forEach(tag => {
       const isSelected = this.selectedRecipeTags.has(tag);
       const isDietary = PREDEFINED_DIETARY_TAGS.includes(tag);
+      const displayTag = window.I18n ? window.I18n.getTagLabel(tag) : tag;
       html += `
         <button type="button" class="m3-filter-chip ${isDietary ? 'dietary-chip' : ''} ${isSelected ? 'active' : ''}" data-tag="${tag}">
           ${isDietary ? `<span class="dietary-emoji">${getDietaryTagEmoji(tag)}</span>` : ''}
           ${isSelected && !isDietary ? '<span class="material-symbols-outlined icon-14">done</span>' : ''}
-          ${tag}
+          ${displayTag}
         </button>
       `;
     });
@@ -9337,7 +9364,7 @@ class FoodAssistantApp {
               Fuente: ${escapeHtml(r.sourceDomain || 'Web Original')}
             </a>
           ` : ''}
-          ${(r.tags || []).filter(t => hasNutData || t !== 'Alta en Proteínas').map(t => `<span class="tag-chip tag-chip-primary">${escapeHtml(t)}</span>`).join('')}
+          ${(r.tags || []).filter(t => hasNutData || t !== 'Alta en Proteínas').map(t => `<span class="tag-chip tag-chip-primary">${escapeHtml(window.I18n ? window.I18n.getTagLabel(t) : t)}</span>`).join('')}
         </div>
         
         <h2 class="recipe-detail-title">${escapeHtml(r.title)}</h2>
@@ -9345,17 +9372,17 @@ class FoodAssistantApp {
         
         <div class="recipe-detail-stats-bar">
           <div>
-            <div class="recipe-stat-upper-label">Tiempo Total</div>
+            <div class="recipe-stat-upper-label">${window.I18n ? window.I18n.t('recipes.totalTime') : 'Tiempo Total'}</div>
             <div class="recipe-stat-time-val">
-              <span class="material-symbols-outlined icon-sm">schedule</span> ${r.prepTimeMinutes + r.cookTimeMinutes} min
+              <span class="material-symbols-outlined icon-sm">schedule</span> ${r.prepTimeMinutes + r.cookTimeMinutes} ${window.I18n ? window.I18n.t('common.minutes') : 'min'}
             </div>
           </div>
           
           <div class="u-flex-row-center-gap-8">
             <div class="u-text-right">
-              <div class="recipe-stat-upper-label">Porciones</div>
+              <div class="recipe-stat-upper-label">${window.I18n ? window.I18n.t('recipes.servings') : 'Porciones'}</div>
               <div class="recipe-stat-servings-val">
-                <span class="material-symbols-outlined icon-sm">group</span> ${this.activeServings} personas
+                <span class="material-symbols-outlined icon-sm">group</span> ${this.activeServings} ${window.I18n ? window.I18n.t('recipes.persons') : 'personas'}
               </div>
             </div>
             <div class="u-flex-row-center-gap-4">
@@ -9369,42 +9396,42 @@ class FoodAssistantApp {
         <div class="recipe-nutrition-card" id="recipe-nutrition-breakdown">
           <div class="recipe-nutrition-header">
             <div class="recipe-nutrition-title">
-              <span class="material-symbols-outlined icon-sm icon-Flame">local_fire_department</span> Información Nutricional
+              <span class="material-symbols-outlined icon-sm icon-Flame">local_fire_department</span> ${window.I18n ? window.I18n.t('recipes.nutritionFacts') : 'Información Nutricional'}
             </div>
             <div class="recipe-nutrition-subtitle" id="recipe-nutrition-subtitle">
-              Por ración individual
+              ${window.I18n ? window.I18n.t('recipes.perServing') : 'Por ración individual'}
             </div>
           </div>
           <div class="recipe-macros-grid">
             <div class="macro-chip macro-cal">
-              <span class="macro-chip-label">Calorías</span>
+              <span class="macro-chip-label">${window.I18n ? window.I18n.t('goals.calories') : 'Calorías'}</span>
               <span class="macro-chip-val" id="macro-detail-calories">${hasNutData ? `${baseNutrition.calories}<span class="macro-chip-unit">kcal</span>` : '—'}</span>
             </div>
             <div class="macro-chip macro-prot">
-              <span class="macro-chip-label">Proteínas</span>
+              <span class="macro-chip-label">${window.I18n ? window.I18n.t('goals.protein') : 'Proteínas'}</span>
               <span class="macro-chip-val" id="macro-detail-protein">${hasNutData ? `${baseNutrition.protein}<span class="macro-chip-unit">g</span>` : '—'}</span>
             </div>
             <div class="macro-chip macro-carbs">
-              <span class="macro-chip-label">Carbos</span>
+              <span class="macro-chip-label">${window.I18n ? window.I18n.t('goals.carbs') : 'Carbos'}</span>
               <span class="macro-chip-val" id="macro-detail-carbs">${hasNutData ? `${baseNutrition.carbs}<span class="macro-chip-unit">g</span>` : '—'}</span>
             </div>
             <div class="macro-chip macro-fat">
-              <span class="macro-chip-label">Grasas</span>
+              <span class="macro-chip-label">${window.I18n ? window.I18n.t('goals.fat') : 'Grasas'}</span>
               <span class="macro-chip-val" id="macro-detail-fat">${hasNutData ? `${baseNutrition.fat}<span class="macro-chip-unit">g</span>` : '—'}</span>
             </div>
           </div>
           <div class="nutrition-estimation-disclaimer" id="recipe-detail-nutrition-disclaimer">
             <span class="material-symbols-outlined">info</span>
-            <span>Los valores nutricionales calculados son una <strong>estimación orientativa</strong> que depende de cada receta (creada a mano o importada por los usuarios). No deben tomarse al pie de la letra, sino solo como referencia aproximada.</span>
+            <span>${window.I18n ? window.I18n.t('recipes.nutritionDisclaimer') : 'Los valores nutricionales calculados son una estimación orientativa que depende de cada receta (creada a mano o importada por los usuarios). No deben tomarse al pie de la letra, sino solo como referencia aproximada.'}</span>
           </div>
         </div>
 
         <div class="recipe-detail-section">
           <div class="recipe-detail-section-header">
-            <h3 class="recipe-detail-section-title">Ingredientes</h3>
+            <h3 class="recipe-detail-section-title">${window.I18n ? window.I18n.t('recipes.ingredients') : 'Ingredientes'}</h3>
             ${!this.isReviewingImport ? `
               <button class="btn btn-tonal btn-sm" onclick="app.addRecipeIngredientsToShopping('${escapeHtml(r.id).replace(/'/g, "\\'")}')">
-                <span class="material-symbols-outlined icon-sm">add_shopping_cart</span> Enviar a la Compra
+                <span class="material-symbols-outlined icon-sm">add_shopping_cart</span> ${window.I18n ? window.I18n.t('recipes.sendToShopping') : 'Enviar a la Compra'}
               </button>
             ` : ''}
           </div>
@@ -9422,7 +9449,7 @@ class FoodAssistantApp {
         </div>
 
         <div class="recipe-detail-section">
-          <h3 class="recipe-detail-section-title-mb">Instrucciones</h3>
+          <h3 class="recipe-detail-section-title-mb">${window.I18n ? window.I18n.t('recipes.instructions') : 'Instrucciones'}</h3>
           <div class="recipe-steps-list">
             ${(r.instructions || []).map(inst => `
               <div class="recipe-step-row">
@@ -9433,7 +9460,7 @@ class FoodAssistantApp {
                   ${escapeHtml(inst.text)}
                   ${inst.timerMinutes > 0 ? `
                     <div class="recipe-step-timer-pill">
-                      <span class="material-symbols-outlined icon-sm">timer</span> ${inst.timerMinutes} minutos
+                      <span class="material-symbols-outlined icon-sm">timer</span> ${inst.timerMinutes} ${window.I18n ? window.I18n.t('recipes.minutes') : 'minutos'}
                     </div>
                   ` : ''}
                 </div>
@@ -9459,10 +9486,10 @@ class FoodAssistantApp {
         ` : `
           <div class="recipe-detail-bottom-actions">
             <button class="btn btn-secondary btn-detail-plan" id="btn-bottom-plan-recipe" onclick="app.openPlanRecipeModal()">
-              <span class="material-symbols-outlined icon-sm">calendar_month</span> Añadir al Plan
+              <span class="material-symbols-outlined icon-sm">calendar_month</span> ${window.I18n ? window.I18n.t('recipes.addToPlan') : 'Añadir al Plan'}
             </button>
             <button class="btn btn-primary btn-detail-cook" id="btn-bottom-start-cook-mode" onclick="app.startCookMode()">
-              <span class="material-symbols-outlined icon-sm">skillet</span> Modo Cocina
+              <span class="material-symbols-outlined icon-sm">skillet</span> ${window.I18n ? window.I18n.t('recipes.cookingMode') : 'Modo Cocina'}
             </button>
           </div>
         `}
@@ -10659,7 +10686,7 @@ class FoodAssistantApp {
       }
     });
     if (pills.length === 0) {
-      return `<span class="day-compact-empty">Sin comidas asignadas · toca para planificar</span>`;
+      return `<span class="day-compact-empty">${window.I18n ? window.I18n.t('planner.noMealsAssigned') : 'Sin comidas asignadas · toca para planificar'}</span>`;
     }
     return pills.join('<span class="day-compact-sep">·</span>');
   }
@@ -10685,6 +10712,7 @@ class FoodAssistantApp {
     const container = document.getElementById('planner-days-container');
     if (!container) return;
 
+    const isEn = typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() === 'en';
     const weekDays = this.getPlannerWeekDates();
     this.updatePlannerWeekLabel(weekDays);
 
@@ -10702,6 +10730,11 @@ class FoodAssistantApp {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowKey = toLocalDateKey(tomorrow);
 
+    const todayBadgeText = window.I18n ? window.I18n.t('planner.todayBadge') : 'HOY';
+    const tomorrowBadgeText = window.I18n ? window.I18n.t('planner.tomorrowBadge') : 'MAÑANA';
+    const addMealText = window.I18n ? window.I18n.t('planner.addMealBtn') : 'Añadir Comida';
+    const addMealTitle = window.I18n ? window.I18n.t('planner.addMealAria') : 'Añadir momento de comida';
+
     container.innerHTML = weekDays.map((wDay) => {
       const dateStr = wDay.dateKey;
       const dayData = state.getDayPlan(dateStr, wDay.dayName);
@@ -10709,21 +10742,22 @@ class FoodAssistantApp {
       const isTomorrow = tomorrowKey === dateStr;
       const isExpanded = this.plannerExpandedDays.has(dateStr);
       const customSlots = Array.isArray(dayData.customSlots) ? dayData.customSlots : [];
-      const dayDateFormatted = `${wDay.date.getDate()} ${MONTHS_SHORT_ES[wDay.date.getMonth()]}`;
+      const localizedDayName = isEn ? (DAYS_OF_WEEK_EN[wDay.date.getDay() === 0 ? 6 : wDay.date.getDay() - 1] || wDay.dayName) : wDay.dayName;
+      const dayDateFormatted = `${wDay.date.getDate()} ${(isEn ? MONTHS_SHORT_EN : MONTHS_SHORT_ES)[wDay.date.getMonth()]}`;
       const compactSummaryHtml = this.buildDayCompactSummaryHtml(dayData);
 
       return `
         <div class="day-card ${isToday ? 'day-card-today' : ''} ${isExpanded ? 'is-expanded' : 'is-collapsed'}" data-date="${dateStr}">
           <div class="day-header" onclick="app.togglePlannerDayAccordion('${dateStr}', event)">
             <div class="day-name">
-              <span class="day-title">${wDay.dayName}</span>
+              <span class="day-title">${localizedDayName}</span>
               <span class="day-date-label">${dayDateFormatted}</span>
-              ${isToday ? `<span class="day-badge-today">HOY</span>` : (isTomorrow ? `<span class="day-badge-tomorrow">MAÑANA</span>` : '')}
+              ${isToday ? `<span class="day-badge-today">${todayBadgeText}</span>` : (isTomorrow ? `<span class="day-badge-tomorrow">${tomorrowBadgeText}</span>` : '')}
             </div>
             <div class="day-compact-summary">${compactSummaryHtml}</div>
             <div class="day-header-actions">
-              <button type="button" class="btn btn-ghost btn-sm btn-add-custom-slot-header" onclick="event.stopPropagation(); app.openAddCustomSlotModal('${dateStr}')" title="Añadir momento de comida">
-                <span class="material-symbols-outlined icon-sm">add</span> Añadir Comida
+              <button type="button" class="btn btn-ghost btn-sm btn-add-custom-slot-header" onclick="event.stopPropagation(); app.openAddCustomSlotModal('${dateStr}')" title="${addMealTitle}">
+                <span class="material-symbols-outlined icon-sm">add</span> ${addMealText}
               </button>
               <button type="button" class="btn-icon day-accordion-toggle" aria-label="Expandir o plegar día" title="Expandir o plegar día">
                 <span class="material-symbols-outlined icon-sm">expand_more</span>
@@ -10732,7 +10766,7 @@ class FoodAssistantApp {
           </div>
 
           <div class="slots-grid">
-            ${STANDARD_SLOTS.map(slot => this.renderSlotCard(dateStr, slot.key, slot.label, slot.icon, dayData[slot.key])).join('')}
+            ${STANDARD_SLOTS.map(slot => this.renderSlotCard(dateStr, slot.key, window.I18n ? window.I18n.getSlotLabel(slot.key, slot.label) : slot.label, slot.icon, dayData[slot.key])).join('')}
             ${customSlots.map(cs => this.renderCustomSlotCard(dateStr, cs)).join('')}
           </div>
         </div>
@@ -10769,11 +10803,11 @@ class FoodAssistantApp {
             </span>
             <div class="u-flex-row-center-gap-4">
               ${isLeftover ? `
-                <span class="leftover-pill-badge" title="Cocinado el día anterior para sobras">
-                  <span class="material-symbols-outlined icon-12">takeout_dining</span> Sobras
+                <span class="leftover-pill-badge" title="${window.I18n ? window.I18n.t('planner.leftoversTooltip') : 'Cocinado el día anterior para sobras'}">
+                  <span class="material-symbols-outlined icon-12">takeout_dining</span> ${window.I18n ? window.I18n.t('today.leftovers') : 'Sobras'}
                 </span>
               ` : ''}
-              <button type="button" class="btn btn-ghost btn-sm btn-slot-clear btn-remove-circle" onclick="event.stopPropagation(); app.clearSlot('${dateStr}', '${slotType}')" title="Quitar receta">
+              <button type="button" class="btn btn-ghost btn-sm btn-slot-clear btn-remove-circle" onclick="event.stopPropagation(); app.clearSlot('${dateStr}', '${slotType}')" title="${window.I18n ? window.I18n.t('planner.removeRecipe') : 'Quitar receta'}">
                 <span class="material-symbols-outlined icon-sm">close</span>
               </button>
             </div>
@@ -11593,14 +11627,17 @@ class FoodAssistantApp {
     const isFavSelected = this.pickerSelectedTags.has('Favoritas');
     const favCount = Array.isArray(state.recipes) ? state.recipes.filter(r => r && r.isFavorite).length : 0;
 
+    const allText = window.I18n ? window.I18n.t('recipes.all') : 'Todas';
+    const favText = window.I18n ? window.I18n.t('recipes.favorites') : 'Favoritas';
+
     let html = `
       <button type="button" class="m3-filter-chip ${isAllActive ? 'active' : ''}" data-picker-tag="all">
         ${isAllActive ? '<span class="material-symbols-outlined icon-14">done</span>' : ''}
-        Todas
+        ${allText}
       </button>
       <button type="button" class="m3-filter-chip m3-filter-chip-fav ${isFavSelected ? 'active' : ''}" data-picker-tag="Favoritas" aria-pressed="${isFavSelected ? 'true' : 'false'}">
         <span class="material-symbols-outlined icon-14">favorite</span>
-        <span>Favoritas${favCount > 0 ? ` (${favCount})` : ''}</span>
+        <span>${favText}${favCount > 0 ? ` (${favCount})` : ''}</span>
       </button>
     `;
 
@@ -11608,11 +11645,12 @@ class FoodAssistantApp {
       const isSelected = this.pickerSelectedTags.has(tag);
       const isDietary = typeof PREDEFINED_DIETARY_TAGS !== 'undefined' && PREDEFINED_DIETARY_TAGS.includes(tag);
       const emoji = typeof getDietaryTagEmoji === 'function' ? getDietaryTagEmoji(tag) : '';
+      const displayTag = window.I18n ? window.I18n.getTagLabel(tag) : tag;
       html += `
         <button type="button" class="m3-filter-chip ${isDietary ? 'dietary-chip' : ''} ${isSelected ? 'active' : ''}" data-picker-tag="${escapeHtml(tag)}">
           ${isDietary && emoji ? `<span class="dietary-emoji">${emoji}</span>` : ''}
           ${isSelected && !isDietary ? '<span class="material-symbols-outlined icon-14">done</span>' : ''}
-          ${escapeHtml(tag)}
+          ${escapeHtml(displayTag)}
         </button>
       `;
     });
@@ -12479,12 +12517,12 @@ class FoodAssistantApp {
           <div class="shopping-completed-header">
             <div class="u-flex-row-center-gap-8">
               <span class="material-symbols-outlined icon-sm u-text-success">check_circle</span>
-              <span class="shopping-completed-title">Completados</span>
+              <span class="shopping-completed-title">${window.I18n ? window.I18n.t('shopping.completedSectionTitle') : 'Completados'}</span>
               <span class="shopping-completed-count">(${completedItems.length})</span>
             </div>
-            <button type="button" class="btn btn-ghost btn-sm btn-clear-completed-section" data-action="clearCompletedGroceries" title="Eliminar artículos completados">
+            <button type="button" class="btn btn-ghost btn-sm btn-clear-completed-section" data-action="clearCompletedGroceries" title="${window.I18n ? window.I18n.t('shopping.clearCompletedBtn') : 'Eliminar artículos completados'}">
               <span class="material-symbols-outlined icon-sm">delete_sweep</span>
-              <span>Limpiar completados</span>
+              <span>${window.I18n ? window.I18n.t('shopping.clearCompletedBtn') : 'Limpiar completados'}</span>
             </button>
           </div>
           <div class="shopping-completed-list">
@@ -12492,7 +12530,9 @@ class FoodAssistantApp {
         const aisleMeta = AISLE_METADATA[item.aisle || 'other'] || AISLE_METADATA.other;
         const displayName = item.name;
         const displayAmt = formatDisplayAmount(item.amount, item.unit, item.displayAmount);
-        const originInfo = item.recipeOrigin ? `Para: ${escapeHtml(item.recipeOrigin)}` : aisleMeta.label;
+        const localizedAisle = window.I18n ? window.I18n.getAisleName(item.aisle || 'other') : aisleMeta.label;
+        const forPrefix = window.I18n ? window.I18n.t('common.forPrefix') : 'Para:';
+        const originInfo = item.recipeOrigin ? `${forPrefix} ${escapeHtml(item.recipeOrigin)}` : localizedAisle;
         return `
                 <div class="grocery-item-row checked">
                   <div class="grocery-left" onclick="app.toggleGroceryCheck(${item.originalIndex})">
@@ -15122,7 +15162,10 @@ ${(typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() ===
         const invokeInput = document.getElementById('gemini-invoke-input');
         if (invokeInput) invokeInput.value = '';
         const invokeTranscription = document.getElementById('gemini-invoke-transcription');
-        if (invokeTranscription) invokeTranscription.textContent = 'Escuchando a Franky...';
+        if (invokeTranscription) {
+          const userName = state.cloudUser?.name ? state.cloudUser.name.trim().split(' ')[0] : 'Franky';
+          invokeTranscription.textContent = window.I18n ? window.I18n.t('ai.listeningTo', { name: userName }) : `Escuchando a ${userName}...`;
+        }
       }
       try {
         this.recognition.start();
@@ -15145,7 +15188,7 @@ ${(typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() ===
       micBtn.innerHTML = isListening
         ? '<span class="material-symbols-outlined icon-sm icon-pulse icon-error">mic</span>'
         : '<span class="material-symbols-outlined icon-sm">mic</span>';
-      micBtn.title = isListening ? 'Escuchando... pulsa para parar' : 'Hablar por micrófono';
+      micBtn.title = isListening ? (window.I18n ? window.I18n.t('ai.listeningStop') : 'Escuchando... pulsa para parar') : (window.I18n ? window.I18n.t('ai.speakMic') : 'Hablar por micrófono');
     }
     if (headerVoiceBtn) {
       headerVoiceBtn.classList.toggle('listening', isListening);
@@ -16525,7 +16568,7 @@ REGLAS CRÍTICAS:
     const activeView = document.getElementById('household-active-view');
 
     if (statusBadge) {
-      statusBadge.textContent = isActive ? `Hogar: ${hh.name}` : 'Modo Personal';
+      statusBadge.textContent = isActive ? `${window.I18n ? window.I18n.t('household.home') : 'Hogar'}: ${hh.name}` : (window.I18n ? window.I18n.t('household.personalMode') : 'Modo Personal');
       statusBadge.classList.toggle('is-active', isActive);
     }
 
@@ -16543,28 +16586,36 @@ REGLAS CRÍTICAS:
 
     const currentUserId = state.cloudUser?.id || '';
     const isOwner = hh.role === 'owner' || (currentUserId && hh.ownerId === currentUserId);
+    const hostRoleText = window.I18n ? window.I18n.t('household.hostRole') : 'Anfitrión';
+    const memberRoleText = window.I18n ? window.I18n.t('household.memberRole') : 'Miembro';
+
     const members = Array.isArray(hh.members) && hh.members.length > 0
       ? hh.members
       : [{
         userId: currentUserId || hh.ownerId || 'local',
-        name: state.cloudUser?.name || 'Anfitrión',
+        name: state.cloudUser?.name || hostRoleText,
         email: state.cloudUser?.email || '',
         role: 'owner'
       }];
 
-    if (activeNameEl) activeNameEl.textContent = hh.name || 'Mi Hogar';
-    if (activeRoleEl) activeRoleEl.textContent = isOwner ? 'Anfitrión' : 'Miembro';
+    if (activeNameEl) activeNameEl.textContent = hh.name || (window.I18n ? window.I18n.t('nav.household') : 'Mi Hogar');
+    if (activeRoleEl) activeRoleEl.textContent = isOwner ? hostRoleText : memberRoleText;
     if (membersCountEl) {
-      membersCountEl.textContent = `${members.length} ${members.length === 1 ? 'miembro sincronizado' : 'miembros sincronizados'}`;
+      const singleText = window.I18n ? window.I18n.t('household.syncedMemberSingle') : 'miembro sincronizado';
+      const pluralText = window.I18n ? window.I18n.t('household.syncedMemberPlural') : 'miembros sincronizados';
+      membersCountEl.textContent = `${members.length} ${members.length === 1 ? singleText : pluralText}`;
     }
     if (inviteCodeEl) inviteCodeEl.textContent = hh.inviteCode || 'SAB-0000';
     if (leaveBtnText) {
-      leaveBtnText.textContent = (isOwner && members.length === 1) ? 'Disolver hogar' : 'Abandonar hogar';
+      leaveBtnText.textContent = (isOwner && members.length === 1) ? (window.I18n ? window.I18n.t('household.dissolveBtn') : 'Disolver hogar') : (window.I18n ? window.I18n.t('household.leaveBtn') : 'Abandonar hogar');
     }
 
     if (membersListEl) {
+      const youText = window.I18n ? window.I18n.t('household.you') : '(Tú)';
+      const makeHostText = window.I18n ? window.I18n.t('household.makeHost') : 'Hacer anfitrión';
+
       membersListEl.innerHTML = members.map(m => {
-        const displayName = m.name || m.display_name || (m.email ? m.email.split('@')[0] : 'Miembro');
+        const displayName = m.name || m.display_name || (m.email ? m.email.split('@')[0] : memberRoleText);
         const initials = displayName.trim().slice(0, 2).toUpperCase() || 'HM';
         const mRole = (m.role === 'owner' || m.userId === hh.ownerId) ? 'owner' : 'member';
         const isMe = currentUserId && (m.userId === currentUserId || m.user_id === currentUserId);
@@ -16576,19 +16627,19 @@ REGLAS CRÍTICAS:
               <div class="household-member-avatar" aria-hidden="true">${escapeHtml(initials)}</div>
               <div class="household-member-texts">
                 <span class="household-member-name">
-                  ${escapeHtml(displayName)}${isMe ? ' <span class="household-member-self-tag">(Tú)</span>' : ''}
+                  ${escapeHtml(displayName)}${isMe ? ` <span class="household-member-self-tag">${youText}</span>` : ''}
                 </span>
                 ${m.email ? `<span class="household-member-email">${escapeHtml(m.email)}</span>` : ''}
               </div>
             </div>
             <div class="household-member-actions">
-              <span class="household-role-pill">${mRole === 'owner' ? 'Anfitrión' : 'Miembro'}</span>
+              <span class="household-role-pill">${mRole === 'owner' ? hostRoleText : memberRoleText}</span>
               ${isOwner && !isMe && targetId ? `
                 <button type="button" class="btn btn-secondary btn-sm"
                   data-action="transferHouseholdOwnership"
                   data-user-id="${escapeHtml(targetId)}"
-                  title="Transferir administración del hogar a ${escapeHtml(displayName)}">
-                  Hacer anfitrión
+                  title="${makeHostText} (${escapeHtml(displayName)})">
+                  ${makeHostText}
                 </button>
               ` : ''}
             </div>

@@ -243,4 +243,67 @@ describe('US-12: Módulo Core de Internacionalización (i18n.js)', () => {
     const esInstruction = appInstance.buildAiSystemInstruction();
     expect(esInstruction).toContain('10. IDIOMA: Responde a Franky en español');
   });
+
+  it('traduce etiquetas de recetas canónicas mediante getTagLabel() (Fase 5 - US-12 Exhaustiva)', () => {
+    I18n.setPreference('es');
+    expect(I18n.getTagLabel('Alta en Proteínas')).toBe('Alta en Proteínas');
+    expect(I18n.getTagLabel('Desayuno')).toBe('Desayuno');
+    expect(I18n.getTagLabel('Sin Gluten')).toBe('Sin Gluten');
+    expect(I18n.getTagLabel('Robot de Cocina')).toBe('Robot de Cocina');
+
+    I18n.setPreference('en');
+    expect(I18n.getTagLabel('Alta en Proteínas')).toBe('High Protein');
+    expect(I18n.getTagLabel('Desayuno')).toBe('Breakfast');
+    expect(I18n.getTagLabel('Almuerzo')).toBe('Lunch');
+    expect(I18n.getTagLabel('Merienda')).toBe('Snack');
+    expect(I18n.getTagLabel('Cena')).toBe('Dinner');
+    expect(I18n.getTagLabel('Sin Gluten')).toBe('Gluten-Free');
+    expect(I18n.getTagLabel('Robot de Cocina')).toBe('Food Processor');
+    expect(I18n.getTagLabel('Saludable')).toBe('Healthy');
+    expect(I18n.getTagLabel('CustomUserTag')).toBe('CustomUserTag'); // preserves custom user tags
+  });
+
+  it('traduce nombres de slots de comida mediante getSlotLabel()', () => {
+    I18n.setPreference('es');
+    expect(I18n.getSlotLabel('breakfast')).toBe('Desayuno');
+    expect(I18n.getSlotLabel('lunch')).toBe('Almuerzo');
+    expect(I18n.getSlotLabel('snack')).toBe('Merienda');
+    expect(I18n.getSlotLabel('dinner')).toBe('Cena');
+    expect(I18n.getSlotLabel('custom_slot', 'Postre')).toBe('Postre');
+
+    I18n.setPreference('en');
+    expect(I18n.getSlotLabel('breakfast')).toBe('Breakfast');
+    expect(I18n.getSlotLabel('lunch')).toBe('Lunch');
+    expect(I18n.getSlotLabel('snack')).toBe('Snack');
+    expect(I18n.getSlotLabel('dinner')).toBe('Dinner');
+    expect(I18n.getSlotLabel('custom_slot', 'Dessert')).toBe('Dessert');
+  });
+
+  it('traduce nombres de días de la semana mediante getDayName()', () => {
+    I18n.setPreference('es');
+    expect(I18n.getDayName(0)).toBe('Lunes');
+    expect(I18n.getDayName(1)).toBe('Martes');
+    expect(I18n.getDayName(6)).toBe('Domingo');
+
+    I18n.setPreference('en');
+    expect(I18n.getDayName(0)).toBe('Monday');
+    expect(I18n.getDayName(1)).toBe('Tuesday');
+    expect(I18n.getDayName(6)).toBe('Sunday');
+  });
+
+  it('proporciona cadenas para la sección de completados en la lista de compra y desglose nutricional', () => {
+    I18n.setPreference('en');
+    expect(I18n.t('shopping.completedHeading', { count: 45 })).toBe('Completed (45)');
+    expect(I18n.t('shopping.clearCompleted')).toBe('Clear completed');
+    expect(I18n.t('common.forPrefix')).toBe('For:');
+    expect(I18n.t('nutrition.breakdownTitle')).toBe("Today's Nutritional Breakdown");
+    expect(I18n.t('nutrition.configureGoals')).toBe('Configure Goals');
+
+    I18n.setPreference('es');
+    expect(I18n.t('shopping.completedHeading', { count: 45 })).toBe('Completados (45)');
+    expect(I18n.t('shopping.clearCompleted')).toBe('Limpiar completados');
+    expect(I18n.t('common.forPrefix')).toBe('Para:');
+    expect(I18n.t('nutrition.breakdownTitle')).toBe('Desglose Nutricional de Hoy');
+    expect(I18n.t('nutrition.configureGoals')).toBe('Configurar Objetivos');
+  });
 });

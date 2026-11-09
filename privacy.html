@@ -66,6 +66,8 @@
       align-items: center;
       border-bottom: 1px solid var(--color-outline-variant);
       margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 12px;
     }
 
     .brand-link {
@@ -96,6 +98,39 @@
       letter-spacing: -0.5px;
     }
 
+    .header-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .lang-switcher {
+      display: inline-flex;
+      align-items: center;
+      background: var(--color-surface-card);
+      border: 1px solid var(--color-outline-variant);
+      border-radius: var(--radius-full);
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .lang-pill-btn {
+      border: none;
+      background: transparent;
+      padding: 5px 12px;
+      border-radius: var(--radius-full);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--color-on-surface-variant);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .lang-pill-btn.active {
+      background: var(--color-brand);
+      color: #ffffff;
+    }
+
     .back-btn {
       display: inline-flex;
       align-items: center;
@@ -115,6 +150,15 @@
     .back-btn:hover {
       background: var(--color-brand-container);
       border-color: var(--color-brand);
+    }
+
+    /* BILINGUAL VISIBILITY */
+    body.lang-es [data-lang="en"] {
+      display: none !important;
+    }
+
+    body.lang-en [data-lang="es"] {
+      display: none !important;
     }
 
     /* HERO */
@@ -299,7 +343,7 @@
     }
   </style>
 </head>
-<body>
+<body class="lang-es">
   <div class="container">
     <!-- HEADER -->
     <header class="header-bar">
@@ -312,21 +356,35 @@
         </div>
         <span class="brand-title">Sabory</span>
       </a>
-      <a href="index.html" class="back-btn">
-        <span class="material-symbols-outlined" style="font-size: 16px;">arrow_back</span> Volver a la App
-      </a>
+
+      <div class="header-actions">
+        <div class="lang-switcher" role="group" aria-label="Selector de idioma / Language selector">
+          <button type="button" class="lang-pill-btn active" id="btn-lang-es" onclick="setPrivacyLanguage('es')">ES</button>
+          <button type="button" class="lang-pill-btn" id="btn-lang-en" onclick="setPrivacyLanguage('en')">EN</button>
+        </div>
+        <a href="index.html" class="back-btn">
+          <span class="material-symbols-outlined" style="font-size: 16px;">arrow_back</span>
+          <span data-lang="es">Volver a la App</span>
+          <span data-lang="en">Back to App</span>
+        </a>
+      </div>
     </header>
 
     <!-- HERO -->
     <div class="hero">
       <div class="hero-badge">
-        <span class="material-symbols-outlined" style="font-size: 14px;">verified_user</span> Privacidad Transparente y Offline-First
+        <span class="material-symbols-outlined" style="font-size: 14px;">verified_user</span>
+        <span data-lang="es">Privacidad Transparente y Offline-First</span>
+        <span data-lang="en">Transparent & Offline-First Privacy</span>
       </div>
-      <h1>Política de Privacidad y Tratamiento de Datos</h1>
+      <h1 data-lang="es">Política de Privacidad y Tratamiento de Datos</h1>
+      <h1 data-lang="en">Privacy Policy & Data Processing</h1>
       <div class="hero-meta">
-        <span><strong>Aplicación:</strong> Sabory (Asistente de Cocina & Planificador Inteligente)</span>
-        <span><strong>Versión:</strong> 1.30</span>
-        <span><strong>Última actualización:</strong> Noviembre 2026</span>
+        <span data-lang="es"><strong>Aplicación:</strong> Sabory (Asistente de Cocina & Planificador Inteligente)</span>
+        <span data-lang="en"><strong>Application:</strong> Sabory (Kitchen Assistant & Smart Meal Planner)</span>
+        <span><strong>Versión / Version:</strong> 1.61</span>
+        <span data-lang="es"><strong>Última actualización:</strong> Noviembre 2026</span>
+        <span data-lang="en"><strong>Last updated:</strong> November 2026</span>
       </div>
     </div>
 
@@ -334,163 +392,366 @@
     <div class="key-points-grid">
       <div class="point-card">
         <span class="material-symbols-outlined icon">cloud_off</span>
-        <h4>Offline-First</h4>
-        <p>Tus recetas y menús se guardan localmente en tu dispositivo. Funcionamiento 100% autónomo sin necesidad de internet.</p>
+        <h4 data-lang="es">Offline-First</h4>
+        <h4 data-lang="en">Offline-First</h4>
+        <p data-lang="es">Tus recetas y menús se guardan localmente en tu dispositivo. Funcionamiento 100% autónomo sin necesidad de internet.</p>
+        <p data-lang="en">Your recipes and meal plans are stored locally on your device. 100% autonomous operation with no internet required.</p>
       </div>
       <div class="point-card">
         <span class="material-symbols-outlined icon">block</span>
-        <h4>Cero Anuncios ni Venta</h4>
-        <p>No recopilamos datos con fines publicitarios, no integramos redes de anuncios ni vendemos tus datos personales.</p>
+        <h4 data-lang="es">Cero Anuncios ni Venta</h4>
+        <h4 data-lang="en">Zero Ads & No Sale</h4>
+        <p data-lang="es">No recopilamos datos con fines publicitarios, no integramos redes de anuncios ni vendemos tus datos personales.</p>
+        <p data-lang="en">We do not collect data for advertising, integrate ad networks, or sell your personal information.</p>
       </div>
       <div class="point-card">
         <span class="material-symbols-outlined icon">key</span>
-        <h4>Claves Seguras (BYOK)</h4>
-        <p>Tus claves personales de IA se almacenan exclusivamente en el almacenamiento seguro de tu propio navegador.</p>
+        <h4 data-lang="es">Claves Seguras (BYOK)</h4>
+        <h4 data-lang="en">Secure Keys (BYOK)</h4>
+        <p data-lang="es">Tus claves personales de IA se almacenan exclusivamente en el almacenamiento seguro de tu propio navegador.</p>
+        <p data-lang="en">Your personal AI keys are stored exclusively inside your device browser's secure local storage.</p>
       </div>
       <div class="point-card">
         <span class="material-symbols-outlined icon">delete_forever</span>
-        <h4>Control y Borrado Total</h4>
-        <p>Puedes eliminar tu cuenta y todos tus datos guardados en la nube con un solo clic desde la app o por solicitud web.</p>
+        <h4 data-lang="es">Control y Borrado Total</h4>
+        <h4 data-lang="en">Full Control & Deletion</h4>
+        <p data-lang="es">Puedes eliminar tu cuenta y todos tus datos guardados en la nube con un solo clic desde la app o por solicitud web.</p>
+        <p data-lang="en">You can delete your account and all cloud data with a single click from the app or via email request.</p>
       </div>
     </div>
 
     <!-- SECTION 1 -->
     <section class="section-card">
-      <h2><span class="material-symbols-outlined">info</span> 1. Responsable del Tratamiento</h2>
-      <p>
-        El responsable del tratamiento de los datos tratados a través de la aplicación web y móvil <strong>Sabory</strong> es el equipo de desarrollo de <strong>Sabory</strong> (en adelante, el "Desarrollador").
-      </p>
-      <p>
-        Para cualquier duda, sugerencia o ejercicio de tus derechos de protección de datos (acceso, rectificación, supresión o portabilidad), puedes ponerte en contacto directamente a través del correo oficial de soporte:
-      </p>
-      <p style="font-weight: 600; color: var(--color-brand);">
-        <a href="mailto:saboryfood@gmail.com" style="color: inherit; text-decoration: underline;">saboryfood@gmail.com</a>
-      </p>
+      <h2>
+        <span class="material-symbols-outlined">info</span>
+        <span data-lang="es">1. Responsable del Tratamiento</span>
+        <span data-lang="en">1. Data Controller</span>
+      </h2>
+      <div data-lang="es">
+        <p>
+          El responsable del tratamiento de los datos tratados a través de la aplicación web y móvil <strong>Sabory</strong> es el equipo de desarrollo de <strong>Sabory</strong> (en adelante, el "Desarrollador").
+        </p>
+        <p>
+          Para cualquier duda, sugerencia o ejercicio de tus derechos de protección de datos (acceso, rectificación, supresión o portabilidad), puedes ponerte en contacto directamente a través del correo oficial de soporte:
+        </p>
+        <p style="font-weight: 600; color: var(--color-brand);">
+          <a href="mailto:saboryfood@gmail.com" style="color: inherit; text-decoration: underline;">saboryfood@gmail.com</a>
+        </p>
+      </div>
+      <div data-lang="en">
+        <p>
+          The data controller for information processed through the <strong>Sabory</strong> web and mobile application is the <strong>Sabory</strong> development team (hereinafter, the "Developer").
+        </p>
+        <p>
+          For any questions, suggestions, or to exercise your data protection rights (access, rectification, erasure, or portability), you can contact us directly via our official support email:
+        </p>
+        <p style="font-weight: 600; color: var(--color-brand);">
+          <a href="mailto:saboryfood@gmail.com" style="color: inherit; text-decoration: underline;">saboryfood@gmail.com</a>
+        </p>
+      </div>
     </section>
 
     <!-- SECTION 2 -->
     <section class="section-card">
-      <h2><span class="material-symbols-outlined">data_object</span> 2. Datos Tratados y Finalidad</h2>
-      <p>Sabory procesa única y exclusivamente la información estrictamente necesaria para ofrecerte las funciones gastronómicas de la aplicación:</p>
-      <ul>
-        <li><strong>Recetas Personales:</strong> Título, tiempo de preparación, raciones, ingredientes, pasos elaborados, fotos e información nutricional orientativa. Se emplean para organizar tu recetario personal.</li>
-        <li><strong>Planificador Semanal de Comidas:</strong> Asignación de platos a días de la semana y momentos del día (Desayuno, Almuerzo, Merienda, Cena).</li>
-        <li><strong>Lista de la Compra:</strong> Productos, cantidades e ingredientes añadidos manualmente o extraídos de tus recetas y planes semanales.</li>
-        <li><strong>Preferencias Dietéticas y Nutricionales:</strong> Selección de tipos de dieta (ej. vegana, vegetariana, sin gluten) y objetivos diarios de calorías y macronutrientes. Su única finalidad es mostrar avisos y orientaciones dentro de la app.</li>
-        <li><strong>Cuenta de Usuario (Opcional):</strong> Dirección de correo electrónico y nombre de perfil en caso de que decidas registrarte voluntariamente para sincronizar tu recetario entre varios dispositivos móviles o de escritorio.</li>
-        <li><strong>Claves de API Personales (BYOK - Bring Your Own Key):</strong> Si decides conectar tus propias claves para Google Gemini, OpenAI o Anthropic Claude, estas claves se almacenan <em>exclusivamente en el LocalStorage de tu dispositivo</em> y nunca son enviadas ni almacenadas en servidores del Desarrollador.</li>
-      </ul>
+      <h2>
+        <span class="material-symbols-outlined">data_object</span>
+        <span data-lang="es">2. Datos Tratados y Finalidad</span>
+        <span data-lang="en">2. Data Processed and Purpose</span>
+      </h2>
+      <div data-lang="es">
+        <p>Sabory procesa única y exclusivamente la información estrictamente necesaria para ofrecerte las funciones gastronómicas de la aplicación:</p>
+        <ul>
+          <li><strong>Recetas Personales:</strong> Título, tiempo de preparación, raciones, ingredientes, pasos elaborados, fotos e información nutricional orientativa. Se emplean para organizar tu recetario personal.</li>
+          <li><strong>Planificador Semanal de Comidas:</strong> Asignación de platos a días de la semana y momentos del día (Desayuno, Almuerzo, Merienda, Cena).</li>
+          <li><strong>Lista de la Compra:</strong> Productos, cantidades e ingredientes añadidos manualmente o extraídos de tus recetas y planes semanales.</li>
+          <li><strong>Preferencias Dietéticas y Nutricionales:</strong> Selección de tipos de dieta (ej. vegana, vegetariana, sin gluten) y objetivos diarios de calorías y macronutrientes. Su única finalidad es mostrar avisos y orientaciones dentro de la app.</li>
+          <li><strong>Cuenta de Usuario (Opcional):</strong> Dirección de correo electrónico y nombre de perfil en caso de que decidas registrarte voluntariamente para sincronizar tu recetario entre varios dispositivos móviles o de escritorio.</li>
+          <li><strong>Claves de API Personales (BYOK - Bring Your Own Key):</strong> Si decides conectar tus propias claves para Google Gemini, OpenAI o Anthropic Claude, estas claves se almacenan <em>exclusivamente en el LocalStorage de tu dispositivo</em> y nunca son enviadas ni almacenadas en servidores del Desarrollador.</li>
+        </ul>
+      </div>
+      <div data-lang="en">
+        <p>Sabory processes only the information strictly necessary to provide the culinary features of the application:</p>
+        <ul>
+          <li><strong>Personal Recipes:</strong> Title, prep time, servings, ingredients, instructions, photos, and approximate nutritional facts. Used solely to manage your personal cookbook.</li>
+          <li><strong>Weekly Meal Planner:</strong> Assignment of dishes to days of the week and meal slots (Breakfast, Lunch, Snack, Dinner).</li>
+          <li><strong>Shopping List:</strong> Items, quantities, and ingredients added manually or extracted from your recipes and meal plans.</li>
+          <li><strong>Dietary & Nutritional Preferences:</strong> Selection of diet types (e.g. vegan, vegetarian, gluten-free) and daily calorie and macronutrient targets. Solely used to display guides and balance hints within the app.</li>
+          <li><strong>User Account (Optional):</strong> Email address and profile name if you choose to sign in to sync your cookbook across multiple devices.</li>
+          <li><strong>Personal API Keys (BYOK - Bring Your Own Key):</strong> If you connect your own keys for Google Gemini, OpenAI, or Claude, these keys are stored <em>exclusively inside your browser's LocalStorage</em> and are never sent to or stored on Developer servers.</li>
+        </ul>
+      </div>
     </section>
 
     <!-- SECTION 3 -->
     <section class="section-card">
-      <h2><span class="material-symbols-outlined">storage</span> 3. Arquitectura Local (Offline-First) y Nube Opcional</h2>
-      <p>
-        Sabory ha sido desarrollada siguiendo una arquitectura <strong>Offline-First</strong>. La aplicación almacena tus datos de forma local mediante <code>IndexedDB</code> y <code>LocalStorage</code> en el navegador de tu dispositivo.
-      </p>
-      <div class="callout-highlight">
-        <strong>Modo Invitado / Sin Cuenta:</strong> Si utilizas Sabory sin iniciar sesión, todos tus datos residen únicamente en tu dispositivo. Si borras los datos de navegación de tu dispositivo o pulsas "Restablecer" en Ajustes, dichos datos se eliminan localmente sin dejar rastro en ningún servidor.
+      <h2>
+        <span class="material-symbols-outlined">storage</span>
+        <span data-lang="es">3. Arquitectura Local (Offline-First) y Nube Opcional</span>
+        <span data-lang="en">3. Offline-First Architecture & Optional Cloud Sync</span>
+      </h2>
+      <div data-lang="es">
+        <p>
+          Sabory ha sido desarrollada siguiendo una arquitectura <strong>Offline-First</strong>. La aplicación almacena tus datos de forma local mediante <code>IndexedDB</code> y <code>LocalStorage</code> en el navegador de tu dispositivo.
+        </p>
+        <div class="callout-highlight">
+          <strong>Modo Invitado / Sin Cuenta:</strong> Si utilizas Sabory sin iniciar sesión, todos tus datos residen únicamente en tu dispositivo. Si borras los datos de navegación de tu dispositivo o pulsas "Restablecer" en Ajustes, dichos datos se eliminan localmente sin dejar rastro en ningún servidor.
+        </div>
+        <p>
+          <strong>Sincronización en la Nube con Supabase (Opcional):</strong> Si creas una cuenta de usuario, tus recetas, planes y listas se sincronizan con una base de datos gestionada en la nube mediante <strong>Supabase</strong> (PostgreSQL). La base de datos implementa estrictas políticas de seguridad por fila (<em>Row Level Security - RLS</em>), garantizando que solo tú, mediante tu token de autenticación cifrado, puedes leer, insertar, editar o borrar tus propios datos.
+        </p>
       </div>
-      <p>
-        <strong>Sincronización en la Nube con Supabase (Opcional):</strong> Si creas una cuenta de usuario, tus recetas, planes y listas se sincronizan con una base de datos gestionada en la nube mediante <strong>Supabase</strong> (PostgreSQL). La base de datos implementa estrictas políticas de seguridad por fila (<em>Row Level Security - RLS</em>), garantizando que solo tú, mediante tu token de autenticación cifrado, puedes leer, insertar, editar o borrar tus propios datos.
-      </p>
+      <div data-lang="en">
+        <p>
+          Sabory is built upon an <strong>Offline-First</strong> architecture. The application stores your data locally using <code>IndexedDB</code> and <code>LocalStorage</code> directly within your device's browser.
+        </p>
+        <div class="callout-highlight">
+          <strong>Guest Mode / No Account:</strong> If you use Sabory without signing in, all your data resides strictly on your local device. If you clear your browser data or click "Reset" in Settings, your data is erased locally without leaving any trace on any server.
+        </div>
+        <p>
+          <strong>Cloud Synchronization with Supabase (Optional):</strong> If you create a user account, your recipes, plans, and shopping items sync with a managed cloud database powered by <strong>Supabase</strong> (PostgreSQL). The database enforces strict <em>Row Level Security (RLS)</em> policies, ensuring that only you, with your encrypted authentication token, can read, create, edit, or delete your own data.
+        </p>
+      </div>
     </section>
 
     <!-- SECTION 4 -->
     <section class="section-card">
-      <h2><span class="material-symbols-outlined">smart_toy</span> 4. Uso de Inteligencia Artificial (Google Gemini API)</h2>
-      <p>
-        Sabory integra capacidades de asistencia inteligente mediante los modelos oficiales de Google Gemini (tales como <code>gemini-3.5-flash-lite</code> y <code>gemini-3.8-flash</code>):
-      </p>
-      <ul>
-        <li><strong>Importación por Foto/Texto:</strong> Si decides fotografiar una página de un libro de cocina o pegar texto de una red social, el fragmento o imagen comprimida se envía a la API de Google Gemini para extraer y estructurar automáticamente los ingredientes y los pasos.</li>
-        <li><strong>Asistente Culinario:</strong> Las consultas y peticiones que realices al Chef Asistente se procesan en tiempo real para generar ideas, sugerencias y planes de comida.</li>
-      </ul>
-      <p>
-        De acuerdo con los términos de servicio de la <em>Google Gemini API</em> y la <em>Google API Services User Data Policy</em>, las peticiones son de procesamiento efímero y no se utilizan para entrenar modelos fundacionales públicos de terceros.
-      </p>
+      <h2>
+        <span class="material-symbols-outlined">smart_toy</span>
+        <span data-lang="es">4. Uso de Inteligencia Artificial (Google Gemini API)</span>
+        <span data-lang="en">4. Use of Artificial Intelligence (Google Gemini API)</span>
+      </h2>
+      <div data-lang="es">
+        <p>
+          Sabory integra capacidades de asistencia inteligente mediante los modelos oficiales de Google Gemini (tales como <code>gemini-3.5-flash-lite</code> y <code>gemini-3.8-flash</code>):
+        </p>
+        <ul>
+          <li><strong>Importación por Foto/Texto:</strong> Si decides fotografiar una página de un libro de cocina o pegar texto de una red social, el fragmento o imagen comprimida se envía a la API de Google Gemini para extraer y estructurar automáticamente los ingredientes y los pasos.</li>
+          <li><strong>Asistente Culinario:</strong> Las consultas y peticiones que realices al Chef Asistente se procesan en tiempo real para generar ideas, sugerencias y planes de comida.</li>
+        </ul>
+        <p>
+          De acuerdo con los términos de servicio de la <em>Google Gemini API</em> y la <em>Google API Services User Data Policy</em>, las peticiones son de procesamiento efímero y no se utilizan para entrenar modelos fundacionales públicos de terceros.
+        </p>
+      </div>
+      <div data-lang="en">
+        <p>
+          Sabory integrates smart cooking assistance features powered by official Google Gemini models (such as <code>gemini-3.5-flash-lite</code> and <code>gemini-3.8-flash</code>):
+        </p>
+        <ul>
+          <li><strong>Photo/Text Recipe Import:</strong> When you snap a photo of a cookbook or paste recipe text, the compressed image or snippet is sent to the Google Gemini API to automatically structure ingredients and preparation steps.</li>
+          <li><strong>Kitchen Assistant:</strong> Queries and meal planning prompts submitted to the Kitchen Assistant are processed in real-time to generate culinary ideas, advice, and meal recommendations.</li>
+        </ul>
+        <p>
+          In accordance with Google Gemini API terms of service and the <em>Google API Services User Data Policy</em>, requests are ephemeral and are not used to train public third-party foundation models.
+        </p>
+      </div>
     </section>
 
     <!-- SECTION 5 -->
     <section class="section-card">
-      <h2><span class="material-symbols-outlined">devices</span> 5. Permisos Solicitados en el Dispositivo</h2>
-      <p>Sabory solicita únicamente los permisos que el usuario activa de manera consciente e interactiva:</p>
-      <ul>
-        <li><strong>Cámara y Galería de Fotos:</strong> Se solicita únicamente si decides usar la pestaña <em>"✨ Foto / IA"</em> del importador o añadir una foto a una receta. La imagen se comprime y procesa en tu dispositivo mediante un elemento <code>&lt;canvas&gt;</code> antes de ser almacenada.</li>
-        <li><strong>Micrófono:</strong> Se solicita únicamente cuando pulsas el botón del micrófono en el Asistente de Cocina para dictar consultas por voz a través de la Web Speech API del navegador. La app nunca escucha ni graba audio de fondo.</li>
-        <li><strong>Pantalla Activa (Screen Wake Lock):</strong> Se utiliza exclusivamente para evitar que la pantalla del móvil se apague mientras tienes una receta abierta o te encuentras cocinando en el Modo Cocina.</li>
-      </ul>
+      <h2>
+        <span class="material-symbols-outlined">devices</span>
+        <span data-lang="es">5. Permisos Solicitados en el Dispositivo</span>
+        <span data-lang="en">5. Device Permissions Requested</span>
+      </h2>
+      <div data-lang="es">
+        <p>Sabory solicita únicamente los permisos que el usuario activa de manera consciente e interactiva:</p>
+        <ul>
+          <li><strong>Cámara y Galería de Fotos:</strong> Se solicita únicamente si decides usar la pestaña <em>"✨ Foto / IA"</em> del importador o añadir una foto a una receta. La imagen se comprime y procesa en tu dispositivo mediante un elemento <code>&lt;canvas&gt;</code> antes de ser almacenada.</li>
+          <li><strong>Micrófono:</strong> Se solicita únicamente cuando pulsas el botón del micrófono en el Asistente de Cocina para dictar consultas por voz a través de la Web Speech API del navegador. La app nunca escucha ni graba audio de fondo.</li>
+          <li><strong>Pantalla Activa (Screen Wake Lock):</strong> Se utiliza exclusivamente para evitar que la pantalla del móvil se apague mientras tienes una receta abierta o te encuentras cocinando en el Modo Cocina.</li>
+        </ul>
+      </div>
+      <div data-lang="en">
+        <p>Sabory only requests device permissions that you deliberately and interactively trigger:</p>
+        <ul>
+          <li><strong>Camera & Photo Gallery:</strong> Requested only if you choose to use the <em>"✨ Photo / AI"</em> import tab or upload a photo to a recipe. Images are compressed on-device using a <code>&lt;canvas&gt;</code> element prior to storage.</li>
+          <li><strong>Microphone:</strong> Requested only when you tap the microphone button in the Kitchen Assistant to dictate voice requests via the browser's native Web Speech API. The app never records or listens to background audio.</li>
+          <li><strong>Screen Wake Lock:</strong> Used exclusively to prevent your device screen from turning off while actively following instructions in Cooking Mode.</li>
+        </ul>
+      </div>
     </section>
 
     <!-- SECTION 6: GOOGLE PLAY ACCOUNT DELETION COMPLIANCE -->
     <section class="section-card" id="account-deletion">
-      <h2><span class="material-symbols-outlined" style="color: var(--color-error);">delete_forever</span> 6. Eliminación de Cuenta y Retención de Datos</h2>
-      <p>
-        En cumplimiento estricto con las <strong>Políticas de Datos de Usuario de Google Play Store</strong> y la normativa europea <strong>RGPD</strong>, todo usuario que cree una cuenta en Sabory tiene el derecho inalienable de eliminar su cuenta y todos sus datos personales de forma total, inmediata y permanente.
-      </p>
-
-      <div class="callout-danger">
-        <strong>Efecto de la eliminación:</strong> Al solicitar el borrado, se destruyen permanentemente de la base de datos remota todas las recetas, los planes semanales de comidas, las listas de la compra, las configuraciones de usuario y los tokens de acceso vinculados a tu identificador de usuario. Esta acción es irreversible.
-      </div>
-
-      <h3>A. Eliminación Directa desde la Aplicación (Recomendado)</h3>
-      <p>Puedes ejecutar el borrado instantáneo en cualquier momento siguiendo estos sencillos pasos:</p>
-      <div class="step-box">
-        <ol>
-          <li>Abre <strong>Sabory</strong> en tu dispositivo.</li>
-          <li>Entra en la sección <strong>Ajustes</strong> (icono de engranaje en la cabecera).</li>
-          <li>En la tarjeta <strong>"Cuenta de Usuario"</strong> o en la tarjeta <strong>"Privacidad y Control de Datos"</strong>, pulsa el botón <strong>"Eliminar cuenta y datos"</strong> (también disponible dentro del modal de cuenta tras pulsar "Ver Cuenta").</li>
-          <li>Confirma la acción en el cuadro de diálogo pulsando <strong>"Eliminar definitivamente"</strong>.</li>
-          <li>Tu cuenta y todos tus datos en la nube y en el dispositivo se eliminarán en ese mismo instante.</li>
-        </ol>
-      </div>
-
-      <h3>B. Solicitud Web / Remota de Eliminación de Cuenta y Datos</h3>
-      <p>
-        Si has desinstalado la aplicación, no tienes acceso a tu dispositivo o prefieres que gestionemos la baja manualmente, puedes solicitar el borrado completo por vía telemática:
-      </p>
-      <div class="step-box">
-        <p>Envía un correo electrónico a <strong><a href="mailto:saboryfood@gmail.com?subject=Solicitud%20de%20Eliminaci%C3%B3n%20de%20Cuenta%20-%20Sabory" style="color: var(--color-brand); text-decoration: underline;">saboryfood@gmail.com</a></strong> con los siguientes datos:</p>
-        <ul style="margin-top: 8px;">
-          <li><strong>Asunto:</strong> Solicitud de Eliminación de Cuenta y Datos - Sabory</li>
-          <li><strong>Remitente:</strong> La solicitud debe enviarse desde la misma dirección de correo electrónico con la que te diste de alta en la aplicación.</li>
-        </ul>
-        <p style="margin-top: 10px; font-size: 13px; color: var(--color-on-surface-variant);">
-          <em>Plazo de tramitación:</em> El Desarrollador procederá a la baja y supresión definitiva de la cuenta en Supabase en un plazo inferior a 48 horas laborables, remitiéndote una confirmación escrita sin coste alguno.
+      <h2>
+        <span class="material-symbols-outlined" style="color: var(--color-error);">delete_forever</span>
+        <span data-lang="es">6. Eliminación de Cuenta y Retención de Datos</span>
+        <span data-lang="en">6. Account Deletion and Data Retention</span>
+      </h2>
+      <div data-lang="es">
+        <p>
+          En cumplimiento estricto con las <strong>Políticas de Datos de Usuario de Google Play Store</strong> y la normativa europea <strong>RGPD</strong>, todo usuario que cree una cuenta en Sabory tiene el derecho inalienable de eliminar su cuenta y todos sus datos personales de forma total, inmediata y permanente.
         </p>
+
+        <div class="callout-danger">
+          <strong>Efecto de la eliminación:</strong> Al solicitar el borrado, se destruyen permanentemente de la base de datos remota todas las recetas, los planes semanales de comidas, las listas de la compra, las configuraciones de usuario y los tokens de acceso vinculados a tu identificador de usuario. Esta acción es irreversible.
+        </div>
+
+        <h3>A. Eliminación Directa desde la Aplicación (Recomendado)</h3>
+        <p>Puedes ejecutar el borrado instantáneo en cualquier momento siguiendo estos sencillos pasos:</p>
+        <div class="step-box">
+          <ol>
+            <li>Abre <strong>Sabory</strong> en tu dispositivo.</li>
+            <li>Entra en la sección <strong>Ajustes</strong> (icono de engranaje en la cabecera).</li>
+            <li>En la tarjeta <strong>"Cuenta de Usuario"</strong> o en la tarjeta <strong>"Privacidad y Control de Datos"</strong>, pulsa el botón <strong>"Eliminar cuenta y datos"</strong> (también disponible dentro del modal de cuenta tras pulsar "Ver Cuenta").</li>
+            <li>Confirma la acción en el cuadro de diálogo pulsando <strong>"Eliminar definitivamente"</strong>.</li>
+            <li>Tu cuenta y todos tus datos en la nube y en el dispositivo se eliminarán en ese mismo instante.</li>
+          </ol>
+        </div>
+
+        <h3>B. Solicitud Web / Remota de Eliminación de Cuenta y Datos</h3>
+        <p>
+          Si has desinstalado la aplicación, no tienes acceso a tu dispositivo o prefieres que gestionemos la baja manualmente, puedes solicitar el borrado completo por vía telemática:
+        </p>
+        <div class="step-box">
+          <p>Envía un correo electrónico a <strong><a href="mailto:saboryfood@gmail.com?subject=Solicitud%20de%20Eliminaci%C3%B3n%20de%20Cuenta%20-%20Sabory" style="color: var(--color-brand); text-decoration: underline;">saboryfood@gmail.com</a></strong> con los siguientes datos:</p>
+          <ul style="margin-top: 8px;">
+            <li><strong>Asunto:</strong> Solicitud de Eliminación de Cuenta y Datos - Sabory</li>
+            <li><strong>Remitente:</strong> La solicitud debe enviarse desde la misma dirección de correo electrónico con la que te diste de alta en la aplicación.</li>
+          </ul>
+          <p style="margin-top: 10px; font-size: 13px; color: var(--color-on-surface-variant);">
+            <em>Plazo de tramitación:</em> El Desarrollador procederá a la baja y supresión definitiva de la cuenta en Supabase en un plazo inferior a 48 horas laborables, remitiéndote una confirmación escrita sin coste alguno.
+          </p>
+        </div>
+      </div>
+
+      <div data-lang="en">
+        <p>
+          In strict compliance with <strong>Google Play Store User Data Policies</strong> and European <strong>GDPR</strong> regulations, every user who registers an account in Sabory has the inalienable right to delete their account and all personal data completely, immediately, and permanently.
+        </p>
+
+        <div class="callout-danger">
+          <strong>Effect of deletion:</strong> When account deletion is requested, all recipes, weekly meal plans, grocery lists, user configurations, and access tokens associated with your user ID are permanently destroyed from the remote database. This action is irreversible.
+        </div>
+
+        <h3>A. Direct Deletion from the Application (Recommended)</h3>
+        <p>You can perform instant deletion anytime following these simple steps:</p>
+        <div class="step-box">
+          <ol>
+            <li>Open <strong>Sabory</strong> on your device.</li>
+            <li>Navigate to <strong>Settings</strong> (gear icon in the top header).</li>
+            <li>In the <strong>"User Account"</strong> card or <strong>"Data & Privacy Control"</strong> card, tap <strong>"Delete account & data"</strong> (also available inside the account modal after clicking "View Account").</li>
+            <li>Confirm your action by clicking <strong>"Delete permanently"</strong>.</li>
+            <li>Your account and all associated cloud and local data will be deleted immediately.</li>
+          </ol>
+        </div>
+
+        <h3>B. Web / Remote Account Deletion Request</h3>
+        <p>
+          If you have uninstalled the app, lack access to your device, or prefer manual processing, you can request full deletion via email:
+        </p>
+        <div class="step-box">
+          <p>Send an email to <strong><a href="mailto:saboryfood@gmail.com?subject=Account%20and%20Data%20Deletion%20Request%20-%20Sabory" style="color: var(--color-brand); text-decoration: underline;">saboryfood@gmail.com</a></strong> containing:</p>
+          <ul style="margin-top: 8px;">
+            <li><strong>Subject:</strong> Account and Data Deletion Request - Sabory</li>
+            <li><strong>Sender:</strong> The request must originate from the exact email address registered with your account.</li>
+          </ul>
+          <p style="margin-top: 10px; font-size: 13px; color: var(--color-on-surface-variant);">
+            <em>Processing turnaround:</em> The Developer will process the permanent deletion from Supabase within 48 business hours and provide written confirmation at no cost.
+          </p>
+        </div>
       </div>
     </section>
 
     <!-- SECTION 7 -->
     <section class="section-card">
-      <h2><span class="material-symbols-outlined">gavel</span> 7. Derechos del Usuario (RGPD y Portabilidad)</h2>
-      <p>
-        Como usuario, dispones de plenos derechos de acceso, rectificación, supresión, limitación del tratamiento, oposición y portabilidad de tus datos personales:
-      </p>
-      <ul>
-        <li><strong>Portabilidad Completa:</strong> Puedes exportar en cualquier momento una copia íntegra de todas tus recetas y planes en un archivo legible estándar <code>JSON</code> desde <em>Ajustes &gt; Configuración Avanzada &gt; Copia de Seguridad Local &gt; Exportar</em>.</li>
-        <li><strong>Reclamación:</strong> Tienes derecho a presentar una reclamación ante la autoridad de control en materia de protección de datos correspondiente (en España, la Agencia Española de Protección de Datos - AEPD).</li>
-      </ul>
+      <h2>
+        <span class="material-symbols-outlined">gavel</span>
+        <span data-lang="es">7. Derechos del Usuario (RGPD y Portabilidad)</span>
+        <span data-lang="en">7. User Rights (GDPR & Portability)</span>
+      </h2>
+      <div data-lang="es">
+        <p>
+          Como usuario, dispones de plenos derechos de acceso, rectificación, supresión, limitación del tratamiento, oposición y portabilidad de tus datos personales:
+        </p>
+        <ul>
+          <li><strong>Portabilidad Completa:</strong> Puedes exportar en cualquier momento una copia íntegra de todas tus recetas y planes en un archivo legible estándar <code>JSON</code> desde <em>Ajustes &gt; Configuración Avanzada &gt; Copia de Seguridad Local &gt; Exportar</em>.</li>
+          <li><strong>Reclamación:</strong> Tienes derecho a presentar una reclamación ante la autoridad de control en materia de protección de datos correspondiente (en España, la Agencia Española de Protección de Datos - AEPD).</li>
+        </ul>
+      </div>
+      <div data-lang="en">
+        <p>
+          As a user, you hold full legal rights to access, rectification, erasure, restriction of processing, objection, and data portability:
+        </p>
+        <ul>
+          <li><strong>Full Portability:</strong> You can export a complete, machine-readable <code>JSON</code> copy of all your recipes and plans at any time via <em>Settings &gt; Advanced Settings &gt; Local Backup &gt; Export</em>.</li>
+          <li><strong>Complaints:</strong> You have the right to lodge a complaint with your competent data protection supervisory authority (in Spain, the Agencia Española de Protección de Datos - AEPD).</li>
+        </ul>
+      </div>
     </section>
 
     <!-- SECTION 8 -->
     <section class="section-card">
-      <h2><span class="material-symbols-outlined">update</span> 8. Modificaciones de la Política de Privacidad</h2>
-      <p>
+      <h2>
+        <span class="material-symbols-outlined">update</span>
+        <span data-lang="es">8. Modificaciones de la Política de Privacidad</span>
+        <span data-lang="en">8. Changes to this Privacy Policy</span>
+      </h2>
+      <p data-lang="es">
         El Desarrollador se reserva el derecho a actualizar la presente Política de Privacidad para adecuarla a novedades legislativas, cambios técnicos o nuevas funcionalidades de la aplicación. Cualquier modificación sustancial será comunicada a través de la propia aplicación o en esta misma página web.
+      </p>
+      <p data-lang="en">
+        The Developer reserves the right to update this Privacy Policy to reflect legislative updates, technical evolutions, or new application features. Any substantial modifications will be announced within the application or directly on this webpage.
       </p>
     </section>
 
     <!-- FOOTER -->
     <footer class="footer-bar">
-      <p>© 2026 <strong>Sabory</strong> — Creado con esmero para cocinar mejor.</p>
+      <p data-lang="es">© 2026 <strong>Sabory</strong> — Creado con esmero para cocinar mejor.</p>
+      <p data-lang="en">© 2026 <strong>Sabory</strong> — Crafted with care for better cooking.</p>
       <p style="margin-top: 6px;">
-        <a href="index.html">Abrir Aplicación</a> · 
-        <a href="#account-deletion">Eliminar Cuenta</a> · 
-        <a href="mailto:saboryfood@gmail.com">Contacto y Soporte</a>
+        <a href="index.html">
+          <span data-lang="es">Abrir Aplicación</span>
+          <span data-lang="en">Open App</span>
+        </a> · 
+        <a href="#account-deletion">
+          <span data-lang="es">Eliminar Cuenta</span>
+          <span data-lang="en">Delete Account</span>
+        </a> · 
+        <a href="mailto:saboryfood@gmail.com">
+          <span data-lang="es">Contacto y Soporte</span>
+          <span data-lang="en">Contact & Support</span>
+        </a>
       </p>
     </footer>
   </div>
+
+  <script>
+    function setPrivacyLanguage(lang) {
+      const isEn = lang === 'en';
+      document.body.classList.toggle('lang-en', isEn);
+      document.body.classList.toggle('lang-es', !isEn);
+      document.documentElement.setAttribute('lang', isEn ? 'en' : 'es');
+      document.title = isEn
+        ? 'Privacy Policy & Data Processing — Sabory'
+        : 'Política de Privacidad y Tratamiento de Datos — Sabory';
+      
+      const btnEs = document.getElementById('btn-lang-es');
+      const btnEn = document.getElementById('btn-lang-en');
+      if (btnEs) btnEs.classList.toggle('active', !isEn);
+      if (btnEn) btnEn.classList.toggle('active', isEn);
+
+      try {
+        localStorage.setItem('fa_language', lang);
+      } catch (e) {}
+    }
+
+    // Auto-detect language on load
+    (function initPrivacyLang() {
+      let saved = null;
+      try {
+        saved = localStorage.getItem('fa_language');
+      } catch (e) {}
+      
+      let target = 'es';
+      if (saved === 'en' || saved === 'es') {
+        target = saved;
+      } else {
+        const navLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
+        target = navLang.startsWith('es') ? 'es' : 'en';
+      }
+      setPrivacyLanguage(target);
+    })();
+  </script>
 </body>
 </html>
-
