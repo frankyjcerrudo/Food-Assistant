@@ -4494,7 +4494,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.52';
+  window.APP_VERSION = 'v1.53';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4535,7 +4535,8 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
-    this.appVersion = window.APP_VERSION || 'v1.52';
+    this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
+    this.appVersion = window.APP_VERSION || 'v1.53';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5302,6 +5303,19 @@ class FoodAssistantApp {
           }
         }
       });
+
+      // US-81: Refresco activo en vivo (cada 5s) si la lista de la compra o el planificador están en pantalla
+      setInterval(async () => {
+        try {
+          if (typeof document !== 'undefined' && document.visibilityState === 'visible' && !this.isPushingToCloud) {
+            if (this.activeView === 'view-shopping' || this.activeView === 'view-planner') {
+              if (this.supabaseClient && state.cloudUser?.id && (typeof navigator === 'undefined' || navigator.onLine)) {
+                await this.pullFromCloud();
+              }
+            }
+          }
+        } catch (e) { }
+      }, 5000);
       window.addEventListener('pagehide', () => {
         this.flushSync();
       });
@@ -16920,7 +16934,15 @@ REGLAS CRÍTICAS:
             .on('postgres_changes', { event: '*', schema: 'public', table: 'household_members', filter: filterScope }, onRealtimeChange);
         }
 
-        channel.subscribe();
+        channel.subscribe((status, err) => {
+          if (status === 'SUBSCRIBED') {
+            console.log(`[Realtime] Conectado y suscrito exitosamente al canal ${channelName}`);
+          } else if (status === 'CHANNEL_ERROR') {
+            console.warn(`[Realtime] Error en canal ${channelName}:`, err);
+          } else if (status === 'TIMED_OUT') {
+            console.warn(`[Realtime] Timeout en canal ${channelName}`);
+          }
+        });
         return channel;
       } catch (err) {
         console.warn(`[Household Realtime] No se pudo suscribir al canal ${channelName}:`, err);
@@ -16963,13 +16985,14 @@ REGLAS CRÍTICAS:
     if (!this.supabaseClient) return;
     const body = {
       ...payload,
+      clientId: this.clientId,
       senderId: state.cloudUser?.id,
       timestamp: Date.now()
     };
-    const sendToChan = (ch) => {
+    const sendToChan = async (ch) => {
       if (ch && typeof ch.send === 'function') {
         try {
-          ch.send({
+          await ch.send({
             type: 'broadcast',
             event: event,
             payload: body
@@ -16985,7 +17008,8 @@ REGLAS CRÍTICAS:
 
   handleRealtimeShoppingBroadcast(payload) {
     if (!payload || !Array.isArray(state.shoppingList)) return;
-    if (payload.senderId && state.cloudUser?.id && payload.senderId === state.cloudUser.id) {
+    // Ignorar únicamente si fue emitido por esta misma ventana/pestaña local
+    if (payload.clientId && this.clientId && payload.clientId === this.clientId) {
       return;
     }
 
@@ -17046,7 +17070,8 @@ REGLAS CRÍTICAS:
 
   handleRealtimePlannerBroadcast(payload) {
     if (!payload) return;
-    if (payload.senderId && state.cloudUser?.id && payload.senderId === state.cloudUser.id) {
+    // Ignorar únicamente si fue emitido por esta misma ventana/pestaña local
+    if (payload.clientId && this.clientId && payload.clientId === this.clientId) {
       return;
     }
     let modified = false;

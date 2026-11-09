@@ -687,6 +687,15 @@ describe('US-77: Modo Familia / Espacio Colaborativo del Hogar (Family Mode)', (
 
       expect(state.shoppingList[0].isChecked).toBe(true);
       expect(renderSpy).toHaveBeenCalled();
+
+      // Recepción de broadcast en otro dispositivo con la MISMA CUENTA (mismo senderId pero distinto clientId)
+      appInstance.handleRealtimeShoppingBroadcast({
+        action: 'toggle',
+        clientId: 'device-mobile-222',
+        senderId: state.cloudUser?.id,
+        item: { id: 'shop-bc-1', isChecked: false, updatedAt: new Date().toISOString() }
+      });
+      expect(state.shoppingList[0].isChecked).toBe(false);
     });
 
     it('12. US-81: handleRealtimePlannerBroadcast actualiza instantáneamente el planificador entre dispositivos y miembros', () => {
