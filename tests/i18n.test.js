@@ -371,24 +371,26 @@ describe('US-12: Módulo Core de Internacionalización (i18n.js)', () => {
 
     const metaEs = getRecipeLanguageMeta(esRecipe);
     expect(metaEs.code).toBe('ES');
-    expect(metaEs.flag).toBe('🇪🇸');
+    expect(metaEs.flag).toContain('flag-es');
+    expect(metaEs.flagEmoji).toBe('🇪🇸');
     expect(metaEs.label).toBe('Español');
 
     const metaEn = getRecipeLanguageMeta(enRecipe);
     expect(metaEn.code).toBe('EN');
-    expect(metaEn.flag).toBe('🇬🇧');
+    expect(metaEn.flag).toContain('flag-en');
+    expect(metaEn.flagEmoji).toBe('🇬🇧');
     expect(metaEn.label).toBe('English');
 
     // Test card HTML rendering
     const appInstance = new window.FoodAssistantApp();
     const cardHtmlEs = appInstance.renderSingleRecipeCardHtml(esRecipe, false);
     expect(cardHtmlEs).toContain('class="recipe-lang-badge"');
-    expect(cardHtmlEs).toContain('🇪🇸');
+    expect(cardHtmlEs).toContain('flag-es');
     expect(cardHtmlEs).toContain('ES');
 
     const cardHtmlEn = appInstance.renderSingleRecipeCardHtml(enRecipe, false);
     expect(cardHtmlEn).toContain('class="recipe-lang-badge"');
-    expect(cardHtmlEn).toContain('🇬🇧');
+    expect(cardHtmlEn).toContain('flag-en');
     expect(cardHtmlEn).toContain('EN');
   });
 

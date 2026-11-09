@@ -444,14 +444,16 @@ function getRecipeLanguageMeta(recipe) {
   if (lang === 'en') {
     return {
       code: 'EN',
-      flag: '🇬🇧',
+      flag: '<span class="recipe-flag-icon flag-en" aria-hidden="true"></span>',
+      flagEmoji: '🇬🇧',
       label: 'English',
       ariaLabel: isEnApp ? 'Recipe language: English' : 'Idioma de la receta: Inglés'
     };
   }
   return {
     code: 'ES',
-    flag: '🇪🇸',
+    flag: '<span class="recipe-flag-icon flag-es" aria-hidden="true"></span>',
+    flagEmoji: '🇪🇸',
     label: 'Español',
     ariaLabel: isEnApp ? 'Recipe language: Spanish' : 'Idioma de la receta: Español'
   };
@@ -4721,7 +4723,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.63';
+  window.APP_VERSION = 'v1.64';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4768,7 +4770,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.63';
+    this.appVersion = window.APP_VERSION || 'v1.64';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -13754,8 +13756,8 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 8. CAPACIDAD DE RAZONAMIENTO Y ASESORAMIENTO CULINARIO: Si Franky hace preguntas abiertas, pide sugerencias o dudas sobre cocina, sustitutos de ingredientes, macros, técnicas o ideas para comer, razona con empatía e inteligencia como un chef y nutricionista experto, ofreciendo explicaciones claras y prácticas. Solo invoca herramientas cuando haya una acción concreta que ejecutar en la app (como apuntar a la compra, planificar comidas o guardar recetas).
 9. CONCISIÓN OBLIGATORIA PARA VOZ HABLADA: Franky escucha tus respuestas mediante sintetizador de voz. Responde SIEMPRE de forma directa y sintética (máximo 1 a 3 frases claras y conversacionales). NUNCA recites monólogos largos ni enumeres listas eternas de ingredientes en el mensaje hablado si no se te pide expresamente. Confirma las acciones realizadas con agilidad y brevedad.
 ${(typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() === 'en')
-  ? '10. LANGUAGE: Respond to Franky in fluent English with a warm, encouraging and concise tone. Keep recipe names and food terms natural.'
-  : '10. IDIOMA: Responde a Franky en español natural, cálido y conciso.'}`;
+        ? '10. LANGUAGE: Respond to Franky in fluent English with a warm, encouraging and concise tone. Keep recipe names and food terms natural.'
+        : '10. IDIOMA: Responde a Franky en español natural, cálido y conciso.'}`;
   }
 
   getEffectiveGeminiApiKey() {
