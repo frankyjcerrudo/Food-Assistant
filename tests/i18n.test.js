@@ -185,4 +185,62 @@ describe('US-12: Módulo Core de Internacionalización (i18n.js)', () => {
     expect(document.querySelector('#view-settings .section-title').textContent).toBe("Settings");
     expect(document.querySelector('#card-language-settings [data-i18n="settings.languageTitle"]').textContent).toBe("Language");
   });
+
+  it('traduce modales interactivos: Onboarding, Cook Mode e Importador (Fase 3)', () => {
+    const htmlPath = path.resolve(process.cwd(), 'index.html');
+    let htmlContent = fs.readFileSync(htmlPath, 'utf-8');
+    htmlContent = htmlContent.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<link[\s\S]*?>/gi, '');
+    document.body.innerHTML = htmlContent;
+
+    I18n.setPreference('en');
+    I18n.applyTranslations(document.body);
+
+    // Onboarding Wizard
+    expect(document.querySelector('#onboarding-modal-title').textContent).toBe("Welcome to Sabory!");
+    expect(document.querySelector('#btn-onboarding-skip').textContent.trim()).toBe("Skip for now");
+    expect(document.querySelector('#onboarding-step-2 .onboarding-step-kicker').textContent).toBe("Step 2 of 5 · Food");
+    expect(document.querySelector('#onboarding-step-3 .onboarding-step-kicker').textContent).toBe("Step 3 of 5 · Nutrition");
+    expect(document.querySelector('#onboarding-step-4 .onboarding-step-kicker').textContent).toBe("Step 4 of 5 · Household");
+    expect(document.querySelector('#btn-onboarding-next span[data-i18n]').textContent).toBe("Next");
+    expect(document.querySelector('#btn-onboarding-finish span[data-i18n]').textContent).toBe("Start cooking!");
+
+    // Cook Mode Overlay
+    expect(document.querySelector('#cook-mode-overlay .cook-mode-header-kicker span[data-i18n="cooking.mode"]').textContent).toBe("Cooking Mode");
+    expect(document.querySelector('#btn-exit-cook-mode span[data-i18n]').textContent).toBe("Exit");
+    expect(document.querySelector('#btn-timer-start').textContent).toBe("Start");
+    expect(document.querySelector('#btn-timer-reset').textContent).toBe("Reset");
+    expect(document.querySelector('#btn-cook-prev-step span[data-i18n]').textContent).toBe("Previous");
+    expect(document.querySelector('#btn-cook-next-step span[data-i18n]').textContent).toBe("Next");
+
+    // Recipe Importer
+    expect(document.querySelector('#modal-recipe-import h3 span[data-i18n]').textContent).toBe("Recipe Importer");
+    expect(document.querySelector('#tab-import-url .import-tab-label').textContent).toBe("Link");
+    expect(document.querySelector('#tab-import-text .import-tab-label').textContent).toBe("Text");
+    expect(document.querySelector('#tab-import-ai .import-tab-label').textContent).toBe("Photo / AI");
+    expect(document.querySelector('#btn-execute-import span[data-i18n]').textContent).toBe("Analyze & Import");
+  });
+
+  it('resuelve claves de toast y añade directiva de idioma al prompt de IA (Fase 4)', () => {
+    const appPath = path.resolve(process.cwd(), 'app.js');
+    const appCode = fs.readFileSync(appPath, 'utf-8');
+    new Function(appCode)();
+
+    I18n.setPreference('en');
+    expect(I18n.t('toasts.recipeSaved')).toBe('Recipe saved successfully');
+    expect(I18n.t('toasts.shoppingCleared')).toBe('Purchased items cleared');
+
+    I18n.setPreference('es');
+    expect(I18n.t('toasts.recipeSaved')).toBe('Receta guardada con éxito');
+    expect(I18n.t('toasts.shoppingCleared')).toBe('Artículos comprados eliminados');
+
+    // Test AI System Instruction language directive
+    const appInstance = new window.FoodAssistantApp();
+    I18n.setPreference('en');
+    const enInstruction = appInstance.buildAiSystemInstruction();
+    expect(enInstruction).toContain('10. LANGUAGE: Respond to Franky in fluent English');
+
+    I18n.setPreference('es');
+    const esInstruction = appInstance.buildAiSystemInstruction();
+    expect(esInstruction).toContain('10. IDIOMA: Responde a Franky en español');
+  });
 });

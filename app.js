@@ -4653,7 +4653,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.59';
+  window.APP_VERSION = 'v1.60';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4697,7 +4697,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.59';
+    this.appVersion = window.APP_VERSION || 'v1.60';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5103,17 +5103,21 @@ class FoodAssistantApp {
     };
     const iconName = icons[type] || icons.info;
 
+    const closeAria = window.I18n ? window.I18n.t('common.close') : 'Cerrar aviso';
     const toast = document.createElement('div');
     toast.className = `m3-toast toast-${type}`;
     toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
     toast.innerHTML = `
       <span class="material-symbols-outlined m3-toast-icon">${iconName}</span>
       <span class="m3-toast-message"></span>
-      <button type="button" class="m3-toast-close" aria-label="Cerrar aviso">
+      <button type="button" class="m3-toast-close" aria-label="${closeAria}">
         <span class="material-symbols-outlined icon-16">close</span>
       </button>
     `;
-    toast.querySelector('.m3-toast-message').textContent = message;
+    const resolvedMessage = (window.I18n && typeof message === 'string' && (message.startsWith('toasts.') || message.startsWith('common.')))
+      ? window.I18n.t(message)
+      : message;
+    toast.querySelector('.m3-toast-message').textContent = resolvedMessage;
 
     const dismiss = () => {
       if (!toast.parentNode) return;
@@ -10440,7 +10444,8 @@ class FoodAssistantApp {
       this.renderCookStep();
     } else {
       this.exitCookMode();
-      this.showToast("¡Enhorabuena! Has completado todos los pasos de la receta. ¡A disfrutar!", 'success');
+      const finishMsg = window.I18n ? window.I18n.t('cooking.finish') : "¡Enhorabuena! Has completado todos los pasos de la receta. ¡A disfrutar!";
+      this.showToast(finishMsg, 'success');
     }
   }
 
@@ -10455,16 +10460,20 @@ class FoodAssistantApp {
     const r = this.activeRecipe;
     const step = r.instructions[this.cookStepIndex];
 
+    const stepWord = window.I18n ? window.I18n.t('cooking.step') : 'Paso';
+    const ofWord = window.I18n ? window.I18n.t('cooking.of') : 'de';
     document.getElementById('cook-recipe-title').textContent = r.title;
-    document.getElementById('cook-step-indicator').textContent = `Paso ${step.step} de ${r.instructions.length}`;
+    document.getElementById('cook-step-indicator').textContent = `${stepWord} ${step.step} ${ofWord} ${r.instructions.length}`;
     document.getElementById('cook-step-text').textContent = step.text;
 
     const nextBtn = document.getElementById('btn-cook-next-step');
     if (nextBtn) {
       const isLast = this.cookStepIndex >= r.instructions.length - 1;
+      const finishText = window.I18n ? window.I18n.t('cooking.finish') : 'Finalizar';
+      const nextText = window.I18n ? window.I18n.t('cooking.nextStep') : 'Siguiente';
       nextBtn.innerHTML = isLast
-        ? 'Finalizar <span class="material-symbols-outlined icon-sm">check_circle</span>'
-        : 'Siguiente <span class="material-symbols-outlined icon-sm">arrow_forward</span>';
+        ? `${finishText} <span class="material-symbols-outlined icon-sm">check_circle</span>`
+        : `${nextText} <span class="material-symbols-outlined icon-sm">arrow_forward</span>`;
     }
 
     const timerBox = document.getElementById('cook-timer-box');
@@ -10473,7 +10482,7 @@ class FoodAssistantApp {
 
     const timerStartBtn = document.getElementById('btn-timer-start');
     if (timerStartBtn) {
-      timerStartBtn.textContent = 'Iniciar';
+      timerStartBtn.textContent = window.I18n ? window.I18n.t('cooking.timerStart') : 'Iniciar';
     }
 
     if (step.timerMinutes > 0) {
@@ -10490,7 +10499,7 @@ class FoodAssistantApp {
         this.timerSecondsLeft = step.timerMinutes * 60;
         this.updateTimerDisplay();
         const startBtn = document.getElementById('btn-timer-start');
-        if (startBtn) startBtn.textContent = 'Iniciar';
+        if (startBtn) startBtn.textContent = window.I18n ? window.I18n.t('cooking.timerStart') : 'Iniciar';
       };
     } else {
       timerBox.style.display = 'none';
@@ -10509,9 +10518,9 @@ class FoodAssistantApp {
     if (this.timerInterval) {
       clearInterval(this.timerInterval);
       this.timerInterval = null;
-      btn.textContent = 'Reanudar';
+      btn.textContent = window.I18n ? window.I18n.t('cooking.resumeTimer') : 'Reanudar';
     } else {
-      btn.textContent = 'Pausar';
+      btn.textContent = window.I18n ? window.I18n.t('cooking.pauseTimer') : 'Pausar';
       this.timerInterval = setInterval(() => {
         if (this.timerSecondsLeft > 0) {
           this.timerSecondsLeft--;
@@ -10519,7 +10528,7 @@ class FoodAssistantApp {
         } else {
           clearInterval(this.timerInterval);
           this.timerInterval = null;
-          btn.textContent = '¡Completado!';
+          btn.textContent = window.I18n ? window.I18n.t('cooking.timerFinished') : '¡Completado!';
           this.playTimerChime();
         }
       }, 1000);
@@ -13535,7 +13544,10 @@ INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
 6. GUARDAR Y CREAR RECETAS EN EL CATÁLOGO: Si Franky te pide recomendaciones de recetas y a continuación te pide guardarlas (ej: "guárdalas", "guarda las recetas", "guarda esa receta", "añádelas a mis recetas", "guárdame la primera", "créala"), o si te pide directamente inventar o crear una o varias recetas nuevas: DEBES invocar OBLIGATORIAMENTE la herramienta "create_and_save_recipe" (una llamada por cada receta que Franky quiera guardar) con todos los datos estructurados: title, description, prepTimeMinutes, cookTimeMinutes, servings, tags, ingredients (name, amount, unit) e instructions (step, text, timerMinutes) y nutrition (calories, protein, carbs, fat). NUNCA uses esta herramienta si la receta ya existe en el catálogo de Franky (incluso si la frase empieza por "añade la receta X a las meriendas de toda la semana"), pues en ese caso se trata de planificarla con "set_weekly_plan". NUNCA respondas diciendo que has guardado una receta sin haber ejecutado la llamada a "create_and_save_recipe".
 7. PROHIBIDO terminantemente mostrar IDs internos tipo "rec-..." en el texto visible para Franky. Escribe los nombres legibles de los platos de forma limpia y atractiva.
 8. CAPACIDAD DE RAZONAMIENTO Y ASESORAMIENTO CULINARIO: Si Franky hace preguntas abiertas, pide sugerencias o dudas sobre cocina, sustitutos de ingredientes, macros, técnicas o ideas para comer, razona con empatía e inteligencia como un chef y nutricionista experto, ofreciendo explicaciones claras y prácticas. Solo invoca herramientas cuando haya una acción concreta que ejecutar en la app (como apuntar a la compra, planificar comidas o guardar recetas).
-9. CONCISIÓN OBLIGATORIA PARA VOZ HABLADA: Franky escucha tus respuestas mediante sintetizador de voz. Responde SIEMPRE de forma directa y sintética (máximo 1 a 3 frases claras y conversacionales). NUNCA recites monólogos largos ni enumeres listas eternas de ingredientes en el mensaje hablado si no se te pide expresamente. Confirma las acciones realizadas con agilidad y brevedad.`;
+9. CONCISIÓN OBLIGATORIA PARA VOZ HABLADA: Franky escucha tus respuestas mediante sintetizador de voz. Responde SIEMPRE de forma directa y sintética (máximo 1 a 3 frases claras y conversacionales). NUNCA recites monólogos largos ni enumeres listas eternas de ingredientes en el mensaje hablado si no se te pide expresamente. Confirma las acciones realizadas con agilidad y brevedad.
+${(typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() === 'en')
+  ? '10. LANGUAGE: Respond to Franky in fluent English with a warm, encouraging and concise tone. Keep recipe names and food terms natural.'
+  : '10. IDIOMA: Responde a Franky en español natural, cálido y conciso.'}`;
   }
 
   getEffectiveGeminiApiKey() {
@@ -18345,10 +18357,22 @@ Autenticación: API Key → Bearer → ${tk}`;
       const statusText = document.getElementById('onboarding-account-status-text');
       const connectBtn = document.getElementById('btn-onboarding-connect-account');
       if (state.cloudUser?.email) {
-        if (statusText) statusText.textContent = `Conectado como ${state.cloudUser.email}`;
-        if (connectBtn) connectBtn.textContent = 'Cuenta conectada';
+        if (statusText) {
+          statusText.textContent = window.I18n && window.I18n.getLanguage() === 'en'
+            ? `Connected as ${state.cloudUser.email}`
+            : `Conectado como ${state.cloudUser.email}`;
+        }
+        if (connectBtn) {
+          connectBtn.textContent = window.I18n && window.I18n.getLanguage() === 'en'
+            ? 'Account connected'
+            : 'Cuenta conectada';
+        }
       } else {
-        if (statusText) statusText.textContent = '¿Tienes cuenta o quieres sincronizar entre dispositivos?';
+        if (statusText) {
+          statusText.textContent = window.I18n
+            ? window.I18n.t('onboarding.accountPromo')
+            : '¿Tienes cuenta o quieres sincronizar entre dispositivos?';
+        }
       }
     } else if (step === 2) {
       this.renderOnboardingDietaryChips();
@@ -18357,8 +18381,9 @@ Autenticación: API Key → Bearer → ${tk}`;
     } else if (step === 5) {
       const summaryBox = document.getElementById('onboarding-summary-box');
       if (summaryBox) {
+        const isEn = window.I18n && window.I18n.getLanguage() === 'en';
         const dietList = Array.from(this.onboardingDietary);
-        const dietText = dietList.length > 0 ? dietList.join(', ') : 'Omnívoro / Sin restricciones';
+        const dietText = dietList.length > 0 ? dietList.join(', ') : (isEn ? 'Omnivore / No restrictions' : 'Omnívoro / Sin restricciones');
         const goalsEnabled = document.getElementById('onboarding-goals-enabled')?.checked !== false;
         const cal = parseInt(document.getElementById('onboarding-goal-calories')?.value, 10) || 2000;
         const prot = parseInt(document.getElementById('onboarding-goal-protein')?.value, 10) || 140;
@@ -18366,32 +18391,39 @@ Autenticación: API Key → Bearer → ${tk}`;
         const fat = parseInt(document.getElementById('onboarding-goal-fat')?.value, 10) || 65;
         const goalsText = goalsEnabled
           ? `${cal} kcal · ${prot}g P · ${carbs}g C · ${fat}g G`
-          : 'Seguimiento desactivado';
+          : (isEn ? 'Tracking disabled' : 'Seguimiento desactivado');
+        const dietLabel = window.I18n ? window.I18n.t('settings.dietaryTitle') : 'Preferencias dietéticas';
+        const goalsLabel = window.I18n ? window.I18n.t('settings.nutritionTitle') : 'Objetivos nutricionales diarios';
+        const servingsLabel = window.I18n ? window.I18n.t('settings.servingsTitle') : 'Porciones por defecto';
+        const personWord = this.onboardingServings === 1 ? (isEn ? 'person' : 'persona') : (isEn ? 'people' : 'personas');
 
         summaryBox.innerHTML = `
           <div class="onboarding-summary-item">
             <span class="material-symbols-outlined icon-sm icon-primary">eco</span>
             <div>
-              <div class="onboarding-summary-label">Preferencias dietéticas</div>
+              <div class="onboarding-summary-label">${escapeHtml(dietLabel)}</div>
               <div class="onboarding-summary-value">${escapeHtml(dietText)}</div>
             </div>
           </div>
           <div class="onboarding-summary-item">
             <span class="material-symbols-outlined icon-sm icon-primary">flag</span>
             <div>
-              <div class="onboarding-summary-label">Objetivos nutricionales diarios</div>
+              <div class="onboarding-summary-label">${escapeHtml(goalsLabel)}</div>
               <div class="onboarding-summary-value">${escapeHtml(goalsText)}</div>
             </div>
           </div>
           <div class="onboarding-summary-item">
             <span class="material-symbols-outlined icon-sm icon-primary">group</span>
             <div>
-              <div class="onboarding-summary-label">Porciones por defecto</div>
-              <div class="onboarding-summary-value">${this.onboardingServings} ${this.onboardingServings === 1 ? 'persona' : 'personas'}</div>
+              <div class="onboarding-summary-label">${escapeHtml(servingsLabel)}</div>
+              <div class="onboarding-summary-value">${this.onboardingServings} ${personWord}</div>
             </div>
           </div>
         `;
       }
+    }
+    if (window.I18n && typeof window.I18n.applyTranslations === 'function') {
+      window.I18n.applyTranslations(document.getElementById('modal-onboarding'));
     }
   }
 
