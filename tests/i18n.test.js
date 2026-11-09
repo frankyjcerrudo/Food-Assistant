@@ -436,4 +436,69 @@ describe('US-12: Módulo Core de Internacionalización (i18n.js)', () => {
     expect(I18n.t('recipes.newRecipeTitle')).toBe('Nueva Receta');
     expect(I18n.t('recipes.titleLabel')).toBe('Título de la Receta');
   });
+
+  it('traduce las etiquetas de macronutrientes en la tarjeta compacta de recetas y actualiza el selector de idioma con banderas SVG', () => {
+    const appPath = path.resolve(process.cwd(), 'app.js');
+    const appCode = fs.readFileSync(appPath, 'utf-8');
+    new Function(appCode)();
+
+    const recipeWithMacros = {
+      id: 'rec-test-macros-i18n',
+      title: 'Healthy Chicken Salad',
+      description: 'Tasty salad',
+      imageUrl: '',
+      prepTimeMinutes: 10,
+      cookTimeMinutes: 5,
+      nutrition: { calories: 350, protein: 32, carbs: 12, fat: 14 }
+    };
+
+    const appInstance = new window.FoodAssistantApp();
+
+    // In Spanish
+    I18n.setPreference('es');
+    const htmlEs = appInstance.renderSingleRecipeCardHtml(recipeWithMacros, true);
+    expect(htmlEs).toContain('<span class="card-macro-lbl">Calorías</span>');
+    expect(htmlEs).toContain('<span class="card-macro-lbl">Proteínas</span>');
+    expect(htmlEs).toContain('<span class="card-macro-lbl">Carbos</span>');
+    expect(htmlEs).toContain('<span class="card-macro-lbl">Grasas</span>');
+
+    // In English
+    I18n.setPreference('en');
+    const htmlEn = appInstance.renderSingleRecipeCardHtml(recipeWithMacros, true);
+    expect(htmlEn).toContain('<span class="card-macro-lbl">Calories</span>');
+    expect(htmlEn).toContain('<span class="card-macro-lbl">Protein</span>');
+    expect(htmlEn).toContain('<span class="card-macro-lbl">Carbs</span>');
+    expect(htmlEn).toContain('<span class="card-macro-lbl">Fats</span>');
+
+    // Test custom recipe language selector sync
+    const flagEl = document.getElementById('edit-recipe-lang-flag') || (() => {
+      const el = document.createElement('span');
+      el.id = 'edit-recipe-lang-flag';
+      document.body.appendChild(el);
+      return el;
+    })();
+    const labelEl = document.getElementById('edit-recipe-lang-label') || (() => {
+      const el = document.createElement('span');
+      el.id = 'edit-recipe-lang-label';
+      document.body.appendChild(el);
+      return el;
+    })();
+    const selectEl = document.getElementById('edit-recipe-language') || (() => {
+      const el = document.createElement('select');
+      el.id = 'edit-recipe-language';
+      el.innerHTML = '<option value="es">Español</option><option value="en">English</option>';
+      document.body.appendChild(el);
+      return el;
+    })();
+
+    appInstance.syncRecipeEditorLanguageUI('en');
+    expect(flagEl.className).toContain('flag-en');
+    expect(labelEl.textContent).toBe('English');
+    expect(selectEl.value).toBe('en');
+
+    appInstance.syncRecipeEditorLanguageUI('es');
+    expect(flagEl.className).toContain('flag-es');
+    expect(labelEl.textContent).toBe('Español');
+    expect(selectEl.value).toBe('es');
+  });
 });

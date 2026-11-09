@@ -4723,7 +4723,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.64';
+  window.APP_VERSION = 'v1.65';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4770,7 +4770,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.64';
+    this.appVersion = window.APP_VERSION || 'v1.65';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5468,6 +5468,85 @@ class FoodAssistantApp {
     });
     if (window.I18n) {
       window.I18n.applyTranslations();
+    }
+    const currentRecipeLang = document.getElementById('edit-recipe-language')?.value || 'es';
+    this.syncRecipeEditorLanguageUI(currentRecipeLang);
+  }
+
+  initRecipeEditorLanguagePicker() {
+    const langBtn = document.getElementById('edit-recipe-lang-btn');
+    const langDropdown = document.getElementById('edit-recipe-lang-dropdown');
+    const langWrapper = document.getElementById('edit-recipe-lang-wrapper');
+    const hiddenSelect = document.getElementById('edit-recipe-language');
+
+    if (!langBtn || !langDropdown || !langWrapper) return;
+
+    langBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isHidden = langDropdown.classList.contains('is-hidden');
+      if (isHidden) {
+        langDropdown.classList.remove('is-hidden');
+        langWrapper.classList.add('is-open');
+        langBtn.setAttribute('aria-expanded', 'true');
+      } else {
+        langDropdown.classList.add('is-hidden');
+        langWrapper.classList.remove('is-open');
+        langBtn.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    langDropdown.querySelectorAll('.custom-lang-option').forEach(opt => {
+      opt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const selectedLang = opt.dataset.lang || 'es';
+        this.syncRecipeEditorLanguageUI(selectedLang);
+        langDropdown.classList.add('is-hidden');
+        langWrapper.classList.remove('is-open');
+        langBtn.setAttribute('aria-expanded', 'false');
+        if (hiddenSelect) {
+          hiddenSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!langWrapper.contains(e.target)) {
+        langDropdown.classList.add('is-hidden');
+        langWrapper.classList.remove('is-open');
+        langBtn.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    if (hiddenSelect) {
+      hiddenSelect.addEventListener('change', () => {
+        this.syncRecipeEditorLanguageUI(hiddenSelect.value);
+      });
+    }
+  }
+
+  syncRecipeEditorLanguageUI(lang) {
+    const normalized = (lang === 'en') ? 'en' : 'es';
+    const hiddenSelect = document.getElementById('edit-recipe-language');
+    if (hiddenSelect && hiddenSelect.value !== normalized) {
+      hiddenSelect.value = normalized;
+    }
+
+    const flagIcon = document.getElementById('edit-recipe-lang-flag');
+    const label = document.getElementById('edit-recipe-lang-label');
+    const isEn = normalized === 'en';
+
+    if (flagIcon) {
+      flagIcon.className = `recipe-flag-icon flag-${isEn ? 'en' : 'es'}`;
+    }
+    if (label) {
+      label.textContent = isEn ? 'English' : 'Español';
+    }
+
+    const dropdown = document.getElementById('edit-recipe-lang-dropdown');
+    if (dropdown) {
+      dropdown.querySelectorAll('.custom-lang-option').forEach(opt => {
+        opt.classList.toggle('active', opt.dataset.lang === normalized);
+      });
     }
   }
 
@@ -7303,6 +7382,7 @@ class FoodAssistantApp {
         this.applyLanguage(langMode, true);
       });
     });
+    this.initRecipeEditorLanguagePicker();
 
     // Cloud Auth events
     document.getElementById('btn-header-account')?.addEventListener('click', () => this.openAuthModal());
@@ -8394,6 +8474,21 @@ class FoodAssistantApp {
       ? `app.toggleRecipeSelect('${safeRecipeId}')`
       : `app.openRecipeDetail('${safeRecipeId}')`;
 
+    const macroCardTitle = hasNutData
+      ? (window.I18n ? window.I18n.t('recipes.macrosCardTitleHasData') : 'Valores nutricionales orientativos por ración individual')
+      : (window.I18n ? window.I18n.t('recipes.macrosCardTitleNoData') : 'Sin información nutricional ni ingredientes');
+    const lblCal = window.I18n ? window.I18n.t('recipes.macrosCalLabel') : 'Calorías';
+    const titleCal = window.I18n ? window.I18n.t('recipes.macrosCalTitle') : 'Calorías';
+    const lblProt = window.I18n ? window.I18n.t('recipes.macrosProtLabel') : 'Proteínas';
+    const titleProt = window.I18n ? window.I18n.t('recipes.macrosProtTitle') : 'Proteínas';
+    const lblCarbs = window.I18n ? window.I18n.t('recipes.macrosCarbsLabel') : 'Carbos';
+    const titleCarbs = window.I18n ? window.I18n.t('recipes.macrosCarbsTitle') : 'Carbohidratos';
+    const lblFat = window.I18n ? window.I18n.t('recipes.macrosFatLabel') : 'Grasas';
+    const titleFat = window.I18n ? window.I18n.t('recipes.macrosFatTitle') : 'Grasas';
+    const privateBadgeText = window.I18n ? window.I18n.t('recipes.cardPrivateBadge') : 'Privada';
+    const privateBadgeTitle = window.I18n ? window.I18n.t('recipes.cardPrivateTitle') : 'Receta privada (solo visible para ti)';
+    const sourcePrefixTitle = window.I18n ? window.I18n.t('recipes.cardSourceTitle', { domain: rec.sourceDomain }) : `Fuente: ${rec.sourceDomain}`;
+
     return `
       <article class="recipe-card ${this.isRecipeSelectMode ? 'is-select-mode' : ''} ${isSelected ? 'is-selected' : ''}" onclick="${cardOnClick}" data-action="${this.isRecipeSelectMode ? 'toggleRecipeSelect' : 'openRecipeDetail'}" data-recipe-id="${escapeHtml(rec.id)}">
         <div class="recipe-image-wrap">
@@ -8439,21 +8534,21 @@ class FoodAssistantApp {
 
           ${showCardMacros ? `
           <!-- Tabla compacta de valores nutricionales por ración (US-01 / BUG-27) -->
-          <div class="recipe-card-macros" title="${hasNutData ? 'Valores nutricionales orientativos por ración individual' : 'Sin información nutricional ni ingredientes'}">
-            <div class="card-macro-item card-macro-cal" title="Calorías">
-              <span class="card-macro-lbl">Calorías</span>
+          <div class="recipe-card-macros" title="${escapeHtml(macroCardTitle)}">
+            <div class="card-macro-item card-macro-cal" title="${escapeHtml(titleCal)}">
+              <span class="card-macro-lbl">${escapeHtml(lblCal)}</span>
               <span class="card-macro-val">${hasNutData && nut && nut.calories > 0 ? `${nut.calories}<span class="card-macro-unit">kcal</span>` : '—'}</span>
             </div>
-            <div class="card-macro-item card-macro-prot" title="Proteínas">
-              <span class="card-macro-lbl">Proteínas</span>
+            <div class="card-macro-item card-macro-prot" title="${escapeHtml(titleProt)}">
+              <span class="card-macro-lbl">${escapeHtml(lblProt)}</span>
               <span class="card-macro-val">${hasNutData && nut && nut.protein > 0 ? `${Math.round(nut.protein)}<span class="card-macro-unit">g</span>` : '—'}</span>
             </div>
-            <div class="card-macro-item card-macro-carbs" title="Carbohidratos">
-              <span class="card-macro-lbl">Carbos</span>
+            <div class="card-macro-item card-macro-carbs" title="${escapeHtml(titleCarbs)}">
+              <span class="card-macro-lbl">${escapeHtml(lblCarbs)}</span>
               <span class="card-macro-val">${hasNutData && nut && (nut.carbs > 0 || nut.carbs === 0) ? `${Math.round(nut.carbs)}<span class="card-macro-unit">g</span>` : '—'}</span>
             </div>
-            <div class="card-macro-item card-macro-fat" title="Grasas">
-              <span class="card-macro-lbl">Grasas</span>
+            <div class="card-macro-item card-macro-fat" title="${escapeHtml(titleFat)}">
+              <span class="card-macro-lbl">${escapeHtml(lblFat)}</span>
               <span class="card-macro-val">${hasNutData && nut && (nut.fat > 0 || nut.fat === 0) ? `${Math.round(nut.fat)}<span class="card-macro-unit">g</span>` : '—'}</span>
             </div>
           </div>
@@ -8461,12 +8556,12 @@ class FoodAssistantApp {
 
           <div class="recipe-tags">
             ${rec.isPrivate ? `
-              <span class="tag-chip recipe-privacy-badge" title="Receta privada (solo visible para ti)">
-                <span class="material-symbols-outlined icon-13">lock</span> Privada
+              <span class="tag-chip recipe-privacy-badge" title="${escapeHtml(privateBadgeTitle)}">
+                <span class="material-symbols-outlined icon-13">lock</span> ${escapeHtml(privateBadgeText)}
               </span>
             ` : ''}
             ${rec.sourceDomain ? `
-              <span class="tag-chip tag-chip-source" title="Fuente: ${rec.sourceDomain}">
+              <span class="tag-chip tag-chip-source" title="${escapeHtml(sourcePrefixTitle)}">
                 <span class="material-symbols-outlined icon-13">link</span> ${rec.sourceDomain}
               </span>
             ` : ''}
@@ -9641,7 +9736,9 @@ class FoodAssistantApp {
     document.getElementById('edit-recipe-cook').value = "20";
     document.getElementById('edit-recipe-servings').value = state.settings.defaultServings || "2";
     const langSelect = document.getElementById('edit-recipe-language');
-    if (langSelect) langSelect.value = (window.I18n && window.I18n.getLanguage() === 'en') ? 'en' : 'es';
+    const initialLang = (window.I18n && window.I18n.getLanguage() === 'en') ? 'en' : 'es';
+    if (langSelect) langSelect.value = initialLang;
+    this.syncRecipeEditorLanguageUI(initialLang);
     const imgEl = document.getElementById('edit-recipe-image');
     if (imgEl) imgEl.value = "";
     this.updateRecipeEditorImagePreview();
@@ -9695,7 +9792,9 @@ class FoodAssistantApp {
     document.getElementById('edit-recipe-cook').value = r.cookTimeMinutes || 0;
     document.getElementById('edit-recipe-servings').value = r.servings || 2;
     const editLangSelect = document.getElementById('edit-recipe-language');
-    if (editLangSelect) editLangSelect.value = getRecipeLanguage(r);
+    const recipeLang = getRecipeLanguage(r);
+    if (editLangSelect) editLangSelect.value = recipeLang;
+    this.syncRecipeEditorLanguageUI(recipeLang);
     const editImgEl = document.getElementById('edit-recipe-image');
     if (editImgEl) editImgEl.value = r.imageUrl || "";
     this.updateRecipeEditorImagePreview();
@@ -9730,6 +9829,12 @@ class FoodAssistantApp {
 
   closeEditModal() {
     this.closeDialogModal(this.modalRecipeEdit);
+    const langDropdown = document.getElementById('edit-recipe-lang-dropdown');
+    const langWrapper = document.getElementById('edit-recipe-lang-wrapper');
+    const langBtn = document.getElementById('edit-recipe-lang-btn');
+    if (langDropdown) langDropdown.classList.add('is-hidden');
+    if (langWrapper) langWrapper.classList.remove('is-open');
+    if (langBtn) langBtn.setAttribute('aria-expanded', 'false');
     if (this.isReviewingImport && this.pendingImportRecipe) {
       this.openImportReview(this.pendingImportRecipe);
     }
