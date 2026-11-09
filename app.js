@@ -4657,7 +4657,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.61';
+  window.APP_VERSION = 'v1.62';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4701,7 +4701,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.61';
+    this.appVersion = window.APP_VERSION || 'v1.62';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -7066,7 +7066,7 @@ class FoodAssistantApp {
           this.confirmAddCustomSlot();
           break;
         case 'selectCustomSlotPreset':
-          this.selectCustomSlotPreset(target.dataset.name, target.dataset.icon);
+          this.selectCustomSlotPreset(target.dataset.name, target.dataset.icon, target);
           break;
         case 'closeShoppingPreviewModal':
           this.closeShoppingPreviewModal();
@@ -8002,7 +8002,7 @@ class FoodAssistantApp {
         const calProgressPct = calGoalNum > 0 ? Math.min(100, Math.round((todayNutrition.totalCalories / calGoalNum) * 100)) : 0;
 
         nutritionContainer.innerHTML = `
-          <div class="today-nutrition-pill-bar" id="today-nutrition-pill-bar" onclick="app.toggleTodayNutritionDetails()" role="button" tabindex="0" aria-expanded="${!!this.todayNutritionExpanded}" title="Ver desglose nutricional diario">
+          <div class="today-nutrition-pill-bar" id="today-nutrition-pill-bar" onclick="app.toggleTodayNutritionDetails()" role="button" tabindex="0" aria-expanded="${!!this.todayNutritionExpanded}" title="${window.I18n ? window.I18n.t('today.breakdownAria') : 'Ver desglose nutricional diario'}">
             <div class="today-header-macro-top-row">
               <span class="today-nutrition-pill-kcal">
                 <span class="material-symbols-outlined icon-15 icon-primary">local_fire_department</span>
@@ -8179,7 +8179,9 @@ class FoodAssistantApp {
       if (pill) pill.setAttribute('aria-expanded', String(this.todayNutritionExpanded));
       const actionLabel = card.querySelector('.today-header-macro-action-label');
       if (actionLabel) {
-        actionLabel.textContent = this.todayNutritionExpanded ? 'Ocultar desglose' : 'Ver desglose';
+        actionLabel.textContent = this.todayNutritionExpanded
+          ? (window.I18n ? window.I18n.t('today.hideBreakdown') : 'Ocultar desglose')
+          : (window.I18n ? window.I18n.t('today.viewBreakdown') : 'Ver desglose');
       }
     }
     if (typeof window !== 'undefined' && window.innerWidth >= 900 && this.todayNutritionExpanded) {
@@ -11146,10 +11148,15 @@ class FoodAssistantApp {
     if (modal) this.closeDialogModal(modal);
   }
 
-  selectCustomSlotPreset(name, icon) {
+  selectCustomSlotPreset(name, icon, targetEl) {
     const nameInput = document.getElementById('custom-slot-name');
     const iconSelect = document.getElementById('custom-slot-icon');
-    if (nameInput) nameInput.value = name;
+    const isEn = typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() === 'en';
+    let chosenName = name;
+    if (targetEl && targetEl.dataset) {
+      chosenName = isEn ? (targetEl.dataset.nameEn || name) : (targetEl.dataset.nameEs || name);
+    }
+    if (nameInput) nameInput.value = chosenName;
     if (iconSelect && icon) iconSelect.value = icon;
   }
 
@@ -11163,7 +11170,8 @@ class FoodAssistantApp {
     const icon = iconSelect?.value || 'lunch_dining';
 
     if (!name) {
-      this.highlightInputError(nameInput, "Por favor, introduce el nombre del momento de comida (ej. Media Mañana, Post-Entreno...).");
+      const errorMsg = window.I18n ? window.I18n.t('planner.slotNameError') : "Por favor, introduce el nombre del momento de comida (ej. Media Mañana, Post-Entreno...).";
+      this.highlightInputError(nameInput, errorMsg);
       return;
     }
 
@@ -12261,22 +12269,28 @@ class FoodAssistantApp {
       btnRecipe.setAttribute('aria-pressed', isRecipeView ? 'true' : 'false');
     }
 
+    const isEn = typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() === 'en';
     const pendingCount = state.shoppingList.filter(i => !i.isChecked).length;
     const summaryEl = document.getElementById('shopping-summary-text');
     if (summaryEl) {
-      summaryEl.textContent = `${pendingCount} art\u00EDculo${pendingCount === 1 ? '' : 's'} pendiente${pendingCount === 1 ? '' : 's'}`;
+      if (isEn) {
+        summaryEl.textContent = `${pendingCount} ${pendingCount === 1 ? 'item pending' : 'items pending'}`;
+      } else {
+        summaryEl.textContent = `${pendingCount} artículo${pendingCount === 1 ? '' : 's'} pendiente${pendingCount === 1 ? '' : 's'}`;
+      }
     }
 
     if (!state.shoppingList.length) {
+      const emptyTitle = window.I18n ? window.I18n.t('shopping.emptyTitle') : 'Lista de la compra vacía';
+      const emptyDesc = window.I18n ? window.I18n.t('shopping.emptyDesc') : 'Genera la lista desde tu plan semanal con un clic o añade artículos manualmente.';
+      const genBtnText = window.I18n ? window.I18n.t('shopping.generateFromPlan') : 'Generar desde el Plan';
       container.innerHTML = `
         <div class="card shopping-empty-card">
           <span class="material-symbols-outlined shopping-empty-icon">shopping_cart</span>
-          <h3 class="shopping-empty-title">Lista de la compra vac\u00EDa</h3>
-          <p class="shopping-empty-desc">
-            Genera la lista desde tu plan semanal con un clic o a\u00F1ade art\u00EDculos manualmente.
-          </p>
+          <h3 class="shopping-empty-title">${escapeHtml(emptyTitle)}</h3>
+          <p class="shopping-empty-desc">${escapeHtml(emptyDesc)}</p>
           <button class="btn btn-primary btn-sm" onclick="app.generateShoppingFromPlan()">
-            <span class="material-symbols-outlined icon-sm">add_shopping_cart</span> Generar desde el Plan
+            <span class="material-symbols-outlined icon-sm">add_shopping_cart</span> ${escapeHtml(genBtnText)}
           </button>
         </div>
       `;
@@ -12324,6 +12338,9 @@ class FoodAssistantApp {
         const pendingInRecipe = items.filter(i => !i.isChecked).length;
         const isManualGroup = /manualmente|otros|asistente/i.test(recipeLabel);
         const headerIcon = isManualGroup ? 'shopping_bag' : 'menu_book';
+        const pendingRecipeText = isEn
+          ? `${pendingInRecipe} pending`
+          : `${pendingInRecipe} ${pendingInRecipe === 1 ? 'pendiente' : 'pendientes'}`;
 
         const html = `
           <div class="aisle-card recipe-shopping-card" data-recipe-group="${escapeHtml(recipeLabel)}">
@@ -12332,7 +12349,7 @@ class FoodAssistantApp {
                 <span class="material-symbols-outlined icon-sm">${headerIcon}</span>
                 <span>${escapeHtml(recipeLabel)}</span>
               </div>
-              <span class="aisle-pending-count">${pendingInRecipe} pendientes</span>
+              <span class="aisle-pending-count">${pendingRecipeText}</span>
             </div>
 
             <div>
@@ -12340,6 +12357,7 @@ class FoodAssistantApp {
           const aisleMeta = AISLE_METADATA[item.aisle || 'other'] || AISLE_METADATA.other;
           const displayName = item.recipeSpecificName || item.name;
           const displayAmt = formatDisplayAmount(item.amount, item.unit, item.recipeSpecificAmount || item.displayAmount);
+          const removeTitle = window.I18n ? window.I18n.t('shopping.removeItemTitle') : 'Eliminar artículo';
           return `
                   <div class="grocery-item-row ${item.isChecked ? 'checked' : ''}">
                     <div class="grocery-left" onclick="app.toggleGroceryCheck(${item.originalIndex})">
@@ -12349,12 +12367,12 @@ class FoodAssistantApp {
                       </div>
                       <div class="u-flex-1-truncate">
                         <div class="grocery-name">${escapeHtml(displayName)}</div>
-                        <div class="grocery-origin-sub">${escapeHtml(aisleMeta.label)}</div>
+                        <div class="grocery-origin-sub">${escapeHtml(getAisleLabel(item.aisle || 'other'))}</div>
                       </div>
                     </div>
                     <div class="u-flex-center-gap-8-shrink">
                       ${displayAmt ? `<span class="grocery-amount">${escapeHtml(displayAmt)}</span>` : ''}
-                      <button type="button" class="btn btn-ghost btn-sm btn-grocery-remove btn-remove-circle" onclick="app.deleteGroceryItem(${item.originalIndex})" title="Eliminar artículo">
+                      <button type="button" class="btn btn-ghost btn-sm btn-grocery-remove btn-remove-circle" onclick="app.deleteGroceryItem(${item.originalIndex})" title="${removeTitle}">
                         <span class="material-symbols-outlined icon-sm">close</span>
                       </button>
                     </div>
@@ -12379,6 +12397,9 @@ class FoodAssistantApp {
       cards = Object.entries(grouped).map(([aisleKey, items]) => {
         const meta = AISLE_METADATA[aisleKey] || AISLE_METADATA.other;
         const pendingInAisle = items.filter(i => !i.isChecked).length;
+        const pendingAisleText = isEn
+          ? `${pendingInAisle} pending`
+          : `${pendingInAisle} ${pendingInAisle === 1 ? 'pendiente' : 'pendientes'}`;
 
         const html = `
           <div class="aisle-card">
@@ -12387,7 +12408,7 @@ class FoodAssistantApp {
                 <span class="material-symbols-outlined icon-sm">${meta.icon}</span>
                 <span>${getAisleLabel(aisleKey)}</span>
               </div>
-              <span class="aisle-pending-count">${pendingInAisle} pendientes</span>
+              <span class="aisle-pending-count">${pendingAisleText}</span>
             </div>
 
             <div>

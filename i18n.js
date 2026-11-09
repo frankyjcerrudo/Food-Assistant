@@ -134,7 +134,11 @@
         privacyDesc: 'Sabory funciona offline de forma predeterminada y solo sincroniza tus datos si decides iniciar sesión.',
         privacyBtn: 'Política de Privacidad',
         deleteAccountBtn: 'Eliminar cuenta y datos',
-        installedVersion: 'Versión instalada:'
+        installedVersion: 'Versión instalada:',
+        connectedSynced: 'Conectado y Sincronizado',
+        signOut: 'Cerrar Sesión',
+        deleteAccountAndData: 'Eliminar mi cuenta y datos',
+        viewPrivacyPolicy: 'Consultar Política de Privacidad'
       },
       today: {
         title: 'Comidas de Hoy',
@@ -192,7 +196,27 @@
         thursday: 'Jueves',
         friday: 'Viernes',
         saturday: 'Sábado',
-        sunday: 'Domingo'
+        sunday: 'Domingo',
+        customSlotTitle: 'Añadir Momento de Comida',
+        customSlotSubtitle: 'Elige una sugerencia o escribe un momento personalizado para tu plan del día (ej. media mañana, post-entreno, merienda extra...).',
+        customSlotMealName: 'Nombre de la comida:',
+        customSlotPlaceholder: 'Ej. Media mañana, Batido...',
+        customSlotCreateBtn: 'Crear Momento',
+        slotNameError: 'Por favor, introduce el nombre del momento de comida (ej. Media Mañana, Post-Entreno...).',
+        presetMidMorning: '🥪 Media Mañana',
+        presetPostWorkout: '🏋️ Post-Entreno',
+        presetPreWorkout: '⚡ Pre-Entreno',
+        presetHealthySnack: '🍎 Snack Saludable',
+        presetLateSnack: '🌙 Recena',
+        presetBrunch: '🥞 Brunch',
+        optSnack: '🥪 Snack',
+        optWorkout: '🏋️ Deporte',
+        optEnergy: '⚡ Energía',
+        optFruit: '🍎 Fruta',
+        optCoffee: '☕ Café',
+        optSweet: '🍪 Dulce',
+        optMeal: '🍽️ Plato',
+        optNight: '🌙 Noche'
       },
       recipes: {
         title: 'Recetario',
@@ -264,6 +288,8 @@
       nutrition: {
         breakdownTitle: 'Desglose Nutricional de Hoy',
         breakdownSubtitle: 'Plan para hoy ({count} {meals}).',
+        modalGoalsTitle: 'Objetivos Nutricionales',
+        modalGoalsSubtitle: 'Define tus metas diarias para comparar tu ingesta en tiempo real.',
         mealSingle: 'comida',
         mealPlural: 'comidas',
         configureGoals: 'Configurar Objetivos',
@@ -322,7 +348,14 @@
         clearCompleted: 'Limpiar completados',
         emptyList: 'Tu lista de la compra está vacía.',
         completedSectionTitle: 'Completados',
-        completedHeading: 'Completados ({count})'
+        completedHeading: 'Completados ({count})',
+        pendingSingle: 'artículo pendiente',
+        pendingPlural: 'artículos pendientes',
+        pendingBadge: 'pendientes',
+        emptyTitle: 'Lista de la compra vacía',
+        emptyDesc: 'Genera la lista desde tu plan semanal con un clic o añade artículos manualmente.',
+        generateFromPlan: 'Generar desde el Plan',
+        removeItemTitle: 'Eliminar artículo'
       },
       aisles: {
         produce: 'Frutas y Verduras',
@@ -583,7 +616,11 @@
         privacyDesc: 'Sabory works offline by default and only syncs your data if you choose to sign in.',
         privacyBtn: 'Privacy Policy',
         deleteAccountBtn: 'Delete account & data',
-        installedVersion: 'Installed version:'
+        installedVersion: 'Installed version:',
+        connectedSynced: 'Connected & Synced',
+        signOut: 'Sign Out',
+        deleteAccountAndData: 'Delete my account and data',
+        viewPrivacyPolicy: 'View Privacy Policy'
       },
       today: {
         title: "Today's Meals",
@@ -597,7 +634,7 @@
         viewRecipe: 'View recipe',
         removeDish: 'Remove dish',
         leftovers: 'Leftovers',
-        viewBreakdown: 'Show breakdown',
+        viewBreakdown: 'View breakdown',
         hideBreakdown: 'Hide breakdown',
         breakdownAria: 'View full nutritional breakdown in modal',
         noMealsPlanned: 'No meals assigned for today. Tap a meal slot to start.',
@@ -641,7 +678,27 @@
         thursday: 'Thursday',
         friday: 'Friday',
         saturday: 'Saturday',
-        sunday: 'Sunday'
+        sunday: 'Sunday',
+        customSlotTitle: 'Add Meal Slot',
+        customSlotSubtitle: 'Choose a preset or type a custom moment for your daily meal plan (e.g. mid-morning, post-workout, extra snack...).',
+        customSlotMealName: 'Meal name:',
+        customSlotPlaceholder: 'e.g. Mid-morning, Shake...',
+        customSlotCreateBtn: 'Create Meal Slot',
+        slotNameError: 'Please enter the name of the meal slot (e.g. Mid-Morning, Post-Workout...).',
+        presetMidMorning: '🥪 Mid-Morning',
+        presetPostWorkout: '🏋️ Post-Workout',
+        presetPreWorkout: '⚡ Pre-Workout',
+        presetHealthySnack: '🍎 Healthy Snack',
+        presetLateSnack: '🌙 Late-Night Snack',
+        presetBrunch: '🥞 Brunch',
+        optSnack: '🥪 Snack',
+        optWorkout: '🏋️ Workout',
+        optEnergy: '⚡ Energy',
+        optFruit: '🍎 Fruit',
+        optCoffee: '☕ Coffee',
+        optSweet: '🍪 Sweet',
+        optMeal: '🍽️ Meal',
+        optNight: '🌙 Night'
       },
       recipes: {
         title: 'Recipes',
@@ -713,6 +770,8 @@
       nutrition: {
         breakdownTitle: "Today's Nutritional Breakdown",
         breakdownSubtitle: "Today's plan ({count} {meals}).",
+        modalGoalsTitle: 'Nutritional Goals',
+        modalGoalsSubtitle: 'Set your daily targets to track your intake in real time.',
         mealSingle: 'meal',
         mealPlural: 'meals',
         configureGoals: 'Configure Goals',
@@ -771,7 +830,14 @@
         clearCompleted: 'Clear completed',
         emptyList: 'Your shopping list is empty.',
         completedSectionTitle: 'Completed',
-        completedHeading: 'Completed ({count})'
+        completedHeading: 'Completed ({count})',
+        pendingSingle: 'item pending',
+        pendingPlural: 'items pending',
+        pendingBadge: 'pending',
+        emptyTitle: 'Shopping list is empty',
+        emptyDesc: 'Generate the list from your weekly plan with one click or add items manually.',
+        generateFromPlan: 'Generate from Plan',
+        removeItemTitle: 'Remove item'
       },
       aisles: {
         produce: 'Produce & Veggies',
