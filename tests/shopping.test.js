@@ -10,6 +10,7 @@ const {
   AISLE_METADATA,
   RecipeParser,
   cleanInvisibleChars,
+  deduplicateShoppingBreakdown,
   parseCookingAmount,
   normalizeAndConvertUnit,
   mergeShoppingQuantities,
@@ -560,6 +561,103 @@ describe('US-64: Conversión y normalización de unidades en la compra', () => {
       expect(cleanInvisibleChars('Puerro\u2060')).toBe('Puerro');
       expect(cleanInvisibleChars('\uFEFFPuerro\u200B')).toBe('Puerro');
       expect(cleanInvisibleChars(' Cebolla \u200D ')).toBe('Cebolla');
+    });
+
+    it('deduplicateShoppingBreakdown sana desgloses inflados o repetidos por la misma receta', () => {
+      // Simula el estado corrupto con 6 repeticiones de champiñones y 4 de calabaza (7 ud + ud)
+      const corruptedItem = {
+        name: 'Puerro',
+        amount: 7,
+        unit: 'ud',
+        displayAmount: '7 ud + ud',
+        recipeBreakdown: [
+          { recipe: 'Crema de calabaza con pipas tostadas con picatostes caseros especiados', amount: 1, unit: 'ud' },
+          { recipe: 'CREMA DE CHAMPIÑONES', amount: 1, unit: 'ud' },
+          { recipe: 'CREMA DE CHAMPIÑONES', amount: 1, unit: 'ud' },
+          { recipe: 'CREMA DE CHAMPIÑONES', amount: 1, unit: 'ud' },
+          { recipe: 'CREMA DE CHAMPIÑONES', amount: 1, unit: 'ud' },
+          { recipe: 'CREMA DE CHAMPIÑONES', amount: 1, unit: 'ud' },
+          { recipe: 'CREMA DE CHAMPIÑONES', amount: 1, unit: 'ud' },
+          { recipe: 'CREMA DE CHAMPIÑONES', amount: null, unit: 'ud' },
+          { recipe: 'Crema de calabaza con pipas tostadas con picatostes caseros especiados', amount: null, unit: 'ud' },
+          { recipe: 'CREMA DE CHAMPIÑONES', amount: null, unit: 'ud' },
+          { recipe: 'Crema de calabaza con pipas tostadas con picatostes caseros especiados', amount: null, unit: 'ud' }
+        ]
+      };
+
+      const healed = deduplicateShoppingBreakdown(corruptedItem);
+
+      expect(healed.recipeBreakdown).toHaveLength(2);
+      expect(healed.recipeBreakdown[0].recipe).toContain('Crema de calabaza');
+      expect(healed.recipeBreakdown[0].amount).toBe(1);
+      expect(healed.recipeBreakdown[1].recipe).toBe('CREMA DE CHAMPIÑONES');
+      expect(healed.recipeBreakdown[1].amount).toBe(1);
+      expect(healed.amount).toBe(2);
+      expect(healed.unit).toBe('ud');
+      expect(healed.displayAmount).toBe('2 ud');
+    });
+
+    it('mergeOrAddShoppingItem evita duplicar filas si se fusiona repetidamente la misma receta', () => {
+      const list = [];
+      const item1 = {
+        name: 'Puerro',
+        amount: 1,
+        unit: 'ud',
+        recipeOrigin: 'Crema de calabaza'
+      };
+      const item2 = {
+        name: 'Puerro',
+        amount: 1,
+        unit: 'ud',
+        recipeOrigin: 'CREMA DE CHAMPIÑONES'
+      };
+
+      mergeOrAddShoppingItem(list, item1);
+      mergeOrAddShoppingItem(list, item2);
+      // Intento de re-fusión duplicada
+      mergeOrAddShoppingItem(list, item2);
+      mergeOrAddShoppingItem(list, item2);
+
+      expect(list).toHaveLength(1);
+      expect(list[0].recipeBreakdown).toHaveLength(2);
+      expect(list[0].amount).toBe(2);
+      expect(list[0].unit).toBe('ud');
+    });
+
+    it('renderShoppingList auto-cura en vivo los items corruptos en el DOM sin lanzar sincronización en bucle', () => {
+      let syncScheduled = false;
+      appInstance.scheduleSyncWithCloud = () => { syncScheduled = true; };
+
+      window.state.shoppingList = [
+        {
+          id: 'shop-corrupted-puerro',
+          name: 'Puerro',
+          amount: 7,
+          unit: 'ud',
+          displayAmount: '7 ud + ud',
+          aisle: 'produce',
+          isChecked: false,
+          recipeBreakdown: [
+            { recipe: 'Crema de calabaza con pipas tostadas con picatostes caseros especiados', amount: 1, unit: 'ud' },
+            { recipe: 'CREMA DE CHAMPIÑONES', amount: 1, unit: 'ud' },
+            { recipe: 'CREMA DE CHAMPIÑONES', amount: 1, unit: 'ud' },
+            { recipe: 'CREMA DE CHAMPIÑONES', amount: 1, unit: 'ud' },
+            { recipe: 'CREMA DE CHAMPIÑONES', amount: null, unit: 'ud' }
+          ]
+        }
+      ];
+
+      appInstance.renderShoppingList();
+
+      expect(window.state.shoppingList[0].amount).toBe(2);
+      expect(window.state.shoppingList[0].recipeBreakdown).toHaveLength(2);
+      expect(syncScheduled).toBe(false);
+
+      const container = document.getElementById('shopping-aisles-container');
+      const puerroRows = container.querySelectorAll('.grocery-item-row');
+      expect(puerroRows).toHaveLength(1);
+      expect(container.textContent).toContain('2 ud');
+      expect(container.textContent).not.toContain('7 ud');
     });
   });
 });

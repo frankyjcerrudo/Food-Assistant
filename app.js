@@ -1340,6 +1340,51 @@ function reconcileShoppingItemBreakdown(item, recipes = []) {
   return item;
 }
 
+function deduplicateShoppingBreakdown(item) {
+  if (!item) return item;
+  if (!Array.isArray(item.recipeBreakdown) || item.recipeBreakdown.length === 0) {
+    recalculateShoppingItemQuantities(item);
+    return item;
+  }
+  if (item.recipeBreakdown.length === 1) {
+    const single = item.recipeBreakdown[0];
+    if (single && single.recipe) {
+      item.recipeOrigin = String(single.recipe).trim();
+    }
+    recalculateShoppingItemQuantities(item);
+    return item;
+  }
+
+  const uniqueBreakdown = [];
+  item.recipeBreakdown.forEach(b => {
+    if (!b || !b.recipe) return;
+    const cleanRecipe = String(b.recipe).trim();
+    const recipeKey = cleanRecipe.toLowerCase();
+
+    const existing = uniqueBreakdown.find(u => String(u.recipe).trim().toLowerCase() === recipeKey);
+    const bAmt = parseCookingAmount(b.amount);
+    if (!existing) {
+      uniqueBreakdown.push({
+        recipe: cleanRecipe,
+        name: cleanInvisibleChars(b.name || item.name),
+        amount: bAmt,
+        unit: b.unit || ''
+      });
+    } else {
+      // Si la entrada existente no tenía cantidad y la nueva sí, actualizarla
+      if ((existing.amount === null || existing.amount === undefined || isNaN(existing.amount)) && bAmt !== null) {
+        existing.amount = bAmt;
+        existing.unit = b.unit || existing.unit;
+      }
+    }
+  });
+
+  item.recipeBreakdown = uniqueBreakdown;
+  item.recipeOrigin = uniqueBreakdown.map(b => b.recipe).join(', ');
+  recalculateShoppingItemQuantities(item);
+  return item;
+}
+
 function mergeOrAddShoppingItem(shoppingList, newItem) {
   if (!Array.isArray(shoppingList) || !newItem || !newItem.name) return null;
   const targetKey = getCanonicalIngredientKey(newItem.name);
@@ -1375,18 +1420,45 @@ function mergeOrAddShoppingItem(shoppingList, newItem) {
       }];
     }
 
-    // 2. Anexar ingredientes desglosados
+    // 2. Anexar ingredientes desglosados (deduplicando por receta para evitar repeticiones)
     incomingBreakdown.forEach(inc => {
-      existing.recipeBreakdown.push({
-        recipe: inc.recipe,
-        name: inc.name,
-        amount: parseCookingAmount(inc.amount),
-        unit: inc.unit
-      });
+      if (!inc || !inc.recipe) return;
+      const incRecipe = String(inc.recipe).trim();
+      const incRecipeKey = incRecipe.toLowerCase();
+      const existingEntry = existing.recipeBreakdown.find(b => b && String(b.recipe).trim().toLowerCase() === incRecipeKey);
+      const incAmt = parseCookingAmount(inc.amount);
+
+      if (existingEntry) {
+        if (incRecipeKey === 'añadido manualmente' || incRecipeKey === 'anadido manualmente' || !incRecipeKey) {
+          // Entradas manuales: acumular cantidades
+          if (existingEntry.amount === null || existingEntry.amount === undefined || isNaN(existingEntry.amount)) {
+            existingEntry.amount = incAmt;
+            existingEntry.unit = inc.unit || existingEntry.unit;
+          } else if (incAmt !== null) {
+            const merged = mergeShoppingQuantities(existingEntry.amount, existingEntry.unit, incAmt, inc.unit);
+            if (merged) {
+              existingEntry.amount = merged.amount;
+              existingEntry.unit = merged.unit;
+            } else if (existingEntry.unit === inc.unit) {
+              existingEntry.amount += incAmt;
+            }
+          }
+        } else if ((existingEntry.amount === null || existingEntry.amount === undefined || isNaN(existingEntry.amount)) && incAmt !== null) {
+          existingEntry.amount = incAmt;
+          existingEntry.unit = inc.unit || existingEntry.unit;
+        }
+      } else {
+        existing.recipeBreakdown.push({
+          recipe: incRecipe,
+          name: inc.name ? cleanInvisibleChars(inc.name) : existing.name,
+          amount: incAmt,
+          unit: inc.unit || ''
+        });
+      }
     });
 
-    // 3. Recalcular cantidades (soporta suma dimensional exacta y multi-unidad 800 g + 6 ud)
-    recalculateShoppingItemQuantities(existing);
+    // 3. Sanear y recalcular cantidades (evita multiplicaciones indeseadas)
+    deduplicateShoppingBreakdown(existing);
 
     // 4. Mejorar pasillo si era 'other'
     if ((!existing.aisle || existing.aisle === 'other') && newItem.aisle && newItem.aisle !== 'other') {
@@ -1429,7 +1501,9 @@ function mergeOrAddShoppingItem(shoppingList, newItem) {
 }
 
 function consolidateShoppingList(list, trackDeletionFn = null) {
-  if (!Array.isArray(list) || list.length <= 1) return list;
+  if (!Array.isArray(list)) return list;
+  list.forEach(item => deduplicateShoppingBreakdown(item));
+  if (list.length <= 1) return list;
   const result = [];
   list.forEach(item => {
     if (!item) return;
@@ -4567,7 +4641,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.56';
+  window.APP_VERSION = 'v1.57';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4581,6 +4655,7 @@ if (typeof window !== 'undefined') {
   window.DAYS_OF_WEEK_ES = DAYS_OF_WEEK_ES;
   window.escapeHtml = escapeHtml;
   window.cleanInvisibleChars = cleanInvisibleChars;
+  window.deduplicateShoppingBreakdown = deduplicateShoppingBreakdown;
   window.normalizeIngredientText = normalizeIngredientText;
   window.categorizeIngredientAisle = categorizeIngredientAisle;
   window.getIngredientIcon = getIngredientIcon;
@@ -4610,7 +4685,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.56';
+    this.appVersion = window.APP_VERSION || 'v1.57';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -6160,7 +6235,6 @@ class FoodAssistantApp {
           state.shoppingList = consolidateShoppingList(state.shoppingList);
           if (state.shoppingList.length !== prevLen) {
             stateChanged = true;
-            this.scheduleSyncWithCloud();
           }
         }
       }
@@ -12058,13 +12132,15 @@ class FoodAssistantApp {
       }
     }
 
-    // US-64: Auto-consolidar en vivo ingredientes compatibles (ej. puerros de diferentes recetas)
-    if (Array.isArray(state.shoppingList) && state.shoppingList.length > 1) {
-      const prevLen = state.shoppingList.length;
-      state.shoppingList = consolidateShoppingList(state.shoppingList);
-      if (state.shoppingList.length !== prevLen) {
-        state.save('fa_shopping', state.shoppingList);
-        this.scheduleSyncWithCloud();
+    // US-64: Auto-consolidar y sanear desgloses en vivo (sin bucles de sincronización)
+    if (Array.isArray(state.shoppingList)) {
+      state.shoppingList.forEach(item => deduplicateShoppingBreakdown(item));
+      if (state.shoppingList.length > 1) {
+        const prevLen = state.shoppingList.length;
+        state.shoppingList = consolidateShoppingList(state.shoppingList);
+        if (state.shoppingList.length !== prevLen) {
+          state.save('fa_shopping', state.shoppingList);
+        }
       }
     }
 
@@ -12236,6 +12312,20 @@ class FoodAssistantApp {
                 unit: item.unit || ''
               }));
             }
+          }
+
+          if (breakdown && breakdown.length > 1) {
+            const seenRecs = new Set();
+            const cleanBreakdown = [];
+            breakdown.forEach(b => {
+              if (!b || !b.recipe) return;
+              const rk = String(b.recipe).trim().toLowerCase();
+              if (!seenRecs.has(rk)) {
+                seenRecs.add(rk);
+                cleanBreakdown.push(b);
+              }
+            });
+            breakdown = cleanBreakdown;
           }
 
           if (breakdown && breakdown.length > 1) {
@@ -18514,6 +18604,7 @@ if (typeof module !== 'undefined' && module.exports) {
     mergeShoppingQuantities,
     mergeOrAddShoppingItem,
     recalculateShoppingItemQuantities,
+    deduplicateShoppingBreakdown,
     consolidateShoppingList,
     categorizeIngredientAisle,
     resolveAisleOnline,
