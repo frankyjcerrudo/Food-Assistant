@@ -753,6 +753,11 @@ const AISLE_METADATA = {
   other: { label: "Otros / Varios", icon: "category" }
 };
 
+const AISLE_ORDER = Object.keys(AISLE_METADATA);
+if (typeof window !== 'undefined') {
+  window.AISLE_ORDER = AISLE_ORDER;
+}
+
 function getAisleLabel(aisleKey) {
   if (typeof window !== 'undefined' && window.I18n && typeof window.I18n.getAisleName === 'function') {
     return window.I18n.getAisleName(aisleKey);
@@ -4723,7 +4728,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.73';
+  window.APP_VERSION = 'v1.75';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4770,7 +4775,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.73';
+    this.appVersion = window.APP_VERSION || 'v1.75';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -6070,8 +6075,9 @@ class FoodAssistantApp {
     if (this.syncDebounceTimer) {
       clearTimeout(this.syncDebounceTimer);
       this.syncDebounceTimer = null;
-      this.pushToCloud(true);
+      return this.pushToCloud(true);
     }
+    return Promise.resolve({ success: true });
   }
 
   // US-35: Descarga y fusión bidireccional desde Supabase
@@ -6325,8 +6331,8 @@ class FoodAssistantApp {
 
       // 2. Fusión de Meal Plans (con desduplicación por fecha en Modo Familia US-77)
       let remoteHouseholdPrefsRow = null;
-      const hasLocalDayMeals = (d) => !!(d && (d.breakfast || d.lunch || d.snack || d.dinner || (Array.isArray(d.customSlots) && d.customSlots.length > 0)));
-      const hasRemoteRowMeals = (r) => !!(r && (r.breakfast_recipe_id || r.lunch_recipe_id || r.snack_recipe_id || r.dinner_recipe_id || (Array.isArray(r.custom_slots) && r.custom_slots.length > 0)));
+      const hasLocalDayMeals = (d) => !!(d && (d.breakfast || d.lunch || d.snack || d.dinner || (Array.isArray(d.customSlots) && d.customSlots.some(cs => cs && cs.recipeId && cs.type !== 'plan_explicit_clear'))));
+      const hasRemoteRowMeals = (r) => !!(r && (r.breakfast_recipe_id || r.lunch_recipe_id || r.snack_recipe_id || r.dinner_recipe_id || (Array.isArray(r.custom_slots) && r.custom_slots.some(cs => cs && cs.recipeId && cs.type !== 'plan_explicit_clear'))));
 
       if (state.mealPlan && state.mealPlan['__household_prefs__']) {
         delete state.mealPlan['__household_prefs__'];
@@ -6348,12 +6354,21 @@ class FoodAssistantApp {
             dedupedPlansMap.set(dKey, row);
             return;
           }
+          const rowHasExplicitClear = Array.isArray(row.custom_slots) && row.custom_slots.some(c => c && c.type === 'plan_explicit_clear');
+          const prevHasExplicitClear = Array.isArray(prev.custom_slots) && prev.custom_slots.some(c => c && c.type === 'plan_explicit_clear');
           const rowHasContent = hasRemoteRowMeals(row);
           const prevHasContent = hasRemoteRowMeals(prev);
-          if (rowHasContent && !prevHasContent) {
+
+          if (rowHasExplicitClear || prevHasExplicitClear) {
+            // Si alguno de los registros tiene un vaciado explícito por un miembro al mover o borrar,
+            // prevalece la acción más reciente en el tiempo
+            if (new Date(row.updated_at || 0).getTime() >= new Date(prev.updated_at || 0).getTime()) {
+              dedupedPlansMap.set(dKey, row);
+            }
+          } else if (rowHasContent && !prevHasContent) {
             dedupedPlansMap.set(dKey, row);
           } else if (!rowHasContent && prevHasContent) {
-            // Un registro vacío de otro miembro nunca pisa un día planificado del hogar
+            // Un registro vacío autogenerado de otro miembro nunca pisa un día planificado del hogar
             if (row.user_id && prev.user_id && row.user_id === prev.user_id && new Date(row.updated_at || 0).getTime() > new Date(prev.updated_at || 0).getTime()) {
               dedupedPlansMap.set(dKey, row);
             }
@@ -6393,13 +6408,14 @@ class FoodAssistantApp {
           const remoteHasContent = hasRemoteRowMeals(remoteRow);
 
           if (!localPlan || localIsUntouchedEmpty || (remoteHasContent && !hasLocalDayMeals(localPlan) && !localPlan.updatedAt) || remoteDate >= localDate) {
+            const cleanCustomSlots = (Array.isArray(remoteRow.custom_slots) ? remoteRow.custom_slots : []).filter(c => !c || c.type !== 'plan_explicit_clear');
             const mergedDay = {
               dayName: remoteRow.day_name || localPlan?.dayName || 'Día',
               breakfast: remoteRow.breakfast_recipe_id || null,
               lunch: remoteRow.lunch_recipe_id || null,
               snack: remoteRow.snack_recipe_id || null,
               dinner: remoteRow.dinner_recipe_id || null,
-              customSlots: Array.isArray(remoteRow.custom_slots) ? remoteRow.custom_slots : [],
+              customSlots: cleanCustomSlots,
               updatedAt: remoteRow.updated_at
             };
             if (remoteRow.household_id) mergedDay.householdId = remoteRow.household_id;
@@ -6484,7 +6500,7 @@ class FoodAssistantApp {
           if (localIdx >= 0) {
             const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
             const localDate = new Date(local.updatedAt || 0).getTime();
-            if (remoteDate >= localDate || remoteRow.is_checked !== local.isChecked) {
+            if (remoteDate >= localDate) {
               state.shoppingList[localIdx] = { ...local, ...remoteItem, isChecked: !!remoteRow.is_checked };
               stateChanged = true;
             }
@@ -6855,26 +6871,50 @@ class FoodAssistantApp {
       }
 
       if (state.deletedRecords.mealPlans?.length > 0) {
-        const { error } = await this.supabaseClient.from('meal_plans')
-          .delete()
-          .in('id', state.deletedRecords.mealPlans)
-          .eq(deleteScopeCol, deleteScopeVal);
-        if (!error) {
-          state.clearDeletedRecords('mealPlans', [...state.deletedRecords.mealPlans]);
-        } else {
-          console.warn('Error al propagar borrado de planes:', error);
+        const toDelete = [...state.deletedRecords.mealPlans];
+        const CHUNK_SIZE = 50;
+        const successfullyDeleted = [];
+        for (let i = 0; i < toDelete.length; i += CHUNK_SIZE) {
+          const chunk = toDelete.slice(i, i + CHUNK_SIZE);
+          let delQuery = this.supabaseClient.from('meal_plans').delete().in('id', chunk);
+          if (activeHouseholdId && typeof delQuery.or === 'function') {
+            delQuery = delQuery.or(`household_id.eq.${activeHouseholdId},user_id.eq.${state.cloudUser.id}`);
+          } else {
+            delQuery = delQuery.eq(deleteScopeCol, deleteScopeVal);
+          }
+          const { error } = await delQuery;
+          if (!error) {
+            successfullyDeleted.push(...chunk);
+          } else {
+            console.warn('Error al propagar borrado de planes:', error);
+          }
+        }
+        if (successfullyDeleted.length > 0) {
+          state.clearDeletedRecords('mealPlans', successfullyDeleted);
         }
       }
 
       if (state.deletedRecords.shoppingItems?.length > 0) {
-        const { error } = await this.supabaseClient.from('shopping_items')
-          .delete()
-          .in('id', state.deletedRecords.shoppingItems)
-          .eq(deleteScopeCol, deleteScopeVal);
-        if (!error) {
-          state.clearDeletedRecords('shoppingItems', [...state.deletedRecords.shoppingItems]);
-        } else {
-          console.warn('Error al propagar borrado de compra:', error);
+        const toDelete = [...state.deletedRecords.shoppingItems];
+        const CHUNK_SIZE = 50;
+        const successfullyDeleted = [];
+        for (let i = 0; i < toDelete.length; i += CHUNK_SIZE) {
+          const chunk = toDelete.slice(i, i + CHUNK_SIZE);
+          let delQuery = this.supabaseClient.from('shopping_items').delete().in('id', chunk);
+          if (activeHouseholdId && typeof delQuery.or === 'function') {
+            delQuery = delQuery.or(`household_id.eq.${activeHouseholdId},user_id.eq.${state.cloudUser.id}`);
+          } else {
+            delQuery = delQuery.eq(deleteScopeCol, deleteScopeVal);
+          }
+          const { error } = await delQuery;
+          if (!error) {
+            successfullyDeleted.push(...chunk);
+          } else {
+            console.warn('Error al propagar borrado de compra:', error);
+          }
+        }
+        if (successfullyDeleted.length > 0) {
+          state.clearDeletedRecords('shoppingItems', successfullyDeleted);
         }
       }
 
@@ -6985,13 +7025,23 @@ class FoodAssistantApp {
         if (!dateKey || dateKey === '__household_prefs__') return false;
         const day = state.mealPlan[dateKey];
         if (!day || typeof day !== 'object') return false;
-        const hasMeals = !!(day.breakfast || day.lunch || day.snack || day.dinner || (Array.isArray(day.customSlots) && day.customSlots.length > 0));
+        const hasMeals = !!(day.breakfast || day.lunch || day.snack || day.dinner || (Array.isArray(day.customSlots) && day.customSlots.some(cs => cs && cs.recipeId)));
         // Evitar subir días vacíos autogenerados por getDayPlan() que no tienen updatedAt explícito
         return hasMeals || !!day.updatedAt;
       });
 
       const mealPlansPayload = planKeys.map(dateKey => {
         const day = state.mealPlan[dateKey] || {};
+        const hasMeals = !!(day.breakfast || day.lunch || day.snack || day.dinner || (Array.isArray(day.customSlots) && day.customSlots.some(cs => cs && cs.recipeId)));
+        let customSlotsPayload = Array.isArray(day.customSlots)
+          ? day.customSlots.filter(cs => !cs || cs.type !== 'plan_explicit_clear')
+          : [];
+        if (activeHouseholdId && !hasMeals && day.updatedAt) {
+          customSlotsPayload.push({
+            type: 'plan_explicit_clear',
+            updatedAt: day.updatedAt
+          });
+        }
         const rowPayload = {
           id: dateKey,
           user_id: (activeHouseholdId && day.ownerUserId) ? day.ownerUserId : state.cloudUser.id,
@@ -7001,7 +7051,7 @@ class FoodAssistantApp {
           lunch_recipe_id: day.lunch || null,
           snack_recipe_id: day.snack || null,
           dinner_recipe_id: day.dinner || null,
-          custom_slots: Array.isArray(day.customSlots) ? day.customSlots : [],
+          custom_slots: customSlotsPayload,
           updated_at: day.updatedAt || new Date().toISOString()
         };
         if (activeHouseholdId) {
@@ -7680,7 +7730,7 @@ class FoodAssistantApp {
     document.getElementById('input-quick-grocery')?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.handleManualAddGrocery();
     });
-    document.getElementById('btn-clear-completed')?.addEventListener('click', () => this.clearCompletedGroceries());
+    // Nota: 'btn-clear-completed' usa data-action="clearCompletedGroceries" manejado por el listener delegado global
     document.getElementById('btn-copy-shopping')?.addEventListener('click', () => this.copyShoppingList());
     document.getElementById('btn-send-plan-to-shopping')?.addEventListener('click', () => this.generateShoppingFromPlan());
 
@@ -11108,11 +11158,15 @@ class FoodAssistantApp {
       const safeRecipeId = escapeHtml(recipe.id).replace(/'/g, "\\'");
       return `
         <div class="meal-slot has-meal" draggable="true"
+          data-date="${dateStr}" data-slot="${slotType}" data-custom="false"
           ondragstart="app.handlePlannerSlotDragStart(event, '${dateStr}', '${slotType}', false)"
           ondragend="app.handlePlannerSlotDragEnd(event)"
           ondragover="app.handlePlannerSlotDragOver(event)"
           ondragleave="app.handlePlannerSlotDragLeave(event)"
           ondrop="app.handlePlannerSlotDrop(event, '${dateStr}', '${slotType}', false)"
+          ontouchstart="app.handlePlannerSlotTouchStart(event, '${dateStr}', '${slotType}', false)"
+          ontouchmove="app.handlePlannerSlotTouchMove(event)"
+          ontouchend="app.handlePlannerSlotTouchEnd(event)"
           onclick="app.openRecipeDetail('${safeRecipeId}')"
           title="${isEn ? 'Drag to move or swap to another day or slot' : 'Arrastra para mover o intercambiar a otro día o momento'}">
           <div class="u-flex-between-center">
@@ -11148,6 +11202,7 @@ class FoodAssistantApp {
     } else {
       return `
         <div class="meal-slot"
+          data-date="${dateStr}" data-slot="${slotType}" data-custom="false"
           ondragover="app.handlePlannerSlotDragOver(event)"
           ondragleave="app.handlePlannerSlotDragLeave(event)"
           ondrop="app.handlePlannerSlotDrop(event, '${dateStr}', '${slotType}', false)"
@@ -11181,11 +11236,15 @@ class FoodAssistantApp {
       const safeRecipeId = escapeHtml(recipe.id).replace(/'/g, "\\'");
       return `
         <div class="meal-slot has-meal meal-slot-custom" draggable="true"
+          data-date="${dateStr}" data-slot="${customSlot.id}" data-custom="true"
           ondragstart="app.handlePlannerSlotDragStart(event, '${dateStr}', '${customSlot.id}', true)"
           ondragend="app.handlePlannerSlotDragEnd(event)"
           ondragover="app.handlePlannerSlotDragOver(event)"
           ondragleave="app.handlePlannerSlotDragLeave(event)"
           ondrop="app.handlePlannerSlotDrop(event, '${dateStr}', '${customSlot.id}', true)"
+          ontouchstart="app.handlePlannerSlotTouchStart(event, '${dateStr}', '${customSlot.id}', true)"
+          ontouchmove="app.handlePlannerSlotTouchMove(event)"
+          ontouchend="app.handlePlannerSlotTouchEnd(event)"
           onclick="app.openRecipeDetail('${safeRecipeId}')"
           title="${isEn ? 'Drag to move or swap to another day or slot' : 'Arrastra para mover o intercambiar a otro día o momento'}">
           <div class="u-flex-between-center">
@@ -11219,6 +11278,7 @@ class FoodAssistantApp {
     } else {
       return `
         <div class="meal-slot meal-slot-custom"
+          data-date="${dateStr}" data-slot="${customSlot.id}" data-custom="true"
           ondragover="app.handlePlannerSlotDragOver(event)"
           ondragleave="app.handlePlannerSlotDragLeave(event)"
           ondrop="app.handlePlannerSlotDrop(event, '${dateStr}', '${customSlot.id}', true)"
@@ -11243,6 +11303,10 @@ class FoodAssistantApp {
     if (state.mealPlan[dateStr]) {
       state.mealPlan[dateStr][slotType] = null;
       state.mealPlan[dateStr].updatedAt = new Date().toISOString();
+      if (state.household?.id) {
+        state.mealPlan[dateStr].householdId = state.household.id;
+        if (state.cloudUser?.id) state.mealPlan[dateStr].ownerUserId = state.cloudUser.id;
+      }
       state.save('fa_mealplan', state.mealPlan);
       this.broadcastRealtimeChange('planner_change', {
         dateStr: dateStr,
@@ -11260,6 +11324,10 @@ class FoodAssistantApp {
       if (cs) {
         cs.recipeId = null;
         state.mealPlan[dateStr].updatedAt = new Date().toISOString();
+        if (state.household?.id) {
+          state.mealPlan[dateStr].householdId = state.household.id;
+          if (state.cloudUser?.id) state.mealPlan[dateStr].ownerUserId = state.cloudUser.id;
+        }
         state.save('fa_mealplan', state.mealPlan);
         this.broadcastRealtimeChange('planner_change', {
           dateStr: dateStr,
@@ -11276,6 +11344,10 @@ class FoodAssistantApp {
     if (state.mealPlan[dateStr] && Array.isArray(state.mealPlan[dateStr].customSlots)) {
       state.mealPlan[dateStr].customSlots = state.mealPlan[dateStr].customSlots.filter(c => c.id !== customSlotId);
       state.mealPlan[dateStr].updatedAt = new Date().toISOString();
+      if (state.household?.id) {
+        state.mealPlan[dateStr].householdId = state.household.id;
+        if (state.cloudUser?.id) state.mealPlan[dateStr].ownerUserId = state.cloudUser.id;
+      }
       state.save('fa_mealplan', state.mealPlan);
       this.broadcastRealtimeChange('planner_change', {
         dateStr: dateStr,
@@ -11364,6 +11436,114 @@ class FoodAssistantApp {
     );
   }
 
+  handlePlannerSlotTouchStart(e, dateStr, slotKey, isCustom) {
+    if (!e.touches || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    const targetSlot = e.currentTarget && e.currentTarget.closest ? e.currentTarget.closest('.meal-slot') : e.currentTarget;
+    if (this._touchHoldTimeout) {
+      clearTimeout(this._touchHoldTimeout);
+      this._touchHoldTimeout = null;
+    }
+    this._touchDragSource = {
+      dateStr,
+      slotKey,
+      isCustom: !!isCustom,
+      startX: touch.clientX,
+      startY: touch.clientY,
+      currentX: touch.clientX,
+      currentY: touch.clientY,
+      slotEl: targetSlot,
+      active: false
+    };
+    this._touchHoldTimeout = setTimeout(() => {
+      if (this._touchDragSource) {
+        this._touchDragSource.active = true;
+        if (targetSlot) targetSlot.classList.add('is-dragging');
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          try { navigator.vibrate(40); } catch (err) {}
+        }
+      }
+    }, 220);
+  }
+
+  handlePlannerSlotTouchMove(e) {
+    if (!this._touchDragSource || !e.touches || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - this._touchDragSource.startX);
+    const dy = Math.abs(touch.clientY - this._touchDragSource.startY);
+
+    if (!this._touchDragSource.active) {
+      if (dx > 10 || dy > 10) {
+        if (this._touchHoldTimeout) {
+          clearTimeout(this._touchHoldTimeout);
+          this._touchHoldTimeout = null;
+        }
+        this._touchDragSource = null;
+      }
+      return;
+    }
+
+    if (e.cancelable && e.preventDefault) e.preventDefault();
+    this._touchDragSource.currentX = touch.clientX;
+    this._touchDragSource.currentY = touch.clientY;
+
+    if (typeof document !== 'undefined' && typeof document.elementFromPoint === 'function') {
+      const elUnder = document.elementFromPoint(touch.clientX, touch.clientY);
+      const targetSlot = elUnder ? elUnder.closest('.meal-slot') : null;
+      document.querySelectorAll('.meal-slot.drag-over').forEach(el => {
+        if (el !== targetSlot) el.classList.remove('drag-over');
+      });
+      if (targetSlot && targetSlot !== this._touchDragSource.slotEl) {
+        targetSlot.classList.add('drag-over');
+      }
+    }
+  }
+
+  handlePlannerSlotTouchEnd(e) {
+    if (this._touchHoldTimeout) {
+      clearTimeout(this._touchHoldTimeout);
+      this._touchHoldTimeout = null;
+    }
+    if (!this._touchDragSource) return;
+
+    const source = this._touchDragSource;
+    this._touchDragSource = null;
+
+    if (source.slotEl) {
+      source.slotEl.classList.remove('is-dragging');
+    }
+    if (typeof document !== 'undefined') {
+      document.querySelectorAll('.meal-slot.drag-over').forEach(el => el.classList.remove('drag-over'));
+      document.querySelectorAll('.meal-slot.is-dragging').forEach(el => el.classList.remove('is-dragging'));
+    }
+
+    if (!source.active) return;
+    if (e.cancelable && e.preventDefault) e.preventDefault();
+    if (e.stopPropagation) e.stopPropagation();
+
+    let targetSlot = null;
+    if (typeof document !== 'undefined' && typeof document.elementFromPoint === 'function') {
+      const targetEl = document.elementFromPoint(source.currentX, source.currentY);
+      targetSlot = targetEl ? targetEl.closest('.meal-slot') : null;
+    }
+    if (!targetSlot) return;
+
+    const targetDateStr = targetSlot.dataset ? targetSlot.dataset.date : targetSlot.getAttribute('data-date');
+    const targetSlotKey = targetSlot.dataset ? targetSlot.dataset.slot : targetSlot.getAttribute('data-slot');
+    const isTargetCustom = (targetSlot.dataset ? targetSlot.dataset.custom : targetSlot.getAttribute('data-custom')) === 'true';
+
+    if (targetDateStr && targetSlotKey) {
+      this.moveOrSwapPlannerSlot(
+        source.dateStr,
+        source.slotKey,
+        source.isCustom,
+        targetDateStr,
+        targetSlotKey,
+        isTargetCustom
+      );
+    }
+  }
+
   moveOrSwapPlannerSlot(sourceDate, sourceSlotKey, isSourceCustom, targetDate, targetSlotKey, isTargetCustom) {
     if (sourceDate === targetDate && sourceSlotKey === targetSlotKey && !!isSourceCustom === !!isTargetCustom) {
       return false;
@@ -11423,6 +11603,14 @@ class FoodAssistantApp {
     const nowIso = new Date().toISOString();
     srcDay.updatedAt = nowIso;
     tgtDay.updatedAt = nowIso;
+    if (state.household?.id) {
+      srcDay.householdId = state.household.id;
+      tgtDay.householdId = state.household.id;
+      if (state.cloudUser?.id) {
+        srcDay.ownerUserId = state.cloudUser.id;
+        tgtDay.ownerUserId = state.cloudUser.id;
+      }
+    }
     state.save('fa_mealplan', state.mealPlan);
     this.broadcastRealtimeChange('planner_change', {
       dateStr: targetDate,
@@ -12507,10 +12695,21 @@ class FoodAssistantApp {
     } else {
       dayData[slotKey] = r.id;
     }
+    if (state.household?.id) {
+      dayData.householdId = state.household.id;
+      if (state.cloudUser?.id) {
+        dayData.ownerUserId = state.cloudUser.id;
+      }
+    }
     dayData.updatedAt = new Date().toISOString();
 
     state.save('fa_mealplan', state.mealPlan);
+    this.broadcastRealtimeChange('planner_change', {
+      dateStr: dateKey,
+      dayPlan: state.mealPlan[dateKey]
+    });
     this.scheduleSyncWithCloud();
+    this.flushSync();
     this.closePlanRecipeModal();
     this.render();
 
@@ -12540,6 +12739,12 @@ class FoodAssistantApp {
       } else {
         dayData[slotKey] = recipeId;
       }
+      if (state.household?.id) {
+        dayData.householdId = state.household.id;
+        if (state.cloudUser?.id) {
+          dayData.ownerUserId = state.cloudUser.id;
+        }
+      }
       dayData.updatedAt = new Date().toISOString();
 
       // US-65: Batch cooking / Cocinar doble para sobras
@@ -12559,6 +12764,12 @@ class FoodAssistantApp {
           nextDayData[targetNextSlot] = recipeId;
           if (!nextDayData.leftoverSlots) nextDayData.leftoverSlots = {};
           nextDayData.leftoverSlots[targetNextSlot] = true;
+          if (state.household?.id) {
+            nextDayData.householdId = state.household.id;
+            if (state.cloudUser?.id) {
+              nextDayData.ownerUserId = state.cloudUser.id;
+            }
+          }
           nextDayData.updatedAt = new Date().toISOString();
         }
       }
@@ -12602,21 +12813,13 @@ class FoodAssistantApp {
 
     const actualCols = Math.min(numCols, cardsWithWeights.length);
     const cols = Array.from({ length: actualCols }, () => []);
-    const colHeights = new Array(actualCols).fill(0);
 
-    // Ordenar de mayor a menor peso para balanceo greedy uniforme
-    const sorted = [...cardsWithWeights].sort((a, b) => b.weight - a.weight);
-
-    for (const card of sorted) {
-      let minColIdx = 0;
-      for (let c = 1; c < actualCols; c++) {
-        if (colHeights[c] < colHeights[minColIdx]) {
-          minColIdx = c;
-        }
-      }
-      cols[minColIdx].push(card.html);
-      colHeights[minColIdx] += card.weight;
-    }
+    // Distribuir en orden secuencial fijo (Round-Robin) para que los pasillos
+    // mantengan SIEMPRE su posición estable y predecible de izquierda a derecha y arriba hacia abajo.
+    // Esto evita que las tarjetas salten de columna o cambien de orden al tachar artículos.
+    cardsWithWeights.forEach((card, i) => {
+      cols[i % actualCols].push(card.html);
+    });
 
     return cols
       .filter(col => col.length > 0)
@@ -12665,6 +12868,12 @@ class FoodAssistantApp {
     if (btnRecipe) {
       btnRecipe.classList.toggle('active', isRecipeView);
       btnRecipe.setAttribute('aria-pressed', isRecipeView ? 'true' : 'false');
+    }
+
+    if (Array.isArray(state.shoppingList)) {
+      state.shoppingList.forEach(item => {
+        if (item && !item.id) item.id = generateId('shop-');
+      });
     }
 
     const isEn = typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() === 'en';
@@ -12758,8 +12967,8 @@ class FoodAssistantApp {
           const removeTitle = window.I18n ? window.I18n.t('shopping.removeItemTitle') : 'Eliminar artículo';
           return `
                   <div class="grocery-item-row ${item.isChecked ? 'checked' : ''}">
-                    <div class="grocery-left" onclick="app.toggleGroceryCheck(${item.originalIndex})">
-                      <input type="checkbox" class="grocery-checkbox" ${item.isChecked ? 'checked' : ''} onclick="event.stopPropagation(); app.toggleGroceryCheck(${item.originalIndex})">
+                    <div class="grocery-left" onclick="app.toggleGroceryCheck('${escapeHtml(item.id)}')">
+                      <input type="checkbox" class="grocery-checkbox" ${item.isChecked ? 'checked' : ''} onclick="event.stopPropagation(); app.toggleGroceryCheck('${escapeHtml(item.id)}')">
                       <div class="grocery-item-icon-badge" title="${escapeHtml(displayName)}">
                         <span class="material-symbols-outlined icon-sm">${getIngredientIcon(displayName, item.aisle)}</span>
                       </div>
@@ -12770,7 +12979,7 @@ class FoodAssistantApp {
                     </div>
                     <div class="u-flex-center-gap-8-shrink">
                       ${displayAmt ? `<span class="grocery-amount">${escapeHtml(displayAmt)}</span>` : ''}
-                      <button type="button" class="btn btn-ghost btn-sm btn-grocery-remove btn-remove-circle" onclick="app.deleteGroceryItem(${item.originalIndex})" title="${removeTitle}">
+                      <button type="button" class="btn btn-ghost btn-sm btn-grocery-remove btn-remove-circle" onclick="app.deleteGroceryItem('${escapeHtml(item.id)}')" title="${removeTitle}">
                         <span class="material-symbols-outlined icon-sm">close</span>
                       </button>
                     </div>
@@ -12780,7 +12989,15 @@ class FoodAssistantApp {
             </div>
           </div>
         `;
-        return { html, weight: 3 + items.length };
+        return { recipeLabel, html, weight: 3 + items.length };
+      });
+
+      cards.sort((a, b) => {
+        const isAManual = /manualmente|otros|asistente|sous chef/i.test(a.recipeLabel);
+        const isBManual = /manualmente|otros|asistente|sous chef/i.test(b.recipeLabel);
+        if (isAManual && !isBManual) return 1;
+        if (!isAManual && isBManual) return -1;
+        return a.recipeLabel.localeCompare(b.recipeLabel, undefined, { sensitivity: 'base' });
       });
     } else {
       const grouped = {};
@@ -12800,7 +13017,7 @@ class FoodAssistantApp {
           : `${pendingInAisle} ${pendingInAisle === 1 ? 'pendiente' : 'pendientes'}`;
 
         const html = `
-          <div class="aisle-card">
+          <div class="aisle-card" data-aisle="${escapeHtml(aisleKey)}">
             <div class="aisle-header">
               <div class="u-flex-row-center-gap-8">
                 <span class="material-symbols-outlined icon-sm">${meta.icon}</span>
@@ -12880,8 +13097,8 @@ class FoodAssistantApp {
 
           return `
                   <div class="grocery-item-row ${item.isChecked ? 'checked' : ''}">
-                    <div class="grocery-left" onclick="app.toggleGroceryCheck(${item.originalIndex})">
-                      <input type="checkbox" class="grocery-checkbox" ${item.isChecked ? 'checked' : ''} onclick="event.stopPropagation(); app.toggleGroceryCheck(${item.originalIndex})">
+                    <div class="grocery-left" onclick="app.toggleGroceryCheck('${escapeHtml(item.id)}')">
+                      <input type="checkbox" class="grocery-checkbox" ${item.isChecked ? 'checked' : ''} onclick="event.stopPropagation(); app.toggleGroceryCheck('${escapeHtml(item.id)}')">
                       <div class="grocery-item-icon-badge" title="${escapeHtml(item.name)}">
                         <span class="material-symbols-outlined icon-sm">${getIngredientIcon(item.name, item.aisle)}</span>
                       </div>
@@ -12892,7 +13109,7 @@ class FoodAssistantApp {
                     </div>
                     <div class="u-flex-center-gap-8-shrink">
                       ${displayAmt ? `<span class="grocery-amount">${escapeHtml(displayAmt)}</span>` : ''}
-                      <button type="button" class="btn btn-ghost btn-sm btn-grocery-remove btn-remove-circle" onclick="app.deleteGroceryItem(${item.originalIndex})" title="Eliminar artículo">
+                      <button type="button" class="btn btn-ghost btn-sm btn-grocery-remove btn-remove-circle" onclick="app.deleteGroceryItem('${escapeHtml(item.id)}')" title="Eliminar artículo">
                         <span class="material-symbols-outlined icon-sm">close</span>
                       </button>
                     </div>
@@ -12902,7 +13119,13 @@ class FoodAssistantApp {
             </div>
           </div>
         `;
-        return { html, weight: 3 + items.length };
+        return { aisleKey, html, weight: 3 + items.length };
+      });
+
+      cards.sort((a, b) => {
+        const idxA = AISLE_ORDER.indexOf(a.aisleKey);
+        const idxB = AISLE_ORDER.indexOf(b.aisleKey);
+        return (idxA >= 0 ? idxA : 999) - (idxB >= 0 ? idxB : 999);
       });
     }
 
@@ -12954,8 +13177,8 @@ class FoodAssistantApp {
         const originInfo = item.recipeOrigin ? `${forPrefix} ${escapeHtml(item.recipeOrigin)}` : localizedAisle;
         return `
                 <div class="grocery-item-row checked">
-                  <div class="grocery-left" onclick="app.toggleGroceryCheck(${item.originalIndex})">
-                    <input type="checkbox" class="grocery-checkbox" checked onclick="event.stopPropagation(); app.toggleGroceryCheck(${item.originalIndex})">
+                  <div class="grocery-left" onclick="app.toggleGroceryCheck('${escapeHtml(item.id)}')">
+                    <input type="checkbox" class="grocery-checkbox" checked onclick="event.stopPropagation(); app.toggleGroceryCheck('${escapeHtml(item.id)}')">
                     <div class="grocery-item-icon-badge" title="${escapeHtml(displayName)}">
                       <span class="material-symbols-outlined icon-sm">${getIngredientIcon(displayName, item.aisle)}</span>
                     </div>
@@ -12966,7 +13189,7 @@ class FoodAssistantApp {
                   </div>
                   <div class="u-flex-center-gap-8-shrink">
                     ${displayAmt ? `<span class="grocery-amount">${escapeHtml(displayAmt)}</span>` : ''}
-                    <button type="button" class="btn btn-ghost btn-sm btn-grocery-remove btn-remove-circle" onclick="app.deleteGroceryItem(${item.originalIndex})" title="Eliminar artículo">
+                    <button type="button" class="btn btn-ghost btn-sm btn-grocery-remove btn-remove-circle" onclick="app.deleteGroceryItem('${escapeHtml(item.id)}')" title="Eliminar artículo">
                       <span class="material-symbols-outlined icon-sm">close</span>
                     </button>
                   </div>
@@ -12988,20 +13211,34 @@ class FoodAssistantApp {
     }
   }
 
-  async toggleGroceryCheck(index) {
-    if (state.shoppingList && state.shoppingList[index]) {
-      const item = state.shoppingList[index];
-      item.isChecked = !item.isChecked;
-      item.updatedAt = new Date().toISOString();
-      state.save('fa_shopping', state.shoppingList);
-      this.render();
+  async toggleGroceryCheck(idOrIndex) {
+    if (!state.shoppingList || state.shoppingList.length === 0) return;
+    let item = null;
+    if (typeof idOrIndex === 'string') {
+      item = state.shoppingList.find(i => i.id === idOrIndex);
+    }
+    if (!item && (typeof idOrIndex === 'number' || (!isNaN(Number(idOrIndex)) && idOrIndex !== ''))) {
+      const idx = Number(idOrIndex);
+      if (state.shoppingList[idx]) item = state.shoppingList[idx];
+    }
+    if (!item) return;
 
-      // US-81: Sincronización instantánea en la nube / Modo Familia sin retardo
-      if (this.supabaseClient && state.cloudUser?.id) {
-        await this.syncShoppingItemInstant(item);
-      } else {
-        this.scheduleSyncWithCloud();
+    item.isChecked = !item.isChecked;
+    item.updatedAt = new Date().toISOString();
+    if (state.household?.id) {
+      item.householdId = state.household.id;
+      if (state.cloudUser?.id && !item.ownerUserId) {
+        item.ownerUserId = state.cloudUser.id;
       }
+    }
+    state.save('fa_shopping', state.shoppingList);
+    this.render();
+
+    // US-81: Sincronización instantánea en la nube / Modo Familia sin retardo
+    if (this.supabaseClient && state.cloudUser?.id) {
+      await this.syncShoppingItemInstant(item);
+    } else {
+      this.scheduleSyncWithCloud();
     }
   }
 
@@ -13046,7 +13283,18 @@ class FoodAssistantApp {
     }
   }
 
-  deleteGroceryItem(index) {
+  deleteGroceryItem(idOrIndex) {
+    if (!state.shoppingList || state.shoppingList.length === 0) return;
+    let index = -1;
+    if (typeof idOrIndex === 'string') {
+      index = state.shoppingList.findIndex(i => i.id === idOrIndex);
+    }
+    if (index === -1 && (typeof idOrIndex === 'number' || (!isNaN(Number(idOrIndex)) && idOrIndex !== ''))) {
+      const idx = Number(idOrIndex);
+      if (idx >= 0 && idx < state.shoppingList.length) index = idx;
+    }
+    if (index < 0 || index >= state.shoppingList.length) return;
+
     const item = state.shoppingList[index];
     if (item && item.id) {
       state.trackDeletion('shoppingItems', item.id);
@@ -13063,92 +13311,113 @@ class FoodAssistantApp {
   }
 
   async clearCompletedGroceries(skipConfirm = false) {
-    if (!state.shoppingList || state.shoppingList.length === 0) {
-      this.showToast("La lista de la compra ya está vacía.", 'info');
-      return false;
-    }
+    if (this._isClearingCompleted) return false;
+    this._isClearingCompleted = true;
+    try {
+      if (!state.shoppingList || state.shoppingList.length === 0) {
+        this.showToast("La lista de la compra ya está vacía.", 'info');
+        return false;
+      }
 
-    const completed = state.shoppingList.filter(i => i.isChecked);
+      const completed = state.shoppingList.filter(i => i.isChecked);
 
-    if (completed.length > 0) {
-      const count = completed.length;
-      const total = state.shoppingList.length;
-      if (count === total) {
+      if (completed.length > 0) {
+        const count = completed.length;
+        const total = state.shoppingList.length;
+        if (count === total) {
+          const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
+            title: 'Vaciar lista comprada',
+            message: `¿Eliminar los ${count} artículos comprados y vaciar la lista?`,
+            confirmText: 'Vaciar lista',
+            cancelText: 'Cancelar',
+            danger: true,
+            icon: 'delete_sweep'
+          });
+          if (confirmed) {
+            const deletedIds = [];
+            state.shoppingList.forEach(item => {
+              if (item.id) {
+                state.trackDeletion('shoppingItems', item.id);
+                deletedIds.push(item.id);
+              }
+            });
+            state.shoppingList = [];
+            state.save('fa_shopping', state.shoppingList);
+            this.broadcastRealtimeChange('shopping_change', {
+              action: 'clear_completed',
+              deletedIds
+            });
+            this.scheduleSyncWithCloud();
+            await this.flushSync();
+            this.render();
+            this.showToast("Lista de la compra vaciada.", 'info');
+            return true;
+          }
+        } else {
+          const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
+            title: 'Limpiar comprados',
+            message: `¿Eliminar los ${count} artículos marcados como comprados?`,
+            confirmText: 'Eliminar comprados',
+            cancelText: 'Cancelar',
+            danger: true,
+            icon: 'remove_done'
+          });
+          if (confirmed) {
+            const deletedIds = [];
+            completed.forEach(item => {
+              if (item.id) {
+                state.trackDeletion('shoppingItems', item.id);
+                deletedIds.push(item.id);
+              }
+            });
+            state.shoppingList = state.shoppingList.filter(i => !i.isChecked);
+            state.save('fa_shopping', state.shoppingList);
+            this.broadcastRealtimeChange('shopping_change', {
+              action: 'clear_completed',
+              deletedIds
+            });
+            this.scheduleSyncWithCloud();
+            await this.flushSync();
+            this.render();
+            this.showToast(`Se eliminaron ${count} artículos comprados.`, 'info');
+            return true;
+          }
+        }
+      } else {
+        // Ningún artículo está marcado con el checkbox
         const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
-          title: 'Vaciar lista comprada',
-          message: `¿Eliminar los ${count} artículos comprados y vaciar la lista?`,
-          confirmText: 'Vaciar lista',
+          title: 'Vaciar toda la lista',
+          message: "No hay artículos marcados como comprados.\n\n¿Deseas vaciar toda la lista de la compra?",
+          confirmText: 'Vaciar todo',
           cancelText: 'Cancelar',
           danger: true,
           icon: 'delete_sweep'
         });
         if (confirmed) {
+          const deletedIds = [];
           state.shoppingList.forEach(item => {
-            if (item.id) state.trackDeletion('shoppingItems', item.id);
+            if (item.id) {
+              state.trackDeletion('shoppingItems', item.id);
+              deletedIds.push(item.id);
+            }
           });
           state.shoppingList = [];
           state.save('fa_shopping', state.shoppingList);
           this.broadcastRealtimeChange('shopping_change', {
-            action: 'clear_completed'
+            action: 'clear_completed',
+            deletedIds
           });
           this.scheduleSyncWithCloud();
-          this.flushSync();
+          await this.flushSync();
           this.render();
           this.showToast("Lista de la compra vaciada.", 'info');
           return true;
         }
-      } else {
-        const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
-          title: 'Limpiar comprados',
-          message: `¿Eliminar los ${count} artículos marcados como comprados?`,
-          confirmText: 'Eliminar comprados',
-          cancelText: 'Cancelar',
-          danger: true,
-          icon: 'remove_done'
-        });
-        if (confirmed) {
-          completed.forEach(item => {
-            if (item.id) state.trackDeletion('shoppingItems', item.id);
-          });
-          state.shoppingList = state.shoppingList.filter(i => !i.isChecked);
-          state.save('fa_shopping', state.shoppingList);
-          this.broadcastRealtimeChange('shopping_change', {
-            action: 'clear_completed'
-          });
-          this.scheduleSyncWithCloud();
-          this.flushSync();
-          this.render();
-          this.showToast(`Se eliminaron ${count} artículos comprados.`, 'info');
-          return true;
-        }
       }
-    } else {
-      // Ningún artículo está marcado con el checkbox
-      const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
-        title: 'Vaciar toda la lista',
-        message: "No hay artículos marcados como comprados.\n\n¿Deseas vaciar toda la lista de la compra?",
-        confirmText: 'Vaciar todo',
-        cancelText: 'Cancelar',
-        danger: true,
-        icon: 'delete_sweep'
-      });
-      if (confirmed) {
-        state.shoppingList.forEach(item => {
-          if (item.id) state.trackDeletion('shoppingItems', item.id);
-        });
-        state.shoppingList = [];
-        state.save('fa_shopping', state.shoppingList);
-        this.broadcastRealtimeChange('shopping_change', {
-          action: 'clear_completed'
-        });
-        this.scheduleSyncWithCloud();
-        this.flushSync();
-        this.render();
-        this.showToast("Lista de la compra vaciada.", 'info');
-        return true;
-      }
+      return false;
+    } finally {
+      this._isClearingCompleted = false;
     }
-    return false;
   }
 
   handleManualAddGrocery() {
@@ -17781,13 +18050,17 @@ REGLAS CRÍTICAS:
       const localIdx = state.shoppingList.findIndex(i => i.id === item.id);
       if (localIdx >= 0) {
         const local = state.shoppingList[localIdx];
-        local.isChecked = !!item.isChecked;
-        local.updatedAt = item.updatedAt || new Date().toISOString();
-        if (item.name) local.name = item.name;
-        if (item.amount !== undefined) local.amount = item.amount;
-        if (item.unit !== undefined) local.unit = item.unit;
-        if (item.aisle) local.aisle = item.aisle;
-        modified = true;
+        const remoteDate = new Date(item.updatedAt || 0).getTime();
+        const localDate = new Date(local.updatedAt || 0).getTime();
+        if (remoteDate >= localDate) {
+          local.isChecked = !!item.isChecked;
+          local.updatedAt = item.updatedAt || new Date().toISOString();
+          if (item.name) local.name = item.name;
+          if (item.amount !== undefined) local.amount = item.amount;
+          if (item.unit !== undefined) local.unit = item.unit;
+          if (item.aisle) local.aisle = item.aisle;
+          modified = true;
+        }
       } else {
         state.shoppingList.push({
           id: item.id,
@@ -17803,13 +18076,22 @@ REGLAS CRÍTICAS:
       }
     } else if (action === 'delete') {
       if (payload.itemId) {
+        state.trackDeletion('shoppingItems', payload.itemId);
         const prevLen = state.shoppingList.length;
         state.shoppingList = state.shoppingList.filter(i => i.id !== payload.itemId);
         if (state.shoppingList.length !== prevLen) modified = true;
       }
     } else if (action === 'clear_completed') {
       const prevLen = state.shoppingList.length;
-      state.shoppingList = state.shoppingList.filter(i => !i.isChecked);
+      if (Array.isArray(payload.deletedIds) && payload.deletedIds.length > 0) {
+        payload.deletedIds.forEach(id => state.trackDeletion('shoppingItems', id));
+        state.shoppingList = state.shoppingList.filter(i => !payload.deletedIds.includes(i.id));
+      } else {
+        state.shoppingList.forEach(i => {
+          if (i.isChecked && i.id) state.trackDeletion('shoppingItems', i.id);
+        });
+        state.shoppingList = state.shoppingList.filter(i => !i.isChecked);
+      }
       if (state.shoppingList.length !== prevLen) modified = true;
     } else if (action === 'add') {
       if (payload.item && payload.item.id) {
@@ -17870,7 +18152,7 @@ REGLAS CRÍTICAS:
             const local = state.shoppingList[localIdx];
             const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
             const localDate = new Date(local.updatedAt || 0).getTime();
-            if (remoteDate >= localDate || remoteRow.is_checked !== local.isChecked) {
+            if (remoteDate >= localDate) {
               local.isChecked = !!remoteRow.is_checked;
               local.updatedAt = remoteRow.updated_at;
               if (remoteRow.name) local.name = remoteRow.name;
@@ -17933,6 +18215,7 @@ REGLAS CRÍTICAS:
           }
         } else if (eventType === 'DELETE' && payload.old?.id) {
           const delId = payload.old.id;
+          state.trackDeletion('shoppingItems', delId);
           const prevLen = state.shoppingList.length;
           state.shoppingList = state.shoppingList.filter(i => i.id !== delId);
           if (state.shoppingList.length !== prevLen) {

@@ -659,5 +659,97 @@ describe('US-64: Conversión y normalización de unidades en la compra', () => {
       expect(container.textContent).toContain('2 ud');
       expect(container.textContent).not.toContain('7 ud');
     });
+
+    it('toggleGroceryCheck y deleteGroceryItem soportan lookup por ID y persisten estado', async () => {
+      window.state.shoppingList = [
+        { id: 'shop-test-1', name: 'Leche', amount: 1, unit: 'l', isChecked: false, updatedAt: '2026-11-10T10:00:00.000Z' },
+        { id: 'shop-test-2', name: 'Huevos', amount: 6, unit: 'ud', isChecked: false, updatedAt: '2026-11-10T10:00:00.000Z' }
+      ];
+
+      await appInstance.toggleGroceryCheck('shop-test-2');
+      expect(window.state.shoppingList[1].isChecked).toBe(true);
+
+      // Borrado por ID
+      appInstance.deleteGroceryItem('shop-test-1');
+      expect(window.state.shoppingList).toHaveLength(1);
+      expect(window.state.shoppingList[0].id).toBe('shop-test-2');
+      expect(window.state.deletedRecords.shoppingItems).toContain('shop-test-1');
+    });
+
+    it('clearCompletedGroceries previene re-entrancia y propaga deletedIds en broadcast', async () => {
+      window.state.shoppingList = [
+        { id: 'shop-c1', name: 'Manzanas', isChecked: true },
+        { id: 'shop-c2', name: 'Plátanos', isChecked: true },
+        { id: 'shop-p1', name: 'Pan', isChecked: false }
+      ];
+
+      let lastBroadcast = null;
+      appInstance.broadcastRealtimeChange = (evt, payload) => {
+        lastBroadcast = { evt, payload };
+      };
+
+      const cleared = await appInstance.clearCompletedGroceries(true);
+      expect(cleared).toBe(true);
+      expect(window.state.shoppingList).toHaveLength(1);
+      expect(window.state.shoppingList[0].id).toBe('shop-p1');
+      expect(lastBroadcast.payload.action).toBe('clear_completed');
+      expect(lastBroadcast.payload.deletedIds).toEqual(['shop-c1', 'shop-c2']);
+      expect(window.state.deletedRecords.shoppingItems).toContain('shop-c1');
+      expect(window.state.deletedRecords.shoppingItems).toContain('shop-c2');
+    });
+
+    it('handleHouseholdRealtimeEvent no revierte local newer check con paquete remote desactualizado', () => {
+      const now = new Date().toISOString();
+      const older = new Date(Date.now() - 60000).toISOString();
+      window.state.shoppingList = [
+        { id: 'shop-fast-1', name: 'Tomate', isChecked: true, updatedAt: now }
+      ];
+
+      // Evento remoto con is_checked: false pero timestamp anterior
+      appInstance.handleHouseholdRealtimeEvent({
+        table: 'shopping_items',
+        eventType: 'UPDATE',
+        new: {
+          id: 'shop-fast-1',
+          name: 'Tomate',
+          is_checked: false,
+          updated_at: older
+        }
+      });
+
+      // Debe permanecer checked (no revertirse)
+      expect(window.state.shoppingList[0].isChecked).toBe(true);
+    });
+
+    it('renderShoppingList y _distributeShoppingCards mantienen un orden canónico y estable sin saltos de columnas', () => {
+      window.state.shoppingList = [
+        { id: 'item-bakery', name: 'Pan', aisle: 'bakery', isChecked: false },
+        { id: 'item-produce-1', name: 'Manzanas', aisle: 'produce', isChecked: false },
+        { id: 'item-produce-2', name: 'Plátanos', aisle: 'produce', isChecked: false },
+        { id: 'item-meat', name: 'Pollo', aisle: 'meat', isChecked: false },
+        { id: 'item-dairy', name: 'Leche', aisle: 'dairy', isChecked: false }
+      ];
+
+      appInstance.renderShoppingList();
+
+      const container = document.getElementById('shopping-aisles-container');
+      const cards = container.querySelectorAll('.aisle-card');
+      const aisleNames = Array.from(cards).map(c => c.getAttribute('data-aisle'));
+
+      // Orden canónico esperado: produce (0), meat (1), dairy (2), bakery (3)
+      expect(aisleNames).toEqual(['produce', 'bakery', 'meat', 'dairy']);
+      // En columnas:
+      // Col 0: produce, bakery
+      // Col 1: meat
+      // Col 2: dairy
+
+      // Al tachar un item de produce, los pasillos NO deben cambiar de orden ni de columna
+      window.state.shoppingList[1].isChecked = true; // tachar Manzanas
+      appInstance.renderShoppingList();
+
+      const cardsAfterCheck = container.querySelectorAll('.aisle-card');
+      const aisleNamesAfterCheck = Array.from(cardsAfterCheck).map(c => c.getAttribute('data-aisle'));
+      expect(aisleNamesAfterCheck).toEqual(['produce', 'bakery', 'meat', 'dairy']);
+    });
   });
 });

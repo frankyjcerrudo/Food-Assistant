@@ -717,7 +717,7 @@ describe('US-72: Planificar receta directamente desde su ficha ("Añadir al plan
   });
 
   describe('US-19: Mover recetas por la semana y cambiar momentos (Drag & Drop)', () => {
-    it('renderSlotCard genera atributos draggable y listeners de drag & drop', () => {
+    it('renderSlotCard genera atributos draggable, listeners de drag & drop y eventos touch para móviles', () => {
       window.state.recipes = [
         { id: 'rec-pasta', title: 'Pasta boloñesa', ingredients: [] }
       ];
@@ -725,10 +725,15 @@ describe('US-72: Planificar receta directamente desde su ficha ("Añadir al plan
       expect(htmlWithMeal).toContain('draggable="true"');
       expect(htmlWithMeal).toContain('handlePlannerSlotDragStart');
       expect(htmlWithMeal).toContain('handlePlannerSlotDrop');
+      expect(htmlWithMeal).toContain('handlePlannerSlotTouchStart');
+      expect(htmlWithMeal).toContain('data-date="2026-11-02"');
+      expect(htmlWithMeal).toContain('data-slot="lunch"');
 
       const htmlEmpty = appInstance.renderSlotCard('2026-11-02', 'dinner', 'Cena', 'dinner_dining', null);
       expect(htmlEmpty).not.toContain('draggable="true"');
       expect(htmlEmpty).toContain('handlePlannerSlotDrop');
+      expect(htmlEmpty).toContain('data-date="2026-11-02"');
+      expect(htmlEmpty).toContain('data-slot="dinner"');
     });
 
     it('moveOrSwapPlannerSlot mueve una receta a un slot libre en otro momento o día', () => {

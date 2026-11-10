@@ -3,8 +3,8 @@
 
 <head>
   <meta charset="UTF-8">
-  <!-- US-53: zoom permitido (WCAG 1.4.4), sin maximum-scale ni user-scalable=no -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- US-53: zoom permitido (WCAG 1.4.4), sin maximum-scale ni user-scalable=no, con viewport-fit=cover para notch/safe-areas móviles -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <!-- US-41: política de referrer base para peticiones a terceros -->
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>Sabory</title>
@@ -35,22 +35,22 @@
   <meta name="application-name" content="Sabory">
   <meta name="apple-mobile-web-app-title" content="Sabory">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <link rel="manifest" href="manifest.json?v=1.73">
+  <link rel="manifest" href="manifest.json?v=1.75">
   <meta name="theme-color" content="#FAF7F2">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=1.73">
-  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.73">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.73">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.73">
+  <link rel="stylesheet" href="styles.css?v=1.75">
+  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.75">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.75">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.75">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <!-- US-41: versión fija + Subresource Integrity (sha384) para el SDK de Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"
     integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"
     referrerpolicy="no-referrer"></script>
   <!-- US-12: i18n Core Engine (in head for instant zero-flash localization) -->
-  <script src="i18n.js?v=1.73"></script>
+  <script src="i18n.js?v=1.75"></script>
 </head>
 
 <body>
@@ -127,7 +127,7 @@
     <aside class="pwa-smart-banner" id="pwa-smart-banner" hidden aria-label="Instalación de la app en la pantalla de inicio">
       <div class="pwa-smart-banner-content">
         <div class="pwa-smart-banner-icon" aria-hidden="true">
-          <img src="icon-192.png?v=1.73" alt="" width="28" height="28" class="pwa-smart-banner-img">
+          <img src="icon-192.png?v=1.75" alt="" width="28" height="28" class="pwa-smart-banner-img">
         </div>
         <div class="pwa-smart-banner-texts">
           <strong class="pwa-smart-banner-title" data-i18n="pwa.bannerTitle">Prueba Sabory como App</strong>
@@ -171,7 +171,7 @@
 
     <!-- VIEW 2: RECIPES -->
     <section class="view-panel" id="view-recipes">
-      <div class="section-header">
+      <div class="section-header" style="flex-wrap: wrap; gap: 10px;">
         <div>
           <h2 class="section-title">
             <span data-i18n="recipes.title">Recetario</span>
@@ -179,7 +179,7 @@
           </h2>
           <p class="section-subtitle" id="recipes-count-subtitle" data-i18n="recipes.subtitle">Tu colección culinaria personal.</p>
         </div>
-        <div class="section-header-actions" style="display: flex; gap: 8px; align-items: center;">
+        <div class="section-header-actions" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
           <button type="button" class="btn btn-secondary btn-sm" id="btn-toggle-recipes-select-mode" title="Seleccionar recetas para gestión o borrado masivo">
             <span class="material-symbols-outlined icon-sm">checklist</span>
             <span id="btn-toggle-recipes-select-text" data-i18n="recipes.select">Seleccionar</span>
@@ -894,8 +894,8 @@
             </h3>
             <p
               style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-              <span data-i18n="settings.installedVersion">Versión instalada:</span> <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.73</strong>
-              <span class="app-version-badge" id="app-version-badge">v1.73</span>
+              <span data-i18n="settings.installedVersion">Versión instalada:</span> <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.75</strong>
+              <span class="app-version-badge" id="app-version-badge">v1.75</span>
             </p>
             <div
               style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;" data-i18n="settings.versionCacheNotice">
@@ -2614,8 +2614,8 @@
     </div>
   </div>
 
-  <script src="config.js?v=1.73"></script>
-  <script src="app.js?v=1.73"></script>
+  <script src="config.js?v=1.75"></script>
+  <script src="app.js?v=1.75"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

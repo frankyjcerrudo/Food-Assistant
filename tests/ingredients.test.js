@@ -223,8 +223,9 @@ describe('US-20: Autocompletado Inteligente de Ingredientes e Iconos Distintivos
       const badges = container.querySelectorAll('.grocery-item-icon-badge');
       expect(badges.length).toBe(2);
 
-      expect(badges[0].innerHTML).toContain('egg');
-      expect(badges[1].innerHTML).toContain('nutrition');
+      const badgeHtmls = Array.from(badges).map(b => b.innerHTML);
+      expect(badgeHtmls.some(h => h.includes('egg'))).toBe(true);
+      expect(badgeHtmls.some(h => h.includes('nutrition'))).toBe(true);
     });
 
     it('renderShoppingList renderiza desglose múltiple de recetas con estructura que evita desalineaciones', () => {

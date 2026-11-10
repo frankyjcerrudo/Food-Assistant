@@ -246,18 +246,22 @@
 }
 
 html, body {
-  height: 100%;
+  min-height: 100%;
   font-family: var(--font-family);
   background-color: var(--m3-surface-canvas);
   color: var(--m3-on-surface);
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   transition: background-color 0.2s ease, color 0.2s ease;
+  overflow-x: clip;
+  max-width: 100vw;
 }
 
 body {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  overflow-x: clip;
 }
 
 button,
@@ -276,10 +280,12 @@ textarea {
   max-width: 880px;
   margin: 0 auto;
   width: 100%;
+  min-width: 0;
   position: relative;
-  padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   background-color: var(--m3-surface-canvas);
   transition: background-color 0.2s ease;
+  overflow-x: clip;
 }
 
 /* Frosted Glass App Top Bar (US-23 / US-24) */
@@ -388,7 +394,7 @@ textarea {
   max-width: 85px;
 }
 
-/* Responsive Top Bar for Mobile */
+/* Responsive Top Bar & Mobile Navigation */
 @media (max-width: 540px) {
   .app-header {
     padding: 8px 12px;
@@ -422,13 +428,99 @@ textarea {
   .user-pill-text {
     display: none;
   }
+  .household-header-pill {
+    padding: 3px 6px;
+    font-size: 11px;
+    gap: 4px;
+    max-width: 120px;
+  }
+  .household-header-pill-text {
+    max-width: 70px !important;
+  }
+  .section-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .section-header-actions {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-container {
+    padding-bottom: calc(108px + env(safe-area-inset-bottom, 0px));
+  }
+  .bottom-nav {
+    width: calc(100% - 16px);
+    max-width: 420px;
+    padding: 4px 6px;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    z-index: 100;
+  }
+  .nav-item {
+    font-size: 10px;
+    gap: 1px;
+    padding: 2px 0;
+  }
+  .nav-item .material-symbols-outlined {
+    font-size: 21px;
+  }
+  .week-nav-bar {
+    padding: 8px 10px;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .week-nav-actions {
+    display: flex;
+    width: 100%;
+    gap: 4px;
+    justify-content: space-between;
+  }
+  .week-nav-actions .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 6px 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    justify-content: center;
+  }
+  .week-nav-range {
+    width: 100%;
+    justify-content: space-between;
+    font-size: 11.5px;
+    padding-top: 6px;
+    border-top: 1px solid var(--m3-outline-variant);
+    gap: 4px;
+  }
+  .week-nav-range .btn {
+    padding: 2px 6px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 380px) {
+  .household-header-pill-text {
+    max-width: 50px !important;
+  }
 }
 
 /* Typography & Layout Elements (Editorial 2.5x Scale & 8pt Grid - US-23 / US-24) */
 .view-panel {
   display: none;
   flex: 1;
-  padding: var(--space-3) var(--space-2) calc(116px + env(safe-area-inset-bottom, 0px));
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: var(--space-3) var(--space-2) var(--space-4);
   animation: fadeIn 0.18s var(--ease-out);
 }
 
@@ -445,7 +537,16 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-bottom: var(--space-2);
+}
+
+.section-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .section-title {
@@ -1486,13 +1587,13 @@ textarea {
 /* Recipe Cards Grid (US-23 / US-24 Editorial Showcase) */
 .recipes-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
 }
 
 @media (min-width: 520px) {
   .recipes-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1506,6 +1607,7 @@ textarea {
   transition: transform var(--duration-normal) var(--ease-out), box-shadow var(--duration-normal) var(--ease-out), border-color var(--duration-normal) ease;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .recipe-card:hover {
@@ -1938,12 +2040,15 @@ textarea {
   border-radius: var(--radius-md);
   padding: 8px 12px;
   margin-bottom: 12px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .week-nav-actions {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .week-nav-range {
@@ -1958,6 +2063,26 @@ textarea {
 /* Shopping List */
 .shopping-column {
   display: contents;
+}
+
+@media (max-width: 899px) {
+  #shopping-aisles-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .aisle-card {
+    margin-bottom: 0;
+  }
+  .aisle-card[data-aisle="produce"] { order: 1; }
+  .aisle-card[data-aisle="meat"] { order: 2; }
+  .aisle-card[data-aisle="dairy"] { order: 3; }
+  .aisle-card[data-aisle="bakery"] { order: 4; }
+  .aisle-card[data-aisle="pantry"] { order: 5; }
+  .aisle-card[data-aisle="spices"] { order: 6; }
+  .aisle-card[data-aisle="frozen"] { order: 7; }
+  .aisle-card[data-aisle="beverages"] { order: 8; }
+  .aisle-card[data-aisle="other"] { order: 9; }
 }
 
 .aisle-card {
@@ -7220,8 +7345,6 @@ h2,
     flex-direction: row;
     align-items: flex-start;
     gap: 18px;
-    column-count: 3;
-    column-gap: 18px;
   }
 
   .shopping-column {

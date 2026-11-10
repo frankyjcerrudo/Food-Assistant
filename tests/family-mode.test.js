@@ -800,5 +800,156 @@ describe('US-77: Modo Familia / Espacio Colaborativo del Hogar (Family Mode)', (
       expect(state.household).toBeDefined();
       expect(state.household.id).toBe('hh-cerrudo-pre-resolved');
     });
+
+    it('14. Sincronización colaborativa de mover/vaciar recetas en hogar: prevalece el vaciado explícito reciente y no resucita platos de otros miembros', async () => {
+      // Hogar activo compartido (Casa Aroa y Fran)
+      state.household = { id: 'hh-family-999', name: 'Casa Aroa y Fran', ownerId: 'user-franky-111' };
+      state.cloudUser = { id: 'user-aroa-222', email: 'aroa@sabory.food', name: 'Aroa' };
+
+      // Registro remoto antiguo de Franky en el día 2026-11-10 con Garbanzos
+      // vs registro reciente de Aroa que vació o movió la comida de ese día
+      const remoteMealPlans = [
+        {
+          id: '2026-11-10',
+          user_id: 'user-franky-111',
+          household_id: 'hh-family-999',
+          plan_date: '2026-11-10',
+          day_name: 'Martes',
+          breakfast_recipe_id: null,
+          lunch_recipe_id: 'rec-garbanzos-bacalao',
+          snack_recipe_id: null,
+          dinner_recipe_id: null,
+          custom_slots: [],
+          updated_at: '2026-11-10T10:00:00.000Z'
+        },
+        {
+          id: '2026-11-10',
+          user_id: 'user-aroa-222',
+          household_id: 'hh-family-999',
+          plan_date: '2026-11-10',
+          day_name: 'Martes',
+          breakfast_recipe_id: null,
+          lunch_recipe_id: null,
+          snack_recipe_id: null,
+          dinner_recipe_id: null,
+          custom_slots: [{ type: 'plan_explicit_clear', updatedAt: '2026-11-10T12:00:00.000Z' }],
+          updated_at: '2026-11-10T12:00:00.000Z'
+        }
+      ];
+
+      appInstance.supabaseClient = {
+        from: vi.fn((table) => {
+          if (table === 'meal_plans') {
+            return {
+              select: vi.fn().mockReturnValue({
+                or: vi.fn().mockReturnValue({
+                  limit: vi.fn().mockResolvedValue({ data: remoteMealPlans, error: null })
+                })
+              })
+            };
+          }
+          const chain = {
+            select: vi.fn().mockReturnThis(),
+            or: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockResolvedValue({ data: [], error: null })
+          };
+          return chain;
+        })
+      };
+
+      state.mealPlan = {};
+      const pullRes = await appInstance.pullFromCloud();
+      expect(pullRes.success).toBe(true);
+
+      // El día debe estar vacío (el vaciado explícito reciente de Aroa vence al plato antiguo de Franky)
+      expect(state.mealPlan['2026-11-10'].lunch).toBeNull();
+      // plan_explicit_clear debe haber sido limpiado de customSlots para no contaminar la UI
+      expect(state.mealPlan['2026-11-10'].customSlots).toEqual([]);
+    });
+
+    it('15. Intercambiar recetas entre distintos días (swap por drag & drop) en modo hogar actualiza ownership, emite broadcast y sincroniza en la nube sin revertirse', async () => {
+      state.household = { id: 'hh-family-999', name: 'Casa Aroa y Fran', ownerId: 'user-franky-111' };
+      state.cloudUser = { id: 'user-franky-111', email: 'franky@sabory.food', name: 'Franky' };
+      state.deletedRecords = { recipes: [], mealPlans: [], shoppingItems: [] };
+
+      state.recipes = [
+        { id: 'rec-tostadas', title: 'Tostadas con Revuelto' },
+        { id: 'rec-garbanzos', title: 'Garbanzos con bacalao' }
+      ];
+
+      // Lunes con Tostadas, Martes con Garbanzos
+      state.mealPlan = {
+        '2026-11-09': { dayName: 'Lunes', lunch: 'rec-tostadas', householdId: 'hh-family-999', ownerUserId: 'user-franky-111', updatedAt: '2026-11-09T10:00:00Z' },
+        '2026-11-10': { dayName: 'Martes', lunch: 'rec-garbanzos', householdId: 'hh-family-999', ownerUserId: 'user-aroa-222', updatedAt: '2026-11-09T11:00:00Z' }
+      };
+
+      const broadcastSpy = vi.spyOn(appInstance, 'broadcastRealtimeChange');
+      let pushedPayloads = {};
+
+      appInstance.supabaseClient = {
+        from: vi.fn((table) => {
+          return {
+            upsert: vi.fn().mockImplementation((payload) => {
+              pushedPayloads[table] = payload;
+              return Promise.resolve({ data: payload, error: null });
+            }),
+            delete: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ error: null })
+              })
+            }),
+            select: vi.fn().mockReturnValue({
+              or: vi.fn().mockReturnValue({
+                limit: vi.fn().mockImplementation(() => {
+                  return Promise.resolve({
+                    data: (pushedPayloads['meal_plans'] || []).map(r => ({
+                      ...r,
+                      updated_at: r.updated_at || new Date().toISOString()
+                    })),
+                    error: null
+                  });
+                })
+              })
+            })
+          };
+        })
+      };
+
+      // Franky intercambia Lunes Almuerzo con Martes Almuerzo usando moveOrSwapPlannerSlot
+      const swapped = appInstance.moveOrSwapPlannerSlot('2026-11-09', 'lunch', false, '2026-11-10', 'lunch', false);
+      expect(swapped).toBe(true);
+
+      // Esperar a que la sincronización en segundo plano culmine
+      while (appInstance.isPushingToCloud) {
+        await new Promise(r => setTimeout(r, 10));
+      }
+
+      // 1. Verificación local inmediata:
+      expect(state.mealPlan['2026-11-09'].lunch).toBe('rec-garbanzos');
+      expect(state.mealPlan['2026-11-10'].lunch).toBe('rec-tostadas');
+      expect(state.mealPlan['2026-11-09'].householdId).toBe('hh-family-999');
+      expect(state.mealPlan['2026-11-10'].householdId).toBe('hh-family-999');
+      expect(state.mealPlan['2026-11-09'].ownerUserId).toBe('user-franky-111');
+      expect(state.mealPlan['2026-11-10'].ownerUserId).toBe('user-franky-111');
+
+      // 2. Verificación de emisión WebSocket a otros miembros:
+      expect(broadcastSpy).toHaveBeenCalledWith('planner_change', expect.objectContaining({
+        dateStr: '2026-11-10',
+        sourceDateStr: '2026-11-09'
+      }));
+
+      // 3. Verificación de payload subido a Supabase:
+      expect(pushedPayloads['meal_plans']).toBeDefined();
+      const lunesRow = pushedPayloads['meal_plans'].find(r => r.id === '2026-11-09');
+      const martesRow = pushedPayloads['meal_plans'].find(r => r.id === '2026-11-10');
+      expect(lunesRow.lunch_recipe_id).toBe('rec-garbanzos');
+      expect(martesRow.lunch_recipe_id).toBe('rec-tostadas');
+
+      // 4. Verificación de pull desde la nube: no se revierten las recetas
+      await appInstance.pullFromCloud();
+      expect(state.mealPlan['2026-11-09'].lunch).toBe('rec-garbanzos');
+      expect(state.mealPlan['2026-11-10'].lunch).toBe('rec-tostadas');
+    });
   });
 });
