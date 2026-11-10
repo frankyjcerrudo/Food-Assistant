@@ -304,6 +304,36 @@ class StateStore {
       this.deletedRecords[entityType].push(id);
       this.save('fa_deleted_records', this.deletedRecords);
     }
+    // US-81: Registrar lápida persistente (14 días) para evitar resurrección remota
+    this.addTombstone(entityType, id);
+  }
+
+  addTombstone(entityType, id) {
+    if (!id || !entityType) return;
+    if (!this.tombstones) {
+      this.tombstones = this.load('fa_tombstones', {});
+    }
+    if (!this.tombstones[entityType]) {
+      this.tombstones[entityType] = {};
+    }
+    this.tombstones[entityType][id] = Date.now();
+    this.save('fa_tombstones', this.tombstones);
+  }
+
+  isTombstoned(entityType, id) {
+    if (!id || !entityType) return false;
+    if (!this.tombstones) {
+      this.tombstones = this.load('fa_tombstones', {});
+    }
+    const bucket = this.tombstones[entityType];
+    if (!bucket || !bucket[id]) return false;
+    // Expira a los 14 días (14 * 24 * 60 * 60 * 1000 = 1209600000 ms)
+    if (Date.now() - bucket[id] > 1209600000) {
+      delete bucket[id];
+      this.save('fa_tombstones', this.tombstones);
+      return false;
+    }
+    return true;
   }
 
   clearDeletedRecords(entityType, ids) {

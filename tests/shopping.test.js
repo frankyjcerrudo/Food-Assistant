@@ -751,5 +751,69 @@ describe('US-64: Conversión y normalización de unidades en la compra', () => {
       const aisleNamesAfterCheck = Array.from(cardsAfterCheck).map(c => c.getAttribute('data-aisle'));
       expect(aisleNamesAfterCheck).toEqual(['produce', 'bakery', 'meat', 'dairy']);
     });
+
+    it('v1.76: pullFromCloud y handleHouseholdRealtimeEvent descartan items en lápida (tombstone) evitando resurrección', async () => {
+      window.state.shoppingList = [
+        { id: 'item-keep', name: 'Huevos', isChecked: false }
+      ];
+      // Simular que 'item-deleted-1' fue borrado y tiene tombstone activa
+      window.state.addTombstone('shoppingItems', 'item-deleted-1');
+      expect(window.state.isTombstoned('shoppingItems', 'item-deleted-1')).toBe(true);
+
+      // 1. WebSocket INSERT no debe añadirlo
+      appInstance.handleHouseholdRealtimeEvent({
+        table: 'shopping_items',
+        eventType: 'INSERT',
+        new: {
+          id: 'item-deleted-1',
+          name: 'Yogur resucitado',
+          is_checked: false
+        }
+      });
+      expect(window.state.shoppingList.some(i => i.id === 'item-deleted-1')).toBe(false);
+
+      // 2. pullFromCloud con datos remotos no debe resucitarlo
+      appInstance.supabaseClient = {
+        from: (table) => ({
+          select: () => ({
+            eq: () => ({ limit: () => Promise.resolve({ data: [{ id: 'item-deleted-1', name: 'Yogur resucitado', is_checked: false }], error: null }) }),
+            or: () => ({ limit: () => Promise.resolve({ data: [{ id: 'item-deleted-1', name: 'Yogur resucitado', is_checked: false }], error: null }) })
+          })
+        })
+      };
+      await appInstance.pullFromCloud();
+      expect(window.state.shoppingList.some(i => i.id === 'item-deleted-1')).toBe(false);
+    });
+
+    it('v1.76: toggleGroceryCheck agrupa pulsaciones rápidas y protege el estado frente a respuestas de red desactualizadas', async () => {
+      window.state.shoppingList = [
+        { id: 'item-fast-a', name: 'Pan', isChecked: false },
+        { id: 'item-fast-b', name: 'Leche', isChecked: false }
+      ];
+
+      // El usuario tacha rápidamente ambos items
+      await appInstance.toggleGroceryCheck('item-fast-a');
+      await appInstance.toggleGroceryCheck('item-fast-b');
+
+      expect(window.state.shoppingList[0].isChecked).toBe(true);
+      expect(window.state.shoppingList[1].isChecked).toBe(true);
+      expect(appInstance._recentShoppingCheckTimestamps.has('item-fast-a')).toBe(true);
+      expect(appInstance._recentShoppingCheckTimestamps.has('item-fast-b')).toBe(true);
+
+      // Llega un evento remoto desactualizado con is_checked: false
+      appInstance.handleHouseholdRealtimeEvent({
+        table: 'shopping_items',
+        eventType: 'UPDATE',
+        new: {
+          id: 'item-fast-a',
+          name: 'Pan',
+          is_checked: false,
+          updated_at: new Date(Date.now() - 5000).toISOString()
+        }
+      });
+
+      // Debe mantenerse en true (marcado)
+      expect(window.state.shoppingList[0].isChecked).toBe(true);
+    });
   });
 });

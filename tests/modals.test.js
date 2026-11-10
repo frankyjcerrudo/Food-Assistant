@@ -165,8 +165,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
   });
 
   it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-    expect(window.APP_VERSION).toBe('v1.75');
-    expect(appInstance.appVersion).toBe('v1.75');
+    expect(window.APP_VERSION).toBe('v1.76');
+    expect(appInstance.appVersion).toBe('v1.76');
 
     const badge = document.createElement('span');
     badge.id = 'app-version-badge';
@@ -176,8 +176,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     document.body.appendChild(settingsVer);
 
     appInstance.initVersion();
-    expect(badge.textContent).toBe('v1.75');
-    expect(settingsVer.textContent).toBe('v1.75');
+    expect(badge.textContent).toBe('v1.76');
+    expect(settingsVer.textContent).toBe('v1.76');
 
     document.body.removeChild(badge);
     document.body.removeChild(settingsVer);
@@ -344,6 +344,35 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     confirmDialog.querySelector('#btn-confirm-dialog-cancel').click();
     const cancelled = await cancelPromise;
     expect(cancelled).toBe(false);
+  });
+
+  it('v1.76: showConfirmDialog bloquea apertura duplicada concurrente y elimina data-i18n para evitar sobreescritura', async () => {
+    const dialog = appInstance.ensureConfirmDialogElement();
+    const firstPromise = appInstance.showConfirmDialog({
+      title: 'Limpiar comprados',
+      message: '¿Eliminar artículos?',
+      confirmText: 'Eliminar comprados'
+    });
+
+    const titleEl = dialog.querySelector('#confirm-dialog-title');
+    const acceptBtn = dialog.querySelector('#btn-confirm-dialog-accept');
+    expect(titleEl.textContent).toBe('Limpiar comprados');
+    expect(acceptBtn.textContent).toBe('Eliminar comprados');
+    expect(titleEl.hasAttribute('data-i18n')).toBe(false);
+    expect(acceptBtn.hasAttribute('data-i18n')).toBe(false);
+
+    // Intento de segunda llamada concurrente mientras el diálogo sigue abierto
+    const secondPromise = appInstance.showConfirmDialog({
+      title: 'Confirmar acción',
+      message: 'Segunda llamada'
+    });
+    const secondResult = await secondPromise;
+    expect(secondResult).toBe(false);
+
+    // Cerrar el primero
+    dialog.querySelector('#btn-confirm-dialog-accept').click();
+    const firstResult = await firstPromise;
+    expect(firstResult).toBe(true);
   });
 
   it('v1.23: switchImportTab alterna correctamente clases activas, ARIA states y no ensucia con inline styles', () => {

@@ -2573,6 +2573,36 @@ class StateStore {
       this.deletedRecords[entityType].push(id);
       this.save('fa_deleted_records', this.deletedRecords);
     }
+    // US-81: Registrar lápida persistente (14 días) para evitar resurrección remota
+    this.addTombstone(entityType, id);
+  }
+
+  addTombstone(entityType, id) {
+    if (!id || !entityType) return;
+    if (!this.tombstones) {
+      this.tombstones = this.load('fa_tombstones', {});
+    }
+    if (!this.tombstones[entityType]) {
+      this.tombstones[entityType] = {};
+    }
+    this.tombstones[entityType][id] = Date.now();
+    this.save('fa_tombstones', this.tombstones);
+  }
+
+  isTombstoned(entityType, id) {
+    if (!id || !entityType) return false;
+    if (!this.tombstones) {
+      this.tombstones = this.load('fa_tombstones', {});
+    }
+    const bucket = this.tombstones[entityType];
+    if (!bucket || !bucket[id]) return false;
+    // Expira a los 14 días (14 * 24 * 60 * 60 * 1000 = 1209600000 ms)
+    if (Date.now() - bucket[id] > 1209600000) {
+      delete bucket[id];
+      this.save('fa_tombstones', this.tombstones);
+      return false;
+    }
+    return true;
   }
 
   clearDeletedRecords(entityType, ids) {
@@ -4728,7 +4758,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.75';
+  window.APP_VERSION = 'v1.76';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4775,7 +4805,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.75';
+    this.appVersion = window.APP_VERSION || 'v1.76';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5290,6 +5320,10 @@ class FoodAssistantApp {
   showConfirmDialog(options = {}) {
     const dialog = this.ensureConfirmDialogElement();
     if (!dialog) return Promise.resolve(false);
+    if (this._isConfirmDialogOpen || dialog.open) {
+      return Promise.resolve(false);
+    }
+    this._isConfirmDialogOpen = true;
     this.bindConfirmDialogEvents(dialog);
 
     const {
@@ -5314,6 +5348,12 @@ class FoodAssistantApp {
     const cancelBtn = dialog.querySelector('#btn-confirm-dialog-cancel');
     const inputWrap = dialog.querySelector('#confirm-dialog-input-wrap');
     const inputEl = dialog.querySelector('#confirm-dialog-input');
+
+    // Desvincular atributos i18n para evitar que un barrido de traducciones en segundo plano sobreescriba los textos del diálogo
+    titleEl?.removeAttribute('data-i18n');
+    msgEl?.removeAttribute('data-i18n');
+    acceptBtn?.removeAttribute('data-i18n');
+    cancelBtn?.removeAttribute('data-i18n');
 
     if (titleEl) titleEl.textContent = title;
     if (msgEl) msgEl.textContent = message;
@@ -5354,6 +5394,7 @@ class FoodAssistantApp {
   }
 
   closeConfirmDialog(accepted = false) {
+    this._isConfirmDialogOpen = false;
     const dialog = this.modalConfirmDialog || document.getElementById('modal-confirm-dialog');
     const resolver = this._confirmDialogResolver;
     const mode = this._confirmDialogMode;
@@ -6454,7 +6495,10 @@ class FoodAssistantApp {
         }
 
         remoteShopList.forEach(remoteRow => {
-          if (state.deletedRecords.shoppingItems?.includes(remoteRow.id)) return;
+          if (state.deletedRecords.shoppingItems?.includes(remoteRow.id) ||
+              (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', remoteRow.id))) {
+            return;
+          }
 
           const localIdx = state.shoppingList.findIndex(i => i.id === remoteRow.id);
           const local = localIdx >= 0 ? state.shoppingList[localIdx] : null;
@@ -6498,10 +6542,18 @@ class FoodAssistantApp {
           reconcileShoppingItemBreakdown(remoteItem, state.recipes || []);
 
           if (localIdx >= 0) {
+            const isRecentlyCheckedLocally = this._recentShoppingCheckTimestamps &&
+              (Date.now() - (this._recentShoppingCheckTimestamps.get(local.id) || 0) < 10000);
             const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
             const localDate = new Date(local.updatedAt || 0).getTime();
-            if (remoteDate >= localDate) {
-              state.shoppingList[localIdx] = { ...local, ...remoteItem, isChecked: !!remoteRow.is_checked };
+            const finalChecked = isRecentlyCheckedLocally ? local.isChecked : !!remoteRow.is_checked;
+
+            if (remoteDate >= localDate || !isRecentlyCheckedLocally) {
+              state.shoppingList[localIdx] = {
+                ...local,
+                ...remoteItem,
+                isChecked: finalChecked
+              };
               stateChanged = true;
             }
           } else {
@@ -13223,7 +13275,9 @@ class FoodAssistantApp {
     }
     if (!item) return;
 
-    item.isChecked = !item.isChecked;
+    if (!item.id) item.id = generateId('shop-');
+    item.isChecked = !Boolean(item.isChecked || item.checked);
+    delete item.checked;
     item.updatedAt = new Date().toISOString();
     if (state.household?.id) {
       item.householdId = state.household.id;
@@ -13233,6 +13287,10 @@ class FoodAssistantApp {
     }
     state.save('fa_shopping', state.shoppingList);
     this.render();
+
+    // Registrar timestamp de modificación local reciente para proteger contra respuestas remotas desactualizadas
+    if (!this._recentShoppingCheckTimestamps) this._recentShoppingCheckTimestamps = new Map();
+    this._recentShoppingCheckTimestamps.set(item.id, Date.now());
 
     // US-81: Sincronización instantánea en la nube / Modo Familia sin retardo
     if (this.supabaseClient && state.cloudUser?.id) {
@@ -13319,7 +13377,8 @@ class FoodAssistantApp {
         return false;
       }
 
-      const completed = state.shoppingList.filter(i => i.isChecked);
+      // Normalizar y recoger todos los artículos marcados como comprados (tanto isChecked como checked)
+      const completed = state.shoppingList.filter(i => Boolean(i && (i.isChecked || i.checked)));
 
       if (completed.length > 0) {
         const count = completed.length;
@@ -13336,10 +13395,10 @@ class FoodAssistantApp {
           if (confirmed) {
             const deletedIds = [];
             state.shoppingList.forEach(item => {
-              if (item.id) {
-                state.trackDeletion('shoppingItems', item.id);
-                deletedIds.push(item.id);
-              }
+              const id = item.id || generateId('shop-');
+              state.trackDeletion('shoppingItems', id);
+              deletedIds.push(id);
+              if (this._pendingShoppingToggles) this._pendingShoppingToggles.delete(id);
             });
             state.shoppingList = [];
             state.save('fa_shopping', state.shoppingList);
@@ -13365,12 +13424,12 @@ class FoodAssistantApp {
           if (confirmed) {
             const deletedIds = [];
             completed.forEach(item => {
-              if (item.id) {
-                state.trackDeletion('shoppingItems', item.id);
-                deletedIds.push(item.id);
-              }
+              const id = item.id || generateId('shop-');
+              state.trackDeletion('shoppingItems', id);
+              deletedIds.push(id);
+              if (this._pendingShoppingToggles) this._pendingShoppingToggles.delete(id);
             });
-            state.shoppingList = state.shoppingList.filter(i => !i.isChecked);
+            state.shoppingList = state.shoppingList.filter(i => !i.isChecked && !i.checked);
             state.save('fa_shopping', state.shoppingList);
             this.broadcastRealtimeChange('shopping_change', {
               action: 'clear_completed',
@@ -13396,10 +13455,10 @@ class FoodAssistantApp {
         if (confirmed) {
           const deletedIds = [];
           state.shoppingList.forEach(item => {
-            if (item.id) {
-              state.trackDeletion('shoppingItems', item.id);
-              deletedIds.push(item.id);
-            }
+            const id = item.id || generateId('shop-');
+            state.trackDeletion('shoppingItems', id);
+            deletedIds.push(id);
+            if (this._pendingShoppingToggles) this._pendingShoppingToggles.delete(id);
           });
           state.shoppingList = [];
           state.save('fa_shopping', state.shoppingList);
@@ -18047,6 +18106,10 @@ REGLAS CRÍTICAS:
     if (action === 'toggle' || action === 'update') {
       const item = payload.item;
       if (!item || !item.id) return;
+      if (state.deletedRecords.shoppingItems?.includes(item.id) ||
+          (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', item.id))) {
+        return;
+      }
       const localIdx = state.shoppingList.findIndex(i => i.id === item.id);
       if (localIdx >= 0) {
         const local = state.shoppingList[localIdx];
@@ -18077,6 +18140,7 @@ REGLAS CRÍTICAS:
     } else if (action === 'delete') {
       if (payload.itemId) {
         state.trackDeletion('shoppingItems', payload.itemId);
+        if (this._pendingShoppingToggles) this._pendingShoppingToggles.delete(payload.itemId);
         const prevLen = state.shoppingList.length;
         state.shoppingList = state.shoppingList.filter(i => i.id !== payload.itemId);
         if (state.shoppingList.length !== prevLen) modified = true;
@@ -18084,17 +18148,27 @@ REGLAS CRÍTICAS:
     } else if (action === 'clear_completed') {
       const prevLen = state.shoppingList.length;
       if (Array.isArray(payload.deletedIds) && payload.deletedIds.length > 0) {
-        payload.deletedIds.forEach(id => state.trackDeletion('shoppingItems', id));
+        payload.deletedIds.forEach(id => {
+          state.trackDeletion('shoppingItems', id);
+          if (this._pendingShoppingToggles) this._pendingShoppingToggles.delete(id);
+        });
         state.shoppingList = state.shoppingList.filter(i => !payload.deletedIds.includes(i.id));
       } else {
         state.shoppingList.forEach(i => {
-          if (i.isChecked && i.id) state.trackDeletion('shoppingItems', i.id);
+          if (Boolean(i.isChecked || i.checked) && i.id) {
+            state.trackDeletion('shoppingItems', i.id);
+            if (this._pendingShoppingToggles) this._pendingShoppingToggles.delete(i.id);
+          }
         });
-        state.shoppingList = state.shoppingList.filter(i => !i.isChecked);
+        state.shoppingList = state.shoppingList.filter(i => !i.isChecked && !i.checked);
       }
       if (state.shoppingList.length !== prevLen) modified = true;
     } else if (action === 'add') {
       if (payload.item && payload.item.id) {
+        if (state.deletedRecords.shoppingItems?.includes(payload.item.id) ||
+            (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', payload.item.id))) {
+          return;
+        }
         const exists = state.shoppingList.some(i => i.id === payload.item.id);
         if (!exists) {
           state.shoppingList.push(payload.item);
@@ -18147,9 +18221,17 @@ REGLAS CRÍTICAS:
         const eventType = payload.eventType;
         if (eventType === 'UPDATE' && payload.new) {
           const remoteRow = payload.new;
+          if (state.deletedRecords.shoppingItems?.includes(remoteRow.id) ||
+              (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', remoteRow.id))) {
+            return;
+          }
           const localIdx = state.shoppingList.findIndex(i => i.id === remoteRow.id);
           if (localIdx >= 0) {
             const local = state.shoppingList[localIdx];
+            const isRecentlyCheckedLocally = this._recentShoppingCheckTimestamps &&
+              (Date.now() - (this._recentShoppingCheckTimestamps.get(local.id) || 0) < 10000);
+            if (isRecentlyCheckedLocally) return;
+
             const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
             const localDate = new Date(local.updatedAt || 0).getTime();
             if (remoteDate >= localDate) {
@@ -18188,6 +18270,10 @@ REGLAS CRÍTICAS:
           }
         } else if (eventType === 'INSERT' && payload.new) {
           const remoteRow = payload.new;
+          if (state.deletedRecords.shoppingItems?.includes(remoteRow.id) ||
+              (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', remoteRow.id))) {
+            return;
+          }
           const localIdx = state.shoppingList.findIndex(i => i.id === remoteRow.id);
           if (localIdx < 0) {
             let breakdown = null;
@@ -18216,6 +18302,7 @@ REGLAS CRÍTICAS:
         } else if (eventType === 'DELETE' && payload.old?.id) {
           const delId = payload.old.id;
           state.trackDeletion('shoppingItems', delId);
+          if (this._pendingShoppingToggles) this._pendingShoppingToggles.delete(delId);
           const prevLen = state.shoppingList.length;
           state.shoppingList = state.shoppingList.filter(i => i.id !== delId);
           if (state.shoppingList.length !== prevLen) {

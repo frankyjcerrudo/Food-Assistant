@@ -439,13 +439,18 @@ textarea {
   }
   .section-header {
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-start !important;
+    text-align: left !important;
     gap: 8px;
+  }
+  .section-header > div:first-child {
+    text-align: left !important;
   }
   .section-header-actions {
     width: 100%;
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     flex-wrap: wrap;
     gap: 8px;
   }
@@ -535,11 +540,16 @@ textarea {
 
 .section-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  text-align: left;
   flex-wrap: wrap;
   gap: 10px;
   margin-bottom: var(--space-2);
+}
+
+.section-header > div:first-child {
+  text-align: left;
 }
 
 .section-header-actions {
@@ -558,6 +568,7 @@ textarea {
   line-height: 1.15;
   display: flex;
   align-items: center;
+  text-align: left;
   gap: var(--space-1);
 }
 
@@ -565,6 +576,7 @@ textarea {
   font-size: var(--text-sm);
   color: var(--m3-on-surface-variant);
   margin-top: var(--space-0-5);
+  text-align: left;
 }
 
 /* Precision Cards (Multi-layer Elevation & Alpha Borders - US-24) */
