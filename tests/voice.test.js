@@ -197,7 +197,7 @@ describe('Camino B (US-17 & BUG-26): Asistente de Voz Integrado, Plurales y Fin 
       expect(Array.isArray(manifest.shortcuts)).toBe(true);
       const voiceShortcut = manifest.shortcuts.find(s => s.url.includes('action=voice'));
       expect(voiceShortcut).toBeDefined();
-      expect(voiceShortcut.name).toContain('Hablar al Asistente');
+      expect(voiceShortcut.name).toContain('Hablar al Sous Chef');
     });
   });
 
@@ -208,7 +208,7 @@ describe('Camino B (US-17 & BUG-26): Asistente de Voz Integrado, Plurales y Fin 
       const svg = centralBtn.querySelector('.gemini-sparkle-icon');
       expect(svg).not.toBeNull();
       const label = centralBtn.querySelector('.nav-gemini-label');
-      expect(label.textContent).toBe('Asistente');
+      expect(label.textContent).toBe('Sous Chef');
     });
 
     it('el modal de invocación rápida #modal-gemini-invoke contiene los controles necesarios', () => {

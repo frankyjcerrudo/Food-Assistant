@@ -4723,7 +4723,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.72';
+  window.APP_VERSION = 'v1.73';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4770,7 +4770,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.72';
+    this.appVersion = window.APP_VERSION || 'v1.73';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -12734,7 +12734,7 @@ class FoodAssistantApp {
 
       cards = Object.entries(groupedByRecipe).map(([recipeLabel, items]) => {
         const pendingInRecipe = items.filter(i => !i.isChecked).length;
-        const isManualGroup = /manualmente|otros|asistente/i.test(recipeLabel);
+        const isManualGroup = /manualmente|otros|asistente|sous chef/i.test(recipeLabel);
         const headerIcon = isManualGroup ? 'shopping_bag' : 'menu_book';
         const pendingRecipeText = isEn
           ? `${pendingInRecipe} pending`
@@ -13955,7 +13955,7 @@ class FoodAssistantApp {
     const userPossessive = userName ? `de ${userName}` : (isEn ? 'del usuario' : 'del usuario');
     const userCatalog = userName ? `DE ${userName.toUpperCase()}` : 'DEL USUARIO';
 
-    return `Eres el Asistente Culinario Personal ${userName ? `de ${userName}` : 'en Sabory'} en Food Assistant.
+    return `Eres el Sous Chef Personal ${userName ? `de ${userName}` : 'en Sabory'} en Food Assistant.
 Fecha actual: ${todayKey}.
 Raciones por defecto en casa: ${state.settings?.defaultServings || 2}.
 Preferencias dietéticas ${userName ? `de ${userName}` : 'del usuario'} (RESPETAR SIEMPRE): ${prefs}.
@@ -15204,7 +15204,7 @@ ${isEn
             unit: RecipeParser.normalizeUnit(item.unit || 'ud'),
             aisle: item.aisle || categorizeIngredientAisle(cleanName),
             isChecked: false,
-            recipeOrigin: 'Asistente IA',
+            recipeOrigin: 'Sous Chef',
             updatedAt: new Date().toISOString()
           });
           affectedCount++;
@@ -15281,7 +15281,8 @@ ${isEn
     aiBubble.className = 'ai-assistant-bubble';
     const isFullCatalog = false;
     const waitNotice = isFullCatalog ? `<div class="ai-wait-notice">Analizando recetario completo (${state.recipes.length} recetas)... unos segundos.</div>` : '';
-    aiBubble.innerHTML = `<em>Consultando al Asistente...</em>${waitNotice}`;
+    const consultingText = window.I18n ? window.I18n.t('ai.consultingAssistant') : 'Consultando al Sous Chef...';
+    aiBubble.innerHTML = `<em>${consultingText}</em>${waitNotice}`;
     history.appendChild(aiBubble);
     history.scrollTop = history.scrollHeight;
 
@@ -15713,9 +15714,10 @@ ${isEn
       ? `<div class="ai-wait-notice">Analizando tu recetario completo (${state.recipes.length} recetas)... Esto puede tardar unos segundos.</div>`
       : '';
     if (transcription) {
+      const thinkingText = window.I18n ? window.I18n.t('ai.assistantThinking') : 'El Sous Chef está pensando...';
       transcription.innerHTML = `<span class="ai-status-loading">
         <span class="material-symbols-outlined icon-sm icon-spin">sync</span>
-        El Asistente está pensando...
+        ${thinkingText}
       </span>${noticeHtml}`;
     }
     if (sendBtn) sendBtn.disabled = true;
@@ -15767,8 +15769,11 @@ ${isEn
           threadBox.innerHTML = previousTurns.map(t => {
             const isU = t.role === 'user';
             const escaped = typeof escapeHtml === 'function' ? escapeHtml(t.text) : String(t.text).replace(/</g, '&lt;');
+            const authorText = isU
+              ? (window.I18n ? window.I18n.t('household.you').replace(/[()]/g, '') : 'Tú')
+              : 'Sous Chef';
             return `<div class="ai-history-bubble ${isU ? 'is-user' : ''}">
-              <strong class="${isU ? 'ai-history-author-user' : 'ai-history-author-assistant'}">${isU ? 'Tú' : 'Asistente'}:</strong> ${escaped.slice(0, 160)}${escaped.length > 160 ? '...' : ''}
+              <strong class="${isU ? 'ai-history-author-user' : 'ai-history-author-assistant'}">${authorText}:</strong> ${escaped.slice(0, 160)}${escaped.length > 160 ? '...' : ''}
             </div>`;
           }).join('');
         } else {
@@ -15859,12 +15864,12 @@ ${isEn
       if (isVoice) {
         this.speakAiResponse(cleanText);
       }
-      this.showToast('✓ Tu Asistente respondió.', 'success');
+      this.showToast('✓ Tu Sous Chef respondió.', 'success');
     } catch (err) {
       if (transcription) {
         transcription.innerHTML = `<span class="u-text-error-medium">Error: ${err.message}</span>`;
       }
-      this.showToast(`Error del Asistente: ${err.message}`, 'error');
+      this.showToast(`Error del Sous Chef: ${err.message}`, 'error');
     } finally {
       if (sendBtn) sendBtn.disabled = false;
     }
@@ -15936,7 +15941,7 @@ ${isEn
     if (resultText) {
       if (isPlaying) {
         resultText.style.cursor = 'pointer';
-        resultText.title = 'Haz clic para detener la voz del Asistente';
+        resultText.title = window.I18n ? window.I18n.t('ai.clickToStopVoice') : 'Haz clic para detener la voz del Sous Chef';
       } else {
         resultText.style.cursor = 'default';
         resultText.removeAttribute('title');
@@ -16922,7 +16927,7 @@ REGLAS CRÍTICAS:
       } else if (this.getEffectiveGeminiApiKey()) {
         status.innerHTML = `<span class="u-text-brand-medium">✓ ${window.I18n ? window.I18n.t('settings.apiKeySharedActive', { provider: provName }) : `IA de Sabory activa automáticamente (${provName} · clave propia opcional)`}</span>`;
       } else {
-        status.innerHTML = `<span class="u-text-muted">${window.I18n ? window.I18n.t('settings.apiKeyIntegrated') : 'Modo Asistente Integrado activo (sin coste ni clave requerida)'}</span>`;
+        status.innerHTML = `<span class="u-text-muted">${window.I18n ? window.I18n.t('settings.apiKeyIntegrated') : 'Modo Sous Chef Integrado activo (sin coste ni clave requerida)'}</span>`;
       }
     }
 

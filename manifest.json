@@ -55,8 +55,8 @@
   },
   "shortcuts": [
     {
-      "name": "🎙️ Hablar al Asistente",
-      "short_name": "Asistente Voz",
+      "name": "🎙️ Hablar al Sous Chef",
+      "short_name": "Sous Chef",
       "description": "Dicta comidas, recetas o artículos de la compra",
       "url": "./index.html?action=voice",
       "icons": [

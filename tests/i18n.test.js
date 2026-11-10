@@ -775,4 +775,18 @@ describe('US-12: Módulo Core de Internacionalización (i18n.js)', () => {
     appInstance.moveOrSwapPlannerSlot('2026-11-12', 'lunch', false, '2026-11-10', 'lunch', false);
     expect(lastToast.msg).toBe('"Garbanzos con bacalao" movida con éxito');
   });
+
+  it('nombra al Asistente IA como Sous Chef en navegación, modales y ajustes tanto en ES como en EN', () => {
+    I18n.setPreference('es');
+    expect(I18n.t('nav.ai')).toBe('Sous Chef');
+    expect(I18n.t('ai.title')).toBe('Sous Chef');
+    expect(I18n.t('ai.talkToAssistant')).toBe('Hablar con el Sous Chef');
+    expect(I18n.t('settings.aiTtsVoice')).toBe('Voz del Sous Chef (TTS)');
+
+    I18n.setPreference('en');
+    expect(I18n.t('nav.ai')).toBe('Sous Chef');
+    expect(I18n.t('ai.title')).toBe('Sous Chef');
+    expect(I18n.t('ai.talkToAssistant')).toBe('Talk to Sous Chef');
+    expect(I18n.t('settings.aiTtsVoice')).toBe('Sous Chef Voice (TTS)');
+  });
 });
