@@ -5,7 +5,12 @@ test.describe('Shopping List End-to-End User Flow & Concurrency', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.setItem('fa_onboarding_completed', 'true');
-      // No sobreescribir fa_shopping durante reloads si ya fue modificado en la prueba
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register = () => Promise.resolve({
+          update: () => Promise.resolve(),
+          unregister: () => Promise.resolve(true)
+        });
+      }
       if (sessionStorage.getItem('__test_initialized') !== 'true') {
         localStorage.setItem('fa_shopping', '[]');
         localStorage.setItem('fa_tombstones', '{}');
@@ -15,17 +20,15 @@ test.describe('Shopping List End-to-End User Flow & Concurrency', () => {
     });
     await page.goto('/');
     await page.waitForFunction(() => typeof window.app?.switchView === 'function');
+    await page.evaluate(() => window.app.switchView('view-shopping'));
+    await page.waitForSelector('#view-shopping.active');
   });
 
   test('tachar múltiples artículos rápidamente y limpiarlos con popup único sin resurrecciones', async ({ page }) => {
-    // 1. Ir a la pestaña de compra
-    await page.evaluate(() => window.app.switchView('view-shopping'));
-    await page.waitForSelector('#view-shopping.active');
-
     const input = page.locator('#input-quick-grocery');
     const addBtn = page.locator('#btn-add-grocery');
 
-    // 2. Añadir 3 artículos de prueba
+    // 1. Añadir 3 artículos de prueba
     await input.fill('1 kg Manzanas');
     await addBtn.click();
     await input.fill('2 l Leche entera');
@@ -37,11 +40,10 @@ test.describe('Shopping List End-to-End User Flow & Concurrency', () => {
     const activeItems = page.locator('#shopping-aisles-container .grocery-item-row');
     await expect(activeItems).toHaveCount(3);
 
-    // 3. Tachar los dos primeros artículos haciendo clic en sus casillas
+    // 2. Tachar los dos primeros artículos haciendo clic en sus casillas
     const checkTargets = page.locator('#shopping-aisles-container .grocery-left');
     await checkTargets.nth(0).click();
     await page.waitForTimeout(100);
-    // Tras el primer check, ahora el primer elemento restante pasa a ser el índice 0 de la lista activa
     await page.locator('#shopping-aisles-container .grocery-left').nth(0).click();
     await page.waitForTimeout(200);
 
@@ -51,11 +53,11 @@ test.describe('Shopping List End-to-End User Flow & Concurrency', () => {
     const completedItems = page.locator('#shopping-completed-section .grocery-item-row');
     await expect(completedItems).toHaveCount(2);
 
-    // 4. Hacer clic en "Limpiar completados"
+    // 3. Hacer clic en "Limpiar completados"
     const clearBtn = page.locator('.btn-clear-completed-section');
     await clearBtn.click();
 
-    // 5. Verificar que se abre EXACTAMENTE UN diálogo de confirmación
+    // 4. Verificar que se abre EXACTAMENTE UN diálogo de confirmación
     const confirmDialog = page.locator('#modal-confirm-dialog');
     await expect(confirmDialog).toBeVisible();
 
@@ -70,14 +72,12 @@ test.describe('Shopping List End-to-End User Flow & Concurrency', () => {
     await expect(title).toHaveText('Limpiar comprados');
     await expect(acceptBtn).toHaveText('Eliminar comprados');
 
-    // 6. Confirmar la eliminación
+    // 5. Confirmar la eliminación
     await acceptBtn.click();
     await page.waitForTimeout(200);
 
     // El diálogo debe cerrarse
     await expect(confirmDialog).not.toBeVisible();
-
-    // La sección de completados debe haber desaparecido
     await expect(page.locator('#shopping-completed-section')).not.toBeVisible();
 
     // Solo debe quedar 1 artículo pendiente (Barra de Pan)
@@ -85,17 +85,129 @@ test.describe('Shopping List End-to-End User Flow & Concurrency', () => {
     await expect(remainingItems).toHaveCount(1);
     await expect(remainingItems.first()).toContainText('Pan');
 
-    // 7. Simular recarga de página para verificar que los eliminados NO resucitan y el pendiente se conserva
+    // 6. Simular recarga de página para verificar que los eliminados NO resucitan
     await page.reload();
     await page.waitForFunction(() => typeof window.app?.switchView === 'function');
     await page.evaluate(() => window.app.switchView('view-shopping'));
     await page.waitForSelector('#view-shopping.active');
 
-    // Sigue habiendo solo 1 artículo pendiente y 0 completados
     const postReloadPending = page.locator('#shopping-aisles-container .grocery-item-row');
     await expect(postReloadPending).toHaveCount(1);
     await expect(postReloadPending.first()).toContainText('Pan');
     await expect(page.locator('#shopping-completed-section')).not.toBeVisible();
+  });
+
+  test('los pasillos de la lista de la compra mantienen un orden canónico fijo independientemente del tachado de artículos', async ({ page }) => {
+    // Añadir artículos de diferentes pasillos: fruta (produce), lácteos (dairy), panadería (bakery), carne (meat)
+    await page.evaluate(() => {
+      window.state.shoppingList = [
+        { id: 'item-meat', name: 'Pechuga de Pollo', amount: 500, unit: 'g', aisle: 'meat', isChecked: false },
+        { id: 'item-produce', name: 'Plátanos', amount: 1, unit: 'kg', aisle: 'produce', isChecked: false },
+        { id: 'item-bakery', name: 'Pan de Molde', amount: 1, unit: 'paquete', aisle: 'bakery', isChecked: false },
+        { id: 'item-dairy', name: 'Yogur Griego', amount: 4, unit: 'ud', aisle: 'dairy', isChecked: false }
+      ];
+      window.app.renderShoppingList();
+    });
+
+    // Obtener los pasillos renderizados
+    const aisleCardsBefore = page.locator('#shopping-aisles-container .aisle-card');
+    const count = await aisleCardsBefore.count();
+    expect(count).toBeGreaterThanOrEqual(3);
+
+    const aislesBefore = await aisleCardsBefore.evaluateAll(cards => cards.map(c => c.getAttribute('data-aisle')));
+
+    // Tachar un artículo de produce y uno de meat
+    await page.evaluate(() => {
+      const p = window.state.shoppingList.find(i => i.id === 'item-produce');
+      if (p) p.isChecked = true;
+      window.app.renderShoppingList();
+    });
+
+    const aisleCardsAfter = page.locator('#shopping-aisles-container .aisle-card');
+    const aislesAfter = await aisleCardsAfter.evaluateAll(cards => cards.map(c => c.getAttribute('data-aisle')));
+
+    // Validar que los pasillos que permanecen siguen en el mismo orden relativo canónico de AISLE_ORDER
+    const canonicalOrder = await page.evaluate(() => window.AISLE_ORDER || ['produce', 'dairy', 'bakery', 'meat', 'seafood', 'pantry']);
+    
+    let lastIndex = -1;
+    for (const aisle of aislesAfter) {
+      const idx = canonicalOrder.indexOf(aisle);
+      if (idx !== -1) {
+        expect(idx).toBeGreaterThan(lastIndex);
+        lastIndex = idx;
+      }
+    }
+  });
+
+  test('añadir artículos con cantidades y unidades consolida los artículos y actualiza los contadores', async ({ page }) => {
+    const input = page.locator('#input-quick-grocery');
+    const addBtn = page.locator('#btn-add-grocery');
+
+    await input.fill('500 g Arroz');
+    await addBtn.click();
+    await input.fill('1 l Leche desnatada');
+    await addBtn.click();
+
+    const summary = page.locator('#shopping-summary-text');
+    await expect(summary).toContainText('2');
+
+    const firstItem = page.locator('#shopping-aisles-container .grocery-item-row').first();
+    await expect(firstItem).toBeVisible();
+    await expect(firstItem.locator('.grocery-amount')).toBeVisible();
+  });
+
+  test('eliminar un artículo individual lo retira inmediatamente y persiste tras recarga (tombstone)', async ({ page }) => {
+    const input = page.locator('#input-quick-grocery');
+    const addBtn = page.locator('#btn-add-grocery');
+
+    await input.fill('Mantequilla con sal');
+    await addBtn.click();
+
+    const itemRow = page.locator('#shopping-aisles-container .grocery-item-row', { hasText: 'Mantequilla con sal' });
+    await expect(itemRow).toBeVisible();
+
+    // Clic en el botón de borrar (la X del artículo)
+    const removeBtn = itemRow.locator('.btn-grocery-remove');
+    await removeBtn.click();
+
+    // El artículo desaparece de la vista inmediatamente
+    await expect(itemRow).not.toBeVisible();
+
+    // Recargar la página y verificar que no resucita
+    await page.reload();
+    await page.waitForFunction(() => typeof window.app?.switchView === 'function');
+    await page.evaluate(() => window.app.switchView('view-shopping'));
+    await page.waitForSelector('#view-shopping.active');
+
+    await expect(page.locator('#shopping-aisles-container', { hasText: 'Mantequilla con sal' })).not.toBeVisible();
+  });
+
+  test('conmutar entre vista por pasillos y vista por recetas agrupa los artículos correctamente', async ({ page }) => {
+    // Añadir artículos con receta asociada
+    await page.evaluate(() => {
+      window.state.shoppingList = [
+        { id: 's-1', name: 'Espaguetis', amount: 400, unit: 'g', aisle: 'pantry', recipeOrigin: 'Pasta Carbonara', isChecked: false },
+        { id: 's-2', name: 'Huevos', amount: 4, unit: 'ud', aisle: 'dairy', recipeOrigin: 'Pasta Carbonara', isChecked: false }
+      ];
+      window.app.renderShoppingList();
+    });
+
+    const btnRecipe = page.locator('#btn-shopping-view-recipe');
+    const btnAisle = page.locator('#btn-shopping-view-aisle');
+
+    // Cambiar a vista por receta
+    await btnRecipe.click();
+    await page.waitForTimeout(100);
+    await expect(btnRecipe).toHaveClass(/active/);
+
+    // Debe mostrar la tarjeta con el nombre de la receta
+    const recipeCards = page.locator('#shopping-aisles-container .aisle-card');
+    await expect(recipeCards.first()).toContainText('Pasta Carbonara');
+
+    // Volver a vista por pasillos
+    await btnAisle.click();
+    await page.waitForTimeout(100);
+    await expect(btnAisle).toHaveClass(/active/);
   });
 
 });

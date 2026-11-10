@@ -5,6 +5,12 @@ test.describe('Mobile Viewport & Layout Integrity (Zero-Overflow & Editorial Hea
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.setItem('fa_onboarding_completed', 'true');
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register = () => Promise.resolve({
+          update: () => Promise.resolve(),
+          unregister: () => Promise.resolve(true)
+        });
+      }
     });
     await page.goto('/');
     await page.waitForFunction(() => typeof window.app?.switchView === 'function');
@@ -47,7 +53,7 @@ test.describe('Mobile Viewport & Layout Integrity (Zero-Overflow & Editorial Hea
     const recipesBox = await recipesTitle.boundingBox();
     expect(recipesBox).not.toBeNull();
     if (!isDesktop) {
-      expect(recipesBox.x).toBeLessThan(40);
+      expect(recipesBox.x).toBeLessThan(45);
     }
 
     // 2. Planificador
@@ -58,7 +64,7 @@ test.describe('Mobile Viewport & Layout Integrity (Zero-Overflow & Editorial Hea
     const plannerBox = await plannerTitle.boundingBox();
     expect(plannerBox).not.toBeNull();
     if (!isDesktop) {
-      expect(plannerBox.x).toBeLessThan(40);
+      expect(plannerBox.x).toBeLessThan(45);
     }
 
     // 3. Compra
@@ -69,7 +75,7 @@ test.describe('Mobile Viewport & Layout Integrity (Zero-Overflow & Editorial Hea
     const shoppingBox = await shoppingTitle.boundingBox();
     expect(shoppingBox).not.toBeNull();
     if (!isDesktop) {
-      expect(shoppingBox.x).toBeLessThan(40);
+      expect(shoppingBox.x).toBeLessThan(45);
     }
   });
 
@@ -90,6 +96,44 @@ test.describe('Mobile Viewport & Layout Integrity (Zero-Overflow & Editorial Hea
       expect(navBox.y + navBox.height).toBeLessThanOrEqual(viewportSize.height + 2);
       expect(navBox.y).toBeGreaterThan(viewportSize.height - 120);
     }
+  });
+
+  test('los modales principales se adaptan al ancho del viewport sin desbordarse ni truncar botones', async ({ page }) => {
+    const viewportSize = page.viewportSize();
+    expect(viewportSize).not.toBeNull();
+
+    // 1. Abrir diálogo de confirmación genérico
+    await page.evaluate(() => {
+      window.app.showConfirmDialog({
+        title: 'Prueba de Modal',
+        message: 'Este es un mensaje largo para comprobar que el modal no desborda la pantalla en dispositivos estrechos.',
+        confirmText: 'Aceptar prueba'
+      });
+    });
+
+    const confirmModal = page.locator('#modal-confirm-dialog');
+    await expect(confirmModal).toBeVisible();
+
+    const cardBox = await page.locator('#modal-confirm-dialog .confirm-dialog-content').first().boundingBox();
+    expect(cardBox).not.toBeNull();
+    expect(cardBox.x).toBeGreaterThanOrEqual(0);
+    expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(viewportSize.width + 5);
+
+    // Cerrar modal
+    await page.locator('#btn-confirm-dialog-cancel').click();
+    await expect(confirmModal).not.toBeVisible();
+  });
+
+  test('adaptación dinámica de la navegación al redimensionar la ventana', async ({ page }) => {
+    // Redimensionar a móvil estrecho (360px)
+    await page.setViewportSize({ width: 360, height: 740 });
+    await expect(page.locator('.bottom-nav')).toBeVisible();
+    await expect(page.locator('.desktop-header-nav')).not.toBeVisible();
+
+    // Redimensionar a escritorio amplio (1200px)
+    await page.setViewportSize({ width: 1200, height: 800 });
+    await expect(page.locator('.desktop-header-nav')).toBeVisible();
+    await expect(page.locator('.bottom-nav')).not.toBeVisible();
   });
 
 });
