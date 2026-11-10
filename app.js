@@ -6496,7 +6496,7 @@ class FoodAssistantApp {
 
         remoteShopList.forEach(remoteRow => {
           if (state.deletedRecords.shoppingItems?.includes(remoteRow.id) ||
-              (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', remoteRow.id))) {
+            (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', remoteRow.id))) {
             return;
           }
 
@@ -11512,7 +11512,7 @@ class FoodAssistantApp {
         this._touchDragSource.active = true;
         if (targetSlot) targetSlot.classList.add('is-dragging');
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
-          try { navigator.vibrate(40); } catch (err) {}
+          try { navigator.vibrate(40); } catch (err) { }
         }
       }
     }, 220);
@@ -12477,19 +12477,19 @@ class FoodAssistantApp {
                 ${tags.length > 0 ? `
                   <span class="picker-recipe-tags-wrap">
                     ${tags.map(t => {
-                      const tagLabel = window.I18n ? window.I18n.getTagLabel(t) : t;
-                      return `<span class="picker-recipe-mini-tag">${escapeHtml(tagLabel)}</span>`;
-                    }).join('')}
+        const tagLabel = window.I18n ? window.I18n.getTagLabel(t) : t;
+        return `<span class="picker-recipe-mini-tag">${escapeHtml(tagLabel)}</span>`;
+      }).join('')}
                   </span>
                 ` : ''}
               </div>
               ${hasPreferences ? (() => {
-                const prefsLabel = state.dietaryPreferences.map(p => window.I18n ? window.I18n.getTagLabel(p) : p).join(', ');
-                const violationsLabel = comp.violations.map(v => window.I18n ? window.I18n.getTagLabel(v) : v).join(', ');
-                return comp.compliant
-                  ? `<span class="dietary-ok-badge u-mt-3"><span class="material-symbols-outlined icon-12">check</span> ${isEn ? 'Compliant' : 'Apta'} (${escapeHtml(prefsLabel)})</span>`
-                  : `<span class="dietary-warning-badge u-mt-3"><span class="material-symbols-outlined icon-12">warning</span> ${isEn ? 'Does not comply' : 'No cumple'}: ${escapeHtml(violationsLabel)}</span>`;
-              })() : ''}
+          const prefsLabel = state.dietaryPreferences.map(p => window.I18n ? window.I18n.getTagLabel(p) : p).join(', ');
+          const violationsLabel = comp.violations.map(v => window.I18n ? window.I18n.getTagLabel(v) : v).join(', ');
+          return comp.compliant
+            ? `<span class="dietary-ok-badge u-mt-3"><span class="material-symbols-outlined icon-12">check</span> ${isEn ? 'Compliant' : 'Apta'} (${escapeHtml(prefsLabel)})</span>`
+            : `<span class="dietary-warning-badge u-mt-3"><span class="material-symbols-outlined icon-12">warning</span> ${isEn ? 'Does not comply' : 'No cumple'}: ${escapeHtml(violationsLabel)}</span>`;
+        })() : ''}
             </div>
           </div>
           <button type="button" class="btn btn-secondary btn-sm u-shrink-0" onclick="event.stopPropagation(); app.selectRecipeForSlot('${r.id}')">${isEn ? 'Select' : 'Elegir'}</button>
@@ -18107,7 +18107,7 @@ REGLAS CRÍTICAS:
       const item = payload.item;
       if (!item || !item.id) return;
       if (state.deletedRecords.shoppingItems?.includes(item.id) ||
-          (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', item.id))) {
+        (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', item.id))) {
         return;
       }
       const localIdx = state.shoppingList.findIndex(i => i.id === item.id);
@@ -18166,7 +18166,7 @@ REGLAS CRÍTICAS:
     } else if (action === 'add') {
       if (payload.item && payload.item.id) {
         if (state.deletedRecords.shoppingItems?.includes(payload.item.id) ||
-            (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', payload.item.id))) {
+          (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', payload.item.id))) {
           return;
         }
         const exists = state.shoppingList.some(i => i.id === payload.item.id);
@@ -18222,7 +18222,7 @@ REGLAS CRÍTICAS:
         if (eventType === 'UPDATE' && payload.new) {
           const remoteRow = payload.new;
           if (state.deletedRecords.shoppingItems?.includes(remoteRow.id) ||
-              (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', remoteRow.id))) {
+            (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', remoteRow.id))) {
             return;
           }
           const localIdx = state.shoppingList.findIndex(i => i.id === remoteRow.id);
@@ -18271,7 +18271,7 @@ REGLAS CRÍTICAS:
         } else if (eventType === 'INSERT' && payload.new) {
           const remoteRow = payload.new;
           if (state.deletedRecords.shoppingItems?.includes(remoteRow.id) ||
-              (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', remoteRow.id))) {
+            (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', remoteRow.id))) {
             return;
           }
           const localIdx = state.shoppingList.findIndex(i => i.id === remoteRow.id);
