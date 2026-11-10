@@ -4723,7 +4723,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.70';
+  window.APP_VERSION = 'v1.71';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4770,7 +4770,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.70';
+    this.appVersion = window.APP_VERSION || 'v1.71';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -11419,12 +11419,19 @@ class FoodAssistantApp {
     this.renderTodayView();
 
     // 4. Feedback al usuario
+    const defaultRec = window.I18n ? window.I18n.t('planner.defaultRecipe') : 'Receta';
     const srcRec = state.recipes.find(r => r.id === srcRecipeId);
     const tgtRec = tgtRecipeId ? state.recipes.find(r => r.id === tgtRecipeId) : null;
     if (tgtRec) {
-      this.showToast(`Recetas intercambiadas: "${srcRec?.title || 'Receta'}" y "${tgtRec.title}"`, 'success');
+      const msg = window.I18n
+        ? window.I18n.t('planner.recipesSwapped', { recipe1: srcRec?.title || defaultRec, recipe2: tgtRec.title })
+        : `Recetas intercambiadas: "${srcRec?.title || defaultRec}" y "${tgtRec.title}"`;
+      this.showToast(msg, 'success');
     } else {
-      this.showToast(`"${srcRec?.title || 'Receta'}" movida con éxito`, 'success');
+      const msg = window.I18n
+        ? window.I18n.t('planner.recipeMoved', { recipe: srcRec?.title || defaultRec })
+        : `"${srcRec?.title || defaultRec}" movida con éxito`;
+      this.showToast(msg, 'success');
     }
     return true;
   }
@@ -11640,7 +11647,10 @@ class FoodAssistantApp {
     if (!mondayKey) return;
     const targetWeekDays = this.getPlannerWeekDates();
     if (mondayKey === targetWeekDays[0].dateKey) {
-      this.showToast('La semana de origen no puede ser la misma semana de destino.', 'warning');
+      this.showToast(
+        window.I18n ? window.I18n.t('planner.copyWeekSameError') : 'La semana de origen no puede ser la misma semana de destino.',
+        'warning'
+      );
       return;
     }
     this.copyWeekSourceMondayKey = mondayKey;
@@ -11656,7 +11666,10 @@ class FoodAssistantApp {
     const targetWeekDays = this.getPlannerWeekDates();
 
     if (pickedMondayKey === targetWeekDays[0].dateKey) {
-      this.showToast('Esa fecha pertenece a la semana actual de destino. Elige otra semana.', 'warning');
+      this.showToast(
+        window.I18n ? window.I18n.t('planner.copyWeekSameTargetError') : 'Esa fecha pertenece a la semana actual de destino. Elige otra semana.',
+        'warning'
+      );
       return;
     }
 
@@ -11786,13 +11799,19 @@ class FoodAssistantApp {
     const resolvedTargetMondayKey = targetWeekDays[0].dateKey;
 
     if (sourceMondayKey === resolvedTargetMondayKey) {
-      this.showToast('No puedes copiar una semana sobre sí misma.', 'warning');
+      this.showToast(
+        window.I18n ? window.I18n.t('planner.copyWeekSameSelfError') : 'No puedes copiar una semana sobre sí misma.',
+        'warning'
+      );
       return { copied: false, reason: 'same_week' };
     }
 
     const sourceStats = this.getWeekMealStats(sourceWeekDays);
     if (sourceStats.mealCount === 0 && sourceStats.customSlotsCount === 0) {
-      this.showToast('La semana de origen no tiene comidas asignadas para copiar.', 'warning');
+      this.showToast(
+        window.I18n ? window.I18n.t('planner.copyWeekEmptyError') : 'La semana de origen no tiene comidas asignadas para copiar.',
+        'warning'
+      );
       return { copied: false, reason: 'empty_source' };
     }
 
@@ -11884,8 +11903,13 @@ class FoodAssistantApp {
     this.scheduleSyncWithCloud();
     this.render();
 
+    const mealLabel = copiedMealsCount === 1
+      ? (window.I18n ? window.I18n.t('planner.copyWeekMealSingular') : 'comida')
+      : (window.I18n ? window.I18n.t('planner.copyWeekMealPlural') : 'comidas');
     this.showToast(
-      `¡Semana copiada con éxito (${copiedMealsCount} ${copiedMealsCount === 1 ? 'comida' : 'comidas'})!`,
+      window.I18n
+        ? window.I18n.t('planner.copyWeekSuccess', { count: copiedMealsCount, label: mealLabel })
+        : `¡Semana copiada con éxito (${copiedMealsCount} ${mealLabel})!`,
       'success'
     );
 
@@ -12243,7 +12267,10 @@ class FoodAssistantApp {
     }
 
     if (!r) {
-      this.showToast('No se encontró la receta a planificar.', 'error');
+      this.showToast(
+        window.I18n ? window.I18n.t('planner.recipeNotFound') : 'No se encontró la receta a planificar.',
+        'error'
+      );
       return;
     }
 
@@ -12445,7 +12472,10 @@ class FoodAssistantApp {
     const dateInput = document.getElementById('plan-recipe-date-input');
     const dateKey = dateInput?.value || toLocalDateKey(new Date());
     if (!dateKey) {
-      this.showToast('Por favor selecciona una fecha válida.', 'error');
+      this.showToast(
+        window.I18n ? window.I18n.t('planner.selectValidDate') : 'Por favor selecciona una fecha válida.',
+        'error'
+      );
       return;
     }
 
@@ -12468,11 +12498,16 @@ class FoodAssistantApp {
     this.render();
 
     const std = STANDARD_SLOTS.find(s => s.key === slotKey);
-    const slotLabel = std ? std.label : slotKey;
+    const slotLabel = std
+      ? (window.I18n ? window.I18n.getSlotLabel(std.key, std.label) : std.label)
+      : slotKey;
     const parts = dateKey.split('-');
     const formattedDate = parts.length === 3 ? `${parts[2]}/${parts[1]}` : dateKey;
 
-    this.showToast(`¡"${r.title}" planificada para ${slotLabel} (${formattedDate})!`, 'success');
+    const plannedMsg = window.I18n
+      ? window.I18n.t('planner.recipePlanned', { recipe: r.title, slot: slotLabel, date: formattedDate })
+      : `¡"${r.title}" planificada para ${slotLabel} (${formattedDate})!`;
+    this.showToast(plannedMsg, 'success');
   }
 
   selectRecipeForSlot(recipeId, cookDoubleOverride = null) {
@@ -12521,7 +12556,10 @@ class FoodAssistantApp {
       this.flushSync();
       this.render();
       if (shouldCookDouble) {
-        this.showToast("¡Plato asignado para hoy y programado como sobras para mañana!", "success");
+        this.showToast(
+          window.I18n ? window.I18n.t('planner.batchCookingScheduled') : "¡Plato asignado para hoy y programado como sobras para mañana!",
+          "success"
+        );
       }
     }
   }

@@ -723,4 +723,49 @@ describe('US-12: Módulo Core de Internacionalización (i18n.js)', () => {
     expect(settingsAuthBtn.getAttribute('data-i18n')).toBe('settings.signIn');
     expect(settingsAuthBtn.textContent).toBe('Sign In');
   });
+
+  it('muestra toast de recetas intercambiadas y movidas en el idioma activo (v1.71)', () => {
+    const appPath = path.resolve(process.cwd(), 'app.js');
+    const appCode = fs.readFileSync(appPath, 'utf-8');
+    new Function(appCode)();
+
+    const appInstance = new window.FoodAssistantApp();
+
+    state.recipes = [
+      { id: 'rec_1', title: 'Merluza al estilo tandoori' },
+      { id: 'rec_2', title: 'Garbanzos con bacalao' }
+    ];
+
+    state.mealPlan = {
+      '2026-11-10': { lunch: 'rec_1', updatedAt: new Date().toISOString() },
+      '2026-11-11': { lunch: 'rec_2', updatedAt: new Date().toISOString() },
+      '2026-11-12': { lunch: null, updatedAt: new Date().toISOString() }
+    };
+
+    let lastToast = null;
+    appInstance.showToast = (msg, type) => {
+      lastToast = { msg, type };
+    };
+
+    // 1. En inglés
+    I18n.setPreference('en');
+    appInstance.moveOrSwapPlannerSlot('2026-11-10', 'lunch', false, '2026-11-11', 'lunch', false);
+    expect(lastToast).not.toBeNull();
+    expect(lastToast.msg).toBe('Recipes swapped: "Merluza al estilo tandoori" and "Garbanzos con bacalao"');
+    expect(lastToast.type).toBe('success');
+
+    // Mover a un slot vacío en inglés
+    appInstance.moveOrSwapPlannerSlot('2026-11-11', 'lunch', false, '2026-11-12', 'lunch', false);
+    expect(lastToast.msg).toBe('"Merluza al estilo tandoori" moved successfully');
+
+    // 2. En español
+    I18n.setPreference('es');
+    appInstance.moveOrSwapPlannerSlot('2026-11-10', 'lunch', false, '2026-11-12', 'lunch', false);
+    expect(lastToast.msg).toBe('Recetas intercambiadas: "Garbanzos con bacalao" y "Merluza al estilo tandoori"');
+
+    // Mover a un slot vacío en español
+    state.mealPlan['2026-11-10'].lunch = null;
+    appInstance.moveOrSwapPlannerSlot('2026-11-12', 'lunch', false, '2026-11-10', 'lunch', false);
+    expect(lastToast.msg).toBe('"Garbanzos con bacalao" movida con éxito');
+  });
 });
