@@ -664,7 +664,13 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     expect(appInstance.isWeeklyPlanPrompt('Dime qué comer hoy')).toBe(false);
   });
 
-  it('v0.74 Refinamiento: "Planifica mi dia de hoy" invoca set_day_plan y personaliza la respuesta para Franky', () => {
+  it('v0.74 Refinamiento: "Planifica mi dia de hoy" invoca set_day_plan y personaliza la respuesta con el nombre del usuario activo', () => {
+    state.cloudUser = { name: 'Aroa' };
+    const resAroa = appInstance.simulateGeminiAgentResponse('Planifica mi dia de hoy');
+    expect(resAroa.text).toContain('Aroa');
+    expect(resAroa.text).not.toContain('Franky');
+
+    state.cloudUser = { name: 'Franky' };
     const res = appInstance.simulateGeminiAgentResponse('Planifica mi dia de hoy');
     expect(res.text).toContain('Franky');
     expect(res.toolCalls.length).toBe(1);
@@ -915,10 +921,12 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     }
   });
 
-  it('v0.84: simulateGeminiAgentResponse resuelve con éxito consultas de recetas temáticas de Halloween', () => {
+  it('v0.84: simulateGeminiAgentResponse resuelve con éxito consultas de recetas temáticas de Halloween personalizadas', () => {
+    state.cloudUser = { name: 'Aroa' };
     const res = appInstance.simulateGeminiAgentResponse('dime recetas interesantes para Hall');
     expect(res).toBeDefined();
-    expect(res.text).toContain('Franky');
+    expect(res.text).toContain('Aroa');
+    expect(res.text).not.toContain('Franky');
     expect(res.text.toLowerCase()).toContain('halloween');
     expect(res.text.toLowerCase()).toContain('pimientos');
     expect(res.text.toLowerCase()).toContain('calabaza');

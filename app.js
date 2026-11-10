@@ -4723,7 +4723,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.71';
+  window.APP_VERSION = 'v1.72';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4770,7 +4770,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.71';
+    this.appVersion = window.APP_VERSION || 'v1.72';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5715,6 +5715,23 @@ class FoodAssistantApp {
     }
   }
 
+  getUserDisplayName() {
+    if (state.cloudUser?.name && typeof state.cloudUser.name === 'string') {
+      const trimmed = state.cloudUser.name.trim();
+      const first = trimmed.split(' ')[0];
+      if (first) return first;
+    }
+    if (state.cloudUser?.email && typeof state.cloudUser.email === 'string') {
+      const emailName = state.cloudUser.email.split('@')[0];
+      if (emailName) return emailName;
+    }
+    if (state.settings?.userName && typeof state.settings.userName === 'string') {
+      const customName = state.settings.userName.trim().split(' ')[0];
+      if (customName) return customName;
+    }
+    return '';
+  }
+
   updateUserAccountUI() {
     const user = state.cloudUser;
     const pillBtn = document.getElementById('btn-header-account');
@@ -5740,7 +5757,7 @@ class FoodAssistantApp {
         pillBtn.title = user.name ? `${user.name} (${user.email})` : user.email;
       }
       if (pillIcon) pillIcon.textContent = 'cloud_done';
-      const firstName = user.name ? user.name.trim().split(' ')[0] : user.email.split('@')[0];
+      const firstName = this.getUserDisplayName() || user.email.split('@')[0];
       const isDemoSession = user.isDemo || !this.supabaseClient;
       if (pillText) {
         pillText.textContent = isDemoSession ? `${firstName} (Demo)` : firstName;
@@ -13932,64 +13949,70 @@ class FoodAssistantApp {
       ? `\nAVISO DE COBERTURA DEL CATÁLOGO: El usuario no tiene recetas guardadas para [${slotGaps.map(g => g.label).join(', ')}] que cumplan estrictamente con [${prefs}]. Al planificar la semana con "set_weekly_plan", rellena esos huecos con las mejores opciones actuales de su catálogo (sin dejar huecos vacíos) y SUGIÉRELE expresamente en tu mensaje crear recetas nuevas de ${slotGaps.map(g => g.label).join(' y ')} adaptadas a (${prefs}) para esos huecos.`
       : '';
 
-    return `Eres el Asistente Culinario Personal de Franky en Food Assistant.
+    const isEn = typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() === 'en';
+    const userName = this.getUserDisplayName();
+    const userRef = userName || (isEn ? 'the user' : 'el usuario');
+    const userPossessive = userName ? `de ${userName}` : (isEn ? 'del usuario' : 'del usuario');
+    const userCatalog = userName ? `DE ${userName.toUpperCase()}` : 'DEL USUARIO';
+
+    return `Eres el Asistente Culinario Personal ${userName ? `de ${userName}` : 'en Sabory'} en Food Assistant.
 Fecha actual: ${todayKey}.
 Raciones por defecto en casa: ${state.settings?.defaultServings || 2}.
-Preferencias dietéticas de Franky (RESPETAR SIEMPRE): ${prefs}.
-Objetivos nutricionales diarios de Franky: ${goals}.
+Preferencias dietéticas ${userName ? `de ${userName}` : 'del usuario'} (RESPETAR SIEMPRE): ${prefs}.
+Objetivos nutricionales diarios ${userName ? `de ${userName}` : 'del usuario'}: ${goals}.
 Lista de la compra pendiente: ${pendingShop}.${gapNotice}
 
-CATÁLOGO DE RECETAS DE FRANKY:
+CATÁLOGO DE RECETAS ${userCatalog}:
 ${recipesCatalog || '(Sin recetas guardadas)'}
 
 PLAN SEMANAL ACTUAL (Semana visible):
 ${currentPlanSummary}
 
 INSTRUCCIONES DE CONTROL Y PERSONALIDAD OBLIGATORIAS:
-1. Dirígete siempre a Franky de forma natural, cálida, concisa y directa (sin introducciones robóticas, sin disculpas innecesarias y yendo siempre al grano).
+1. Dirígete siempre a ${userRef} de forma natural, cálida, concisa y directa (sin introducciones robóticas, sin disculpas innecesarias y yendo siempre al grano).
 2. PRECISIÓN DE MOMENTO Y ALCANCE (EVITAR SOBRE-PLANIFICACIÓN):
-- Si Franky pide ideas, dudas o sugerencias para un momento concreto (ej. "dame ideas para cenar hoy", "¿qué puedo cenar?", "ideas para el almuerzo"): NUNCA planifiques ni reemplaces el día entero. Ofrece 2 o 3 opciones apetecibles y saludables para ese momento específico (cena, almuerzo, etc.) de forma conversacional.
-- Si Franky pide asignar un plato a una comida concreta (ej. "pon salmón para cenar hoy"), usa "set_day_plan" manteniendo intactos el desayuno, almuerzo y merienda existentes del día.
-- Solo invoca "set_day_plan" con las 4 comidas completas cuando Franky pida explícitamente planificar u organizar todo el día ("planifica mi día de hoy", "organiza todas las comidas de hoy"). NUNCA invoques "set_weekly_plan" para un solo día ni toques el resto de la semana.
+- Si ${userRef} pide ideas, dudas o sugerencias para un momento concreto (ej. "dame ideas para cenar hoy", "¿qué puedo cenar?", "ideas para el almuerzo"): NUNCA planifiques ni reemplaces el día entero. Ofrece 2 o 3 opciones apetecibles y saludables para ese momento específico (cena, almuerzo, etc.) de forma conversacional.
+- Si ${userRef} pide asignar un plato a una comida concreta (ej. "pon salmón para cenar hoy"), usa "set_day_plan" manteniendo intactos el desayuno, almuerzo y merienda existentes del día.
+- Solo invoca "set_day_plan" con las 4 comidas completas cuando ${userRef} pida explícitamente planificar u organizar todo el día ("planifica mi día de hoy", "organiza todas las comidas de hoy"). NUNCA invoques "set_weekly_plan" para un solo día ni toques el resto de la semana.
 3. PLANIFICACIÓN SEMANAL INTELIGENTE Y APLICACIÓN DIRECTA EN EL PLANIFICADOR:
-- Cuando Franky pida crear, armar, planificar o modificar su menú semanal (ej. "Crea un plan semanal...", "Planifica mi semana...", "Organiza las comidas..."):
+- Cuando ${userRef} pida crear, armar, planificar o modificar su menú semanal (ej. "Crea un plan semanal...", "Planifica mi semana...", "Organiza las comidas..."):
   * DEBES invocar OBLIGATORIAMENTE la herramienta "set_weekly_plan" para que los platos queden guardados y aplicados directamente en su Planificador. NUNCA respondas solo con texto plano pidiendo confirmación cuando se te pide explícitamente crear el plan.
-  * Utiliza SIEMPRE los IDs ("rec-...") de las recetas ya existentes en el catálogo de Franky. NUNCA uses "create_and_save_recipe" para platos que ya están en el catálogo de Franky ni si solo se te pidió planificar.
-  * Si Franky pide exclusiones (ej. "no incluyas el fin de semana", "sin meriendas"), pasa null en esas propiedades en "days" (ej. "snack": null) u omite el fin de semana. El esquema de "set_weekly_plan" ahora permite valores null en comidas excluidas.
+  * Utiliza SIEMPRE los IDs ("rec-...") de las recetas ya existentes en el catálogo ${userPossessive}. NUNCA uses "create_and_save_recipe" para platos que ya están en el catálogo ${userPossessive} ni si solo se te pidió planificar.
+  * Si ${userRef} pide exclusiones (ej. "no incluyas el fin de semana", "sin meriendas"), pasa null en esas propiedades en "days" (ej. "snack": null) u omite el fin de semana. El esquema de "set_weekly_plan" ahora permite valores null en comidas excluidas.
 - ASIGNACIÓN RECURRENTE DE UNA RECETA A UN MOMENTO CONCRETO EN LA SEMANA:
-  * Si Franky pide asignar, poner o cambiar una receta concreta en un momento de comida específico para varios días o para toda la semana (ej. "pon en todas las meriendas de esta semana el Batido de proteinas MyProtein", "asigna la ensalada césar a las cenas de la semana", "pon avena en los desayunos"):
+  * Si ${userRef} pide asignar, poner o cambiar una receta concreta en un momento de comida específico para varios días o para toda la semana (ej. "pon en todas las meriendas de esta semana el Batido de proteinas MyProtein", "asigna la ensalada césar a las cenas de la semana", "pon avena en los desayunos"):
     - NUNCA uses "manage_shopping_list" (NO es un artículo de compra, es una asignación en el planificador).
-    - NUNCA uses "create_and_save_recipe" si el plato ya existe en el catálogo de recetas de Franky (aunque Franky diga "añade la receta X").
+    - NUNCA uses "create_and_save_recipe" si el plato ya existe en el catálogo de recetas ${userPossessive} (aunque ${userRef} diga "añade la receta X").
     - DEBES invocar "set_weekly_plan" indicando en "days" los días correspondientes con su "dateKey" y asignando el ID de esa receta ÚNICAMENTE en el momento pedido (ej. "snack": "rec-...", "breakfast": "rec-...", etc.), conservando o dejando intactos los demás momentos de comida existentes.
-    - TOLERANCIA A PREPOSICIONES Y CONECTORES: Franky puede nombrar una receta con o sin conectores como "de", "con", "al", "a la" (ej. "Batido de proteinas MyProtein" frente a "Batido proteinas MyProtein", o "Pollo verduras" frente a "Pollo con verduras"). Empareja SIEMPRE por similitud de palabras clave con el catálogo de Franky y utiliza el ID exacto ("rec-...").
+    - TOLERANCIA A PREPOSICIONES Y CONECTORES: ${userRef} puede nombrar una receta con o sin conectores como "de", "con", "al", "a la" (ej. "Batido de proteinas MyProtein" frente a "Batido proteinas MyProtein", o "Pollo verduras" frente a "Pollo con verduras"). Empareja SIEMPRE por similitud de palabras clave con el catálogo ${userPossessive} y utiliza el ID exacto ("rec-...").
     - TOLERANCIA A ERRATAS TIPOGRÁFICAS EN MOMENTOS: Entiende erratas menores comunes como "metiendas" -> meriendas, "almuersos" -> almuerzos, "desallunos" -> desayunos.
 - RESPETO RIGUROSO A EXCLUSIONES DEL USUARIO:
-  * Si Franky indica "no incluyas el fin de semana", "de lunes a viernes" o excluye ciertos días, DEBES dejar los días Sábado y Domingo con comidas en null o sin modificar.
-  * Si Franky indica "sin meriendas", "sin desayunos" o excluye cualquier momento, DEBES dejar esos momentos en null. NUNCA fuerces comidas que el usuario haya pedido excluir explícitamente.
+  * Si ${userRef} indica "no incluyas el fin de semana", "de lunes a viernes" o excluye ciertos días, DEBES dejar los días Sábado y Domingo con comidas en null o sin modificar.
+  * Si ${userRef} indica "sin meriendas", "sin desayunos" o excluye cualquier momento, DEBES dejar esos momentos en null. NUNCA fuerces comidas que el usuario haya pedido excluir explícitamente.
 - CUADRE FLEXIBLE DE OBJETIVOS NUTRICIONALES DIARIOS:
-  * Si Franky tiene objetivos nutricionales diarios activos (${goals}):
+  * Si ${userRef} tiene objetivos nutricionales diarios activos (${goals}):
     - Al crear o proponer un menú semanal, combina las comidas de cada día (desayuno, almuerzo, merienda y cena) buscando que la suma total diaria de calorías y macronutrientes se aproxime de forma equilibrada y realista a sus objetivos (tolerancia flexible de ±10-15%, sin obsesionarte con exactitudes milimétricas que perjudiquen la variedad o el disfrute de la comida casera).
   * ADVERTENCIA TRANSPARENTE ANTE SOBREPASOS EXCESIVOS (SIN BLOQUEO):
-    - Si Franky pide asignar, poner o cambiar una receta (ej. poner un batido proteico en todas las meriendas, o un plato muy calórico) y eso causa que en uno o varios días se sobrepase de forma excesiva (+25% a +30% o más) el objetivo diario de calorías, proteínas, carbohidratos o grasas:
-      1. NUNCA bloquees ni te niegues: ejecuta SIEMPRE la acción solicitada en el planificador ("set_weekly_plan" o "set_day_plan"). La voluntad de Franky siempre manda.
+    - Si ${userRef} pide asignar, poner o cambiar una receta (ej. poner un batido proteico en todas las meriendas, o un plato muy calórico) y eso causa que en uno o varios días se sobrepase de forma excesiva (+25% a +30% o más) el objetivo diario de calorías, proteínas, carbohidratos o grasas:
+      1. NUNCA bloquees ni te niegues: ejecuta SIEMPRE la acción solicitada en el planificador ("set_weekly_plan" o "set_day_plan"). La voluntad de ${userRef} siempre manda.
       2. Añade en tu mensaje de respuesta un aviso nutricional breve, cordial y transparente (ej. "💡 Nota: He asignado tu plato al planificador. Ten en cuenta que con esta merienda rondarás los ~Xg de proteína diaria, superando tu meta de Yg.").
 - REGLA ESTRICTA DE VARIEDAD Y ROTACIÓN DE PROTEÍNAS (ANTI-MONOTONÍA):
-  * NUNCA repitas la misma receta en la misma semana (excepto si Franky solicita expresamente modo sobras o Batch Cooking).
+  * NUNCA repitas la misma receta en la misma semana (excepto si ${userRef} solicita expresamente modo sobras o Batch Cooking).
   * NUNCA repitas la misma fuente de proteína principal (ej. pollo) en días seguidos ni dos veces en el mismo día. Alterna obligatoriamente fuentes proteicas: pescados (blanco o azul), legumbres, aves (pollo/pavo), huevos, ternera magra y opciones vegetales/tofu.
-  * PONDERACIÓN INTELIGENTE DE RECETAS FAVORITAS (US-70): Otorga una ligera prioridad de selección a las recetas marcadas con "❤️ FAVORITA: Sí" cuando encajen con el momento de comida y las preferencias dietéticas de Franky, integrándolas de forma natural en el menú semanal o sugerencias sin monopolizar la semana ni romper la rotación de proteínas y variedad.
-  * Si Franky pide un enfoque nutricional (ej. "enfoque en proteínas", "bajo en calorías"), selecciona preferentemente recetas del catálogo con altos valores de ese macro y explica brevemente en tu mensaje tu razonamiento y cómo se distribuyen los nutrientes a lo largo de los días planificados.
+  * PONDERACIÓN INTELIGENTE DE RECETAS FAVORITAS (US-70): Otorga una ligera prioridad de selección a las recetas marcadas con "❤️ FAVORITA: Sí" cuando encajen con el momento de comida y las preferencias dietéticas ${userPossessive}, integrándolas de forma natural en el menú semanal o sugerencias sin monopolizar la semana ni romper la rotación de proteínas y variedad.
+  * Si ${userRef} pide un enfoque nutricional (ej. "enfoque en proteínas", "bajo en calorías"), selecciona preferentemente recetas del catálogo con altos valores de ese macro y explica brevemente en tu mensaje tu razonamiento y cómo se distribuyen los nutrientes a lo largo de los días planificados.
 - RAZONAMIENTO, TRANSPARENCIA Y PREGUNTAS:
-  * Si en el catálogo de recetas no hay suficientes platos para cubrir los días solicitados sin repetir o sin incumplir las preferencias, RAZONA con total honestidad: explica a Franky qué días has planificado y pregúntale si quiere que le inventes y guardes recetas nuevas para completar los huecos restantes.
-  * Si la petición de Franky es ambigua o contradictoria, PREGUNTA antes de asumir decisiones arbitrarias.
-4. Si Franky pide "Batch Cooking" o modo sobras: planifica cocinar ración doble en la cena de 2 días (ej. Lunes cena y Miércoles cena) para reutilizar como tupper en el almuerzo del día siguiente (Martes almuerzo y Jueves almuerzo) con isLeftoverLunch: true. Todas las demás comidas (desayunos, meriendas y demás cenas/almuerzos) DEBEN ser diferentes, frescas y variadas; NUNCA repitas todo el día idéntico.
-5. REGLA ESTRICTA PARA LA LISTA DE LA COMPRA: Si Franky pide añadir artículos concretos (ej. "añade leche y plátanos", "apunta 3 huevos"), usa SIEMPRE la herramienta "manage_shopping_list" con action: "add" y la lista de artículos pedidos en "items". NUNCA uses action: "add_from_current_plan" a menos que Franky diga explícitamente "añade los ingredientes del plan", "vuelca el menú semanal" o "añade todo lo de la semana". PROHIBIDO ABSOLUTAMENTE usar "manage_shopping_list" si Franky pide poner o asignar un plato a una comida o merienda del planificador (ej. "pon X en las meriendas", "mete X a las cenas"). En esos casos es SIEMPRE "set_weekly_plan" o "set_day_plan".
-6. GUARDAR Y CREAR RECETAS EN EL CATÁLOGO: Si Franky te pide recomendaciones de recetas y a continuación te pide guardarlas (ej: "guárdalas", "guarda las recetas", "guarda esa receta", "añádelas a mis recetas", "guárdame la primera", "créala"), o si te pide directamente inventar o crear una o varias recetas nuevas: DEBES invocar OBLIGATORIAMENTE la herramienta "create_and_save_recipe" (una llamada por cada receta que Franky quiera guardar) con todos los datos estructurados: title, description, prepTimeMinutes, cookTimeMinutes, servings, tags, ingredients (name, amount, unit) e instructions (step, text, timerMinutes) y nutrition (calories, protein, carbs, fat). NUNCA uses esta herramienta si la receta ya existe en el catálogo de Franky (incluso si la frase empieza por "añade la receta X a las meriendas de toda la semana"), pues en ese caso se trata de planificarla con "set_weekly_plan". NUNCA respondas diciendo que has guardado una receta sin haber ejecutado la llamada a "create_and_save_recipe".
-7. PROHIBIDO terminantemente mostrar IDs internos tipo "rec-..." en el texto visible para Franky. Escribe los nombres legibles de los platos de forma limpia y atractiva.
-8. CAPACIDAD DE RAZONAMIENTO Y ASESORAMIENTO CULINARIO: Si Franky hace preguntas abiertas, pide sugerencias o dudas sobre cocina, sustitutos de ingredientes, macros, técnicas o ideas para comer, razona con empatía e inteligencia como un chef y nutricionista experto, ofreciendo explicaciones claras y prácticas. Solo invoca herramientas cuando haya una acción concreta que ejecutar en la app (como apuntar a la compra, planificar comidas o guardar recetas).
-9. CONCISIÓN OBLIGATORIA PARA VOZ HABLADA: Franky escucha tus respuestas mediante sintetizador de voz. Responde SIEMPRE de forma directa y sintética (máximo 1 a 3 frases claras y conversacionales). NUNCA recites monólogos largos ni enumeres listas eternas de ingredientes en el mensaje hablado si no se te pide expresamente. Confirma las acciones realizadas con agilidad y brevedad.
-${(typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() === 'en')
-        ? '10. LANGUAGE: Respond to Franky in fluent English with a warm, encouraging and concise tone. Keep recipe names and food terms natural.'
-        : '10. IDIOMA: Responde a Franky en español natural, cálido y conciso.'}`;
+  * Si en el catálogo de recetas no hay suficientes platos para cubrir los días solicitados sin repetir o sin incumplir las preferencias, RAZONA con total honestidad: explica a ${userRef} qué días has planificado y pregúntale si quiere que le inventes y guardes recetas nuevas para completar los huecos restantes.
+  * Si la petición de ${userRef} es ambigua o contradictoria, PREGUNTA antes de asumir decisiones arbitrarias.
+4. Si ${userRef} pide "Batch Cooking" o modo sobras: planifica cocinar ración doble en la cena de 2 días (ej. Lunes cena y Miércoles cena) para reutilizar como tupper en el almuerzo del día siguiente (Martes almuerzo y Jueves almuerzo) con isLeftoverLunch: true. Todas las demás comidas (desayunos, meriendas y demás cenas/almuerzos) DEBEN ser diferentes, frescas y variadas; NUNCA repitas todo el día idéntico.
+5. REGLA ESTRICTA PARA LA LISTA DE LA COMPRA: Si ${userRef} pide añadir artículos concretos (ej. "añade leche y plátanos", "apunta 3 huevos"), usa SIEMPRE la herramienta "manage_shopping_list" con action: "add" y la lista de artículos pedidos en "items". NUNCA uses action: "add_from_current_plan" a menos que ${userRef} diga explícitamente "añade los ingredientes del plan", "vuelca el menú semanal" o "añade todo lo de la semana". PROHIBIDO ABSOLUTAMENTE usar "manage_shopping_list" si ${userRef} pide poner o asignar un plato a una comida o merienda del planificador (ej. "pon X en las meriendas", "mete X a las cenas"). En esos casos es SIEMPRE "set_weekly_plan" o "set_day_plan".
+6. GUARDAR Y CREAR RECETAS EN EL CATÁLOGO: Si ${userRef} te pide recomendaciones de recetas y a continuación te pide guardarlas (ej: "guárdalas", "guarda las recetas", "guarda esa receta", "añádelas a mis recetas", "guárdame la primera", "créala"), o si te pide directamente inventar o crear una o varias recetas nuevas: DEBES invocar OBLIGATORIAMENTE la herramienta "create_and_save_recipe" (una llamada por cada receta que ${userRef} quiera guardar) con todos los datos estructurados: title, description, prepTimeMinutes, cookTimeMinutes, servings, tags, ingredients (name, amount, unit) e instructions (step, text, timerMinutes) y nutrition (calories, protein, carbs, fat). NUNCA uses esta herramienta si la receta ya existe en el catálogo ${userPossessive} (incluso si la frase empieza por "añade la receta X a las meriendas de toda la semana"), pues en ese caso se trata de planificarla con "set_weekly_plan". NUNCA respondas diciendo que has guardado una receta sin haber ejecutado la llamada a "create_and_save_recipe".
+7. PROHIBIDO terminantemente mostrar IDs internos tipo "rec-..." en el texto visible para ${userRef}. Escribe los nombres legibles de los platos de forma limpia y atractiva.
+8. CAPACIDAD DE RAZONAMIENTO Y ASESORAMIENTO CULINARIO: Si ${userRef} hace preguntas abiertas, pide sugerencias o dudas sobre cocina, sustitutos de ingredientes, macros, técnicas o ideas para comer, razona con empatía e inteligencia como un chef y nutricionista experto, ofreciendo explicaciones claras y prácticas. Solo invoca herramientas cuando haya una acción concreta que ejecutar en la app (como apuntar a la compra, planificar comidas o guardar recetas).
+9. CONCISIÓN OBLIGATORIA PARA VOZ HABLADA: ${userRef} escucha tus respuestas mediante sintetizador de voz. Responde SIEMPRE de forma directa y sintética (máximo 1 a 3 frases claras y conversacionales). NUNCA recites monólogos largos ni enumeres listas eternas de ingredientes en el mensaje hablado si no se te pide expresamente. Confirma las acciones realizadas con agilidad y brevedad.
+${isEn
+        ? `10. LANGUAGE: Respond to ${userRef} in fluent English with a warm, encouraging and concise tone. Keep recipe names and food terms natural.`
+        : `10. IDIOMA: Responde a ${userRef} en español natural, cálido y conciso.`}`;
   }
 
   getEffectiveGeminiApiKey() {
@@ -14364,11 +14387,13 @@ ${(typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() ===
 
   simulateGeminiAgentResponse(prompt) {
     const lower = (prompt || '').toLowerCase();
+    const userName = this.getUserDisplayName();
+    const salutation = userName ? `, ${userName}` : '';
 
     // 0. Recetas temáticas, Halloween, celebraciones o preguntas culinarias abiertas
     if (/hall|halloween|calabaza|tem[aá]tic|oto[ñn]o|fiesta/i.test(prompt)) {
       return {
-        text: `¡Por supuesto, Franky! Aquí tienes 3 ideas temáticas espectaculares, divertidas y saludables para **Halloween**:\n\n` +
+        text: `¡Por supuesto${salutation}! Aquí tienes 3 ideas temáticas espectaculares, divertidas y saludables para **Halloween**:\n\n` +
           `🎃 **1. Pimientos Monstruosos Rellenos de Arroz y Pavo**:\n` +
           `Pimientos naranjas y amarillos vaciados, a los que les tallas ojos y sonrisa terrorífica. Los rellenas con carne picada de pavo, arroz integral salteado y tomate natural, gratinados con queso mozzarella fundido imitando telarañas.\n\n` +
           `👻 **2. Momias de Hojaldre con Pechuga de Pollo y Espárragos**:\n` +
@@ -14383,7 +14408,7 @@ ${(typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() ===
     // 0.0 Consultas y dudas culinarias, sustitutos o técnicas
     if (/sustitu|cambiar|puedo usar|qu[eé] pongo en vez|consejo|truco|c[oó]mo cocino|c[oó]mo preparar/i.test(prompt)) {
       return {
-        text: `¡Claro, Franky! En la cocina casi todo tiene alternativa saludable:\n\n` +
+        text: `¡Claro${salutation}! En la cocina casi todo tiene alternativa saludable:\n\n` +
           `• Si buscas sustituir **harinas refinadas**, la harina de avena integral o almendra molida funcionan de maravilla.\n` +
           `• Para reemplazar la **nata o crema**, el queso batido 0%, yogur griego natural o bebida de soja sin azúcar aportan cremosidad sin grasas saturadas.\n` +
           `• Si necesitas un sustituto del **huevo**, 1 cucharada de semillas de chía o lino molido hidratadas en 3 cucharadas de agua crean una textura ideal para repostería.\n\n` +
@@ -14436,7 +14461,7 @@ ${(typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() ===
       }).join('\n');
 
       return {
-        text: `¡Hola Franky! Para **${slotLabel}** te propongo estas deliciosas opciones ligeras y saludables:\n\n${optionsText}\n\n¿Te apetece alguna de ellas? Puedes pedirme que te la guarde en tu recetario, o que te detalle sus ingredientes.`,
+        text: `¡Hola${salutation}! Para **${slotLabel}** te propongo estas deliciosas opciones ligeras y saludables:\n\n${optionsText}\n\n¿Te apetece alguna de ellas? Puedes pedirme que te la guarde en tu recetario, o que te detalle sus ingredientes.`,
         toolCalls: []
       };
     }
@@ -14452,7 +14477,7 @@ ${(typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() ===
       const capDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
 
       return {
-        text: `¡Listo, Franky! He planificado las comidas para tu **día de hoy (${capDay})** en tu Planificador:\n\n` +
+        text: `¡Listo${salutation}! He planificado las comidas para tu **día de hoy (${capDay})** en tu Planificador:\n\n` +
           `• **Desayuno**: ${findTitle(todayPlan.breakfast)}\n` +
           `• **Almuerzo**: ${findTitle(todayPlan.lunch)}\n` +
           `• **Merienda**: ${findTitle(todayPlan.snack)}\n` +
@@ -14486,7 +14511,7 @@ ${(typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() ===
       ).join('\n');
 
       return {
-        text: `¡Listo, Franky! He planificado únicamente tu **fin de semana** (Sábado y Domingo), manteniendo intactos los menús del resto de la semana:\n\n${summaryLines}`,
+        text: `¡Listo${salutation}! He planificado únicamente tu **fin de semana** (Sábado y Domingo), manteniendo intactos los menús del resto de la semana:\n\n${summaryLines}`,
         toolCalls: [
           {
             name: 'set_weekly_plan',
@@ -14540,7 +14565,7 @@ ${(typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() ===
         }
 
         return {
-          text: `¡Listo, Franky! He asignado tu receta **${matchedRecipe.title}** a ${slotLabel} de toda la semana en tu Planificador.${notice}`,
+          text: `¡Listo${salutation}! He asignado tu receta **${matchedRecipe.title}** a ${slotLabel} de toda la semana en tu Planificador.${notice}`,
           toolCalls: [
             {
               name: 'set_weekly_plan',
@@ -14596,7 +14621,7 @@ ${(typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() ===
       const modeNote = isBatch ? ' en modo **Batch Cooking Inteligente** (ahorras tiempo con tuppers de sobras martes y jueves)' : '';
 
       return {
-        text: `¡Listo, Franky! He analizado tu catálogo de recetas${prefNote} y he organizado tu menú semanal completo${modeNote}:\n\n${summaryLines}`,
+        text: `¡Listo${salutation}! He analizado tu catálogo de recetas${prefNote} y he organizado tu menú semanal completo${modeNote}:\n\n${summaryLines}`,
         toolCalls: [
           {
             name: 'set_weekly_plan',
@@ -14653,7 +14678,7 @@ ${(typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() ===
       };
 
       return {
-        text: `¡Listo, Franky! He creado y guardado en tu recetario la receta **${newRecipeArgs.title}** (${newRecipeArgs.prepTimeMinutes + newRecipeArgs.cookTimeMinutes} min | ${newRecipeArgs.nutrition.protein}g de proteína por ración).`,
+        text: `¡Listo${salutation}! He creado y guardado en tu recetario la receta **${newRecipeArgs.title}** (${newRecipeArgs.prepTimeMinutes + newRecipeArgs.cookTimeMinutes} min | ${newRecipeArgs.nutrition.protein}g de proteína por ración).`,
         toolCalls: [
           {
             name: 'create_and_save_recipe',
@@ -14668,7 +14693,7 @@ ${(typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() ===
       const isPlanDump = /ingredientes\s+del\s+plan|vuelca|todo\s+el\s+plan|del\s+men[uú]\s+semanal|plan\s+a\s+la\s+compra|completo\s+a\s+la\s+compra/i.test(prompt);
       if (isPlanDump) {
         return {
-          text: `¡Hecho, Franky! He añadido todos los ingredientes de tu plan semanal a la Lista de la Compra.`,
+          text: `¡Hecho${salutation}! He añadido todos los ingredientes de tu plan semanal a la Lista de la Compra.`,
           toolCalls: [
             {
               name: 'manage_shopping_list',
@@ -14697,7 +14722,7 @@ ${(typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() ===
       });
 
       return {
-        text: `¡Hecho, Franky! He añadido **${items.map(i => i.name).join(', ')}** a tu Lista de la Compra clasificados por pasillo.`,
+        text: `¡Hecho${salutation}! He añadido **${items.map(i => i.name).join(', ')}** a tu Lista de la Compra clasificados por pasillo.`,
         toolCalls: [
           {
             name: 'manage_shopping_list',
@@ -14711,7 +14736,7 @@ ${(typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() ===
     }
 
     return {
-      text: `¡Hola Franky! Puedes pedirme que **planifique tu día de hoy**, que **organice tu menú semanal** (incluyendo modo Batch Cooking / sobras), que **cree recetas nuevas** o que **añada artículos a tu lista de la compra**.`,
+      text: `¡Hola${salutation}! Puedes pedirme que **planifique tu día de hoy**, que **organice tu menú semanal** (incluyendo modo Batch Cooking / sobras), que **cree recetas nuevas** o que **añada artículos a tu lista de la compra**.`,
       toolCalls: []
     };
   }
@@ -15565,8 +15590,12 @@ ${(typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() ===
         if (invokeInput) invokeInput.value = '';
         const invokeTranscription = document.getElementById('gemini-invoke-transcription');
         if (invokeTranscription) {
-          const userName = state.cloudUser?.name ? state.cloudUser.name.trim().split(' ')[0] : 'Franky';
-          invokeTranscription.textContent = window.I18n ? window.I18n.t('ai.listeningTo', { name: userName }) : `Escuchando a ${userName}...`;
+          const userName = this.getUserDisplayName();
+          if (userName) {
+            invokeTranscription.textContent = window.I18n ? window.I18n.t('ai.listeningTo', { name: userName }) : `Escuchando a ${userName}...`;
+          } else {
+            invokeTranscription.textContent = window.I18n ? window.I18n.t('ai.listening') : 'Escuchando...';
+          }
         }
       }
       try {
@@ -19082,7 +19111,7 @@ const AI_TOOLS_DECLARATIONS = [
     parameters: {
       type: "OBJECT",
       properties: {
-        action: { type: "STRING", description: "'add' (artículos sueltos pedidos por Franky) | 'check' (marcar comprados) | 'remove' (borrar) | 'add_from_current_plan' (SOLO si Franky pide explícitamente volcar todo el menú semanal a la lista)" },
+        action: { type: "STRING", description: "'add' (artículos sueltos pedidos por el usuario) | 'check' (marcar comprados) | 'remove' (borrar) | 'add_from_current_plan' (SOLO si el usuario pide explícitamente volcar todo el menú semanal a la lista)" },
         items: {
           type: "ARRAY",
           items: {

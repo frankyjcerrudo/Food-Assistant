@@ -235,6 +235,13 @@ describe('US-12: Módulo Core de Internacionalización (i18n.js)', () => {
 
     // Test AI System Instruction language directive
     const appInstance = new window.FoodAssistantApp();
+    state.cloudUser = { name: 'Aroa' };
+    I18n.setPreference('en');
+    const enInstructionAroa = appInstance.buildAiSystemInstruction();
+    expect(enInstructionAroa).toContain('10. LANGUAGE: Respond to Aroa in fluent English');
+    expect(enInstructionAroa).not.toContain('Franky');
+
+    state.cloudUser = { name: 'Franky' };
     I18n.setPreference('en');
     const enInstruction = appInstance.buildAiSystemInstruction();
     expect(enInstruction).toContain('10. LANGUAGE: Respond to Franky in fluent English');
