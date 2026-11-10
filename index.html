@@ -2626,10 +2626,11 @@
           console.warn('[SW] Error al registrar Service Worker:', err);
         });
 
-        // Recarga automática e instantánea cuando un nuevo Service Worker toma el control (elimina cachés viejas)
+        // Recarga automática sólo cuando una versión previa existía y un nuevo Service Worker toma el control
+        const hadController = !!navigator.serviceWorker.controller;
         let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (!refreshing) {
+          if (hadController && !refreshing) {
             refreshing = true;
             window.location.reload();
           }

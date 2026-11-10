@@ -20,4 +20,6 @@ build/
 scratch/
 
 supabase/.temp/
+test-results/
+playwright-report/
 
