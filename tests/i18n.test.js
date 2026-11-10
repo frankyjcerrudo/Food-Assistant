@@ -647,4 +647,80 @@ describe('US-12: Módulo Core de Internacionalización (i18n.js)', () => {
     appInstance.updateToggleAllPlannerButtonLabel(mockWeek);
     expect(btnLabel.textContent).toBe('Plegar semana');
   });
+
+  it('no sobreescribe el perfil de usuario logado al ejecutar applyTranslations o cambiar vista (v1.70)', () => {
+    const appPath = path.resolve(process.cwd(), 'app.js');
+    const appCode = fs.readFileSync(appPath, 'utf-8');
+    new Function(appCode)();
+
+    const appInstance = new window.FoodAssistantApp();
+
+    const pillText = document.getElementById('header-account-text') || (() => {
+      const el = document.createElement('span');
+      el.id = 'header-account-text';
+      document.body.appendChild(el);
+      return el;
+    })();
+
+    const settingsName = document.getElementById('settings-user-name') || (() => {
+      const el = document.createElement('div');
+      el.id = 'settings-user-name';
+      document.body.appendChild(el);
+      return el;
+    })();
+
+    const settingsStatus = document.getElementById('settings-user-status') || (() => {
+      const el = document.createElement('div');
+      el.id = 'settings-user-status';
+      document.body.appendChild(el);
+      return el;
+    })();
+
+    const settingsAuthBtn = document.getElementById('btn-settings-auth-action') || (() => {
+      const el = document.createElement('button');
+      el.id = 'btn-settings-auth-action';
+      document.body.appendChild(el);
+      return el;
+    })();
+
+    I18n.setPreference('en');
+
+    // 1. Simular usuario autenticado en state
+    appInstance.supabaseClient = { auth: {} };
+    state.cloudUser = {
+      id: 'usr_test_123',
+      name: 'Franky J Cerrudo',
+      email: 'franky@example.com',
+      provider: 'google'
+    };
+
+    appInstance.updateUserAccountUI();
+
+    expect(pillText.textContent).toBe('Franky');
+    expect(pillText.hasAttribute('data-i18n')).toBe(false);
+    expect(settingsName.textContent).toBe('Franky J Cerrudo');
+    expect(settingsName.hasAttribute('data-i18n')).toBe(false);
+    expect(settingsStatus.textContent).toContain('Supabase (google)');
+    expect(settingsStatus.hasAttribute('data-i18n')).toBe(false);
+    expect(settingsAuthBtn.getAttribute('data-i18n')).toBe('settings.viewAccount');
+
+    // 2. Ejecutar applyTranslations directamente (como ocurre al refrescar o al re-renderizar)
+    I18n.applyTranslations();
+
+    // El usuario debe PERMANECER con sus datos reales y NO revertirse a Sign In / Local Mode
+    expect(pillText.textContent).toBe('Franky');
+    expect(settingsName.textContent).toBe('Franky J Cerrudo');
+    expect(settingsAuthBtn.textContent).toBe('View Account');
+
+    // 3. Simular logout a modo invitado
+    state.cloudUser = null;
+    appInstance.updateUserAccountUI();
+
+    expect(pillText.getAttribute('data-i18n')).toBe('settings.signIn');
+    expect(pillText.textContent).toBe('Sign In');
+    expect(settingsName.getAttribute('data-i18n')).toBe('settings.localMode');
+    expect(settingsName.textContent).toBe('Local Mode (Guest)');
+    expect(settingsAuthBtn.getAttribute('data-i18n')).toBe('settings.signIn');
+    expect(settingsAuthBtn.textContent).toBe('Sign In');
+  });
 });

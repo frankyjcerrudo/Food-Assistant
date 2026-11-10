@@ -4723,7 +4723,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.69';
+  window.APP_VERSION = 'v1.70';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4770,7 +4770,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.66';
+    this.appVersion = window.APP_VERSION || 'v1.70';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5438,6 +5438,7 @@ class FoodAssistantApp {
     // Listen to changes from any source
     window.I18n.onChange((resolvedLang, preference) => {
       this.updateLanguageUI(preference);
+      this.updateUserAccountUI();
     });
   }
 
@@ -5475,6 +5476,7 @@ class FoodAssistantApp {
     if (window.I18n) {
       window.I18n.applyTranslations();
     }
+    this.updateUserAccountUI();
     const currentRecipeLang = document.getElementById('edit-recipe-language')?.value || 'es';
     this.syncRecipeEditorLanguageUI(currentRecipeLang);
   }
@@ -5740,22 +5742,35 @@ class FoodAssistantApp {
       if (pillIcon) pillIcon.textContent = 'cloud_done';
       const firstName = user.name ? user.name.trim().split(' ')[0] : user.email.split('@')[0];
       const isDemoSession = user.isDemo || !this.supabaseClient;
-      if (pillText) pillText.textContent = isDemoSession ? `${firstName} (Demo)` : firstName;
+      if (pillText) {
+        pillText.textContent = isDemoSession ? `${firstName} (Demo)` : firstName;
+        pillText.removeAttribute('data-i18n');
+      }
 
       if (settingsIcon) settingsIcon.textContent = isDemoSession ? 'account_circle' : 'cloud_done';
-      if (settingsName) settingsName.textContent = user.name || user.email.split('@')[0];
+      if (settingsName) {
+        settingsName.textContent = user.name || user.email.split('@')[0];
+        settingsName.removeAttribute('data-i18n');
+      }
       if (settingsStatus) {
+        settingsStatus.removeAttribute('data-i18n');
         settingsStatus.textContent = !this.supabaseClient
           ? (window.I18n ? window.I18n.t('settings.localProfileDemo') : 'Perfil local (Demo) - Supabase no configurado')
           : `${window.I18n ? window.I18n.t('settings.syncedWith') : 'Sincronizado con'} Supabase (${user.provider || 'email'})`;
       }
-      if (settingsAuthBtn) settingsAuthBtn.textContent = window.I18n ? window.I18n.t('settings.viewAccount') : 'Ver Cuenta';
+      if (settingsAuthBtn) {
+        settingsAuthBtn.setAttribute('data-i18n', 'settings.viewAccount');
+        settingsAuthBtn.textContent = window.I18n ? window.I18n.t('settings.viewAccount') : 'Ver Cuenta';
+      }
       if (syncNowBtn) syncNowBtn.style.display = 'inline-flex';
       if (state.lastSyncedAt && syncIndicator && !syncIndicator.textContent) {
         this.updateSyncIndicator(`${window.I18n ? window.I18n.t('settings.syncedAt') : 'Sincronizado a las'} ${new Date(state.lastSyncedAt).toLocaleTimeString()}`, 'success');
       }
 
-      if (authModalTitle) authModalTitle.textContent = window.I18n ? window.I18n.t('settings.myCloudAccountTitle') : 'Mi Cuenta en la Nube';
+      if (authModalTitle) {
+        authModalTitle.setAttribute('data-i18n', 'settings.myCloudAccountTitle');
+        authModalTitle.textContent = window.I18n ? window.I18n.t('settings.myCloudAccountTitle') : 'Mi Cuenta en la Nube';
+      }
       if (authTabs) authTabs.style.display = 'none';
       if (authForms) authForms.style.display = 'none';
       if (authLoggedIn) {
@@ -5767,16 +5782,31 @@ class FoodAssistantApp {
       // Guest / Local state
       if (pillBtn) pillBtn.classList.remove('logged-in');
       if (pillIcon) pillIcon.textContent = 'account_circle';
-      if (pillText) pillText.textContent = window.I18n ? window.I18n.t('settings.signIn') : 'Iniciar sesión';
+      if (pillText) {
+        pillText.setAttribute('data-i18n', 'settings.signIn');
+        pillText.textContent = window.I18n ? window.I18n.t('settings.signIn') : 'Iniciar sesión';
+      }
 
       if (settingsIcon) settingsIcon.textContent = 'account_circle';
-      if (settingsName) settingsName.textContent = window.I18n ? window.I18n.t('settings.localMode') : 'Modo Local (Invitado)';
-      if (settingsStatus) settingsStatus.textContent = window.I18n ? window.I18n.t('settings.dataOnlyDevice') : 'Datos almacenados solo en este dispositivo';
-      if (settingsAuthBtn) settingsAuthBtn.textContent = window.I18n ? window.I18n.t('settings.signIn') : 'Iniciar Sesión';
+      if (settingsName) {
+        settingsName.setAttribute('data-i18n', 'settings.localMode');
+        settingsName.textContent = window.I18n ? window.I18n.t('settings.localMode') : 'Modo Local (Invitado)';
+      }
+      if (settingsStatus) {
+        settingsStatus.setAttribute('data-i18n', 'settings.localModeDesc');
+        settingsStatus.textContent = window.I18n ? window.I18n.t('settings.dataOnlyDevice') : 'Datos almacenados solo en este dispositivo';
+      }
+      if (settingsAuthBtn) {
+        settingsAuthBtn.setAttribute('data-i18n', 'settings.signIn');
+        settingsAuthBtn.textContent = window.I18n ? window.I18n.t('settings.signIn') : 'Iniciar Sesión';
+      }
       if (syncNowBtn) syncNowBtn.style.display = 'none';
       this.updateSyncIndicator('');
 
-      if (authModalTitle) authModalTitle.textContent = window.I18n ? window.I18n.t('settings.cloudAccountTitle') : 'Cuenta en la Nube';
+      if (authModalTitle) {
+        authModalTitle.setAttribute('data-i18n', 'settings.cloudAccountTitle');
+        authModalTitle.textContent = window.I18n ? window.I18n.t('settings.cloudAccountTitle') : 'Cuenta en la Nube';
+      }
       if (authTabs) authTabs.style.display = 'flex';
       if (authForms) authForms.style.display = 'block';
       if (authLoggedIn) authLoggedIn.style.display = 'none';
@@ -7818,6 +7848,7 @@ class FoodAssistantApp {
     if (window.I18n) {
       window.I18n.applyTranslations(document.getElementById(viewId) || document);
     }
+    this.updateUserAccountUI();
   }
 
   renderView(viewId = this.activeView) {
@@ -7853,6 +7884,7 @@ class FoodAssistantApp {
     if (window.I18n) {
       window.I18n.applyTranslations();
     }
+    this.updateUserAccountUI();
   }
 
   calculateTodayNutrition(todayPlan) {
@@ -16840,6 +16872,7 @@ REGLAS CRÍTICAS:
     this.renderNutritionGoalsSettings();
     this.renderExternalAgentSettings();
     this.renderHouseholdSettings();
+    this.updateUserAccountUI();
   }
 
   // ==========================================================================
