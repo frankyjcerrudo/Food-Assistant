@@ -9750,170 +9750,184 @@ class FoodAssistantApp {
     const langMeta = getRecipeLanguageMeta(r);
 
     body.innerHTML = `
-      ${isSafeUrl(r.imageUrl) ? `
-      <div class="recipe-detail-hero-photo">
-        <img src="${sanitizeUrl(r.imageUrl)}" alt="${escapeHtml(r.title)}" class="img-cover-full" onerror="this.onerror=null; this.parentElement.innerHTML=app.getRecipePlaceholderHtml('${escapeHtml(r.id).replace(/'/g, "\\'")}', 'detail');">
-      </div>
-      ` : `
-      <div class="recipe-detail-hero-placeholder">
-        ${this.getRecipePlaceholderHtml(r, 'detail')}
-      </div>
-      `}
-      
-      <div class="recipe-detail-body">
-        ${this.isReviewingImport ? `
-          <div class="import-review-banner">
-            <div class="u-flex-row-center-gap-8">
-              <span class="material-symbols-outlined icon-brand icon-22">verified</span>
-              <div>
-                <div class="import-review-title">${window.I18n ? window.I18n.t('import.reviewTitle') : 'Revisión de Receta Importada (Borrador)'}</div>
-                <div class="import-review-subtitle">${window.I18n ? window.I18n.t('import.reviewSubtitle') : 'Comprueba ingredientes y pasos antes de guardar o descártala.'}</div>
+      <div class="recipe-detail-layout">
+        <!-- TOP: HERO GRID (Photo on Left, Title & Meta on Right in Desktop) -->
+        <div class="recipe-detail-hero-grid">
+          <div class="recipe-detail-hero-media">
+            ${isSafeUrl(r.imageUrl) ? `
+            <div class="recipe-detail-hero-photo">
+              <img src="${sanitizeUrl(r.imageUrl)}" alt="${escapeHtml(r.title)}" class="img-cover-full" onerror="this.onerror=null; this.parentElement.innerHTML=app.getRecipePlaceholderHtml('${escapeHtml(r.id).replace(/'/g, "\\'")}', 'detail');">
+            </div>
+            ` : `
+            <div class="recipe-detail-hero-placeholder">
+              ${this.getRecipePlaceholderHtml(r, 'detail')}
+            </div>
+            `}
+          </div>
+
+          <div class="recipe-detail-hero-content">
+            ${this.isReviewingImport ? `
+              <div class="import-review-banner">
+                <div class="u-flex-row-center-gap-8">
+                  <span class="material-symbols-outlined icon-brand icon-22">verified</span>
+                  <div>
+                    <div class="import-review-title">${window.I18n ? window.I18n.t('import.reviewTitle') : 'Revisión de Receta Importada (Borrador)'}</div>
+                    <div class="import-review-subtitle">${window.I18n ? window.I18n.t('import.reviewSubtitle') : 'Comprueba ingredientes y pasos antes de guardar o descártala.'}</div>
+                  </div>
+                </div>
+                <span class="badge import-review-badge">${window.I18n ? window.I18n.t('import.draftBadge') : 'Borrador'}</span>
               </div>
-            </div>
-            <span class="badge import-review-badge">${window.I18n ? window.I18n.t('import.draftBadge') : 'Borrador'}</span>
-          </div>
-        ` : ''}
-
-        <div class="recipe-detail-tags-row">
-          <span class="tag-chip tag-chip-lang" title="${escapeHtml(langMeta.ariaLabel)}">
-            <span class="recipe-lang-flag" aria-hidden="true">${langMeta.flag}</span>
-            <span>${langMeta.label}</span>
-          </span>
-          ${isSafeUrl(r.sourceUrl) ? `
-            <a href="${sanitizeUrl(r.sourceUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="tag-chip tag-chip-external-link" title="${window.I18n ? window.I18n.t('import.openOriginalTooltip') : 'Abrir enlace original en nueva pestaña'}">
-              <span class="material-symbols-outlined icon-14">open_in_new</span>
-              ${window.I18n ? window.I18n.t('import.sourcePrefix') : 'Fuente'}: ${escapeHtml(r.sourceDomain || 'Web Original')}
-            </a>
-          ` : ''}
-          ${(r.tags || []).filter(t => hasNutData || t !== 'Alta en Proteínas').map(t => `<span class="tag-chip tag-chip-primary">${escapeHtml(window.I18n ? window.I18n.getTagLabel(t) : t)}</span>`).join('')}
-        </div>
-        
-        <h2 class="recipe-detail-title">${escapeHtml(r.title)}</h2>
-        <p class="recipe-detail-desc">${escapeHtml(r.description)}</p>
-        
-        <div class="recipe-detail-stats-bar">
-          <div>
-            <div class="recipe-stat-upper-label">${window.I18n ? window.I18n.t('recipes.totalTime') : 'Tiempo Total'}</div>
-            <div class="recipe-stat-time-val">
-              <span class="material-symbols-outlined icon-sm">schedule</span> ${r.prepTimeMinutes + r.cookTimeMinutes} ${window.I18n ? window.I18n.t('common.minutes') : 'min'}
-            </div>
-          </div>
-          
-          <div class="u-flex-row-center-gap-8">
-            <div class="u-text-right">
-              <div class="recipe-stat-upper-label">${window.I18n ? window.I18n.t('recipes.servings') : 'Porciones'}</div>
-              <div class="recipe-stat-servings-val">
-                <span class="material-symbols-outlined icon-sm">group</span> ${this.activeServings} ${window.I18n ? window.I18n.t('recipes.persons') : 'personas'}
-              </div>
-            </div>
-            <div class="u-flex-row-center-gap-4">
-              <button class="btn btn-secondary btn-sm btn-servings-step" onclick="app.adjustServings(-1)">-</button>
-              <button class="btn btn-secondary btn-sm btn-servings-step" onclick="app.adjustServings(1)">+</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- NUTRITION BREAKDOWN CARD (US-01 / BUG-27) -->
-        <div class="recipe-nutrition-card" id="recipe-nutrition-breakdown">
-          <div class="recipe-nutrition-header">
-            <div class="recipe-nutrition-title">
-              <span class="material-symbols-outlined icon-sm icon-Flame">local_fire_department</span> ${window.I18n ? window.I18n.t('recipes.nutritionFacts') : 'Información Nutricional'}
-            </div>
-            <div class="recipe-nutrition-subtitle" id="recipe-nutrition-subtitle">
-              ${window.I18n ? window.I18n.t('recipes.perServing') : 'Por ración individual'}
-            </div>
-          </div>
-          <div class="recipe-macros-grid">
-            <div class="macro-chip macro-cal">
-              <span class="macro-chip-label">${window.I18n ? window.I18n.t('goals.calories') : 'Calorías'}</span>
-              <span class="macro-chip-val" id="macro-detail-calories">${hasNutData ? `${baseNutrition.calories}<span class="macro-chip-unit">kcal</span>` : '—'}</span>
-            </div>
-            <div class="macro-chip macro-prot">
-              <span class="macro-chip-label">${window.I18n ? window.I18n.t('goals.protein') : 'Proteínas'}</span>
-              <span class="macro-chip-val" id="macro-detail-protein">${hasNutData ? `${baseNutrition.protein}<span class="macro-chip-unit">g</span>` : '—'}</span>
-            </div>
-            <div class="macro-chip macro-carbs">
-              <span class="macro-chip-label">${window.I18n ? window.I18n.t('goals.carbs') : 'Carbos'}</span>
-              <span class="macro-chip-val" id="macro-detail-carbs">${hasNutData ? `${baseNutrition.carbs}<span class="macro-chip-unit">g</span>` : '—'}</span>
-            </div>
-            <div class="macro-chip macro-fat">
-              <span class="macro-chip-label">${window.I18n ? window.I18n.t('goals.fat') : 'Grasas'}</span>
-              <span class="macro-chip-val" id="macro-detail-fat">${hasNutData ? `${baseNutrition.fat}<span class="macro-chip-unit">g</span>` : '—'}</span>
-            </div>
-          </div>
-          <div class="nutrition-estimation-disclaimer" id="recipe-detail-nutrition-disclaimer">
-            <span class="material-symbols-outlined">info</span>
-            <span>${window.I18n ? window.I18n.t('recipes.nutritionDisclaimer') : 'Los valores nutricionales calculados son una estimación orientativa que depende de cada receta (creada a mano o importada por los usuarios). No deben tomarse al pie de la letra, sino solo como referencia aproximada.'}</span>
-          </div>
-        </div>
-
-        <div class="recipe-detail-section">
-          <div class="recipe-detail-section-header">
-            <h3 class="recipe-detail-section-title">${window.I18n ? window.I18n.t('recipes.ingredients') : 'Ingredientes'}</h3>
-            ${!this.isReviewingImport ? `
-              <button class="btn btn-tonal btn-sm" onclick="app.addRecipeIngredientsToShopping('${escapeHtml(r.id).replace(/'/g, "\\'")}')">
-                <span class="material-symbols-outlined icon-sm">add_shopping_cart</span> ${window.I18n ? window.I18n.t('recipes.sendToShopping') : 'Enviar a la Compra'}
-              </button>
             ` : ''}
-          </div>
-          <ul class="recipe-ingredients-list">
-            ${(r.ingredients || []).map(ing => {
-      const adjustedAmount = ing.amount ? Math.round((ing.amount * scale) * 10) / 10 : null;
-      return `
-                <li class="recipe-ingredient-item">
-                  <span>${escapeHtml(ing.name)}</span>
-                  <strong class="recipe-ingredient-amount">${adjustedAmount !== null ? `${adjustedAmount} ${ing.unit || ''}` : ''}</strong>
-                </li>
-              `;
-    }).join('')}
-          </ul>
-        </div>
 
-        <div class="recipe-detail-section">
-          <h3 class="recipe-detail-section-title-mb">${window.I18n ? window.I18n.t('recipes.instructions') : 'Instrucciones'}</h3>
-          <div class="recipe-steps-list">
-            ${(r.instructions || []).map(inst => `
-              <div class="recipe-step-row">
-                <div class="recipe-step-badge">
-                  ${inst.step}
-                </div>
-                <div class="recipe-step-text">
-                  ${escapeHtml(inst.text)}
-                  ${inst.timerMinutes > 0 ? `
-                    <div class="recipe-step-timer-pill">
-                      <span class="material-symbols-outlined icon-sm">timer</span> ${inst.timerMinutes} ${window.I18n ? window.I18n.t('recipes.minutes') : 'minutos'}
-                    </div>
-                  ` : ''}
+            <div class="recipe-detail-tags-row">
+              <span class="tag-chip tag-chip-lang" title="${escapeHtml(langMeta.ariaLabel)}">
+                <span class="recipe-lang-flag" aria-hidden="true">${langMeta.flag}</span>
+                <span>${langMeta.label}</span>
+              </span>
+              ${isSafeUrl(r.sourceUrl) ? `
+                <a href="${sanitizeUrl(r.sourceUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="tag-chip tag-chip-external-link" title="${window.I18n ? window.I18n.t('import.openOriginalTooltip') : 'Abrir enlace original en nueva pestaña'}">
+                  <span class="material-symbols-outlined icon-14">open_in_new</span>
+                  ${window.I18n ? window.I18n.t('import.sourcePrefix') : 'Fuente'}: ${escapeHtml(r.sourceDomain || 'Web Original')}
+                </a>
+              ` : ''}
+              ${(r.tags || []).filter(t => hasNutData || t !== 'Alta en Proteínas').map(t => `<span class="tag-chip tag-chip-primary">${escapeHtml(window.I18n ? window.I18n.getTagLabel(t) : t)}</span>`).join('')}
+            </div>
+            
+            <h2 class="recipe-detail-title">${escapeHtml(r.title)}</h2>
+            ${r.description ? `<p class="recipe-detail-desc">${escapeHtml(r.description)}</p>` : ''}
+            
+            <div class="recipe-detail-stats-bar">
+              <div>
+                <div class="recipe-stat-upper-label">${window.I18n ? window.I18n.t('recipes.totalTime') : 'Tiempo Total'}</div>
+                <div class="recipe-stat-time-val">
+                  <span class="material-symbols-outlined icon-sm">schedule</span> ${r.prepTimeMinutes + r.cookTimeMinutes} ${window.I18n ? window.I18n.t('common.minutes') : 'min'}
                 </div>
               </div>
-            `).join('')}
+              
+              <div class="u-flex-row-center-gap-8">
+                <div class="u-text-right">
+                  <div class="recipe-stat-upper-label">${window.I18n ? window.I18n.t('recipes.servings') : 'Porciones'}</div>
+                  <div class="recipe-stat-servings-val">
+                    <span class="material-symbols-outlined icon-sm">group</span> ${this.activeServings} ${window.I18n ? window.I18n.t('recipes.persons') : 'personas'}
+                  </div>
+                </div>
+                <div class="u-flex-row-center-gap-4">
+                  <button class="btn btn-secondary btn-sm btn-servings-step" onclick="app.adjustServings(-1)">-</button>
+                  <button class="btn btn-secondary btn-sm btn-servings-step" onclick="app.adjustServings(1)">+</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- NUTRITION BREAKDOWN CARD (US-01 / BUG-27) -->
+            <div class="recipe-nutrition-card" id="recipe-nutrition-breakdown">
+              <div class="recipe-nutrition-header">
+                <div class="recipe-nutrition-title">
+                  <span class="material-symbols-outlined icon-sm icon-Flame">local_fire_department</span> ${window.I18n ? window.I18n.t('recipes.nutritionFacts') : 'Información Nutricional'}
+                </div>
+                <div class="recipe-nutrition-subtitle" id="recipe-nutrition-subtitle">
+                  ${window.I18n ? window.I18n.t('recipes.perServing') : 'Por ración individual'}
+                </div>
+              </div>
+              <div class="recipe-macros-grid">
+                <div class="macro-chip macro-cal">
+                  <span class="macro-chip-label">${window.I18n ? window.I18n.t('goals.calories') : 'Calorías'}</span>
+                  <span class="macro-chip-val" id="macro-detail-calories">${hasNutData ? `${baseNutrition.calories}<span class="macro-chip-unit">kcal</span>` : '—'}</span>
+                </div>
+                <div class="macro-chip macro-prot">
+                  <span class="macro-chip-label">${window.I18n ? window.I18n.t('goals.protein') : 'Proteínas'}</span>
+                  <span class="macro-chip-val" id="macro-detail-protein">${hasNutData ? `${baseNutrition.protein}<span class="macro-chip-unit">g</span>` : '—'}</span>
+                </div>
+                <div class="macro-chip macro-carbs">
+                  <span class="macro-chip-label">${window.I18n ? window.I18n.t('goals.carbs') : 'Carbos'}</span>
+                  <span class="macro-chip-val" id="macro-detail-carbs">${hasNutData ? `${baseNutrition.carbs}<span class="macro-chip-unit">g</span>` : '—'}</span>
+                </div>
+                <div class="macro-chip macro-fat">
+                  <span class="macro-chip-label">${window.I18n ? window.I18n.t('goals.fat') : 'Grasas'}</span>
+                  <span class="macro-chip-val" id="macro-detail-fat">${hasNutData ? `${baseNutrition.fat}<span class="macro-chip-unit">g</span>` : '—'}</span>
+                </div>
+              </div>
+              <div class="nutrition-estimation-disclaimer" id="recipe-detail-nutrition-disclaimer">
+                <span class="material-symbols-outlined">info</span>
+                <span>${window.I18n ? window.I18n.t('recipes.nutritionDisclaimer') : 'Los valores nutricionales calculados son una estimación orientativa que depende de cada receta (creada a mano o importada por los usuarios). No deben tomarse al pie de la letra, sino solo como referencia aproximada.'}</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        ${this.isReviewingImport ? `
-          <div class="import-review-footer">
-            <button class="btn btn-primary btn-save-import-full" id="btn-bottom-save-import-recipe" onclick="app.confirmSaveImportRecipe()">
-              <span class="material-symbols-outlined">check_circle</span> ${window.I18n ? window.I18n.t('import.saveToRecipes') : 'Guardar en Recetas'}
-            </button>
-            <div class="u-flex-row-center-gap-8">
-              <button class="btn btn-secondary btn-import-subaction" onclick="app.editImportReview()">
-                <span class="material-symbols-outlined icon-sm">edit</span> ${window.I18n ? window.I18n.t('import.editRecipe') : 'Editar receta'}
-              </button>
-              <button class="btn btn-ghost btn-import-cancel" onclick="app.cancelImportReview()">
-                <span class="material-symbols-outlined icon-sm">cancel</span> ${window.I18n ? window.I18n.t('import.cancelImport') : 'Cancelar importación'}
-              </button>
+        <!-- BOTTOM: 2 COLUMNS (Ingredients on Left, Instructions on Right in Desktop) -->
+        <div class="recipe-detail-columns-grid">
+          <div class="recipe-detail-col-ingredients">
+            <div class="recipe-detail-section">
+              <div class="recipe-detail-section-header">
+                <h3 class="recipe-detail-section-title">${window.I18n ? window.I18n.t('recipes.ingredients') : 'Ingredientes'}</h3>
+                ${!this.isReviewingImport ? `
+                  <button class="btn btn-tonal btn-sm" onclick="app.addRecipeIngredientsToShopping('${escapeHtml(r.id).replace(/'/g, "\\'")}')">
+                    <span class="material-symbols-outlined icon-sm">add_shopping_cart</span> ${window.I18n ? window.I18n.t('recipes.sendToShopping') : 'Enviar a la Compra'}
+                  </button>
+                ` : ''}
+              </div>
+              <ul class="recipe-ingredients-list">
+                ${(r.ingredients || []).map(ing => {
+                  const adjustedAmount = ing.amount ? Math.round((ing.amount * scale) * 10) / 10 : null;
+                  return `
+                    <li class="recipe-ingredient-item">
+                      <span>${escapeHtml(ing.name)}</span>
+                      <strong class="recipe-ingredient-amount">${adjustedAmount !== null ? `${adjustedAmount} ${ing.unit || ''}` : ''}</strong>
+                    </li>
+                  `;
+                }).join('')}
+              </ul>
             </div>
           </div>
-        ` : `
-          <div class="recipe-detail-bottom-actions">
-            <button class="btn btn-secondary btn-detail-plan" id="btn-bottom-plan-recipe" onclick="app.openPlanRecipeModal()">
-              <span class="material-symbols-outlined icon-sm">calendar_month</span> ${window.I18n ? window.I18n.t('recipes.addToPlan') : 'Añadir al Plan'}
-            </button>
-            <button class="btn btn-primary btn-detail-cook" id="btn-bottom-start-cook-mode" onclick="app.startCookMode()">
-              <span class="material-symbols-outlined icon-sm">skillet</span> ${window.I18n ? window.I18n.t('recipes.cookingMode') : 'Modo Cocina'}
-            </button>
+
+          <div class="recipe-detail-col-instructions">
+            <div class="recipe-detail-section">
+              <h3 class="recipe-detail-section-title-mb">${window.I18n ? window.I18n.t('recipes.instructions') : 'Instrucciones'}</h3>
+              <div class="recipe-steps-list">
+                ${(r.instructions || []).map(inst => `
+                  <div class="recipe-step-row">
+                    <div class="recipe-step-badge">
+                      ${inst.step}
+                    </div>
+                    <div class="recipe-step-text">
+                      ${escapeHtml(inst.text)}
+                      ${inst.timerMinutes > 0 ? `
+                        <div class="recipe-step-timer-pill">
+                          <span class="material-symbols-outlined icon-sm">timer</span> ${inst.timerMinutes} ${window.I18n ? window.I18n.t('recipes.minutes') : 'minutos'}
+                        </div>
+                      ` : ''}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            ${this.isReviewingImport ? `
+              <div class="import-review-footer">
+                <button class="btn btn-primary btn-save-import-full" id="btn-bottom-save-import-recipe" onclick="app.confirmSaveImportRecipe()">
+                  <span class="material-symbols-outlined">check_circle</span> ${window.I18n ? window.I18n.t('import.saveToRecipes') : 'Guardar en Recetas'}
+                </button>
+                <div class="u-flex-row-center-gap-8">
+                  <button class="btn btn-secondary btn-import-subaction" onclick="app.editImportReview()">
+                    <span class="material-symbols-outlined icon-sm">edit</span> ${window.I18n ? window.I18n.t('import.editRecipe') : 'Editar receta'}
+                  </button>
+                  <button class="btn btn-ghost btn-import-cancel" onclick="app.cancelImportReview()">
+                    <span class="material-symbols-outlined icon-sm">cancel</span> ${window.I18n ? window.I18n.t('import.cancelImport') : 'Cancelar importación'}
+                  </button>
+                </div>
+              </div>
+            ` : `
+              <div class="recipe-detail-bottom-actions">
+                <button class="btn btn-secondary btn-detail-plan" id="btn-bottom-plan-recipe" onclick="app.openPlanRecipeModal()">
+                  <span class="material-symbols-outlined icon-sm">calendar_month</span> ${window.I18n ? window.I18n.t('recipes.addToPlan') : 'Añadir al Plan'}
+                </button>
+                <button class="btn btn-primary btn-detail-cook" id="btn-bottom-start-cook-mode" onclick="app.startCookMode()">
+                  <span class="material-symbols-outlined icon-sm">skillet</span> ${window.I18n ? window.I18n.t('recipes.cookingMode') : 'Modo Cocina'}
+                </button>
+              </div>
+            `}
           </div>
-        `}
+        </div>
       </div>
     `;
   }

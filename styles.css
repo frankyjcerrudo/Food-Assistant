@@ -8882,3 +8882,155 @@ h2,
     margin: 0 !important;
   }
 }
+
+
+/* ==========================================================================
+   US-86 / US-87: Ficha de Receta Editorial 2 Columnas (Desktop & Tablet >= 769px)
+   ========================================================================== */
+
+/* Reglas comunes para el contenedor del detalle */
+.recipe-detail-layout {
+  display: flex;
+  flex-direction: column;
+}
+
+.recipe-detail-hero-media {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background-color: var(--m3-surface-container-high);
+}
+
+.recipe-detail-hero-media .recipe-detail-hero-photo,
+.recipe-detail-hero-media .recipe-detail-hero-placeholder {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border-radius: inherit;
+}
+
+.recipe-detail-hero-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* En Móvil (< 769px): Mantiene la experiencia vertical a pantalla completa intacta */
+@media (max-width: 768px) {
+  .recipe-detail-hero-grid {
+    display: flex;
+    flex-direction: column;
+  }
+  .recipe-detail-hero-media {
+    border-radius: 0;
+    height: 220px;
+  }
+  .recipe-detail-hero-content {
+    padding: 16px 18px 0;
+  }
+  .recipe-detail-columns-grid {
+    display: flex;
+    flex-direction: column;
+    padding: 0 18px 24px;
+  }
+}
+
+/* En Tablet y Escritorio (>= 769px): Diseño Editorial Abierto a 2 Columnas */
+@media (min-width: 769px) {
+  #modal-recipe-detail .modal-content {
+    max-width: 1040px !important;
+    width: 92vw !important;
+    max-height: 88vh !important;
+    border-radius: var(--radius-xl) !important;
+    padding: 0 !important;
+    overflow-y: auto !important;
+    box-shadow: var(--elevation-3) !important;
+    box-sizing: border-box !important;
+  }
+
+  #modal-recipe-detail .modal-header-bar {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 20 !important;
+    background: var(--m3-surface) !important;
+    border-bottom: var(--border-subtle) !important;
+    padding: 14px 24px !important;
+  }
+
+  .recipe-detail-hero-grid {
+    display: grid !important;
+    grid-template-columns: 360px 1fr !important;
+    gap: 28px !important;
+    padding: 24px 28px 20px !important;
+    align-items: start !important;
+  }
+
+  .recipe-detail-hero-media {
+    height: 260px !important;
+    box-shadow: var(--elevation-1) !important;
+  }
+
+  .recipe-detail-hero-content {
+    display: flex !important;
+    flex-direction: column !important;
+    min-width: 0 !important;
+  }
+
+  .recipe-detail-hero-content .recipe-detail-title {
+    font-size: 28px !important;
+    line-height: 1.2 !important;
+    margin-bottom: 8px !important;
+  }
+
+  .recipe-detail-hero-content .recipe-detail-desc {
+    font-size: 13.5px !important;
+    line-height: 1.5 !important;
+    margin-bottom: 12px !important;
+  }
+
+  .recipe-detail-hero-content .recipe-detail-stats-bar {
+    margin-bottom: 12px !important;
+    padding: 8px 14px !important;
+  }
+
+  .recipe-detail-hero-content .recipe-nutrition-card {
+    margin-bottom: 0 !important;
+  }
+
+  .recipe-detail-columns-grid {
+    display: grid !important;
+    grid-template-columns: 360px 1fr !important;
+    gap: 32px !important;
+    padding: 22px 28px 28px !important;
+    align-items: start !important;
+    border-top: var(--border-subtle) !important;
+  }
+
+  .recipe-detail-col-ingredients {
+    border-right: var(--border-subtle) !important;
+    padding-right: 24px !important;
+  }
+
+  .recipe-detail-col-instructions {
+    display: flex !important;
+    flex-direction: column !important;
+    min-width: 0 !important;
+  }
+
+  .recipe-detail-col-instructions .recipe-detail-bottom-actions {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 12px !important;
+    margin-top: 24px !important;
+    padding-top: 16px !important;
+    border-top: var(--border-subtle) !important;
+  }
+
+  .recipe-detail-col-instructions .btn-detail-cook {
+    padding: 10px 22px !important;
+    font-size: 14.5px !important;
+    font-weight: 700 !important;
+  }
+}
