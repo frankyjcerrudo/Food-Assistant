@@ -4758,7 +4758,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.77';
+  window.APP_VERSION = 'v1.78';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4805,7 +4805,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.77';
+    this.appVersion = window.APP_VERSION || 'v1.78';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion

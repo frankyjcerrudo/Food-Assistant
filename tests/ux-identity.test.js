@@ -40,7 +40,7 @@ describe('US-73: Auditoría Integral de UX, Arquitectura de Información e Ident
     expect(cssContent).toContain('Playfair+Display');
     expect(cssContent).toContain('--font-serif:');
     expect(cssContent).toContain('--m3-surface-canvas: #FAF7F2');
-    expect(cssContent).toContain('--m3-primary: #C85A32');
+    expect(cssContent).toContain('--m3-primary: #B84D27');
     expect(cssContent).toContain('--color-brand: #2D6A4F');
 
     // Modo oscuro cálido suavizado "Piedra Cálida / Warm Dusk"

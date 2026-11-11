@@ -100,4 +100,36 @@ describe('US-23, US-24 & US-49: Sistema de Diseño Moderno, Micro-interacciones 
       expect(directStyleAssign).toBeNull();
     });
   });
+  describe('US-84 (v1.78): Auditoría Móvil P2 - Ergonomía Táctil, Contraste WCAG 2.2 AA y Accesibilidad', () => {
+    it('define colores conformes con WCAG 2.2 AA (terracota #B84D27 en light, dark texto #261008 en botones oscuros y #b45309 en grasa)', () => {
+      expect(stylesCss).toContain('--m3-primary: #B84D27');
+      expect(stylesCss).toContain('--color-terracotta: #B84D27');
+      expect(stylesCss).toContain('--m3-on-primary: #261008');
+      expect(stylesCss).toContain('.macro-fat .macro-chip-label { color: #b45309; }');
+      expect(stylesCss).toContain('color: var(--m3-on-primary-container, #5C220D);');
+    });
+
+    it('define áreas táctiles mínimas (≥ 44x44px) en @media (pointer: coarse) y controles de Modo Cocina', () => {
+      expect(stylesCss).toContain('@media (pointer: coarse)');
+      expect(stylesCss).toContain('.btn-remove-circle::after');
+      expect(stylesCss).toContain('width: 44px');
+      expect(stylesCss).toContain('height: 44px');
+      expect(stylesCss).toContain('#cook-mode-overlay .btn-sm');
+      expect(stylesCss).toContain('min-height: 48px');
+    });
+
+    it('reserva padding inferior seguro para el dock flotante en móvil (calc(104px + env(safe-area-inset-bottom)))', () => {
+      expect(stylesCss).toContain('padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px))');
+    });
+
+    it('asigna nombres accesibles (aria-label o <label for>) a todos los inputs principales en index.html', () => {
+      const indexHtml = fs.readFileSync(path.join(process.cwd(), 'index.html'), 'utf-8');
+      expect(indexHtml).toContain('id="recipes-search-input" aria-label="');
+      expect(indexHtml).toContain('id="input-fridge-ingredient" aria-label="');
+      expect(indexHtml).toContain('id="input-quick-grocery" aria-label="');
+      expect(indexHtml).toContain('id="gemini-invoke-input" class="form-input gemini-input" aria-label="');
+      expect(indexHtml).toContain('id="input-goal-calories" placeholder="2000" aria-label="');
+      expect(indexHtml).toContain('<label class="form-label" for="auth-email">');
+    });
+  });
 });

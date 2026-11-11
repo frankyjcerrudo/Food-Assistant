@@ -10,7 +10,7 @@
 :root,
 :root[data-theme="light"] {
   color-scheme: light;
-  --m3-primary: #C85A32;
+  --m3-primary: #B84D27;
   --m3-on-primary: #ffffff;
   --m3-primary-container: #FCECE6;
   --m3-on-primary-container: #5C220D;
@@ -38,7 +38,7 @@
   --color-brand: #2D6A4F;
   --color-brand-container: #E6F4EA;
   --color-brand-on-container: #0F3826;
-  --color-terracotta: #C85A32;
+  --color-terracotta: #B84D27;
   --color-terracotta-soft: #FCECE6;
 
   --m3-error: #ba1a1a;
@@ -102,7 +102,7 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
   --m3-primary: #E57A52;
-  --m3-on-primary: #FFFFFF;
+  --m3-on-primary: #261008;
   --m3-primary-container: rgba(229, 122, 82, 0.22);
   --m3-on-primary-container: #FFE4DC;
 
@@ -527,6 +527,12 @@ textarea {
   box-sizing: border-box;
   padding: var(--space-3) var(--space-2) var(--space-4);
   animation: fadeIn 0.18s var(--ease-out);
+}
+
+@media (max-width: 899px) {
+  .view-panel {
+    padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 .view-panel.active {
@@ -3243,7 +3249,7 @@ dialog.modal-overlay:is([open], .active):where(:not([data-closing]))::backdrop {
 .macro-cal .macro-chip-label { color: #d9480f; }
 .macro-prot .macro-chip-label { color: #1971c2; }
 .macro-carbs .macro-chip-label { color: #2f9e44; }
-.macro-fat .macro-chip-label { color: #f59f00; }
+.macro-fat .macro-chip-label { color: #b45309; }
 
 :root[data-theme="dark"] .macro-cal .macro-chip-label { color: #ff922b; }
 :root[data-theme="dark"] .macro-prot .macro-chip-label { color: #74c0fc; }
@@ -7043,7 +7049,7 @@ h2,
   font-size: 10.5px;
   font-weight: 700;
   background: var(--m3-primary-container, #FFEBDD);
-  color: var(--m3-primary);
+  color: var(--m3-on-primary-container, #5C220D);
   padding: 1.5px 7px;
   border-radius: var(--radius-full);
 }
@@ -7831,3 +7837,56 @@ h2,
   color: var(--m3-on-surface-variant);
 }
 
+
+/* Cook Mode Ergonomic Touch Controls (US-84) */
+#cook-mode-overlay .btn-sm {
+  min-height: 44px;
+  padding: 10px 20px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+#btn-cook-prev-step,
+#btn-cook-next-step {
+  min-height: 48px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   US-84: Touch Target Ergonomics (@media (pointer: coarse) ≥ 44x44px)
+   ========================================================================== */
+@media (pointer: coarse) {
+  .btn-remove-circle {
+    position: relative;
+  }
+
+  .btn-remove-circle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .day-card .day-header {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  #btn-toggle-all-planner-days {
+    min-height: 44px;
+    padding: 8px 12px;
+  }
+
+  .btn-servings-step {
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
