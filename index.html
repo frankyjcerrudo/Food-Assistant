@@ -295,7 +295,7 @@
 
       <!-- Week Navigation Controls (US-05 / US-22 / BUG-07) -->
       <div class="week-nav-bar week-nav-bar-unified" id="planner-week-nav-bar">
-        <div class="week-nav-controls-group">
+        <div class="week-nav-stepper">
           <button type="button" class="btn btn-ghost btn-sm btn-icon" id="btn-prev-week" title="Semana anterior"
             data-action="navigateWeek" data-dir="-1" aria-label="Semana anterior">
             <span class="material-symbols-outlined icon-sm">chevron_left</span>
@@ -308,18 +308,20 @@
             data-action="navigateWeek" data-dir="1" data-i18n-title="planner.nextWeekTooltip" aria-label="Semana siguiente">
             <span class="material-symbols-outlined icon-sm">chevron_right</span>
           </button>
+        </div>
+        <div class="week-nav-tools">
           <button type="button" class="btn btn-tonal btn-sm" id="btn-current-week" title="Ir a la semana actual"
             data-action="navigateWeek" data-dir="0" data-i18n-title="planner.currentWeekTooltip">
-            <span class="material-symbols-outlined icon-sm">today</span>
+            <span class="material-symbols-outlined icon-14">today</span>
             <span data-i18n="planner.currentWeek">Esta semana</span>
           </button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-toggle-all-planner-days"
+            data-action="toggleAllPlannerDays" title="Expandir o plegar todos los días de la semana"
+            data-i18n-title="planner.toggleAllDaysTooltip">
+            <span class="material-symbols-outlined icon-sm">unfold_more</span>
+            <span id="btn-toggle-all-planner-days-label" data-i18n="planner.expandWeek">Expandir semana</span>
+          </button>
         </div>
-        <button type="button" class="btn btn-ghost btn-sm" id="btn-toggle-all-planner-days"
-          data-action="toggleAllPlannerDays" title="Expandir o plegar todos los días de la semana"
-          data-i18n-title="planner.toggleAllDaysTooltip">
-          <span class="material-symbols-outlined icon-sm">unfold_more</span>
-          <span id="btn-toggle-all-planner-days-label" data-i18n="planner.expandWeek">Expandir semana</span>
-        </button>
       </div>
 
       <div id="planner-days-container">
@@ -364,14 +366,15 @@
       </div>
 
       <!-- Quick Add Input (US-20: Autocompletado inteligente) -->
-      <div style="display: flex; gap: 8px; margin-bottom: 16px; position: relative;">
-        <div style="flex: 1; position: relative;">
-          <input type="text" class="form-input" id="input-quick-grocery" aria-label="Añadir artículo rápido a la lista de la compra"
+      <div class="shopping-unified-add-bar">
+        <span class="material-symbols-outlined shopping-add-icon">add_shopping_cart</span>
+        <div class="shopping-add-input-wrapper">
+          <input type="text" class="shopping-unified-input" id="input-quick-grocery" aria-label="Añadir artículo rápido a la lista de la compra"
             placeholder="Añadir artículo (ej. Plátanos, 1L Leche, Huevos...)"
             data-i18n-placeholder="shopping.inputPlaceholder" autocomplete="off">
           <div id="quick-grocery-autocomplete" class="autocomplete-dropdown" style="display: none;"></div>
         </div>
-        <button class="btn btn-primary" id="btn-add-grocery">
+        <button class="btn btn-primary shopping-unified-btn" id="btn-add-grocery">
           <span class="material-symbols-outlined icon-sm">add</span>
           <span data-i18n="common.add">Añadir</span>
         </button>
@@ -940,7 +943,6 @@
       </button>
       <button class="nav-item nav-item-gemini" id="btn-central-gemini-invoke" aria-label="Hablar con el Sous Chef"
         title="Hablar con el Sous Chef">
-        <div class="nav-gemini-cradle" aria-hidden="true"></div>
         <div class="nav-gemini-fab">
           <svg class="chef-toque-icon gemini-sparkle-icon" viewBox="0 0 28 28" fill="none"
             xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

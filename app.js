@@ -8333,30 +8333,63 @@ class FoodAssistantApp {
 
         const calGoalNum = Number(goals.calories) || 0;
         const calProgressPct = calGoalNum > 0 ? Math.min(100, Math.round((todayNutrition.totalCalories / calGoalNum) * 100)) : 0;
+        const protGoal = Number(goals.protein) || 0;
+        const carbsGoal = Number(goals.carbs) || 0;
+        const fatGoal = Number(goals.fat) || 0;
+        const protPct = protGoal > 0 ? Math.min(100, Math.round((todayNutrition.totalProtein / protGoal) * 100)) : 0;
+        const carbsPct = carbsGoal > 0 ? Math.min(100, Math.round((todayNutrition.totalCarbs / carbsGoal) * 100)) : 0;
+        const fatPct = fatGoal > 0 ? Math.min(100, Math.round((todayNutrition.totalFat / fatGoal) * 100)) : 0;
 
         nutritionContainer.innerHTML = `
-          <div class="today-nutrition-pill-bar" id="today-nutrition-pill-bar" onclick="app.toggleTodayNutritionDetails()" role="button" tabindex="0" aria-expanded="${!!this.todayNutritionExpanded}" title="${window.I18n ? window.I18n.t('today.breakdownAria') : 'Ver desglose nutricional diario'}">
-            <div class="today-header-macro-top-row">
-              <span class="today-nutrition-pill-kcal">
-                <span class="material-symbols-outlined icon-15 icon-primary">local_fire_department</span>
-                <strong>${todayNutrition.totalCalories}</strong>${calGoalNum > 0 ? `<span class="today-header-cal-goal">/${calGoalNum}</span>` : ''} <span class="today-header-cal-unit">kcal</span>
-              </span>
-              <span class="material-symbols-outlined icon-16 today-nutrition-pill-chevron mobile-only-chevron">expand_more</span>
-            </div>
-            ${calGoalNum > 0 ? `
-              <div class="today-header-mini-bar" aria-hidden="true">
-                <div class="today-header-mini-bar-fill" style="--progress: ${calProgressPct}%;"></div>
+          <div class="today-nutrition-pill-bar today-nutrition-pill-split" id="today-nutrition-pill-bar" onclick="app.toggleTodayNutritionDetails()" role="button" tabindex="0" aria-expanded="${!!this.todayNutritionExpanded}" title="${window.I18n ? window.I18n.t('today.breakdownAria') : 'Ver desglose nutricional diario'}">
+            <!-- Left Half: Calories & its dedicated half-width mini-bar -->
+            <div class="today-macros-half-calories">
+              <div class="today-macros-cal-head">
+                <span class="today-nutrition-pill-kcal">
+                  <span class="material-symbols-outlined icon-16 icon-primary">local_fire_department</span>
+                  <strong>${todayNutrition.totalCalories}</strong>${calGoalNum > 0 ? `<span class="today-header-cal-goal">/${calGoalNum}</span>` : ''} <span class="today-header-cal-unit">kcal</span>
+                </span>
               </div>
-            ` : ''}
-            <div class="today-header-macro-pills-row">
-              <span class="today-header-macro-badge macro-badge-prot"><em>P</em> ${Math.round(todayNutrition.totalProtein)}g</span>
-              <span class="today-header-macro-badge macro-badge-carbs"><em>C</em> ${Math.round(todayNutrition.totalCarbs)}g</span>
-              <span class="today-header-macro-badge macro-badge-fat"><em>G</em> ${Math.round(todayNutrition.totalFat)}g</span>
+              ${calGoalNum > 0 ? `
+                <div class="today-header-mini-bar" aria-hidden="true">
+                  <div class="today-header-mini-bar-fill" style="--progress: ${calProgressPct}%;"></div>
+                </div>
+              ` : ''}
             </div>
-            <div class="today-header-macro-action desktop-only-action" onclick="event.stopPropagation(); app.openNutritionBreakdownModal();" title="${window.I18n ? window.I18n.t('today.breakdownAria') : 'Ver desglose nutricional completo en ventana modal'}">
-              ${headerGoalsBtn}
-              <span class="today-header-macro-action-label">${this.todayNutritionExpanded ? (window.I18n ? window.I18n.t('today.hideBreakdown') : 'Ocultar desglose') : (window.I18n ? window.I18n.t('today.viewBreakdown') : 'Ver desglose')}</span>
-              <span class="material-symbols-outlined icon-16">open_in_new</span>
+
+            <!-- Vertical subtle divider -->
+            <div class="today-macros-split-divider" aria-hidden="true"></div>
+
+            <!-- Right Half: 3 balanced Macro gauges with individual mini-bars -->
+            <div class="today-macros-half-nutrients today-header-macro-pills-row">
+              <div class="today-macro-gauge" title="Proteínas: ${Math.round(todayNutrition.totalProtein)}g${protGoal > 0 ? ' / ' + protGoal + 'g' : ''}">
+                <div class="today-macro-gauge-head">
+                  <span class="today-header-macro-badge macro-badge-prot"><em>P</em> ${Math.round(todayNutrition.totalProtein)}g</span>
+                </div>
+                ${protGoal > 0 ? `
+                  <div class="today-macro-mini-gauge-track"><div class="today-macro-mini-gauge-fill fill-prot" style="--progress: ${protPct}%;"></div></div>
+                ` : ''}
+              </div>
+
+              <div class="today-macro-gauge" title="Carbohidratos: ${Math.round(todayNutrition.totalCarbs)}g${carbsGoal > 0 ? ' / ' + carbsGoal + 'g' : ''}">
+                <div class="today-macro-gauge-head">
+                  <span class="today-header-macro-badge macro-badge-carbs"><em>C</em> ${Math.round(todayNutrition.totalCarbs)}g</span>
+                </div>
+                ${carbsGoal > 0 ? `
+                  <div class="today-macro-mini-gauge-track"><div class="today-macro-mini-gauge-fill fill-carbs" style="--progress: ${carbsPct}%;"></div></div>
+                ` : ''}
+              </div>
+
+              <div class="today-macro-gauge" title="Grasas: ${Math.round(todayNutrition.totalFat)}g${fatGoal > 0 ? ' / ' + fatGoal + 'g' : ''}">
+                <div class="today-macro-gauge-head">
+                  <span class="today-header-macro-badge macro-badge-fat"><em>G</em> ${Math.round(todayNutrition.totalFat)}g</span>
+                </div>
+                ${fatGoal > 0 ? `
+                  <div class="today-macro-mini-gauge-track"><div class="today-macro-mini-gauge-fill fill-fat" style="--progress: ${fatPct}%;"></div></div>
+                ` : ''}
+              </div>
+
+              <span class="material-symbols-outlined icon-16 today-nutrition-pill-chevron">expand_more</span>
             </div>
           </div>
           <div class="today-nutrition-details-body" id="today-nutrition-details-body">

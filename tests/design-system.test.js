@@ -180,10 +180,10 @@ describe('US-23, US-24 & US-49: Sistema de Diseño Moderno, Micro-interacciones 
       expect(stylesCss).toContain('width: 100% !important;');
     });
 
-    it('incorpora cradle esculpido envolvente para el botón central del Sous Chef', () => {
-      expect(indexHtml).toContain('class="nav-gemini-cradle"');
-      expect(stylesCss).toContain('.nav-gemini-cradle');
-      expect(stylesCss).toContain('border-radius: 50%;');
+    it('integra armoniosamente el botón central del Sous Chef dentro del dock sin protuberancias', () => {
+      expect(indexHtml).toContain('id="btn-central-gemini-invoke"');
+      expect(stylesCss).toContain('.bottom-nav');
+      expect(stylesCss).toContain('.nav-item-gemini');
     });
 
     it('elimina la redundancia "Hoy" en la etiqueta de fecha del Menú de Hoy', () => {

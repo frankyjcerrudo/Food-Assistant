@@ -7974,30 +7974,7 @@ h2,
   overflow: visible;
 }
 
-.nav-gemini-cradle {
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  background-color: var(--nav-glass-bg);
-  backdrop-filter: blur(22px) saturate(190%);
-  -webkit-backdrop-filter: blur(22px) saturate(190%);
-  border: var(--border-subtle);
-  border-bottom: none;
-  box-shadow: 0 -4px 14px rgba(42, 33, 27, 0.08);
-  z-index: 0;
-  pointer-events: none;
-  transition: background-color 0.25s ease, box-shadow 0.25s ease;
-}
-
-[data-theme="dark"] .nav-gemini-cradle {
-  box-shadow: 0 -4px 20px rgba(15, 12, 10, 0.45);
-}
-
-.nav-gemini-fab {
+[data-theme="dark"] .nav-gemini-fab {
   position: relative;
   z-index: 1;
 }
@@ -8110,4 +8087,423 @@ h2,
     overflow-y: auto;
     padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px));
   }
+}
+
+
+/* ==========================================================================
+   US-86 v1.80: Pulido Integral de UI & Ergonomía
+   1. Tarjeta de Macros 50/50 equilibrada con mini barras
+   2. Dock Limpio sin protuberancias disonantes
+   3. Planificador Semanal en 2 filas limpias y compactas
+   4. Estilización de Lista de la Compra y Recetario
+   ========================================================================== */
+
+/* 1. Tarjeta de Macros 50/50 */
+.today-nutrition-pill-split {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
+.today-macros-half-calories {
+  flex: 1 1 42%;
+  min-width: 130px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.today-macros-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.today-macros-half-calories .today-header-mini-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background-color: var(--m3-surface-container-high);
+  overflow: hidden;
+  position: relative;
+}
+
+.today-macros-half-calories .today-header-mini-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--m3-primary) 0%, #E07A5F 100%);
+  width: var(--progress, 0%);
+  transition: width 0.3s ease;
+}
+
+.today-macros-split-divider {
+  width: 1px;
+  height: 36px;
+  background-color: var(--m3-outline-variant);
+  opacity: 0.5;
+  flex: 0 0 1px;
+}
+
+.today-macros-half-nutrients {
+  flex: 1 1 54%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.today-macro-gauge {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.today-macro-gauge-head {
+  display: flex;
+  align-items: center;
+}
+
+.today-macro-gauge-head .today-header-macro-badge {
+  font-size: 11px;
+  padding: 1px 4px;
+  white-space: nowrap;
+}
+
+.today-macro-mini-gauge-track {
+  width: 100%;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background-color: var(--m3-surface-container-high);
+  overflow: hidden;
+}
+
+.today-macro-mini-gauge-fill { width: var(--progress, 0%);
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+}
+
+.today-macro-mini-gauge-fill.fill-prot {
+  background-color: #2E7D32;
+}
+
+.today-macro-mini-gauge-fill.fill-carbs {
+  background-color: #E65100;
+}
+
+.today-macro-mini-gauge-fill.fill-fat {
+  background-color: #b45309;
+}
+
+/* 2. Dock Limpio e Integrado */
+.bottom-nav {
+  height: 60px;
+  padding: 4px 12px !important;
+  box-sizing: border-box;
+}
+
+.nav-item-gemini {
+  position: static !important;
+  top: 0 !important;
+  transform: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 100% !important;
+}
+
+.nav-gemini-fab {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 50% !important;
+  box-shadow: 0 3px 12px rgba(200, 90, 50, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4) !important;
+}
+
+/* 3. Planificador Semanal Unificado */
+.week-nav-bar-unified {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px;
+  background-color: var(--m3-surface);
+  border: var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-1);
+  margin-bottom: var(--space-3);
+  box-sizing: border-box;
+}
+
+.week-nav-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+}
+
+.week-nav-stepper .week-nav-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--m3-on-surface);
+  white-space: nowrap;
+  padding: 0 4px;
+}
+
+.week-nav-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 520px) {
+  .week-nav-bar-unified {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .week-nav-stepper {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+  }
+  .week-nav-stepper .week-nav-range {
+    font-size: 13px;
+  }
+  .week-nav-tools {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    border-top: 1px solid var(--m3-outline-variant);
+    padding-top: 8px;
+  }
+  .week-nav-tools .btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+
+/* ==========================================================================
+   US-86 v1.80 FINAL: Perfeccionamiento Visual Definitivo
+   1. Macros 50/50 exacto (Columna 1: Calorías 50%, Columna 2: P/C/G 50%)
+   2. Stepper del Planificador centrado y armonioso
+   3. Barra de Compra Rápida unificada en píldora continua
+   4. Recetario editorial refinado
+   ========================================================================== */
+
+/* 1. Macros 50/50 en Grid de 2 columnas */
+.today-nutrition-pill-split {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  align-items: center !important;
+  gap: 12px !important;
+  width: 100% !important;
+  box-sizing: border-box;
+  padding: 2px 0;
+}
+
+.today-macros-half-calories {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 5px !important;
+  min-width: 0 !important;
+}
+
+.today-macros-half-calories .today-header-mini-bar {
+  width: 100% !important;
+  height: 5px !important;
+  border-radius: var(--radius-full);
+  background-color: var(--m3-surface-container-high);
+  overflow: hidden;
+}
+
+.today-macros-half-calories .today-header-mini-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--m3-primary);
+  width: var(--progress, 0%);
+}
+
+.today-macros-split-divider {
+  display: none !important;
+}
+
+.today-macros-half-nutrients {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) auto !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+}
+
+.today-macro-gauge {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+}
+
+.today-macro-gauge-head .today-header-macro-badge {
+  font-size: 10.5px !important;
+  padding: 1px 3px !important;
+  width: 100% !important;
+  text-align: center !important;
+  box-sizing: border-box;
+}
+
+.today-macro-mini-gauge-track {
+  width: 100% !important;
+  height: 3.5px !important;
+  border-radius: var(--radius-full);
+  background-color: var(--m3-surface-container-high);
+  overflow: hidden;
+}
+
+/* 2. Stepper del Planificador Centrado */
+.week-nav-stepper {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+}
+
+.week-nav-stepper .week-nav-range {
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  color: var(--m3-on-surface) !important;
+  white-space: nowrap !important;
+  padding: 0 4px !important;
+}
+
+/* 3. Barra de Compra Rápida Unificada */
+.shopping-unified-add-bar {
+  display: flex;
+  align-items: center;
+  background-color: var(--m3-surface);
+  border: var(--border-subtle);
+  border-radius: var(--radius-full);
+  padding: 4px 5px 4px 14px;
+  box-shadow: var(--elevation-1);
+  margin-bottom: 16px;
+  gap: 8px;
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+}
+
+.shopping-unified-add-bar:focus-within {
+  border-color: var(--m3-primary);
+  box-shadow: 0 0 0 3px rgba(184, 77, 39, 0.12), var(--elevation-1);
+}
+
+.shopping-add-icon {
+  color: var(--m3-on-surface-variant);
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.shopping-add-input-wrapper {
+  flex: 1;
+  position: relative;
+}
+
+.shopping-unified-input {
+  width: 100%;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  padding: 8px 0;
+  font-size: 13.5px;
+  font-family: var(--font-family);
+  color: var(--m3-on-surface);
+  box-shadow: none !important;
+}
+
+.shopping-unified-btn {
+  border-radius: var(--radius-full) !important;
+  height: 38px !important;
+  padding: 0 16px !important;
+  font-size: 13px !important;
+  flex-shrink: 0;
+}
+
+/* 4. Recetario Refinado */
+.m3-search-bar {
+  border-radius: var(--radius-full) !important;
+  height: 44px !important;
+  background-color: var(--m3-surface) !important;
+  border: var(--border-subtle) !important;
+  box-shadow: var(--elevation-1) !important;
+  padding: 0 16px !important;
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+}
+
+.m3-search-bar:focus-within {
+  border-color: var(--m3-primary) !important;
+  box-shadow: 0 0 0 3px rgba(184, 77, 39, 0.12), var(--elevation-1) !important;
+}
+
+.m3-filter-chip-fridge {
+  background-color: #E8F5E9 !important;
+  color: #2E7D32 !important;
+  border-color: #C8E6C9 !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="dark"] .m3-filter-chip-fridge {
+  background-color: rgba(46, 125, 50, 0.22) !important;
+  color: #81C784 !important;
+  border-color: rgba(76, 175, 80, 0.3) !important;
+}
+
+
+/* Refined Centered Stepper Pill & Polished Headers */
+.week-nav-stepper {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+}
+
+.week-nav-stepper .week-nav-range {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  background-color: var(--m3-surface-container) !important;
+  padding: 5px 14px !important;
+  border-radius: var(--radius-full) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: var(--m3-on-surface) !important;
+  border: var(--border-subtle) !important;
+}
+
+.week-nav-tools .btn {
+  border-radius: var(--radius-full) !important;
+  height: 36px !important;
+  font-size: 12.5px !important;
+}
+
+/* Polished Shopping & Recipes Action Buttons */
+.section-header-actions .btn,
+#view-shopping .section-header .btn,
+#view-recipes .section-header-actions .btn {
+  border-radius: var(--radius-full) !important;
+  height: 36px !important;
+  padding: 0 14px !important;
+  font-size: 12.5px !important;
+}
+
+#btn-toggle-recipes-select-mode {
+  padding: 0 12px !important;
 }
