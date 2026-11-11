@@ -176,23 +176,13 @@
 
     <!-- VIEW 2: RECIPES -->
     <section class="view-panel" id="view-recipes">
-      <div class="section-header" style="flex-wrap: wrap; gap: 10px;">
+      <div class="section-header recipes-section-header" style="margin-bottom: 8px;">
         <div>
           <h2 class="section-title">
             <span data-i18n="recipes.title">Recetario</span>
             <span class="recipes-header-count-pill" id="recipes-count-badge">0</span>
           </h2>
           <p class="section-subtitle" id="recipes-count-subtitle" data-i18n="recipes.subtitle">Tu colección culinaria personal.</p>
-        </div>
-        <div class="section-header-actions" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-          <button type="button" class="btn btn-secondary btn-sm" id="btn-toggle-recipes-select-mode" title="Seleccionar recetas para gestión o borrado masivo">
-            <span class="material-symbols-outlined icon-sm">checklist</span>
-            <span id="btn-toggle-recipes-select-text" data-i18n="recipes.select">Seleccionar</span>
-          </button>
-          <button class="btn btn-primary btn-sm" id="btn-open-create-recipe">
-            <span class="material-symbols-outlined icon-sm">add</span>
-            <span data-i18n="recipes.newRecipeBtn">Añadir</span>
-          </button>
         </div>
       </div>
 
@@ -219,12 +209,26 @@
         </div>
       </div>
 
-      <!-- Clean Editorial Search Bar (US-73) -->
-      <div class="m3-search-bar">
-        <span class="material-symbols-outlined">search</span>
-        <input type="text" class="m3-search-input" id="recipes-search-input" aria-label="Buscar recetas por plato, ingrediente o técnica"
-          placeholder="Buscar por plato, ingrediente o técnica..."
-          data-i18n-placeholder="recipes.searchPlaceholder">
+      <!-- Integrated Search & Action Bar Row (US-86) -->
+      <div class="recipes-search-action-row">
+        <div class="m3-search-bar recipes-search-bar-flex">
+          <span class="material-symbols-outlined">search</span>
+          <input type="text" class="m3-search-input" id="recipes-search-input" aria-label="Buscar recetas por plato, ingrediente o técnica"
+            placeholder="Buscar plato, ingrediente..."
+            data-i18n-placeholder="recipes.searchPlaceholder">
+        </div>
+
+        <div class="recipes-header-actions-compact">
+          <button type="button" class="btn btn-ghost btn-sm btn-icon recipes-action-icon-btn" id="btn-toggle-recipes-select-mode"
+            title="Seleccionar recetas para gestión o borrado masivo" aria-label="Seleccionar recetas">
+            <span class="material-symbols-outlined">checklist</span>
+            <span id="btn-toggle-recipes-select-text" class="sr-only" data-i18n="recipes.select">Seleccionar</span>
+          </button>
+          <button type="button" class="btn btn-primary btn-sm btn-icon recipes-action-add-btn" id="btn-open-create-recipe"
+            title="Añadir nueva receta" aria-label="Añadir receta">
+            <span class="material-symbols-outlined">add</span>
+          </button>
+        </div>
       </div>
 
       <!-- US-34: Fridge Reverse Search Panel ("¿Qué cocino con mi nevera?") -->
@@ -331,38 +335,39 @@
 
     <!-- VIEW 4: SMART SHOPPING LIST -->
     <section class="view-panel" id="view-shopping">
-      <div class="section-header">
+      <div class="section-header shopping-section-header" style="margin-bottom: 8px;">
         <div>
           <h2 class="section-title" data-i18n="shopping.title">Lista de la Compra</h2>
           <p class="section-subtitle" id="shopping-summary-text">0 artículos pendientes</p>
         </div>
-        <div style="display: flex; gap: 6px;">
-          <button class="btn btn-secondary btn-sm" id="btn-copy-shopping" data-action="copyShoppingList"
-            title="Copiar lista al portapapeles">
-            <span class="material-symbols-outlined icon-sm">content_copy</span>
-            <span data-i18n="common.copy">Copiar</span>
-          </button>
-          <button class="btn btn-ghost btn-sm" id="btn-clear-completed" data-action="clearCompletedGroceries"
-            title="Limpiar comprados o vaciar lista">
-            <span class="material-symbols-outlined icon-sm">delete_sweep</span>
-            <span data-i18n="common.clear">Limpiar</span>
-          </button>
-        </div>
       </div>
 
-      <!-- US-33: Shopping View Mode Selector (Por Pasillos vs Por Receta) -->
-      <div class="shopping-view-toolbar" id="shopping-view-toggle" role="group"
-        aria-label="Modo de agrupación de la lista de la compra">
-        <button type="button" class="shopping-view-btn active" id="btn-shopping-view-aisle"
-          data-action="setShoppingViewMode" data-mode="aisle" aria-pressed="true">
-          <span class="material-symbols-outlined icon-sm">storefront</span>
-          <span data-i18n="shopping.byAisles">Por Pasillos</span>
-        </button>
-        <button type="button" class="shopping-view-btn" id="btn-shopping-view-recipe" data-action="setShoppingViewMode"
-          data-mode="recipe" aria-pressed="false">
-          <span class="material-symbols-outlined icon-sm">menu_book</span>
-          <span data-i18n="shopping.byRecipe">Por Receta</span>
-        </button>
+      <!-- Single Compact Toolbar Row (US-86): Mode Selector on left, Icon Actions on right -->
+      <div class="shopping-toolbar-row">
+        <div class="shopping-view-toolbar" id="shopping-view-toggle" role="group"
+          aria-label="Modo de agrupación de la lista de la compra">
+          <button type="button" class="shopping-view-btn active" id="btn-shopping-view-aisle"
+            data-action="setShoppingViewMode" data-mode="aisle" aria-pressed="true">
+            <span class="material-symbols-outlined icon-sm">storefront</span>
+            <span data-i18n="shopping.byAisles">Por Pasillos</span>
+          </button>
+          <button type="button" class="shopping-view-btn" id="btn-shopping-view-recipe" data-action="setShoppingViewMode"
+            data-mode="recipe" aria-pressed="false">
+            <span class="material-symbols-outlined icon-sm">menu_book</span>
+            <span data-i18n="shopping.byRecipe">Por Receta</span>
+          </button>
+        </div>
+
+        <div class="shopping-header-icon-actions">
+          <button type="button" class="btn btn-ghost btn-sm btn-icon" id="btn-copy-shopping" data-action="copyShoppingList"
+            title="Copiar lista al portapapeles" aria-label="Copiar lista">
+            <span class="material-symbols-outlined">content_copy</span>
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm btn-icon" id="btn-clear-completed" data-action="clearCompletedGroceries"
+            title="Limpiar comprados o vaciar lista" aria-label="Limpiar lista">
+            <span class="material-symbols-outlined">delete_sweep</span>
+          </button>
+        </div>
       </div>
 
       <!-- Quick Add Input (US-20: Autocompletado inteligente) -->

@@ -8507,3 +8507,230 @@ h2,
 #btn-toggle-recipes-select-mode {
   padding: 0 12px !important;
 }
+
+
+/* ==========================================================================
+   US-86 v1.80: Dock Perfeccionado, Planificador Anaranjado, Compra y Recetas
+   ========================================================================== */
+
+/* 1. Dock: alineación al milímetro y botón chef sin aplastamiento */
+.bottom-nav {
+  height: 62px !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: space-around !important;
+  padding: 6px 14px 7px !important;
+  box-sizing: border-box;
+}
+
+.bottom-nav .nav-item {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 2px !important;
+  padding: 0 !important;
+  height: 100% !important;
+  flex: 1 !important;
+}
+
+.bottom-nav .nav-item > span,
+.bottom-nav .nav-item-gemini .nav-gemini-label {
+  font-size: 10.5px !important;
+  line-height: 13px !important;
+  font-weight: 600 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block !important;
+  text-align: center !important;
+}
+
+.bottom-nav .nav-icon-wrapper {
+  width: 44px !important;
+  height: 28px !important;
+  margin-bottom: 2px !important;
+}
+
+.bottom-nav .nav-item-gemini {
+  position: static !important;
+  top: 0 !important;
+  transform: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  padding: 0 !important;
+  height: 100% !important;
+  flex: 1.1 !important;
+}
+
+.bottom-nav .nav-gemini-fab {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
+  border-radius: 50% !important;
+  background: linear-gradient(135deg, #C85A32 0%, #E07A5F 100%) !important;
+  color: #ffffff !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-bottom: 2px !important;
+  box-shadow: 0 2px 8px rgba(200, 90, 50, 0.35) !important;
+  flex-shrink: 0 !important;
+}
+
+.bottom-nav .nav-gemini-fab .chef-toque-icon {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+/* 2. Planificador Semanal: acentos anaranjados y alineación de fecha */
+#btn-current-week {
+  background-color: var(--m3-primary-container) !important;
+  color: var(--m3-on-primary-container) !important;
+  border: 1px solid rgba(184, 77, 39, 0.25) !important;
+  font-weight: 600 !important;
+}
+
+#btn-send-plan-to-shopping {
+  background-color: var(--m3-primary-container) !important;
+  color: var(--m3-on-primary-container) !important;
+  border: 1px solid rgba(184, 77, 39, 0.3) !important;
+  font-weight: 600 !important;
+}
+
+.day-badge-today,
+.planner-day-today-badge,
+.day-card.is-today .day-badge {
+  background-color: var(--m3-primary-container) !important;
+  color: var(--m3-primary) !important;
+  border: 1px solid rgba(184, 77, 39, 0.35) !important;
+  font-weight: 700 !important;
+}
+
+.week-nav-stepper .week-nav-range {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  background-color: var(--m3-surface-container) !important;
+  border: 1px solid rgba(184, 77, 39, 0.22) !important;
+  color: var(--m3-primary) !important;
+  border-radius: var(--radius-full) !important;
+  padding: 6px 14px !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+}
+
+.week-nav-stepper .week-nav-range .material-symbols-outlined {
+  color: var(--m3-primary) !important;
+  font-size: 16px !important;
+  line-height: 1 !important;
+}
+
+/* 3. Lista de la Compra: fila compacta */
+.shopping-toolbar-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  margin-bottom: 12px !important;
+}
+
+.shopping-toolbar-row .shopping-view-toolbar {
+  margin-bottom: 0 !important;
+}
+
+.shopping-header-icon-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.shopping-header-icon-actions .btn-icon {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  border-radius: var(--radius-full) !important;
+  border: var(--border-subtle) !important;
+  background-color: var(--m3-surface) !important;
+  color: var(--m3-on-surface-variant) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+}
+
+.shopping-header-icon-actions .btn-icon:hover {
+  color: var(--m3-primary) !important;
+  border-color: var(--m3-primary) !important;
+}
+
+/* 4. Recetario: Buscador integrado con botones compactos */
+.recipes-search-action-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin-bottom: 12px !important;
+}
+
+.recipes-search-bar-flex {
+  flex: 1 !important;
+  margin-bottom: 0 !important;
+}
+
+.recipes-header-actions-compact {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex-shrink: 0 !important;
+}
+
+.recipes-action-icon-btn {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  border-radius: var(--radius-full) !important;
+  border: var(--border-subtle) !important;
+  background-color: var(--m3-surface) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: var(--m3-on-surface-variant) !important;
+  padding: 0 !important;
+}
+
+.recipes-action-add-btn {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  border-radius: var(--radius-full) !important;
+  background-color: var(--m3-primary) !important;
+  color: var(--m3-on-primary) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 3px 10px rgba(184, 77, 39, 0.32) !important;
+  padding: 0 !important;
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+
+/* Garantizar que la cápsula inferior móvil NO aparezca en escritorio */
+@media (min-width: 900px) {
+  .bottom-nav {
+    display: none !important;
+  }
+}
