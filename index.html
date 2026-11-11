@@ -35,8 +35,24 @@
   <meta name="application-name" content="Sabory">
   <meta name="apple-mobile-web-app-title" content="Sabory">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="manifest" href="manifest.json?v=1.80">
   <meta name="theme-color" content="#FAF7F2">
+  <script>
+    (function() {
+      try {
+        var mode = localStorage.getItem('fa_theme_mode') || 'system';
+        var isDark = mode === 'dark' || (mode === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (isDark) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', '#26221E');
+          var appleMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+          if (appleMeta) appleMeta.setAttribute('content', 'black-translucent');
+        }
+      } catch (e) {}
+    })();
+  </script>
   <meta name="color-scheme" content="light dark">
   <!-- US-85: Preconnect & Parallel Font Loading for Optimal LCP -->
   <link rel="preconnect" href="https://fonts.googleapis.com">

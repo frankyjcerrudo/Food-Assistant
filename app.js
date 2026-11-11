@@ -5453,6 +5453,20 @@ class FoodAssistantApp {
     localStorage.setItem('fa_theme_mode', themeMode);
     document.documentElement.setAttribute('data-theme', themeMode);
 
+    // Dynamic Mobile Status Bar Color for Light/Dark Mode (US-86 / PWA / Android & iOS)
+    try {
+      const isDark = themeMode === 'dark' || (themeMode === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      const themeColor = isDark ? '#26221E' : '#FAF7F2';
+      const metaTheme = document.querySelector('meta[name="theme-color"]');
+      if (metaTheme) {
+        metaTheme.setAttribute('content', themeColor);
+      }
+      const metaApple = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+      if (metaApple) {
+        metaApple.setAttribute('content', isDark ? 'black-translucent' : 'default');
+      }
+    } catch (_) {}
+
     // Update Header Theme Icon & Tooltip
     const headerIcon = document.getElementById('header-theme-icon');
     const headerBtn = document.getElementById('btn-header-theme');
