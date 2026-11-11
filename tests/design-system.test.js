@@ -132,4 +132,41 @@ describe('US-23, US-24 & US-49: Sistema de Diseño Moderno, Micro-interacciones 
       expect(indexHtml).toContain('<label class="form-label" for="auth-email">');
     });
   });
+  describe('US-85 (v1.79): Auditoría Visual P3 - Iconografía Vectorial, LCP y Pulido Desktop', () => {
+    it('elimina los @import bloqueantes de styles.css e incorpora preconnect en index.html para acelerar LCP', () => {
+      const indexHtml = fs.readFileSync(path.join(process.cwd(), 'index.html'), 'utf-8');
+      expect(stylesCss).not.toMatch(/^@import\s+url\(/m);
+      expect(indexHtml).toContain('<link rel="preconnect" href="https://fonts.googleapis.com">');
+      expect(indexHtml).toContain('<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>');
+    });
+
+    it('unifica la iconografía sustituyendo emojis crudos en modales de macros y onboarding por Material Symbols', () => {
+      const indexHtml = fs.readFileSync(path.join(process.cwd(), 'index.html'), 'utf-8');
+      expect(indexHtml).toContain('local_fire_department');
+      expect(indexHtml).toContain('egg_alt');
+      expect(indexHtml).toContain('grain');
+      expect(indexHtml).not.toContain('🔥 Kcal');
+      expect(indexHtml).not.toContain('🥩 Proteína');
+      expect(indexHtml).not.toContain('🌾 Carbos');
+    });
+
+    it('aplica font-variant-numeric: tabular-nums a contadores y temporizadores dinámicos', () => {
+      expect(stylesCss).toContain('.today-header-kcal-num');
+      expect(stylesCss).toContain('.macro-chip-val');
+      expect(stylesCss).toContain('font-variant-numeric: tabular-nums');
+    });
+
+    it('restringe la visualización de #pwa-smart-banner en escritorio y centra el estado vacío de compra', () => {
+      expect(stylesCss).toContain('#pwa-smart-banner');
+      expect(stylesCss).toContain('display: none !important;');
+      expect(stylesCss).toContain('max-width: 520px;');
+      expect(stylesCss).toContain('margin: var(--space-4) auto;');
+    });
+
+    it('soporta transiciones suaves entre vistas con document.startViewTransition en switchView', () => {
+      const appJs = fs.readFileSync(path.join(process.cwd(), 'app.js'), 'utf-8');
+      expect(appJs).toContain('document.startViewTransition');
+      expect(appJs).toContain('prefers-reduced-motion');
+    });
+  });
 });

@@ -318,8 +318,8 @@ describe('US-12: Módulo Core de Internacionalización (i18n.js)', () => {
     I18n.setPreference('en');
     expect(I18n.t('planner.customSlotTitle')).toBe('Add Meal Slot');
     expect(I18n.t('planner.customSlotCreateBtn')).toBe('Create Meal Slot');
-    expect(I18n.t('planner.presetMidMorning')).toBe('🥪 Mid-Morning');
-    expect(I18n.t('planner.presetPostWorkout')).toBe('🏋️ Post-Workout');
+    expect(I18n.t('planner.presetMidMorning')).toBe('Mid-Morning');
+    expect(I18n.t('planner.presetPostWorkout')).toBe('Post-Workout');
     expect(I18n.t('settings.connectedSynced')).toBe('Connected & Synced');
     expect(I18n.t('settings.signOut')).toBe('Sign Out');
     expect(I18n.t('settings.deleteAccountAndData')).toBe('Delete my account and data');
@@ -328,8 +328,8 @@ describe('US-12: Módulo Core de Internacionalización (i18n.js)', () => {
     I18n.setPreference('es');
     expect(I18n.t('planner.customSlotTitle')).toBe('Añadir Momento de Comida');
     expect(I18n.t('planner.customSlotCreateBtn')).toBe('Crear Momento');
-    expect(I18n.t('planner.presetMidMorning')).toBe('🥪 Media Mañana');
-    expect(I18n.t('planner.presetPostWorkout')).toBe('🏋️ Post-Entreno');
+    expect(I18n.t('planner.presetMidMorning')).toBe('Media Mañana');
+    expect(I18n.t('planner.presetPostWorkout')).toBe('Post-Entreno');
     expect(I18n.t('settings.connectedSynced')).toBe('Conectado y Sincronizado');
     expect(I18n.t('settings.signOut')).toBe('Cerrar Sesión');
     expect(I18n.t('settings.deleteAccountAndData')).toBe('Eliminar mi cuenta y datos');
@@ -422,9 +422,9 @@ describe('US-12: Módulo Core de Internacionalización (i18n.js)', () => {
     expect(I18n.t('recipes.macrosPerServing')).toBe('Macronutrients per serving');
     expect(I18n.t('recipes.recalculateBtn')).toBe('Recalculate');
     expect(I18n.t('recipes.tagsLabel')).toBe('Tags & Dietary Categories');
-    expect(I18n.t('recipes.catDietHealth')).toBe('🌱 Diet & Health');
-    expect(I18n.t('recipes.catMealTime')).toBe('🍽️ Meal Time');
-    expect(I18n.t('recipes.catMethodPractical')).toBe('⚡ Method & Practical');
+    expect(I18n.t('recipes.catDietHealth')).toBe('Diet & Health');
+    expect(I18n.t('recipes.catMealTime')).toBe('Meal Time');
+    expect(I18n.t('recipes.catMethodPractical')).toBe('Method & Practical');
     expect(I18n.t('recipes.saveRecipeBtn')).toBe('Save Recipe');
     expect(I18n.t('recipes.addIngredientBtn')).toBe('Add Ingredient');
     expect(I18n.t('recipes.instructionsTitle')).toBe('Preparation Steps');

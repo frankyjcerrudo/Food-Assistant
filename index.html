@@ -35,22 +35,27 @@
   <meta name="application-name" content="Sabory">
   <meta name="apple-mobile-web-app-title" content="Sabory">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <link rel="manifest" href="manifest.json?v=1.78">
+  <link rel="manifest" href="manifest.json?v=1.79">
   <meta name="theme-color" content="#FAF7F2">
   <meta name="color-scheme" content="light dark">
+  <!-- US-85: Preconnect & Parallel Font Loading for Optimal LCP -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..600&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Google+Sans:wght@400;500;700&display=swap">
   <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=1.78">
-  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.78">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.78">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.78">
+  <link rel="stylesheet" href="styles.css?v=1.79">
+  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.79">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.79">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.79">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <!-- US-41: versión fija + Subresource Integrity (sha384) para el SDK de Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"
     integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"
     referrerpolicy="no-referrer"></script>
   <!-- US-12: i18n Core Engine (in head for instant zero-flash localization) -->
-  <script src="i18n.js?v=1.78"></script>
+  <script src="i18n.js?v=1.79"></script>
 </head>
 
 <body>
@@ -127,7 +132,7 @@
     <aside class="pwa-smart-banner" id="pwa-smart-banner" hidden aria-label="Instalación de la app en la pantalla de inicio">
       <div class="pwa-smart-banner-content">
         <div class="pwa-smart-banner-icon" aria-hidden="true">
-          <img src="icon-192.png?v=1.78" alt="" width="28" height="28" class="pwa-smart-banner-img">
+          <img src="icon-192.png?v=1.79" alt="" width="28" height="28" class="pwa-smart-banner-img">
         </div>
         <div class="pwa-smart-banner-texts">
           <strong class="pwa-smart-banner-title" data-i18n="pwa.bannerTitle">Prueba Sabory como App</strong>
@@ -894,8 +899,8 @@
             </h3>
             <p
               style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-              <span data-i18n="settings.installedVersion">Versión instalada:</span> <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.78</strong>
-              <span class="app-version-badge" id="app-version-badge">v1.78</span>
+              <span data-i18n="settings.installedVersion">Versión instalada:</span> <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.79</strong>
+              <span class="app-version-badge" id="app-version-badge">v1.79</span>
             </p>
             <div
               style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;" data-i18n="settings.versionCacheNotice">
@@ -1467,19 +1472,19 @@
           </div>
           <div class="nutrition-editor-grid">
             <div>
-              <label class="field-micro-label" style="color: #d9480f;" data-i18n="recipes.kcalLabel">🔥 Kcal</label>
+              <label class="field-micro-label" style="color: #d9480f;" data-i18n="recipes.kcalLabel"><span class="material-symbols-outlined icon-14" style="vertical-align: -2px;">local_fire_department</span> Kcal</label>
               <input type="number" class="form-input" id="edit-recipe-calories" placeholder="Ej. 450" aria-label="Calorías estimadas por ración" min="0" step="1">
             </div>
             <div>
-              <label class="field-micro-label" style="color: #1971c2;" data-i18n="recipes.proteinLabel">🥩 Proteína (g)</label>
+              <label class="field-micro-label" style="color: #1971c2;" data-i18n="recipes.proteinLabel"><span class="material-symbols-outlined icon-14" style="vertical-align: -2px;">egg_alt</span> Proteína (g)</label>
               <input type="number" class="form-input" id="edit-recipe-protein" placeholder="Ej. 30" aria-label="Gramos de proteína por ración" min="0" step="0.5">
             </div>
             <div>
-              <label class="field-micro-label" style="color: #2f9e44;" data-i18n="recipes.carbsLabel">🌾 Carbos (g)</label>
+              <label class="field-micro-label" style="color: #2f9e44;" data-i18n="recipes.carbsLabel"><span class="material-symbols-outlined icon-14" style="vertical-align: -2px;">grain</span> Carbos (g)</label>
               <input type="number" class="form-input" id="edit-recipe-carbs" placeholder="Ej. 45" aria-label="Gramos de carbohidratos por ración" min="0" step="0.5">
             </div>
             <div>
-              <label class="field-micro-label" style="color: #f59f00;" data-i18n="recipes.fatLabel">🥑 Grasas (g)</label>
+              <label class="field-micro-label" style="color: #b45309;" data-i18n="recipes.fatLabel"><span class="material-symbols-outlined icon-14" style="vertical-align: -2px;">eco</span> Grasas (g)</label>
               <input type="number" class="form-input" id="edit-recipe-fat" placeholder="Ej. 14" aria-label="Gramos de grasa por ración" min="0" step="0.5">
             </div>
           </div>
@@ -1515,13 +1520,13 @@
 
           <!-- Suggested tags categorized -->
           <div class="editor-suggested-tags-wrapper">
-            <div class="tags-group-label" data-i18n="recipes.catDietHealth">🌱 Dietéticas y Salud</div>
+            <div class="tags-group-label" data-i18n="recipes.catDietHealth"><span class="material-symbols-outlined icon-14" style="vertical-align: -2px;">spa</span> Dietéticas y Salud</div>
             <div class="chips-wrap" id="editor-dietary-chips"></div>
 
-            <div class="tags-group-label" style="margin-top: 10px;" data-i18n="recipes.catMealTime">🍽️ Momento del Día</div>
+            <div class="tags-group-label" style="margin-top: 10px;" data-i18n="recipes.catMealTime"><span class="material-symbols-outlined icon-14" style="vertical-align: -2px;">schedule</span> Momento del Día</div>
             <div class="chips-wrap" id="editor-occasion-chips"></div>
 
-            <div class="tags-group-label" style="margin-top: 10px;" data-i18n="recipes.catMethodPractical">⚡ Método y Práctico</div>
+            <div class="tags-group-label" style="margin-top: 10px;" data-i18n="recipes.catMethodPractical"><span class="material-symbols-outlined icon-14" style="vertical-align: -2px;">bolt</span> Método y Práctico</div>
             <div class="chips-wrap" id="editor-practical-chips"></div>
           </div>
         </div>
@@ -1795,7 +1800,7 @@
         <label for="toggle-picker-cook-double"
           style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 500; color: var(--m3-on-surface); cursor: pointer; margin: 0;">
           <span class="material-symbols-outlined icon-sm" style="color: var(--m3-primary);">takeout_dining</span>
-          <span data-i18n="picker.cookDouble">🍱 Cocinar doble para sobras (asignar también mañana)</span>
+          <span data-i18n="picker.cookDouble"><span class="material-symbols-outlined icon-14" style="vertical-align: -2px;">bento</span> Cocinar doble para sobras (asignar también mañana)</span>
         </label>
         <input type="checkbox" id="toggle-picker-cook-double" class="grocery-checkbox" style="margin: 0;">
       </div>
@@ -1972,17 +1977,17 @@
       <!-- Quick suggestions -->
       <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px;" id="custom-slot-suggestions">
         <button type="button" class="m3-filter-chip" data-action="selectCustomSlotPreset" data-name="Media Mañana" data-name-en="Mid-Morning" data-name-es="Media Mañana"
-          data-icon="lunch_dining"><span data-i18n="planner.presetMidMorning">🥪 Media Mañana</span></button>
+          data-icon="lunch_dining"><span data-i18n="planner.presetMidMorning"><span class="material-symbols-outlined icon-14" style="vertical-align: -2px;">lunch_dining</span> Media Mañana</span></button>
         <button type="button" class="m3-filter-chip" data-action="selectCustomSlotPreset" data-name="Post-Entreno" data-name-en="Post-Workout" data-name-es="Post-Entreno"
-          data-icon="fitness_center"><span data-i18n="planner.presetPostWorkout">🏋️ Post-Entreno</span></button>
+          data-icon="fitness_center"><span data-i18n="planner.presetPostWorkout"><span class="material-symbols-outlined icon-14" style="vertical-align: -2px;">fitness_center</span> Post-Entreno</span></button>
         <button type="button" class="m3-filter-chip" data-action="selectCustomSlotPreset" data-name="Pre-Entreno" data-name-en="Pre-Workout" data-name-es="Pre-Entreno"
-          data-icon="bolt"><span data-i18n="planner.presetPreWorkout">⚡ Pre-Entreno</span></button>
+          data-icon="bolt"><span data-i18n="planner.presetPreWorkout"><span class="material-symbols-outlined icon-14" style="vertical-align: -2px;">bolt</span> Pre-Entreno</span></button>
         <button type="button" class="m3-filter-chip" data-action="selectCustomSlotPreset" data-name="Snack Saludable" data-name-en="Healthy Snack" data-name-es="Snack Saludable"
-          data-icon="nutrition"><span data-i18n="planner.presetHealthySnack">🍎 Snack Saludable</span></button>
+          data-icon="nutrition"><span data-i18n="planner.presetHealthySnack"><span class="material-symbols-outlined icon-14" style="vertical-align: -2px;">nutrition</span> Snack Saludable</span></button>
         <button type="button" class="m3-filter-chip" data-action="selectCustomSlotPreset" data-name="Recena / Noche" data-name-en="Late-Night Snack" data-name-es="Recena / Noche"
-          data-icon="bedtime"><span data-i18n="planner.presetLateSnack">🌙 Recena</span></button>
+          data-icon="bedtime"><span data-i18n="planner.presetLateSnack"><span class="material-symbols-outlined icon-14" style="vertical-align: -2px;">bedtime</span> Recena</span></button>
         <button type="button" class="m3-filter-chip" data-action="selectCustomSlotPreset" data-name="Brunch" data-name-en="Brunch" data-name-es="Brunch"
-          data-icon="brunch_dining"><span data-i18n="planner.presetBrunch">🥞 Brunch</span></button>
+          data-icon="brunch_dining"><span data-i18n="planner.presetBrunch"><span class="material-symbols-outlined icon-14" style="vertical-align: -2px;">brunch_dining</span> Brunch</span></button>
       </div>
 
       <div style="margin-bottom: 16px;">
@@ -1991,14 +1996,14 @@
           de la comida:</label>
         <div style="display: flex; gap: 8px;">
           <select class="form-select" id="custom-slot-icon" style="width: 110px; padding: 8px;">
-            <option value="lunch_dining" data-i18n="planner.optSnack">🥪 Snack</option>
-            <option value="fitness_center" data-i18n="planner.optWorkout">🏋️ Deporte</option>
-            <option value="bolt" data-i18n="planner.optEnergy">⚡ Energía</option>
-            <option value="nutrition" data-i18n="planner.optFruit">🍎 Fruta</option>
-            <option value="local_cafe" data-i18n="planner.optCoffee">☕ Café</option>
-            <option value="cookie" data-i18n="planner.optSweet">🍪 Dulce</option>
-            <option value="restaurant" data-i18n="planner.optMeal">🍽️ Plato</option>
-            <option value="bedtime" data-i18n="planner.optNight">🌙 Noche</option>
+            <option value="lunch_dining" data-i18n="planner.optSnack">Snack</option>
+            <option value="fitness_center" data-i18n="planner.optWorkout">Deporte</option>
+            <option value="bolt" data-i18n="planner.optEnergy">Energía</option>
+            <option value="nutrition" data-i18n="planner.optFruit">Fruta</option>
+            <option value="local_cafe" data-i18n="planner.optCoffee">Café</option>
+            <option value="cookie" data-i18n="planner.optSweet">Dulce</option>
+            <option value="restaurant" data-i18n="planner.optMeal">Plato</option>
+            <option value="bedtime" data-i18n="planner.optNight">Noche</option>
           </select>
           <input type="text" class="form-input" id="custom-slot-name" autofocus aria-label="Nombre del momento de comida personalizado" placeholder="Ej. Media mañana, Batido..."
             data-i18n-placeholder="planner.customSlotPlaceholder"
@@ -2429,17 +2434,17 @@
           <div class="onboarding-presets-grid" id="onboarding-goal-presets">
             <button type="button" class="onboarding-preset-pill onboarding-preset-btn"
               data-action="applyOnboardingGoalPreset" data-preset="deficit">
-              <span class="preset-pill-title" data-i18n="onboarding.presetDeficit">🔥 Déficit</span>
+              <span class="material-symbols-outlined icon-sm">local_fire_department</span> <span class="preset-pill-title" data-i18n="onboarding.presetDeficit">Déficit</span>
               <span class="preset-pill-kcal">1700 kcal</span>
             </button>
             <button type="button" class="onboarding-preset-pill onboarding-preset-btn active"
               data-action="applyOnboardingGoalPreset" data-preset="balanced">
-              <span class="preset-pill-title" data-i18n="onboarding.presetBalanced">⚖️ Equilibrado</span>
+              <span class="material-symbols-outlined icon-sm">balance</span> <span class="preset-pill-title" data-i18n="onboarding.presetBalanced">Equilibrado</span>
               <span class="preset-pill-kcal">2000 kcal</span>
             </button>
             <button type="button" class="onboarding-preset-pill onboarding-preset-btn"
               data-action="applyOnboardingGoalPreset" data-preset="protein">
-              <span class="preset-pill-title" data-i18n="onboarding.presetProtein">💪 Proteína</span>
+              <span class="material-symbols-outlined icon-sm">fitness_center</span> <span class="preset-pill-title" data-i18n="onboarding.presetProtein">Proteína</span>
               <span class="preset-pill-kcal">2400 kcal</span>
             </button>
           </div>
@@ -2499,7 +2504,7 @@
             </div>
           </div>
         </div>
-        <p class="onboarding-hint-text" data-i18n="onboarding.step3Hint">💡 Toca cualquiera de las cuatro casillas para escribir tus propios números.</p>
+        <p class="onboarding-hint-text" data-i18n="onboarding.step3Hint"><span class="material-symbols-outlined icon-14" style="vertical-align: -2px;">info</span> Toca cualquiera de las cuatro casillas para escribir tus propios números.</p>
       </div>
 
       <!-- STEP 4: COMENSALES / RACIONES POR DEFECTO -->
@@ -2614,8 +2619,8 @@
     </div>
   </div>
 
-  <script src="config.js?v=1.78"></script>
-  <script src="app.js?v=1.78"></script>
+  <script src="config.js?v=1.79"></script>
+  <script src="app.js?v=1.79"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

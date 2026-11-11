@@ -1,6 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..600&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Google+Sans:wght@400;500;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
-
+/* Fonts: Playfair+Display, DM Sans & Google Sans loaded via <link> in index.html (US-85) */
 /* ==========================================================================
    Savory — Editorial Culinary Design System (US-73 / US-23 / US-24)
    Warm Alabaster & Cream Canvas · Terracotta Accent · Botanical Sage
@@ -5522,6 +5520,8 @@ h2,
   text-align: center;
   padding: var(--space-5) var(--space-2);
   color: var(--m3-on-surface-variant);
+  max-width: 520px;
+  margin: var(--space-4) auto;
 }
 
 .shopping-empty-icon {
@@ -7888,5 +7888,26 @@ h2,
   .btn-servings-step {
     min-width: 36px;
     min-height: 36px;
+  }
+}
+
+/* ==========================================================================
+   US-85: Typographic Stability (tabular-nums) & Desktop Polish
+   ========================================================================== */
+.recipe-stat-servings-val,
+.recipe-stat-time-val,
+.today-header-kcal-num,
+.macro-chip-val,
+.today-header-macro-badge,
+.planner-day-calories,
+.shopping-count-badge,
+.timer-digits,
+.aisle-pending-count {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 900px) {
+  #pwa-smart-banner {
+    display: none !important;
   }
 }

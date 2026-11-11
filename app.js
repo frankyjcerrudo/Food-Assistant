@@ -4758,7 +4758,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.78';
+  window.APP_VERSION = 'v1.79';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4805,7 +4805,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.78';
+    this.appVersion = window.APP_VERSION || 'v1.79';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -7970,21 +7970,29 @@ class FoodAssistantApp {
     if (this.isRecipeSelectMode && viewId !== 'view-recipes') {
       this.toggleRecipeSelectMode(false);
     }
-    this.activeView = viewId;
-    this.viewPanels.forEach(panel => {
-      panel.classList.toggle('active', panel.id === viewId);
-    });
+    const updateDOM = () => {
+      this.activeView = viewId;
+      this.viewPanels.forEach(panel => {
+        panel.classList.toggle('active', panel.id === viewId);
+      });
 
-    this.navItems.forEach(item => {
-      item.classList.toggle('active', item.dataset.view === viewId);
-    });
+      this.navItems.forEach(item => {
+        item.classList.toggle('active', item.dataset.view === viewId);
+      });
 
-    window.scrollTo({ top: 0, behavior: 'instant' });
-    this.renderView(viewId);
-    if (window.I18n) {
-      window.I18n.applyTranslations(document.getElementById(viewId) || document);
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      this.renderView(viewId);
+      if (window.I18n) {
+        window.I18n.applyTranslations(document.getElementById(viewId) || document);
+      }
+      this.updateUserAccountUI();
+    };
+
+    if (typeof document !== 'undefined' && typeof document.startViewTransition === 'function' && typeof window !== 'undefined' && window.matchMedia && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.startViewTransition(() => updateDOM());
+    } else {
+      updateDOM();
     }
-    this.updateUserAccountUI();
   }
 
   renderView(viewId = this.activeView) {
