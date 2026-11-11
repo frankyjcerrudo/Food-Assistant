@@ -8753,3 +8753,132 @@ h2,
     display: none !important;
   }
 }
+
+
+/* ==========================================================================
+   US-86 v1.80: Pulido Específico de Escritorio (Desktop Polish >= 900px)
+   1. Menú de Hoy: Tarjeta de Macros compacta y elegante (sin barra kilométrica ni cortes)
+   2. Planificador Semanal: Barra de navegación unificada en 1 sola fila elegante
+   ========================================================================== */
+
+@media (min-width: 900px) {
+  /* 1. Menú de Hoy en Escritorio */
+  .today-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 20px !important;
+    margin-bottom: 24px !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .today-header-info {
+    flex: 0 0 auto !important;
+    min-width: 220px !important;
+  }
+
+  .today-nutrition-card.today-header-macros {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    max-width: 600px !important;
+    margin: 0 0 0 auto !important;
+    padding: 8px 18px !important;
+    box-sizing: border-box !important;
+    border-radius: var(--radius-full) !important;
+  }
+
+  .today-nutrition-pill-split {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 16px !important;
+    width: 100% !important;
+    padding: 0 !important;
+  }
+
+  .today-macros-half-calories {
+    flex: 0 0 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    min-width: 170px !important;
+    max-width: 190px !important;
+  }
+
+  .today-macros-half-calories .today-header-mini-bar {
+    width: 100% !important;
+    height: 5px !important;
+  }
+
+  .today-macros-split-divider {
+    display: block !important;
+    width: 1px !important;
+    height: 28px !important;
+    background-color: var(--m3-outline-variant) !important;
+    opacity: 0.6 !important;
+    flex-shrink: 0 !important;
+  }
+
+  .today-macros-half-nutrients {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .today-macro-gauge {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 3px !important;
+    width: 76px !important;
+    min-width: 76px !important;
+    flex: 0 0 76px !important;
+  }
+
+  .today-macro-gauge-head .today-header-macro-badge {
+    font-size: 11px !important;
+    padding: 2px 4px !important;
+    white-space: nowrap !important;
+    width: 100% !important;
+    text-align: center !important;
+    box-sizing: border-box !important;
+  }
+
+  .today-nutrition-pill-chevron {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: var(--m3-on-surface-variant) !important;
+    font-size: 20px !important;
+    margin-left: 4px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* 2. Planificador Semanal en Escritorio: 1 Sola Fila Compacta */
+  .week-nav-bar {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-wrap: nowrap !important;
+    height: 52px !important;
+    padding: 0 16px !important;
+    margin-bottom: 16px !important;
+    box-sizing: border-box !important;
+  }
+
+  .week-nav-stepper {
+    width: auto !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin: 0 !important;
+  }
+
+  .week-nav-actions {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin: 0 !important;
+  }
+}
