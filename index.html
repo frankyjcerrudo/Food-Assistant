@@ -43,6 +43,29 @@
       try {
         var mode = localStorage.getItem('fa_theme_mode') || 'system';
         var isDark = mode === 'dark' || (mode === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        // US-86: Deteccion de dispositivos moviles, tablets y plegables (Z Fold 8, iPads, etc.)
+        var isMobile = false;
+        var devOverride = localStorage.getItem('fa_device_mode');
+        if (devOverride === 'mobile') {
+          isMobile = true;
+        } else if (devOverride === 'desktop') {
+          isMobile = false;
+        } else {
+          if (navigator.userAgentData && typeof navigator.userAgentData.mobile === 'boolean') {
+            isMobile = navigator.userAgentData.mobile || (navigator.userAgentData.platform === 'Android');
+          }
+          if (!isMobile) {
+            var ua = navigator.userAgent || '';
+            var maxTouch = navigator.maxTouchPoints || 0;
+            if (/Android|iPhone|iPod|iPad|webOS|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|Tablet|Silk|Kindle/i.test(ua)) {
+              isMobile = true;
+            } else if (/Macintosh/i.test(ua) && maxTouch > 1) {
+              isMobile = true;
+            }
+          }
+        }
+        document.documentElement.setAttribute('data-device', isMobile ? 'mobile' : 'desktop');
+        document.documentElement.classList.add(isMobile ? 'is-mobile-device' : 'is-desktop-device');
         if (isDark) {
           document.documentElement.setAttribute('data-theme', 'dark');
           var meta = document.querySelector('meta[name="theme-color"]');

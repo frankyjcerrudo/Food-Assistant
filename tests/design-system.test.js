@@ -204,5 +204,20 @@ describe('US-23, US-24 & US-49: Sistema de Diseño Moderno, Micro-interacciones 
       expect(stylesCss).toContain('height: 100dvh !important;');
       expect(stylesCss).toContain('z-index: 200 !important;');
     });
+
+    it('detecta y asegura la experiencia movil con dock en tablets y plegables (Z Fold 8, iPads, etc.)', () => {
+      expect(indexHtml).toContain('US-86: Deteccion de dispositivos moviles');
+      expect(stylesCss).toContain('html.is-mobile-device .bottom-nav');
+      expect(stylesCss).toContain('display: flex !important;');
+      expect(stylesCss).toContain('html.is-mobile-device .desktop-header-nav');
+      expect(stylesCss).toContain('display: none !important;');
+    });
+
+    it('FoodAssistantApp en app.js implementa detectMobileDevice y applyDeviceMode', () => {
+      const appJs = fs.readFileSync(path.join(process.cwd(), 'app.js'), 'utf-8');
+      expect(appJs).toContain('detectMobileDevice()');
+      expect(appJs).toContain('applyDeviceMode(isMobile)');
+      expect(appJs).toContain('this.isMobileDevice =');
+    });
   });
 });

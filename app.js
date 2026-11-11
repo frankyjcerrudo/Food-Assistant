@@ -4806,6 +4806,8 @@ class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
     this.appVersion = window.APP_VERSION || 'v1.80';
+    this.isMobileDevice = this.detectMobileDevice();
+    this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5131,6 +5133,45 @@ class FoodAssistantApp {
     if (badge) badge.textContent = this.appVersion;
     const settingsVer = document.getElementById('settings-app-version-text');
     if (settingsVer) settingsVer.textContent = this.appVersion;
+  }
+
+  detectMobileDevice() {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const override = localStorage.getItem('fa_device_mode');
+        if (override === 'mobile') return true;
+        if (override === 'desktop') return false;
+      }
+      if (typeof navigator === 'undefined') return false;
+      if (navigator.userAgentData) {
+        if (navigator.userAgentData.mobile) return true;
+        if (navigator.userAgentData.platform === 'Android') return true;
+      }
+      const ua = navigator.userAgent || '';
+      const maxTouch = navigator.maxTouchPoints || 0;
+      if (/Android|iPhone|iPod|iPad|webOS|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|Tablet|Silk|Kindle/i.test(ua)) {
+        return true;
+      }
+      if (/Macintosh/i.test(ua) && maxTouch > 1) {
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  applyDeviceMode(isMobile) {
+    if (typeof document === 'undefined' || !document.documentElement) return;
+    const root = document.documentElement;
+    root.setAttribute('data-device', isMobile ? 'mobile' : 'desktop');
+    if (isMobile) {
+      root.classList.add('is-mobile-device');
+      root.classList.remove('is-desktop-device');
+    } else {
+      root.classList.add('is-desktop-device');
+      root.classList.remove('is-mobile-device');
+    }
   }
 
   initElements() {
