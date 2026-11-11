@@ -8594,19 +8594,38 @@ h2,
 }
 
 #btn-send-plan-to-shopping {
-  background-color: var(--m3-primary-container) !important;
-  color: var(--m3-on-primary-container) !important;
-  border: 1px solid rgba(184, 77, 39, 0.3) !important;
+  background: var(--m3-primary) !important;
+  color: #ffffff !important;
+  border: 1px solid transparent !important;
   font-weight: 600 !important;
+  box-shadow: 0 2px 8px rgba(184, 77, 39, 0.32) !important;
+}
+
+#btn-send-plan-to-shopping .material-symbols-outlined {
+  color: #ffffff !important;
+}
+
+#btn-send-plan-to-shopping:hover {
+  background: var(--m3-primary-dark, #a3411e) !important;
+  box-shadow: 0 4px 12px rgba(184, 77, 39, 0.4) !important;
+}
+
+/* Acento Terracota Completo para el Día de Hoy */
+.day-card-today,
+.day-card.is-today {
+  border-color: var(--m3-primary) !important;
+  box-shadow: 0 0 0 1px var(--m3-primary), 0 3px 12px rgba(184, 77, 39, 0.14) !important;
 }
 
 .day-badge-today,
 .planner-day-today-badge,
-.day-card.is-today .day-badge {
-  background-color: var(--m3-primary-container) !important;
-  color: var(--m3-primary) !important;
-  border: 1px solid rgba(184, 77, 39, 0.35) !important;
+.day-card.is-today .day-badge,
+.day-card-today .day-badge-today {
+  background: var(--m3-primary) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--m3-primary) !important;
   font-weight: 700 !important;
+  box-shadow: 0 1px 4px rgba(184, 77, 39, 0.25) !important;
 }
 
 .week-nav-stepper .week-nav-range {
