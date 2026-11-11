@@ -171,7 +171,7 @@
 | **US-53** | Permitir zoom | 🟡 Media | `Done` | • Eliminar `maximum-scale=1, user-scalable=no` del viewport (WCAG 1.4.4).<br>• *Estado: implementado en v1.29 (viewport sin `maximum-scale` ni `user-scalable=no`); completado, probado y aprobado por Franky (v1.29).* |
 | **US-54** | Elementos interactivos accesibles por teclado | 🟡 Media | `Backlog` | • Slots, tarjetas de receta y filas del selector pasan a `<button>` o tienen `role="button"`, `tabindex="0"` y soporte de Enter/Espacio.<br>• Foco visible. |
 | **US-56** | Iconos PWA y colores de marca coherentes | 🟡 Media | `Descartada` | • Iconos PNG de 192 y 512 px + versión `maskable` en `manifest.json`.<br>• Coherencia de marca con `theme-color` igual en HTML y manifest, y favicon oficial.<br>• *Estado: Descartada / Cerrada. Absorbida y completada en US-10 (implementada y validada en v1.29).* |
-| **US-57** | Optimizar la carga de Material Symbols | 🟢 Baja | `Backlog` | • Fijar ejes (`opsz`, `wght`, `FILL`, `GRAD`) o usar `icon_names=` para reducir el peso de la fuente. |
+| **US-57** | Optimizar la carga de Material Symbols | 🟢 Baja | `Descartada` | • Fijar ejes (`opsz`, `wght`, `FILL`, `GRAD`) o usar `icon_names=` para reducir el peso de la fuente.<br>• *Estado: Descartada. Optimización prematura de bajo impacto; el Service Worker ya precachea la fuente en caché offline y acotar nombres (`icon_names=`) introduce fragilidad con los iconos dinámicos generados en JS.* |
 
 ---
 
