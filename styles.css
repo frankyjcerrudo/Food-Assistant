@@ -1303,11 +1303,14 @@ textarea {
   box-shadow: 0 0 0 1px var(--m3-primary);
 }
 
-.gemini-input {
+.gemini-input,
+.gemini-input-row .gemini-input,
+.gemini-input-row .gemini-input:focus {
   flex: 1;
   background: transparent;
   border: none;
   outline: none;
+  box-shadow: none;
   font-size: 14px;
   color: var(--m3-on-surface);
   padding: 8px 0;
@@ -2268,10 +2271,18 @@ textarea {
   transition-behavior: allow-discrete;
 }
 
+dialog.modal-overlay,
 dialog.modal-overlay:modal {
+  border: none;
+  outline: none;
   background-color: transparent;
   backdrop-filter: none;
   overscroll-behavior: contain;
+}
+
+.modal-overlay :focus:not(:focus-visible),
+.modal-content:focus {
+  outline: none;
 }
 
 dialog.modal-overlay::backdrop {
@@ -2351,8 +2362,50 @@ dialog.modal-overlay:is([open], .active):where(:not([data-closing]))::backdrop {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 14px 18px;
   border-bottom: 1px solid var(--m3-outline-variant);
+}
+
+#recipe-detail-normal-actions,
+#recipe-detail-review-actions {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+#btn-close-recipe-modal {
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  #modal-recipe-detail .modal-header-bar {
+    padding: 10px 12px;
+    gap: 6px;
+  }
+
+  #recipe-detail-normal-actions,
+  #recipe-detail-review-actions {
+    gap: 4px !important;
+  }
+
+  #recipe-detail-normal-actions .btn-sm,
+  #recipe-detail-review-actions .btn-sm {
+    padding: 6px 8px;
+    font-size: 12px;
+    gap: 4px;
+    white-space: nowrap;
+  }
+
+  #recipe-detail-normal-actions .btn-icon,
+  #modal-recipe-detail #btn-close-recipe-modal {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    padding: 4px;
+  }
 }
 
 /* Cook Mode Fullscreen */
@@ -3138,6 +3191,12 @@ dialog.modal-overlay:is([open], .active):where(:not([data-closing]))::backdrop {
   gap: 8px;
 }
 
+@media (max-width: 480px) {
+  .recipe-macros-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 .macro-chip {
   display: flex;
   flex-direction: column;
@@ -3158,6 +3217,7 @@ dialog.modal-overlay:is([open], .active):where(:not([data-closing]))::backdrop {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 3px;
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3806,9 +3866,12 @@ dialog.modal-overlay:is([open], .active):where(:not([data-closing]))::backdrop {
 /* Material 3 Toast / Snackbar Notification System */
 .toast-container {
   position: fixed;
-  bottom: 84px;
-  left: 50%;
-  transform: translateX(-50%);
+  inset: auto 0 84px 0;
+  margin: 0 auto;
+  border: none;
+  padding: 0;
+  background: transparent;
+  overflow: visible;
   z-index: 250;
   display: flex;
   flex-direction: column;

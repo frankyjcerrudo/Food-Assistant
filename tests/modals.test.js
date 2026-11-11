@@ -165,8 +165,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
   });
 
   it('Control de Versión: APP_VERSION sincronizada en badges y vista de ajustes', () => {
-    expect(window.APP_VERSION).toBe('v1.76');
-    expect(appInstance.appVersion).toBe('v1.76');
+    expect(window.APP_VERSION).toBe('v1.77');
+    expect(appInstance.appVersion).toBe('v1.77');
 
     const badge = document.createElement('span');
     badge.id = 'app-version-badge';
@@ -176,8 +176,8 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     document.body.appendChild(settingsVer);
 
     appInstance.initVersion();
-    expect(badge.textContent).toBe('v1.76');
-    expect(settingsVer.textContent).toBe('v1.76');
+    expect(badge.textContent).toBe('v1.77');
+    expect(settingsVer.textContent).toBe('v1.77');
 
     document.body.removeChild(badge);
     document.body.removeChild(settingsVer);
@@ -441,6 +441,38 @@ describe('US-15 & A11y: Cierre de Modales por Clic Fuera (Backdrop Dismiss) y Te
     expect(htmlContent).toContain('id="btn-header-stop-tts"');
     expect(htmlContent).toContain('id="btn-gemini-invoke-new-chat"');
     expect(htmlContent).toContain('id="btn-close-gemini-invoke"');
+  });
+
+  it('US-83 (v1.77): Ficha de Receta responsive en móvil (cabecera y grid 2x2), Toasts en Top-Layer (popover="manual") y foco inicial limpio en <dialog>', () => {
+    const cssContent = fs.readFileSync(path.resolve(process.cwd(), 'styles.css'), 'utf-8');
+    const htmlContent = fs.readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf-8');
+
+    // 1. Cabecera responsive de #modal-recipe-detail y rejilla nutricional 2x2 en móvil (< 480px)
+    expect(cssContent).toContain('#modal-recipe-detail .modal-header-bar');
+    expect(cssContent).toContain('#btn-close-recipe-modal');
+    expect(cssContent).toContain('grid-template-columns: repeat(2, 1fr)');
+    expect(cssContent).toContain('max-width: 100%');
+
+    // 2. #toast-container en Top Layer con popover="manual" e invocación de showPopover()
+    expect(htmlContent).toMatch(/id="toast-container"[^>]*popover="manual"/);
+    let popoverShown = 0;
+    const existingContainer = document.getElementById('toast-container');
+    if (existingContainer) existingContainer.remove();
+    const toastEl = appInstance.showToast('Aviso en Top Layer', 'warning', 0);
+    const container = document.getElementById('toast-container');
+    expect(container).not.toBeNull();
+    expect(container.getAttribute('popover')).toBe('manual');
+    container.showPopover = () => { popoverShown++; };
+    appInstance.showToast('Segundo aviso sobre modal', 'info', 0);
+    expect(popoverShown).toBe(1);
+    expect(toastEl).not.toBeNull();
+
+    // 3. Limpieza de bordes/outlines en <dialog> y autofocus en controles primarios
+    expect(cssContent).toContain('.modal-overlay :focus:not(:focus-visible)');
+    expect(cssContent).toContain('.gemini-input-row .gemini-input:focus');
+    expect(htmlContent).toContain('<div class="modal-content" tabindex="-1" autofocus>');
+    expect(htmlContent).toContain('id="btn-auth-google" autofocus');
+    expect(htmlContent).toContain('id="import-url-input" autofocus');
   });
 });
 

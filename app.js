@@ -4758,7 +4758,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.76';
+  window.APP_VERSION = 'v1.77';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4805,7 +4805,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.76';
+    this.appVersion = window.APP_VERSION || 'v1.77';
     this.activeView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
@@ -5198,6 +5198,7 @@ class FoodAssistantApp {
       container = document.createElement('div');
       container.id = 'toast-container';
       container.className = 'toast-container';
+      container.setAttribute('popover', 'manual');
       container.setAttribute('aria-live', 'polite');
       container.setAttribute('aria-atomic', 'true');
       document.body.appendChild(container);
@@ -5232,11 +5233,27 @@ class FoodAssistantApp {
       toast.classList.add('toast-hiding');
       setTimeout(() => {
         if (toast.parentNode) toast.parentNode.removeChild(toast);
+        if (container && container.children.length === 0 && typeof container.hidePopover === 'function') {
+          try {
+            container.hidePopover();
+          } catch (e) { /* ignore */ }
+        }
       }, 180);
     };
 
     toast.querySelector('.m3-toast-close')?.addEventListener('click', dismiss);
+    if (!container.hasAttribute('popover')) {
+      container.setAttribute('popover', 'manual');
+    }
     container.appendChild(toast);
+    if (typeof container.showPopover === 'function') {
+      try {
+        if (typeof container.hidePopover === 'function' && container.matches && container.matches(':popover-open')) {
+          container.hidePopover();
+        }
+        container.showPopover();
+      } catch (e) { /* fallback for environments without Popover API */ }
+    }
 
     if (duration > 0) {
       setTimeout(dismiss, duration);
