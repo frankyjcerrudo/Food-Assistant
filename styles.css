@@ -9035,18 +9035,235 @@ h2,
   }
 }
 
-
 /* ==========================================================================
-   US-86 v1.80: Cumplimiento de Dispositivos Moviles, Tablets y Plegables
-   (Mobile, Tablet & Foldable Device Enforcement)
-   Independientemente de la resolucion o de si la pantalla esta desplegada
-   (ej. Samsung Galaxy Z Fold 8, iPads, tablets Android):
-   1. Se utiliza SIEMPRE la version movil con el dock inferior tactil.
-   2. La navegacion de escritorio en cabecera (.desktop-header-nav) se oculta.
-   3. La version de Escritorio se reserva exclusivamente para navegadores de PC.
+   US-86 v1.80 (Refinado): Armonia Multi-Dispositivo
+   (Moviles, Plegables como Z Fold 8, Tablets e iPad, y PC de Escritorio)
    ========================================================================== */
 
-/* 1. Navegacion y Dock Inferior */
+/* 1. Holgura de Scroll inferior para que el dock flotante NUNCA tape el contenido */
+.bottom-nav {
+  position: fixed !important;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+  z-index: 100 !important;
+}
+
+@media (max-width: 899px) {
+  .app-container {
+    padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .view-panel {
+    padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+html.is-mobile-device .app-container,
+body.is-mobile-device .app-container {
+  padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+html.is-mobile-device .view-panel,
+body.is-mobile-device .view-panel {
+  padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* 2. Barra de Navegacion del Planificador Semanal: Unificada, Equilibrada y Sin Huecos */
+.week-nav-bar-unified {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-direction: row !important;
+  gap: 12px !important;
+  padding: 8px 16px !important;
+  background-color: var(--m3-surface-container) !important;
+  border: 1px solid var(--m3-outline-variant) !important;
+  border-radius: var(--radius-xl) !important;
+  margin-bottom: 16px !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+}
+
+.week-nav-bar-unified .week-nav-stepper {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+}
+
+.week-nav-bar-unified .week-nav-tools {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex: 0 0 auto !important;
+  margin-left: auto !important;
+}
+
+@media (max-width: 580px) {
+  .week-nav-bar-unified {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    padding: 10px 12px !important;
+  }
+  .week-nav-bar-unified .week-nav-stepper {
+    display: flex !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+  }
+  .week-nav-bar-unified .week-nav-tools {
+    display: flex !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    margin-left: 0 !important;
+  }
+}
+
+/* 3. Modal de Detalle de Receta: Adaptativo, Elegante y Libre de Lineas Fantasma */
+/* Movil Estricto (< 680px): Hoja nativa a pantalla completa */
+@media (max-width: 679px) {
+  #modal-recipe-detail {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+    border: none !important;
+    z-index: 200 !important;
+    background-color: var(--m3-surface) !important;
+  }
+
+  #modal-recipe-detail .modal-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0 !important;
+  }
+
+  .recipe-detail-hero-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0 !important;
+    gap: 0 !important;
+  }
+
+  .recipe-detail-hero-media {
+    width: 100% !important;
+    height: 230px !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .recipe-detail-hero-photo {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 0 !important;
+  }
+
+  .recipe-detail-hero-content {
+    padding: 16px 18px 0 !important;
+  }
+
+  .recipe-detail-columns-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0 18px 24px !important;
+    gap: 20px !important;
+    border-top: none !important;
+  }
+
+  .recipe-detail-col-ingredients {
+    width: 100% !important;
+    border-right: none !important;
+    padding-right: 0 !important;
+  }
+
+  .recipe-detail-col-instructions {
+    width: 100% !important;
+  }
+}
+
+/* Plegables desplegados, Tablets y Escritorio (>= 680px): Diseno Editorial Abierto a 2 Columnas */
+@media (min-width: 680px) {
+  #modal-recipe-detail .modal-content {
+    max-width: 1040px !important;
+    width: 92vw !important;
+    max-height: 88vh !important;
+    border-radius: var(--radius-xl) !important;
+    padding: 0 !important;
+    overflow-y: auto !important;
+    box-shadow: var(--elevation-3) !important;
+    box-sizing: border-box !important;
+    margin: auto !important;
+  }
+
+  #modal-recipe-detail .modal-header-bar {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 20 !important;
+    background: var(--m3-surface) !important;
+    border-bottom: var(--border-subtle) !important;
+    padding: 14px 24px !important;
+  }
+
+  .recipe-detail-hero-grid {
+    display: grid !important;
+    grid-template-columns: minmax(280px, 360px) 1fr !important;
+    gap: 24px !important;
+    padding: 22px 24px 18px !important;
+    align-items: start !important;
+  }
+
+  .recipe-detail-hero-media {
+    width: 100% !important;
+    height: 250px !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--elevation-1) !important;
+    overflow: hidden !important;
+  }
+
+  .recipe-detail-hero-photo {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: inherit !important;
+  }
+
+  .recipe-detail-hero-content {
+    display: flex !important;
+    flex-direction: column !important;
+    min-width: 0 !important;
+  }
+
+  .recipe-detail-columns-grid {
+    display: grid !important;
+    grid-template-columns: minmax(280px, 360px) 1fr !important;
+    gap: 28px !important;
+    padding: 20px 24px 28px !important;
+    align-items: start !important;
+    border-top: var(--border-subtle) !important;
+  }
+
+  .recipe-detail-col-ingredients {
+    border-right: var(--border-subtle) !important;
+    padding-right: 20px !important;
+    min-width: 0 !important;
+  }
+
+  .recipe-detail-col-instructions {
+    display: flex !important;
+    flex-direction: column !important;
+    min-width: 0 !important;
+  }
+}
+
+/* 4. Dispositivos Moviles, Tablets y Plegables: SIEMPRE DOCK INFERIOR (Nunca cabecera desktop) */
 html.is-mobile-device .bottom-nav,
 body.is-mobile-device .bottom-nav {
   display: flex !important;
@@ -9060,108 +9277,10 @@ body.is-mobile-device .desktop-header-nav {
   display: none !important;
 }
 
-/* 2. Contenedor y Espaciado para no tapar el dock */
+/* 5. Contenedor en Plegables/Tablets: Elegante y Centrado */
 html.is-mobile-device .app-container,
 body.is-mobile-device .app-container {
-  max-width: 880px !important;
-  padding-left: var(--space-4) !important;
-  padding-right: var(--space-4) !important;
-  padding-bottom: calc(108px + env(safe-area-inset-bottom, 0px)) !important;
+  max-width: 960px !important;
   margin-left: auto !important;
   margin-right: auto !important;
-}
-
-/* 3. Menu de Hoy en Dispositivos Moviles / Tablets / Plegables */
-html.is-mobile-device .today-header,
-body.is-mobile-device .today-header {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: stretch !important;
-  gap: 14px !important;
-  margin-bottom: 20px !important;
-  flex-wrap: wrap !important;
-}
-
-html.is-mobile-device .today-header-info,
-body.is-mobile-device .today-header-info {
-  min-width: unset !important;
-  flex: 1 1 auto !important;
-}
-
-html.is-mobile-device .today-nutrition-card.today-header-macros,
-body.is-mobile-device .today-nutrition-card.today-header-macros {
-  max-width: 100% !important;
-  width: 100% !important;
-  margin: 0 !important;
-  padding: 10px 14px !important;
-  border-radius: var(--radius-xl) !important;
-}
-
-html.is-mobile-device #today-slots-container,
-body.is-mobile-device #today-slots-container {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: var(--space-3) !important;
-  grid-template-columns: none !important;
-}
-
-html.is-mobile-device .desktop-only-action,
-body.is-mobile-device .desktop-only-action,
-html.is-mobile-device .desktop-only-close,
-body.is-mobile-device .desktop-only-close {
-  display: none !important;
-}
-
-html.is-mobile-device .mobile-only-chevron,
-body.is-mobile-device .mobile-only-chevron {
-  display: inline-flex !important;
-}
-
-html.is-mobile-device #today-slots-container .today-meal-slot-empty .slot-action-text,
-body.is-mobile-device #today-slots-container .today-meal-slot-empty .slot-action-text {
-  display: none !important;
-}
-
-/* 4. Planificador Semanal en Dispositivos Moviles / Tablets / Plegables */
-html.is-mobile-device .day-card .slots-grid,
-body.is-mobile-device .day-card .slots-grid {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: var(--space-2) !important;
-  grid-template-columns: none !important;
-}
-
-/* 5. Modal de Receta en Dispositivos Moviles / Tablets / Plegables */
-html.is-mobile-device #modal-recipe-detail .modal-content,
-body.is-mobile-device #modal-recipe-detail .modal-content {
-  max-width: 560px !important;
-  width: 100% !important;
-  max-height: 90vh !important;
-  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0 !important;
-}
-
-html.is-mobile-device .recipe-detail-hero-grid,
-body.is-mobile-device .recipe-detail-hero-grid {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: var(--space-4) !important;
-}
-
-html.is-mobile-device .recipe-detail-hero-photo,
-body.is-mobile-device .recipe-detail-hero-photo {
-  width: 100% !important;
-  height: 260px !important;
-  border-radius: 0 !important;
-}
-
-html.is-mobile-device .recipe-detail-columns-grid,
-body.is-mobile-device .recipe-detail-columns-grid {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: var(--space-5) !important;
-}
-
-html.is-mobile-device .recipe-detail-body,
-body.is-mobile-device .recipe-detail-body {
-  padding: 16px !important;
 }
