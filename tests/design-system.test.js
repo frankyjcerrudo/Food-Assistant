@@ -169,4 +169,40 @@ describe('US-23, US-24 & US-49: Sistema de Diseño Moderno, Micro-interacciones 
       expect(appJs).toContain('prefers-reduced-motion');
     });
   });
+
+  describe('US-86 (v1.80): Pulido Integral de Jerarquía y Estética Editorial', () => {
+    const indexHtml = fs.readFileSync(path.join(process.cwd(), 'index.html'), 'utf-8');
+    const stylesCss = fs.readFileSync(path.join(process.cwd(), 'styles.css'), 'utf-8');
+
+    it('declara tarjeta de macros al 100% bajo la cabecera en Hoy', () => {
+      expect(indexHtml).toContain('class="today-nutrition-card today-header-macros today-nutrition-fullwidth"');
+      expect(stylesCss).toContain('.today-nutrition-card.today-nutrition-fullwidth');
+      expect(stylesCss).toContain('width: 100% !important;');
+    });
+
+    it('incorpora cradle esculpido envolvente para el botón central del Sous Chef', () => {
+      expect(indexHtml).toContain('class="nav-gemini-cradle"');
+      expect(stylesCss).toContain('.nav-gemini-cradle');
+      expect(stylesCss).toContain('border-radius: 50%;');
+    });
+
+    it('elimina la redundancia "Hoy" en la etiqueta de fecha del Menú de Hoy', () => {
+      expect(indexHtml).toContain('id="today-date-text"');
+      expect(indexHtml).not.toContain('<span id="today-date-text" data-i18n="nav.today">Hoy</span>');
+    });
+
+    it('unifica la barra de navegación del Planificador Semanal en una sola fila', () => {
+      expect(indexHtml).toContain('week-nav-bar-unified');
+      expect(stylesCss).toContain('.week-nav-bar-unified');
+      expect(stylesCss).toContain('.week-nav-controls-group');
+    });
+
+    it('declara ficha de receta modal a pantalla completa en móvil por encima del dock', () => {
+      expect(stylesCss).toContain('@media (max-width: 768px)');
+      expect(stylesCss).toContain('#modal-recipe-detail');
+      expect(stylesCss).toContain('width: 100vw !important;');
+      expect(stylesCss).toContain('height: 100dvh !important;');
+      expect(stylesCss).toContain('z-index: 200 !important;');
+    });
+  });
 });
