@@ -138,6 +138,9 @@ describe('US-31: Colecciones y Libros de Recetas Personalizados (Cookbooks / Car
       const carousel = document.getElementById('cookbooks-cards-carousel');
       expect(carousel).not.toBeNull();
 
+      // v1.93: El botón superior redundante se ha eliminado, centralizando la creación en la tarjeta del carrusel
+      expect(document.getElementById('btn-open-create-cookbook')).toBeNull();
+
       const createCard = carousel.querySelector('#btn-card-create-cookbook');
       expect(createCard).not.toBeNull();
       expect(createCard.textContent).toContain('Crear libro');

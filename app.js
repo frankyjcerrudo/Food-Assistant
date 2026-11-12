@@ -4879,7 +4879,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v1.92';
+  window.APP_VERSION = 'v1.93';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4926,7 +4926,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.92';
+    this.appVersion = window.APP_VERSION || 'v1.93';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -8129,7 +8129,6 @@ class FoodAssistantApp {
     this.initRecipeTagFilters();
 
     // US-31: Cookbooks strip, shelf, active view & modal events
-    document.getElementById('btn-open-create-cookbook')?.addEventListener('click', () => this.openCreateCookbookModal());
     document.getElementById('btn-close-cookbook-dialog')?.addEventListener('click', () => this.closeCookbookModal());
     document.getElementById('btn-cancel-cookbook-dialog')?.addEventListener('click', () => this.closeCookbookModal());
     document.getElementById('form-cookbook')?.addEventListener('submit', (e) => this.handleSaveCookbook(e));
