@@ -743,5 +743,75 @@ describe('US-31: Colecciones y Libros de Recetas Personalizados (Cookbooks / Car
       // Debe preservar los libros locales
       expect(rec.cookbooks).toContain('cb-cenas-rapidas');
     });
+
+    it('getCookbookDisplayName internacionaliza los libros semilla por defecto en inglés y español', () => {
+      const cbCenas = { id: 'cb-cenas-rapidas', name: 'Cenas Rápidas' };
+      const cbFavs = { id: 'cb-favoritas', name: 'Favoritas de la Casa' };
+      const cbCustom = { id: 'cb-custom-1', name: 'Mis Guisos' };
+
+      window.I18n.setPreference('es');
+      expect(getCookbookDisplayName(cbCenas)).toBe('Cenas Rápidas');
+      expect(getCookbookDisplayName(cbFavs)).toBe('Favoritas de la Casa');
+      expect(getCookbookDisplayName(cbCustom)).toBe('Mis Guisos');
+
+      window.I18n.setPreference('en');
+      expect(getCookbookDisplayName(cbCenas)).toBe('Quick Dinners');
+      expect(getCookbookDisplayName(cbFavs)).toBe('House Favorites');
+      expect(getCookbookDisplayName(cbCustom)).toBe('Mis Guisos');
+
+      // Restaurar a español
+      window.I18n.setPreference('es');
+    });
+
+    it('pullFromCloud adopta libros remotos en dispositivo secundario que solo tiene semillas por defecto', async () => {
+      state.cloudUser = { id: 'user-second-device' };
+      state.cookbooks = [
+        { id: 'cb-cenas-rapidas', name: 'Cenas Rápidas' },
+        { id: 'cb-favoritas', name: 'Favoritas de la Casa' }
+      ];
+      state.cookbooksUpdatedAt = null;
+
+      const remoteCustomCookbook = {
+        id: 'cb-movil-creado',
+        name: 'Libro Creado en Móvil',
+        icon: 'menu_book',
+        updatedAt: '2026-11-12T17:00:00.000Z'
+      };
+
+      appInstance.supabaseClient = {
+        from: vi.fn((table) => {
+          if (table === 'households') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [{ id: 'hh-1', cookbooks: [remoteCustomCookbook], updated_at: '2026-11-12T17:00:00.000Z' }],
+                  error: null
+                })
+              })
+            };
+          }
+          if (table === 'recipes' || table === 'meal_plans' || table === 'shopping_items') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ data: [], error: null })
+              })
+            };
+          }
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null })
+            })
+          };
+        }),
+        auth: {
+          getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-second-device', user_metadata: {} } }, error: null })
+        }
+      };
+
+      state.household = { id: 'hh-1' };
+      await appInstance.pullFromCloud();
+
+      expect(state.cookbooks.some(c => c.id === 'cb-movil-creado')).toBe(true);
+    });
   });
 });

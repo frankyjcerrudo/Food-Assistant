@@ -4849,9 +4849,37 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
   return result.length > 0 ? result : candidateParts;
 }
 
+function getCookbookDisplayName(cb) {
+  if (!cb) return '';
+  const id = typeof cb === 'string' ? cb : cb.id;
+  const name = typeof cb === 'object' && cb !== null ? cb.name : '';
+  if (id === 'cb-cenas-rapidas') {
+    return window.I18n ? window.I18n.t('cookbooks.seedQuickDinners') : (name || 'Cenas Rápidas');
+  }
+  if (id === 'cb-favoritas') {
+    return window.I18n ? window.I18n.t('cookbooks.seedFavorites') : (name || 'Favoritas de la Casa');
+  }
+  return name || '';
+}
+
+function getCookbookDisplayDescription(cb) {
+  if (!cb) return '';
+  const id = typeof cb === 'string' ? cb : cb.id;
+  const desc = typeof cb === 'object' && cb !== null ? cb.description : '';
+  if (id === 'cb-cenas-rapidas') {
+    return window.I18n ? window.I18n.t('cookbooks.seedQuickDinnersDesc') : (desc || '');
+  }
+  if (id === 'cb-favoritas') {
+    return window.I18n ? window.I18n.t('cookbooks.seedFavoritesDesc') : (desc || '');
+  }
+  return desc || '';
+}
+
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.90';
+  window.getCookbookDisplayName = getCookbookDisplayName;
+  window.getCookbookDisplayDescription = getCookbookDisplayDescription;
+  window.APP_VERSION = 'v1.91';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4898,7 +4926,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.90';
+    this.appVersion = window.APP_VERSION || 'v1.91';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -6937,7 +6965,21 @@ class FoodAssistantApp {
       let remoteCookbooks = null;
       let remoteCookbooksUpdatedAt = null;
 
-      if (remoteHouseholdPrefsRow && Array.isArray(remoteHouseholdPrefsRow.custom_slots)) {
+      // 1. Prioridad: Consulta directa a la tabla households (fuente de verdad compartida del hogar)
+      if (activeHouseholdId && this.supabaseClient?.from) {
+        try {
+          const hhDataRes = await this.supabaseClient.from('households').select('cookbooks, updated_at').eq('id', activeHouseholdId);
+          if (Array.isArray(hhDataRes?.data) && hhDataRes.data.length > 0) {
+            const hRow = hhDataRes.data[0];
+            if (Array.isArray(hRow.cookbooks)) {
+              remoteCookbooks = hRow.cookbooks;
+              remoteCookbooksUpdatedAt = hRow.updated_at;
+            }
+          }
+        } catch (e) { }
+      }
+
+      if (!remoteCookbooks && remoteHouseholdPrefsRow && Array.isArray(remoteHouseholdPrefsRow.custom_slots)) {
         const hhCookbooksSlot = remoteHouseholdPrefsRow.custom_slots.find(s => s && (s.type === 'household_cookbooks' || s.type === 'user_cookbooks'));
         if (hhCookbooksSlot && Array.isArray(hhCookbooksSlot.cookbooks)) {
           remoteCookbooks = hhCookbooksSlot.cookbooks;
@@ -6961,7 +7003,7 @@ class FoodAssistantApp {
         let cbChanged = false;
         if (!Array.isArray(state.cookbooks)) state.cookbooks = [];
         const isOnlySeed = state.cookbooks.every(cb => SEED_COOKBOOKS.some(s => s.id === cb.id));
-        if (isOnlySeed && remoteCookbooks.length > 0) {
+        if (isOnlySeed || (!state.cookbooksUpdatedAt && remoteCookbooks.length > 0)) {
           state.cookbooks = remoteCookbooks.map(cb => ({ ...cb }));
           cbChanged = true;
         } else {
@@ -6992,6 +7034,9 @@ class FoodAssistantApp {
             const beforeCount = state.cookbooks.length;
             state.cookbooks = state.cookbooks.filter(localBook => {
               if (remoteIds.has(localBook.id)) return true;
+              if (SEED_COOKBOOKS.some(s => s.id === localBook.id)) {
+                return false;
+              }
               const localTime = new Date(localBook.updatedAt || localBook.createdAt || 0).getTime();
               return localTime > remoteSyncTime;
             });
@@ -7434,6 +7479,10 @@ class FoodAssistantApp {
           cookbooks: Array.isArray(state.cookbooks) ? state.cookbooks : [],
           updatedAt: state.cookbooksUpdatedAt || new Date().toISOString()
         };
+        const hhRowUpdatedAt = state.cookbooksUpdatedAt && (!hhDietaryUpdatedAt || new Date(state.cookbooksUpdatedAt).getTime() > new Date(hhDietaryUpdatedAt).getTime())
+          ? state.cookbooksUpdatedAt
+          : hhDietaryUpdatedAt;
+
         mealPlansPayload.push({
           id: '__household_prefs__',
           user_id: state.cloudUser.id,
@@ -7445,8 +7494,18 @@ class FoodAssistantApp {
           dinner_recipe_id: null,
           custom_slots: [hhPrefSlotPayload, hhCookbooksSlotPayload],
           household_id: activeHouseholdId,
-          updated_at: hhDietaryUpdatedAt
+          updated_at: hhRowUpdatedAt
         });
+
+        // Actualización directa en la tabla compartida households
+        if (this.supabaseClient?.from) {
+          try {
+            await this.supabaseClient.from('households').update({
+              cookbooks: state.cookbooks || [],
+              updated_at: state.cookbooksUpdatedAt || new Date().toISOString()
+            }).eq('id', activeHouseholdId);
+          } catch (hhErr) { }
+        }
       } else {
         const userCookbooksUpdatedAt = state.cookbooksUpdatedAt || new Date().toISOString();
         const userCookbooksSlotPayload = {
@@ -7540,7 +7599,9 @@ class FoodAssistantApp {
             nutrition_goals: state.settings?.nutritionGoals || null,
             default_servings: state.settings?.defaultServings || 2,
             cookbooks: state.cookbooks || [],
-            updated_at: state.dietaryUpdatedAt || new Date().toISOString()
+            updated_at: state.cookbooksUpdatedAt && (!state.dietaryUpdatedAt || new Date(state.cookbooksUpdatedAt).getTime() > new Date(state.dietaryUpdatedAt).getTime())
+              ? state.cookbooksUpdatedAt
+              : (state.dietaryUpdatedAt || new Date().toISOString())
           };
           // US-69: solo se envía si este dispositivo conoce el token (evita pisarlo con null)
           if (state.settings?.agentTokenHash !== undefined) {
@@ -9483,12 +9544,13 @@ class FoodAssistantApp {
 
       const cb = books.find(c => c.id === this.selectedCookbookId);
       if (cb && titleText) {
+        const displayName = getCookbookDisplayName(cb);
         titleText.textContent = window.I18n
-          ? window.I18n.t('cookbooks.bookTitlePrefix', { name: cb.name })
-          : `Libro: ${cb.name}`;
+          ? window.I18n.t('cookbooks.bookTitlePrefix', { name: displayName })
+          : `Libro: ${displayName}`;
       }
       if (cb && subtitleText) {
-        subtitleText.textContent = cb.description || (window.I18n && window.I18n.getLanguage() === 'en' ? 'Personal cookbook.' : 'Libro de recetas personal.');
+        subtitleText.textContent = getCookbookDisplayDescription(cb) || (window.I18n && window.I18n.getLanguage() === 'en' ? 'Personal cookbook.' : 'Libro de recetas personal.');
       }
     } else {
       if (shelfSection) shelfSection.style.display = 'flex';
@@ -9519,6 +9581,8 @@ class FoodAssistantApp {
     `;
 
       books.forEach(cb => {
+        const displayName = getCookbookDisplayName(cb);
+        const displayDesc = getCookbookDisplayDescription(cb);
         const count = Array.isArray(state.recipes)
           ? state.recipes.filter(r => Array.isArray(r.cookbooks) && r.cookbooks.includes(cb.id)).length
           : 0;
@@ -9541,9 +9605,9 @@ class FoodAssistantApp {
         }
 
         html += `
-        <div class="cookbook-book-card" role="button" tabindex="0" data-cookbook-id="${escapeHtml(cb.id)}" title="${escapeHtml(cb.description || cb.name)}">
-          ${firstWithImg ? `<img src="${escapeHtml(firstWithImg.imageUrl)}" alt="${escapeHtml(cb.name)}" class="cookbook-book-cover" loading="lazy">` : `<div class="cookbook-book-placeholder"><span class="material-symbols-outlined">${escapeHtml(icon)}</span></div>`}
-          ${coverImgUrl ? `<img src="${escapeHtml(coverImgUrl)}" alt="${escapeHtml(cb.name)}" class="cookbook-book-cover" loading="lazy">` : `<div class="cookbook-book-placeholder"><span class="material-symbols-outlined">${escapeHtml(icon)}</span></div>`}
+        <div class="cookbook-book-card" role="button" tabindex="0" data-cookbook-id="${escapeHtml(cb.id)}" title="${escapeHtml(displayDesc || displayName)}">
+          ${firstWithImg ? `<img src="${escapeHtml(firstWithImg.imageUrl)}" alt="${escapeHtml(displayName)}" class="cookbook-book-cover" loading="lazy">` : `<div class="cookbook-book-placeholder"><span class="material-symbols-outlined">${escapeHtml(icon)}</span></div>`}
+          ${coverImgUrl ? `<img src="${escapeHtml(coverImgUrl)}" alt="${escapeHtml(displayName)}" class="cookbook-book-cover" loading="lazy">` : `<div class="cookbook-book-placeholder"><span class="material-symbols-outlined">${escapeHtml(icon)}</span></div>`}
           <div class="cookbook-book-gradient"></div>
           <button type="button" class="cookbook-book-options-btn" data-cookbook-action="edit" data-cookbook-id="${escapeHtml(cb.id)}" title="${escapeHtml(optTitle)}" aria-label="${escapeHtml(optTitle)}">
             <span class="material-symbols-outlined icon-18">more_vert</span>
@@ -9551,9 +9615,9 @@ class FoodAssistantApp {
           <div class="cookbook-book-content">
             <span class="cookbook-book-icon-pill">
               <span class="material-symbols-outlined icon-12">${escapeHtml(icon)}</span>
-              <span>${escapeHtml(cb.name)}</span>
+              <span>${escapeHtml(displayName)}</span>
             </span>
-            <h4 class="cookbook-book-title">${escapeHtml(cb.name)}</h4>
+            <h4 class="cookbook-book-title">${escapeHtml(displayName)}</h4>
             <span class="cookbook-book-badge">${count} ${countSuffix}</span>
           </div>
         </div>
@@ -9659,7 +9723,7 @@ class FoodAssistantApp {
             <input type="checkbox" id="bulk-cb-${escapeHtml(cb.id)}" value="${escapeHtml(cb.id)}">
             <span class="bulk-add-cookbook-item-label">
               <span class="material-symbols-outlined icon-20 icon-primary">${escapeHtml(cb.icon || 'auto_stories')}</span>
-              <span>${escapeHtml(cb.name)}</span>
+              <span>${escapeHtml(getCookbookDisplayName(cb))}</span>
             </span>
             <span class="bulk-add-cookbook-item-count">${recipeCount}</span>
           </label>
@@ -9738,7 +9802,7 @@ class FoodAssistantApp {
       if (!activeCbId || activeCbId === 'all') return;
 
       const cb = (state.cookbooks || []).find(c => c.id === activeCbId);
-      const cbName = cb ? cb.name : 'este libro';
+      const cbName = cb ? getCookbookDisplayName(cb) : 'este libro';
       const count = this.selectedRecipeIds.size;
       const recipesText = count === 1 ? 'receta' : 'recetas';
 
@@ -10056,7 +10120,7 @@ class FoodAssistantApp {
           return `
         <button type="button" class="cookbook-select-chip ${isSel ? 'active' : ''}" data-cookbook-id="${escapeHtml(cb.id)}" aria-pressed="${isSel ? 'true' : 'false'}">
           <span class="material-symbols-outlined icon-14">${escapeHtml(cb.icon || 'auto_stories')}</span>
-          <span>${escapeHtml(cb.name)}</span>
+          <span>${escapeHtml(getCookbookDisplayName(cb))}</span>
           ${isSel ? '<span class="material-symbols-outlined icon-14">check</span>' : ''}
         </button>
       `;
@@ -10793,7 +10857,8 @@ class FoodAssistantApp {
               ${Array.isArray(r.cookbooks) && r.cookbooks.length > 0 ? r.cookbooks.map(cbId => {
           const cb = (state.cookbooks || []).find(c => c.id === cbId);
           if (!cb) return '';
-          return `<span class="tag-chip tag-chip-cookbook" title="${escapeHtml(cb.name)}"><span class="material-symbols-outlined icon-14">${escapeHtml(cb.icon || 'auto_stories')}</span> ${escapeHtml(cb.name)}</span>`;
+          const cbName = getCookbookDisplayName(cb);
+          return `<span class="tag-chip tag-chip-cookbook" title="${escapeHtml(cbName)}"><span class="material-symbols-outlined icon-14">${escapeHtml(cb.icon || 'auto_stories')}</span> ${escapeHtml(cbName)}</span>`;
         }).join('') : ''}
             </div>
             
@@ -18890,6 +18955,12 @@ REGLAS CRÍTICAS:
         members
       };
       state.saveHousehold(loaded);
+      if (Array.isArray(hhRow.cookbooks) && hhRow.cookbooks.length > 0) {
+        state.cookbooks = hhRow.cookbooks.map(cb => ({ ...cb }));
+        state.saveCookbooks(state.cookbooks);
+        this.renderCookbooksShelf();
+        this.renderCookbooksStrip();
+      }
       this.initHouseholdRealtimeSubscription();
       this.renderHouseholdSettings();
       return loaded;
