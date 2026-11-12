@@ -3,6 +3,24 @@
  * Google Material 3 Design, Google Material Symbols, 3-Way Theme Manager & Cloud Sync
  */
 
+// US-31: Seed Cookbooks
+const SEED_COOKBOOKS = [
+  {
+    id: "cb-cenas-rapidas",
+    name: "Cenas Rápidas",
+    icon: "bolt",
+    description: "Platos sencillos y deliciosos en menos de 20 minutos.",
+    createdAt: "2026-11-12T00:00:00.000Z"
+  },
+  {
+    id: "cb-favoritas",
+    name: "Favoritas de la Casa",
+    icon: "favorite",
+    description: "Nuestras recetas imprescindibles para el día a día.",
+    createdAt: "2026-11-12T00:00:00.000Z"
+  }
+];
+
 const SEED_RECIPES = [
   {
     id: "rec-pesto-pasta",
@@ -14,6 +32,7 @@ const SEED_RECIPES = [
     servings: 2,
     nutrition: { calories: 540, protein: 18, carbs: 62, fat: 24 },
     tags: ["Pasta", "Rápida", "Cena", "Saludable", "Vegetariano"],
+    cookbooks: ["cb-cenas-rapidas", "cb-favoritas"],
     ingredients: [
       { id: "i1", name: "Espaguetis o Tagliatelle", amount: 200, unit: "g", aisle: "pantry" },
       { id: "i2", name: "Albahaca fresca", amount: 50, unit: "g", aisle: "produce" },
@@ -2510,6 +2529,65 @@ class StateStore {
       anonKey: window.APP_CONFIG?.supabaseAnonKey || localStorage.getItem('fa_sb_key') || ''
     };
     this.lastSyncedAt = localStorage.getItem('fa_last_sync') || null;
+
+    // US-31: Cookbooks / Libros y colecciones personalizadas
+    let savedCookbooks = this.load('fa_cookbooks', null);
+    if (!savedCookbooks) {
+      savedCookbooks = typeof structuredClone === 'function' ? structuredClone(SEED_COOKBOOKS) : JSON.parse(JSON.stringify(SEED_COOKBOOKS));
+      this.save('fa_cookbooks', savedCookbooks);
+    }
+    this.cookbooks = Array.isArray(savedCookbooks) ? savedCookbooks : [];
+  }
+
+  saveCookbooks(cookbooks) {
+    this.cookbooks = Array.isArray(cookbooks) ? cookbooks : [];
+    this.save('fa_cookbooks', this.cookbooks);
+  }
+
+  addCookbook(cookbook) {
+    if (!Array.isArray(this.cookbooks)) this.cookbooks = [];
+    const newBook = {
+      id: cookbook.id || generateId('cb-'),
+      name: (cookbook.name || '').trim(),
+      icon: cookbook.icon || 'auto_stories',
+      description: (cookbook.description || '').trim(),
+      createdAt: cookbook.createdAt || new Date().toISOString()
+    };
+    this.cookbooks.push(newBook);
+    this.saveCookbooks(this.cookbooks);
+    return newBook;
+  }
+
+  updateCookbook(id, updates) {
+    if (!Array.isArray(this.cookbooks)) return null;
+    const idx = this.cookbooks.findIndex(c => c.id === id);
+    if (idx === -1) return null;
+    this.cookbooks[idx] = {
+      ...this.cookbooks[idx],
+      ...updates,
+      id
+    };
+    this.saveCookbooks(this.cookbooks);
+    return this.cookbooks[idx];
+  }
+
+  deleteCookbook(id) {
+    if (!Array.isArray(this.cookbooks)) return false;
+    this.cookbooks = this.cookbooks.filter(c => c.id !== id);
+    this.saveCookbooks(this.cookbooks);
+    if (Array.isArray(this.recipes)) {
+      let changed = false;
+      this.recipes.forEach(r => {
+        if (Array.isArray(r.cookbooks) && r.cookbooks.includes(id)) {
+          r.cookbooks = r.cookbooks.filter(cbId => cbId !== id);
+          changed = true;
+        }
+      });
+      if (changed) {
+        this.save('fa_recipes', this.recipes);
+      }
+    }
+    return true;
   }
 
   saveHousehold(household) {
@@ -4758,7 +4836,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.80';
+  window.APP_VERSION = 'v1.81';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4805,7 +4883,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.80';
+    this.appVersion = window.APP_VERSION || 'v1.81';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -5189,6 +5267,9 @@ class FoodAssistantApp {
     this.modalCopyWeek = document.getElementById('modal-copy-week');
     this.modalBulkImport = document.getElementById('modal-bulk-import');
     this.modalConfirmDialog = document.getElementById('modal-confirm-dialog');
+    this.modalCookbookDialog = document.getElementById('modal-cookbook-dialog');
+    this.selectedCookbookId = 'all';
+    this.editorSelectedCookbooks = new Set();
     this.modalGeminiInvoke = document.getElementById('modal-gemini-invoke');
     this.modalPlanRecipe = document.getElementById('modal-plan-recipe');
     this.modalOnboarding = document.getElementById('modal-onboarding');
@@ -5594,6 +5675,7 @@ class FoodAssistantApp {
     if (window.I18n) {
       window.I18n.applyTranslations();
     }
+    this.renderCookbooksStrip();
     this.updateUserAccountUI();
     const currentRecipeLang = document.getElementById('edit-recipe-language')?.value || 'es';
     this.syncRecipeEditorLanguageUI(currentRecipeLang);
@@ -7782,7 +7864,15 @@ class FoodAssistantApp {
     if (searchInput) {
       searchInput.addEventListener('input', () => this.applyRecipeFilters());
     }
+    this.renderCookbooksStrip();
     this.initRecipeTagFilters();
+
+    // US-31: Cookbooks strip & modal events
+    document.getElementById('btn-open-create-cookbook')?.addEventListener('click', () => this.openCreateCookbookModal());
+    document.getElementById('btn-close-cookbook-dialog')?.addEventListener('click', () => this.closeCookbookModal());
+    document.getElementById('btn-cancel-cookbook-dialog')?.addEventListener('click', () => this.closeCookbookModal());
+    document.getElementById('form-cookbook')?.addEventListener('submit', (e) => this.handleSaveCookbook(e));
+    document.getElementById('btn-delete-cookbook-dialog')?.addEventListener('click', () => this.handleDeleteCurrentCookbook());
 
     // US-34: Nevera reverse search events
     document.getElementById('btn-toggle-fridge-panel')?.addEventListener('click', () => this.toggleFridgePanel());
@@ -8056,6 +8146,7 @@ class FoodAssistantApp {
         this.renderTodayView();
         break;
       case 'view-recipes':
+        this.renderCookbooksStrip();
         this.initRecipeTagFilters();
         this.applyRecipeFilters();
         break;
@@ -8075,6 +8166,7 @@ class FoodAssistantApp {
 
   render() {
     this.renderTodayView();
+    this.renderCookbooksStrip();
     this.initRecipeTagFilters();
     this.applyRecipeFilters();
     this.renderPlanner();
@@ -8083,6 +8175,7 @@ class FoodAssistantApp {
     if (window.I18n) {
       window.I18n.applyTranslations();
     }
+    this.renderCookbooksStrip();
     this.updateUserAccountUI();
   }
 
@@ -8874,12 +8967,26 @@ class FoodAssistantApp {
     }
 
     if (!recipesList.length) {
-      grid.innerHTML = `
-        <div class="recipes-empty-state">
-          <span class="material-symbols-outlined recipes-empty-icon">menu_book</span>
-          <h3>No se encontraron recetas</h3>
-        </div>
-      `;
+      if (this.selectedCookbookId && this.selectedCookbookId !== 'all') {
+        const activeCb = (state.cookbooks || []).find(c => c.id === this.selectedCookbookId);
+        const iconName = activeCb?.icon || 'auto_stories';
+        const emptyMsg = window.I18n ? window.I18n.t('cookbooks.noRecipesInBook') : 'No hay recetas en este libro todavía.';
+        const addMsg = window.I18n ? window.I18n.t('cookbooks.addRecipesToBook') : 'Edita una receta para incluirla en este libro.';
+        grid.innerHTML = `
+          <div class="recipes-empty-state">
+            <span class="material-symbols-outlined recipes-empty-icon">${escapeHtml(iconName)}</span>
+            <h3>${escapeHtml(emptyMsg)}</h3>
+            <p class="recipes-empty-desc">${escapeHtml(addMsg)}</p>
+          </div>
+        `;
+      } else {
+        grid.innerHTML = `
+          <div class="recipes-empty-state">
+            <span class="material-symbols-outlined recipes-empty-icon">menu_book</span>
+            <h3>No se encontraron recetas</h3>
+          </div>
+        `;
+      }
       this.currentRenderedRecipesList = [];
       this.recipesRenderedCount = 0;
       return;
@@ -9138,6 +9245,298 @@ class FoodAssistantApp {
     // 5. Enviar cambios inmediatamente a Supabase
     this.pushToCloud(true);
     return true;
+  }
+
+  // ==========================================================================
+  // US-31: COLECCIONES Y LIBROS DE RECETAS (COOKBOOKS / CARPETAS - ESTILO RECIME)
+  // ==========================================================================
+  renderCookbooksStrip() {
+    const strip = document.getElementById('cookbooks-scroll-strip');
+    if (!strip) return;
+
+    const books = Array.isArray(state.cookbooks) ? state.cookbooks : [];
+    const totalCount = Array.isArray(state.recipes) ? state.recipes.length : 0;
+    const isAllActive = !this.selectedCookbookId || this.selectedCookbookId === 'all';
+    const allLabel = window.I18n ? window.I18n.t('cookbooks.all') : 'Todas';
+
+    let html = `
+      <button type="button" class="cookbook-tab-btn ${isAllActive ? 'active' : ''}" role="tab" aria-selected="${isAllActive ? 'true' : 'false'}" data-cookbook-id="all">
+        <span class="material-symbols-outlined icon-16">menu_book</span>
+        <span>${escapeHtml(allLabel)}</span>
+        <span class="cookbook-tab-count">${totalCount}</span>
+      </button>
+    `;
+
+    books.forEach(cb => {
+      const isActive = this.selectedCookbookId === cb.id;
+      const count = Array.isArray(state.recipes)
+        ? state.recipes.filter(r => Array.isArray(r.cookbooks) && r.cookbooks.includes(cb.id)).length
+        : 0;
+      const icon = cb.icon || 'auto_stories';
+      const optTitle = window.I18n ? window.I18n.t('cookbooks.options') : 'Opciones del libro';
+
+      html += `
+        <button type="button" class="cookbook-tab-btn ${isActive ? 'active' : ''}" role="tab" aria-selected="${isActive ? 'true' : 'false'}" data-cookbook-id="${escapeHtml(cb.id)}" title="${escapeHtml(cb.description || cb.name)}">
+          <span class="material-symbols-outlined icon-16">${escapeHtml(icon)}</span>
+          <span>${escapeHtml(cb.name)}</span>
+          <span class="cookbook-tab-count">${count}</span>
+          <span role="button" tabindex="0" class="cookbook-tab-options-btn" data-cookbook-action="edit" data-cookbook-id="${escapeHtml(cb.id)}" title="${escapeHtml(optTitle)}" aria-label="${escapeHtml(optTitle)}">
+            <span class="material-symbols-outlined icon-14">more_vert</span>
+          </span>
+        </button>
+      `;
+    });
+
+    strip.innerHTML = html;
+
+    // Event listeners en cada pestaña y botón de opciones
+    strip.querySelectorAll('.cookbook-tab-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const optBtn = e.target.closest('.cookbook-tab-options-btn');
+        if (optBtn) {
+          e.stopPropagation();
+          const cbId = optBtn.dataset.cookbookId;
+          this.openEditCookbookModal(cbId);
+          return;
+        }
+        const cbId = btn.dataset.cookbookId;
+        this.selectCookbook(cbId);
+      });
+
+      // Teclado para options btn
+      const optBtn = btn.querySelector('.cookbook-tab-options-btn');
+      if (optBtn) {
+        optBtn.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            e.stopPropagation();
+            this.openEditCookbookModal(optBtn.dataset.cookbookId);
+          }
+        });
+      }
+    });
+  }
+
+  selectCookbook(cookbookId) {
+    this.selectedCookbookId = cookbookId || 'all';
+    this.renderCookbooksStrip();
+    this.applyRecipeFilters();
+  }
+
+  openCreateCookbookModal() {
+    const dialog = this.modalCookbookDialog || document.getElementById('modal-cookbook-dialog');
+    if (!dialog) return;
+
+    const idInput = document.getElementById('input-cookbook-id');
+    const nameInput = document.getElementById('input-cookbook-name');
+    const descInput = document.getElementById('input-cookbook-desc');
+    const iconInput = document.getElementById('input-cookbook-icon');
+    const titleEl = document.getElementById('cookbook-dialog-title');
+    const headerIcon = document.getElementById('cookbook-dialog-header-icon');
+    const deleteBtn = document.getElementById('btn-delete-cookbook-dialog');
+
+    if (idInput) idInput.value = '';
+    if (nameInput) nameInput.value = '';
+    if (descInput) descInput.value = '';
+    if (iconInput) iconInput.value = 'auto_stories';
+    if (headerIcon) headerIcon.textContent = 'auto_stories';
+    if (deleteBtn) deleteBtn.style.display = 'none';
+    if (titleEl) {
+      titleEl.textContent = window.I18n ? window.I18n.t('cookbooks.newBookTitle') : 'Crear libro de recetas';
+    }
+
+    this.renderCookbookIconSelector('auto_stories');
+    this.openDialogModal(dialog);
+    if (nameInput) {
+      setTimeout(() => nameInput.focus(), 80);
+    }
+  }
+
+  openEditCookbookModal(cookbookId) {
+    const dialog = this.modalCookbookDialog || document.getElementById('modal-cookbook-dialog');
+    if (!dialog) return;
+
+    const cb = (state.cookbooks || []).find(c => c.id === cookbookId);
+    if (!cb) return;
+
+    const idInput = document.getElementById('input-cookbook-id');
+    const nameInput = document.getElementById('input-cookbook-name');
+    const descInput = document.getElementById('input-cookbook-desc');
+    const iconInput = document.getElementById('input-cookbook-icon');
+    const titleEl = document.getElementById('cookbook-dialog-title');
+    const headerIcon = document.getElementById('cookbook-dialog-header-icon');
+    const deleteBtn = document.getElementById('btn-delete-cookbook-dialog');
+
+    const icon = cb.icon || 'auto_stories';
+    if (idInput) idInput.value = cb.id;
+    if (nameInput) nameInput.value = cb.name || '';
+    if (descInput) descInput.value = cb.description || '';
+    if (iconInput) iconInput.value = icon;
+    if (headerIcon) headerIcon.textContent = icon;
+    if (deleteBtn) deleteBtn.style.display = 'inline-flex';
+    if (titleEl) {
+      titleEl.textContent = window.I18n ? window.I18n.t('cookbooks.editBookTitle') : 'Editar libro de recetas';
+    }
+
+    this.renderCookbookIconSelector(icon);
+    this.openDialogModal(dialog);
+    if (nameInput) {
+      setTimeout(() => nameInput.focus(), 80);
+    }
+  }
+
+  closeCookbookModal() {
+    const dialog = this.modalCookbookDialog || document.getElementById('modal-cookbook-dialog');
+    if (dialog) {
+      this.closeDialogModal(dialog);
+    }
+  }
+
+  renderCookbookIconSelector(selectedIcon = 'auto_stories') {
+    const container = document.getElementById('cookbook-icon-selector');
+    if (!container) return;
+
+    const icons = [
+      'auto_stories', 'bolt', 'favorite', 'cake', 'restaurant', 'skillet',
+      'timer', 'outdoor_grill', 'local_pizza', 'lunch_dining', 'coffee', 'icecream',
+      'soup_kitchen', 'local_cafe', 'star', 'eco', 'nutrition', 'egg_alt'
+    ];
+
+    container.innerHTML = icons.map(ic => {
+      const isSel = ic === selectedIcon;
+      return `
+        <button type="button" class="cookbook-icon-option ${isSel ? 'active' : ''}" role="radio" aria-checked="${isSel ? 'true' : 'false'}" data-icon="${ic}" title="${ic}">
+          <span class="material-symbols-outlined icon-20">${ic}</span>
+        </button>
+      `;
+    }).join('');
+
+    container.querySelectorAll('.cookbook-icon-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const ic = btn.dataset.icon;
+        container.querySelectorAll('.cookbook-icon-option').forEach(b => {
+          b.classList.remove('active');
+          b.setAttribute('aria-checked', 'false');
+        });
+        btn.classList.add('active');
+        btn.setAttribute('aria-checked', 'true');
+        const iconInput = document.getElementById('input-cookbook-icon');
+        const headerIcon = document.getElementById('cookbook-dialog-header-icon');
+        if (iconInput) iconInput.value = ic;
+        if (headerIcon) headerIcon.textContent = ic;
+      });
+    });
+  }
+
+  handleSaveCookbook(e) {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+
+    const nameInput = document.getElementById('input-cookbook-name');
+    const name = nameInput?.value.trim() || '';
+    if (!name) {
+      if (nameInput) this.highlightInputError(nameInput, "Introduce un nombre para el libro.");
+      return;
+    }
+
+    const idInput = document.getElementById('input-cookbook-id');
+    const id = idInput?.value.trim() || '';
+    const descInput = document.getElementById('input-cookbook-desc');
+    const desc = descInput?.value.trim() || '';
+    const iconInput = document.getElementById('input-cookbook-icon');
+    const icon = iconInput?.value.trim() || 'auto_stories';
+
+    if (id) {
+      state.updateCookbook(id, { name, description: desc, icon });
+      const msg = window.I18n ? window.I18n.t('cookbooks.bookUpdated', { name }) : `Libro "${name}" actualizado.`;
+      this.showToast(msg, 'success');
+    } else {
+      const newBook = state.addCookbook({ name, description: desc, icon });
+      this.selectedCookbookId = newBook.id;
+      const msg = window.I18n ? window.I18n.t('cookbooks.bookCreated', { name }) : `Libro "${name}" creado con éxito.`;
+      this.showToast(msg, 'success');
+    }
+
+    this.closeCookbookModal();
+    this.renderCookbooksStrip();
+    this.applyRecipeFilters();
+    this.scheduleSyncWithCloud();
+  }
+
+  async handleDeleteCurrentCookbook() {
+    const idInput = document.getElementById('input-cookbook-id');
+    const id = idInput?.value.trim() || '';
+    if (!id) return;
+
+    const cb = (state.cookbooks || []).find(c => c.id === id);
+    if (!cb) return;
+
+    const confirmMsg = window.I18n
+      ? window.I18n.t('cookbooks.deleteConfirm', { name: cb.name })
+      : `¿Eliminar el libro "${cb.name}"? Las recetas seguirán guardadas en tu recetario general.`;
+
+    const confirmed = await this.showConfirmDialog({
+      title: window.I18n ? window.I18n.t('cookbooks.deleteBook') : 'Eliminar libro',
+      message: confirmMsg,
+      confirmText: window.I18n ? window.I18n.t('common.delete') : 'Eliminar',
+      cancelText: window.I18n ? window.I18n.t('common.cancel') : 'Cancelar',
+      danger: true,
+      icon: 'delete_forever'
+    });
+
+    if (!confirmed) return;
+
+    state.deleteCookbook(id);
+    if (this.selectedCookbookId === id) {
+      this.selectedCookbookId = 'all';
+    }
+
+    this.closeCookbookModal();
+    this.renderCookbooksStrip();
+    this.applyRecipeFilters();
+    const msg = window.I18n ? window.I18n.t('cookbooks.bookDeleted') : 'Libro eliminado.';
+    this.showToast(msg, 'info');
+    this.scheduleSyncWithCloud();
+  }
+
+  renderEditorCookbooksChips() {
+    const container = document.getElementById('editor-cookbooks-chips');
+    if (!container) return;
+
+    const books = Array.isArray(state.cookbooks) ? state.cookbooks : [];
+    if (books.length === 0) {
+      container.innerHTML = `<span class="cookbooks-chips-empty">No hay libros creados todavía.</span>`;
+      return;
+    }
+
+    container.innerHTML = books.map(cb => {
+      const isSel = this.editorSelectedCookbooks && this.editorSelectedCookbooks.has(cb.id);
+      return `
+        <button type="button" class="cookbook-select-chip ${isSel ? 'active' : ''}" data-cookbook-id="${escapeHtml(cb.id)}" aria-pressed="${isSel ? 'true' : 'false'}">
+          <span class="material-symbols-outlined icon-14">${escapeHtml(cb.icon || 'auto_stories')}</span>
+          <span>${escapeHtml(cb.name)}</span>
+          ${isSel ? '<span class="material-symbols-outlined icon-14">check</span>' : ''}
+        </button>
+      `;
+    }).join('');
+
+    container.querySelectorAll('.cookbook-select-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const cbId = chip.dataset.cookbookId;
+        this.toggleEditorCookbook(cbId);
+      });
+    });
+  }
+
+  toggleEditorCookbook(cookbookId) {
+    if (!this.editorSelectedCookbooks) {
+      this.editorSelectedCookbooks = new Set();
+    }
+    if (this.editorSelectedCookbooks.has(cookbookId)) {
+      this.editorSelectedCookbooks.delete(cookbookId);
+    } else {
+      this.editorSelectedCookbooks.add(cookbookId);
+    }
+    this.renderEditorCookbooksChips();
   }
 
   // US-02 & US-73: Filtro múltiple combinado con el buscador de recetas + Chip de Mi Nevera + US-78 Filtros de Auditoría
@@ -9434,6 +9833,12 @@ class FoodAssistantApp {
         if (!this.hasNoInstructions(r)) return false;
       }
 
+      // 0.5. US-31: Filtro por Libro de Recetas / Cookbook (1 toque)
+      if (this.selectedCookbookId && this.selectedCookbookId !== 'all') {
+        const cbs = Array.isArray(r.cookbooks) ? r.cookbooks : [];
+        if (!cbs.includes(this.selectedCookbookId)) return false;
+      }
+
       // 1. Tag multi-selection (AND logic: debe contener todas las etiquetas seleccionadas + chip Favoritas US-70)
       if (this.selectedRecipeTags.size > 0) {
         const rTagsNorm = (r.tags || []).map(t => typeof normalizeIngredientText === 'function' ? normalizeIngredientText(String(t)) : String(t).toLowerCase().trim());
@@ -9493,17 +9898,22 @@ class FoodAssistantApp {
     // Actualizar badge y subtítulo dinámico
     const badge = document.getElementById('recipes-count-badge');
     const subtitle = document.getElementById('recipes-count-subtitle');
+    const isFiltered = this.selectedRecipeTags.size > 0 || term || this.fridgeIngredients.length > 0 || this.recipeAuditFilter || (this.selectedCookbookId && this.selectedCookbookId !== 'all');
     if (badge) {
-      if (this.selectedRecipeTags.size > 0 || term || this.fridgeIngredients.length > 0 || this.recipeAuditFilter) {
+      if (isFiltered) {
         badge.textContent = `${filtered.length} de ${state.recipes.length}`;
       } else {
         badge.textContent = `${state.recipes.length}`;
       }
     }
     if (subtitle) {
-      if (this.selectedRecipeTags.size > 0 || term || this.fridgeIngredients.length > 0 || this.recipeAuditFilter) {
+      if (isFiltered) {
         const isEn = window.I18n && window.I18n.getLanguage() === 'en';
         const filtersDesc = [];
+        if (this.selectedCookbookId && this.selectedCookbookId !== 'all') {
+          const cb = (state.cookbooks || []).find(c => c.id === this.selectedCookbookId);
+          if (cb) filtersDesc.push(`${isEn ? 'Cookbook' : 'Libro'}: ${cb.name}`);
+        }
         if (this.recipeAuditFilter === 'no-ingredients') filtersDesc.push(isEn ? 'No ingredients' : 'Sin ingredientes');
         if (this.recipeAuditFilter === 'no-instructions') filtersDesc.push(isEn ? 'No instructions' : 'Sin pasos');
         if (this.fridgeIngredients.length > 0) filtersDesc.push(`${isEn ? 'Fridge' : 'Nevera'}: ${this.fridgeIngredients.join(', ')}`);
@@ -9739,6 +10149,9 @@ class FoodAssistantApp {
       case 'modal-recipe-edit':
         this.closeEditModal();
         break;
+      case 'modal-cookbook-dialog':
+        this.closeCookbookModal();
+        break;
       case 'modal-recipe-picker':
         this.closePickerModal();
         break;
@@ -9832,6 +10245,11 @@ class FoodAssistantApp {
                 </a>
               ` : ''}
               ${(r.tags || []).filter(t => hasNutData || t !== 'Alta en Proteínas').map(t => `<span class="tag-chip tag-chip-primary">${escapeHtml(window.I18n ? window.I18n.getTagLabel(t) : t)}</span>`).join('')}
+              ${Array.isArray(r.cookbooks) && r.cookbooks.length > 0 ? r.cookbooks.map(cbId => {
+                const cb = (state.cookbooks || []).find(c => c.id === cbId);
+                if (!cb) return '';
+                return `<span class="tag-chip tag-chip-cookbook" title="${escapeHtml(cb.name)}"><span class="material-symbols-outlined icon-14">${escapeHtml(cb.icon || 'auto_stories')}</span> ${escapeHtml(cb.name)}</span>`;
+              }).join('') : ''}
             </div>
             
             <h2 class="recipe-detail-title">${escapeHtml(r.title)}</h2>
@@ -10044,6 +10462,11 @@ class FoodAssistantApp {
     if (fatEl) fatEl.value = "";
     this.editorSelectedTags = new Set(["Cena", "Saludable"]);
     this.renderRecipeEditorChips();
+    this.editorSelectedCookbooks = new Set();
+    if (this.selectedCookbookId && this.selectedCookbookId !== 'all') {
+      this.editorSelectedCookbooks.add(this.selectedCookbookId);
+    }
+    this.renderEditorCookbooksChips();
     const privCheckbox = document.getElementById('edit-recipe-private');
     if (privCheckbox) privCheckbox.checked = false;
 
@@ -10101,6 +10524,8 @@ class FoodAssistantApp {
     if (fatEl) fatEl.value = (nut && nut.fat > 0) ? nut.fat : "";
     this.editorSelectedTags = new Set(Array.isArray(r.tags) ? r.tags : []);
     this.renderRecipeEditorChips();
+    this.editorSelectedCookbooks = new Set(Array.isArray(r.cookbooks) ? r.cookbooks : []);
+    this.renderEditorCookbooksChips();
     const editPrivCheckbox = document.getElementById('edit-recipe-private');
     if (editPrivCheckbox) editPrivCheckbox.checked = !!r.isPrivate;
 
@@ -10923,6 +11348,8 @@ class FoodAssistantApp {
     const languageEl = document.getElementById('edit-recipe-language');
     const language = languageEl?.value || detectRecipeLanguage({ title, description, ingredients, instructions });
 
+    const cookbooks = Array.from(this.editorSelectedCookbooks || []);
+
     const updatedRecipe = {
       id,
       title,
@@ -10932,6 +11359,7 @@ class FoodAssistantApp {
       cookTimeMinutes,
       servings,
       tags,
+      cookbooks,
       language,
       nutrition: nutrition || undefined,
       ingredients,
