@@ -4879,7 +4879,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v1.91';
+  window.APP_VERSION = 'v1.92';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4926,7 +4926,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.91';
+    this.appVersion = window.APP_VERSION || 'v1.92';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -6778,16 +6778,25 @@ class FoodAssistantApp {
               (Date.now() - (this._recentShoppingCheckTimestamps.get(local.id) || 0) < 10000);
             const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
             const localDate = new Date(local.updatedAt || 0).getTime();
-            const finalChecked = isRecentlyCheckedLocally ? local.isChecked : !!remoteRow.is_checked;
 
-            if (remoteDate >= localDate || !isRecentlyCheckedLocally) {
+            // US-81: Proteger contra respuestas de red obsoletas o en vuelo durante sincronización multi-dispositivo
+            if (remoteDate > localDate) {
+              const finalChecked = isRecentlyCheckedLocally ? local.isChecked : !!remoteRow.is_checked;
               state.shoppingList[localIdx] = {
                 ...local,
                 ...remoteItem,
                 isChecked: finalChecked
               };
               stateChanged = true;
+            } else if (remoteDate === localDate) {
+              const finalChecked = isRecentlyCheckedLocally ? local.isChecked : !!remoteRow.is_checked;
+              if (local.isChecked !== finalChecked) {
+                local.isChecked = finalChecked;
+                stateChanged = true;
+              }
             }
+            // Si remoteDate < localDate, la versión local es estrictamente más reciente
+            // (por broadcast en vivo o pulsación local); nunca sobreescribir con datos obsoletos de la nube.
           } else {
             state.shoppingList.push(remoteItem);
             stateChanged = true;
@@ -19346,6 +19355,8 @@ REGLAS CRÍTICAS:
           if (item.unit !== undefined) local.unit = item.unit;
           if (item.aisle) local.aisle = item.aisle;
           modified = true;
+          if (!this._recentShoppingCheckTimestamps) this._recentShoppingCheckTimestamps = new Map();
+          this._recentShoppingCheckTimestamps.set(item.id, Date.now());
         }
       } else {
         state.shoppingList.push({
@@ -19359,6 +19370,8 @@ REGLAS CRÍTICAS:
           updatedAt: item.updatedAt || new Date().toISOString()
         });
         modified = true;
+        if (!this._recentShoppingCheckTimestamps) this._recentShoppingCheckTimestamps = new Map();
+        this._recentShoppingCheckTimestamps.set(item.id, Date.now());
       }
     } else if (action === 'delete') {
       if (payload.itemId) {
@@ -19468,10 +19481,21 @@ REGLAS CRÍTICAS:
             const local = state.shoppingList[localIdx];
             const isRecentlyCheckedLocally = this._recentShoppingCheckTimestamps &&
               (Date.now() - (this._recentShoppingCheckTimestamps.get(local.id) || 0) < 10000);
-            if (isRecentlyCheckedLocally) return;
-
             const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
             const localDate = new Date(local.updatedAt || 0).getTime();
+
+            // Si se acaba de marcar/modificar recientemente y ya coincide con el estado remoto, alinear timestamp sin re-renderizar
+            if (isRecentlyCheckedLocally && local.isChecked === !!remoteRow.is_checked) {
+              if (remoteDate >= localDate) {
+                local.updatedAt = remoteRow.updated_at;
+              }
+              return;
+            }
+            // Si hubo cambio local reciente pero el CDC es obsoleto o anterior a nuestra modificación, descartarlo
+            if (isRecentlyCheckedLocally && remoteDate <= localDate) {
+              return;
+            }
+
             if (remoteDate >= localDate) {
               local.isChecked = !!remoteRow.is_checked;
               local.updatedAt = remoteRow.updated_at;

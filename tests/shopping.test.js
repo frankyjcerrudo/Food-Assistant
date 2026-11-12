@@ -815,5 +815,73 @@ describe('US-64: Conversión y normalización de unidades en la compra', () => {
       // Debe mantenerse en true (marcado)
       expect(window.state.shoppingList[0].isChecked).toBe(true);
     });
+
+    it('v1.92: previene efecto rebote/flapping al recibir broadcast de otro dispositivo seguido de pullFromCloud o CDC desactualizado', async () => {
+      const now = Date.now();
+      const t0 = new Date(now - 10000).toISOString();
+      const t1 = new Date(now).toISOString();
+
+      window.state.shoppingList = [
+        { id: 'item-sync-flap', name: 'Manzanas', isChecked: false, updatedAt: t0 }
+      ];
+
+      // 1. Llega broadcast instantáneo desde el móvil indicando que se ha completado el artículo
+      appInstance.handleRealtimeShoppingBroadcast({
+        action: 'toggle',
+        clientId: 'mobile-client-999',
+        item: {
+          id: 'item-sync-flap',
+          name: 'Manzanas',
+          isChecked: true,
+          updatedAt: t1
+        }
+      });
+
+      // En PC debe estar marcado inmediatamente
+      expect(window.state.shoppingList[0].isChecked).toBe(true);
+      expect(appInstance._recentShoppingCheckTimestamps.has('item-sync-flap')).toBe(true);
+
+      // 2. Se dispara un pullFromCloud() en segundo plano mientras el upsert de Supabase aún no terminaba,
+      // retornando la fila antigua de la BD (con is_checked: false y updated_at anterior a t1).
+      appInstance.supabaseClient = {
+        from: (table) => ({
+          select: () => ({
+            eq: () => ({
+              data: [
+                {
+                  id: 'item-sync-flap',
+                  name: 'Manzanas',
+                  is_checked: false,
+                  updated_at: t0 // Timestamp viejo de la nube
+                }
+              ],
+              error: null
+            }),
+            in: () => ({ data: [], error: null }),
+            or: () => ({ limit: () => Promise.resolve({ data: [], error: null }) })
+          })
+        })
+      };
+
+      await appInstance.pullFromCloud();
+
+      // NO debe desmarcarse (cero rebote/flapping a false)
+      expect(window.state.shoppingList[0].isChecked).toBe(true);
+
+      // 3. Supabase emite un CDC UPDATE desactualizado anterior
+      appInstance.handleHouseholdRealtimeEvent({
+        table: 'shopping_items',
+        eventType: 'UPDATE',
+        new: {
+          id: 'item-sync-flap',
+          name: 'Manzanas',
+          is_checked: false,
+          updated_at: t0
+        }
+      });
+
+      // Debe mantenerse completado
+      expect(window.state.shoppingList[0].isChecked).toBe(true);
+    });
   });
 });
