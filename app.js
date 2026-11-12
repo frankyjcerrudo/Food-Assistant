@@ -2590,9 +2590,11 @@ class StateStore {
     this.trackDeletion('cookbooks', id);
     if (Array.isArray(this.recipes)) {
       let changed = false;
+      const nowIso = new Date().toISOString();
       this.recipes.forEach(r => {
         if (Array.isArray(r.cookbooks) && r.cookbooks.includes(id)) {
           r.cookbooks = r.cookbooks.filter(cbId => cbId !== id);
+          r.updatedAt = nowIso;
           changed = true;
         }
       });
@@ -4849,7 +4851,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.89';
+  window.APP_VERSION = 'v1.90';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4896,7 +4898,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.89';
+    this.appVersion = window.APP_VERSION || 'v1.90';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -6458,6 +6460,9 @@ class FoodAssistantApp {
             ? !!remoteRow.is_favorite
             : !!remoteRow.instructions?.[0]?._isFavorite;
 
+          const hasExplicitRemoteCookbooks = Array.isArray(remoteRow.cookbooks) ||
+            Array.isArray(remoteRow.instructions?.[0]?._cookbooks);
+
           const remoteCookbooks = Array.isArray(remoteRow.cookbooks)
             ? remoteRow.cookbooks
             : (Array.isArray(remoteRow.instructions?.[0]?._cookbooks) ? remoteRow.instructions[0]._cookbooks : []);
@@ -6506,7 +6511,7 @@ class FoodAssistantApp {
             const remoteHasNutrition = !!remoteRecipe.nutrition;
             const localHasNutrition = !!local.nutrition;
             const tagsDiffer = JSON.stringify(local.tags || []) !== JSON.stringify(remoteRecipe.tags || []);
-            const cookbooksDiffer = Array.isArray(remoteRecipe.cookbooks) &&
+            const cookbooksDiffer = hasExplicitRemoteCookbooks &&
               JSON.stringify(remoteRecipe.cookbooks) !== JSON.stringify(local.cookbooks || []);
 
             if (remoteDate > localDate) {
@@ -6514,10 +6519,10 @@ class FoodAssistantApp {
                 ...local,
                 ...remoteRecipe,
                 nutrition: remoteRecipe.nutrition || local.nutrition || null,
-                cookbooks: Array.isArray(remoteRecipe.cookbooks) ? remoteRecipe.cookbooks : (local.cookbooks || [])
+                cookbooks: hasExplicitRemoteCookbooks ? remoteRecipe.cookbooks : (local.cookbooks || [])
               };
               stateChanged = true;
-            } else if (remoteDate === localDate || remoteDate >= localDate) {
+            } else if (remoteDate === localDate) {
               let updated = false;
               if (!localHasNutrition && remoteHasNutrition) {
                 local.nutrition = remoteRecipe.nutrition;
@@ -6528,8 +6533,10 @@ class FoodAssistantApp {
                 updated = true;
               }
               if (cookbooksDiffer) {
-                local.cookbooks = remoteRecipe.cookbooks;
-                updated = true;
+                if (remoteRecipe.cookbooks.length > 0 || !(local.cookbooks && local.cookbooks.length > 0)) {
+                  local.cookbooks = remoteRecipe.cookbooks;
+                  updated = true;
+                }
               }
               if (remoteRecipe.ownerUserId && !local.ownerUserId) {
                 local.ownerUserId = remoteRecipe.ownerUserId;
@@ -7300,7 +7307,7 @@ class FoodAssistantApp {
             : [];
 
           // Adjuntar _nutrition, _isFavorite y _cookbooks como metadato seguro en instructions[0] para persistencia ante fallbacks de esquema
-          if (recipe.nutrition || recipe.isFavorite !== undefined || (Array.isArray(recipe.cookbooks) && recipe.cookbooks.length > 0)) {
+          if (recipe.nutrition || recipe.isFavorite !== undefined || recipe.cookbooks !== undefined) {
             if (instructionsCopy.length === 0) {
               instructionsCopy.push({ text: '' });
             }
@@ -7310,7 +7317,7 @@ class FoodAssistantApp {
             if (recipe.isFavorite !== undefined) {
               instructionsCopy[0]._isFavorite = !!recipe.isFavorite;
             }
-            if (Array.isArray(recipe.cookbooks) && recipe.cookbooks.length > 0) {
+            if (Array.isArray(recipe.cookbooks)) {
               instructionsCopy[0]._cookbooks = recipe.cookbooks;
             }
           }
@@ -7647,6 +7654,11 @@ class FoodAssistantApp {
         case 'openRecipeDetail':
           if (target.dataset.recipeId) {
             this.openRecipeDetail(target.dataset.recipeId);
+          }
+          break;
+        case 'toggleRecipeSelect':
+          if (target.dataset.recipeId) {
+            this.toggleRecipeSelect(target.dataset.recipeId);
           }
           break;
         case 'navigateWeek': {
@@ -9681,6 +9693,7 @@ class FoodAssistantApp {
       const count = this.selectedRecipeIds ? this.selectedRecipeIds.size : 0;
 
       let modified = false;
+      const nowIso = new Date().toISOString();
       (state.recipes || []).forEach(recipe => {
         if (this.selectedRecipeIds.has(recipe.id)) {
           if (!Array.isArray(recipe.cookbooks)) {
@@ -9689,6 +9702,7 @@ class FoodAssistantApp {
           selectedCbIds.forEach(cbId => {
             if (!recipe.cookbooks.includes(cbId)) {
               recipe.cookbooks.push(cbId);
+              recipe.updatedAt = nowIso;
               modified = true;
             }
           });
@@ -9744,10 +9758,12 @@ class FoodAssistantApp {
       if (!confirmed) return;
 
       let modified = false;
+      const nowIso = new Date().toISOString();
       (state.recipes || []).forEach(recipe => {
         if (this.selectedRecipeIds.has(recipe.id)) {
           if (Array.isArray(recipe.cookbooks) && recipe.cookbooks.includes(activeCbId)) {
             recipe.cookbooks = recipe.cookbooks.filter(id => id !== activeCbId);
+            recipe.updatedAt = nowIso;
             modified = true;
           }
         }

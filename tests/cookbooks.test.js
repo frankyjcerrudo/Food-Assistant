@@ -609,4 +609,139 @@ describe('US-31: Colecciones y Libros de Recetas Personalizados (Cookbooks / Car
       expect(state.cookbooks.some(c => c.id === 'cb-ignored')).toBe(false);
     });
   });
+
+  describe('9. Persistencia de asociación Recetas-Libros y Sincronización en la Nube (v1.90)', () => {
+    it('handleBulkAddCookbook actualiza updatedAt en cada receta modificada', () => {
+      const rec = state.recipes.find(r => r.id === 'rec-4');
+      rec.updatedAt = '2026-01-01T00:00:00.000Z';
+
+      appInstance.selectedRecipeIds = new Set(['rec-4']);
+      appInstance.openBulkAddCookbookModal();
+
+      const list = document.getElementById('bulk-add-cookbooks-list');
+      const cbCenas = list.querySelector('#bulk-cb-cb-cenas-rapidas');
+      cbCenas.checked = true;
+
+      const beforeTime = Date.now();
+      appInstance.handleBulkAddCookbook();
+
+      expect(rec.cookbooks).toContain('cb-cenas-rapidas');
+      expect(rec.updatedAt).toBeDefined();
+      const afterTime = new Date(rec.updatedAt).getTime();
+      expect(afterTime).toBeGreaterThanOrEqual(beforeTime - 1000);
+    });
+
+    it('handleBulkRemoveFromCookbook actualiza updatedAt en la receta modificada', async () => {
+      vi.spyOn(appInstance, 'showConfirmDialog').mockResolvedValue(true);
+      const rec = state.recipes.find(r => r.id === 'rec-1');
+      rec.updatedAt = '2026-01-01T00:00:00.000Z';
+
+      appInstance.selectedCookbookId = 'cb-cenas-rapidas';
+      appInstance.selectedRecipeIds = new Set(['rec-1']);
+
+      const beforeTime = Date.now();
+      await appInstance.handleBulkRemoveFromCookbook();
+
+      expect(rec.cookbooks.includes('cb-cenas-rapidas')).toBe(false);
+      const afterTime = new Date(rec.updatedAt).getTime();
+      expect(afterTime).toBeGreaterThanOrEqual(beforeTime - 1000);
+    });
+
+    it('state.deleteCookbook actualiza updatedAt en las recetas de las que se desvincula', () => {
+      const rec = state.recipes.find(r => r.id === 'rec-1');
+      rec.updatedAt = '2026-01-01T00:00:00.000Z';
+      const beforeTime = Date.now();
+
+      state.deleteCookbook('cb-cenas-rapidas');
+      expect(rec.cookbooks.includes('cb-cenas-rapidas')).toBe(false);
+      const afterTime = new Date(rec.updatedAt).getTime();
+      expect(afterTime).toBeGreaterThanOrEqual(beforeTime - 1000);
+    });
+
+    it('pushToCloud detecta las recetas asociadas a un libro como dirty y las incluye en el payload', async () => {
+      state.cloudUser = { id: 'user-cookbooks-test' };
+      state.lastSyncedAt = '2026-01-01T00:00:00.000Z';
+
+      // Simular bulk add
+      const rec = state.recipes.find(r => r.id === 'rec-4');
+      appInstance.selectedRecipeIds = new Set(['rec-4']);
+      appInstance.openBulkAddCookbookModal();
+      const list = document.getElementById('bulk-add-cookbooks-list');
+      list.querySelector('#bulk-cb-cb-cenas-rapidas').checked = true;
+      appInstance.handleBulkAddCookbook();
+
+      let pushedPayloads = {};
+      appInstance.supabaseClient = {
+        from: vi.fn((table) => ({
+          upsert: vi.fn().mockImplementation((payload) => {
+            pushedPayloads[table] = payload;
+            return { data: payload, error: null };
+          }),
+          select: vi.fn().mockReturnValue({
+            or: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue({ data: [], error: null })
+            })
+          })
+        })),
+        auth: {
+          updateUser: vi.fn().mockResolvedValue({ data: {}, error: null })
+        }
+      };
+
+      await appInstance.pushToCloud(true);
+      while (appInstance.isPushingToCloud) {
+        await new Promise(r => setTimeout(r, 10));
+      }
+
+      expect(pushedPayloads['recipes']).toBeDefined();
+      const pushedRec4 = pushedPayloads['recipes'].find(r => r.id === 'rec-4');
+      expect(pushedRec4).toBeDefined();
+      expect(pushedRec4.cookbooks).toContain('cb-cenas-rapidas');
+      expect(pushedRec4.instructions[0]._cookbooks).toContain('cb-cenas-rapidas');
+    });
+
+    it('pullFromCloud no sobreescribe recetas con libros locales si el remoto tiene fecha idéntica y libros vacíos', async () => {
+      state.cloudUser = { id: 'user-cookbooks-test' };
+      const rec = state.recipes.find(r => r.id === 'rec-1');
+      rec.cookbooks = ['cb-cenas-rapidas'];
+      rec.updatedAt = '2026-05-01T12:00:00.000Z';
+
+      appInstance.supabaseClient = {
+        from: vi.fn((table) => {
+          if (table === 'recipes') {
+            return {
+              select: vi.fn().mockReturnValue({
+                or: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: 'rec-1',
+                      title: 'Tortilla Rápida de Espinacas',
+                      cookbooks: [], // Remoto sin libros o devuelto vacío
+                      instructions: [{ text: 'Batir y cocinar' }],
+                      updated_at: '2026-05-01T12:00:00.000Z' // Misma fecha
+                    }
+                  ],
+                  error: null
+                })
+              })
+            };
+          }
+          return {
+            select: vi.fn().mockReturnValue({
+              or: vi.fn().mockResolvedValue({ data: [], error: null }),
+              eq: vi.fn().mockResolvedValue({ data: [], error: null })
+            })
+          };
+        }),
+        auth: {
+          getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-cookbooks-test', user_metadata: {} } }, error: null })
+        }
+      };
+
+      await appInstance.pullFromCloud();
+
+      // Debe preservar los libros locales
+      expect(rec.cookbooks).toContain('cb-cenas-rapidas');
+    });
+  });
 });
