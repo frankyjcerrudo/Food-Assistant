@@ -9699,6 +9699,44 @@ body.is-mobile-device .app-container {
   box-sizing: border-box;
 }
 
+/* Metadatos del editor de recetas (alineación perfecta de campos e inputs en móvil y desktop) */
+.recipe-editor-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+@media (min-width: 580px) {
+  .recipe-editor-meta-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+}
+
+.recipe-editor-meta-grid .form-group {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  margin-bottom: 0;
+}
+
+.recipe-editor-meta-grid .form-label {
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.recipe-editor-meta-grid .form-input,
+.recipe-editor-meta-grid .custom-lang-select-wrapper {
+  margin-top: auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .recipe-editor-header-bar {
   padding: 12px 18px;
   flex-shrink: 0;

@@ -267,12 +267,17 @@ describe('US-31: Colecciones y Libros de Recetas Personalizados (Cookbooks / Car
   });
 
   describe('4. Editor Full-Screen, Saturación de Etiquetas y Detalle de Receta', () => {
-    it('el modal de edición utiliza el contenedor full-screen expansivo', () => {
+    it('el modal de edición utiliza el contenedor full-screen expansivo y alinea inputs numéricos', () => {
       const editModal = document.getElementById('modal-recipe-edit');
       const content = editModal.querySelector('.recipe-editor-full-modal');
       expect(content).not.toBeNull();
       const headerBar = content.querySelector('.recipe-editor-header-bar');
       expect(headerBar).not.toBeNull();
+
+      const metaGrid = editModal.querySelector('.recipe-editor-meta-grid');
+      expect(metaGrid).not.toBeNull();
+      const cookInput = editModal.querySelector('#edit-recipe-cook');
+      expect(cookInput).not.toBeNull();
     });
 
     it('renderRecipeEditorChips controla la saturación de etiquetas limitando la lista inicial', () => {
@@ -419,6 +424,7 @@ describe('US-31: Colecciones y Libros de Recetas Personalizados (Cookbooks / Car
       expect(css).toContain('.cookbook-cover-selector');
       expect(css).toContain('.cookbook-cover-thumb-btn');
       expect(css).toContain('.recipe-editor-full-modal');
+      expect(css).toContain('.recipe-editor-meta-grid');
       expect(css).toContain('.editor-tags-toggle-btn');
       expect(css).toContain('.bulk-add-cookbooks-list');
     });
