@@ -410,6 +410,8 @@
       },
       cookbooks: {
         title: 'Libros de recetas',
+        shelfTitle: 'Mis Libros de Cocina',
+        shelfSubtitle: 'Tus carpetas culinarias y colecciones temáticas',
         all: 'Todas las recetas',
         newBook: 'Nuevo libro',
         newBookTitle: 'Crear libro de recetas',
@@ -431,7 +433,16 @@
         bookCreated: 'Libro "{name}" creado con éxito',
         bookUpdated: 'Libro "{name}" actualizado',
         bookDeleted: 'Libro eliminado',
-        options: 'Opciones del libro'
+        options: 'Opciones del libro',
+        backToShelf: 'Todos los libros',
+        createCardTitle: 'Crear libro',
+        addToCookbook: 'Añadir a libro',
+        bulkAddTitle: 'Añadir a Libros de Recetas',
+        bulkAddBtn: 'Añadir a seleccionados',
+        bulkAddSuccess: 'Se han añadido {count} recetas a los libros seleccionados.',
+        noCookbooksForBulk: 'No hay libros creados todavía. Crea uno primero.',
+        showMoreTags: 'Ver más etiquetas (+{count})',
+        showLessTags: 'Ver menos etiquetas'
       },
       tags: {
         'Keto': 'Keto',
@@ -1084,6 +1095,8 @@
       },
       cookbooks: {
         title: 'Cookbooks',
+        shelfTitle: 'My Cookbooks',
+        shelfSubtitle: 'Your culinary folders and themed collections',
         all: 'All recipes',
         newBook: 'New cookbook',
         newBookTitle: 'Create cookbook',
@@ -1105,7 +1118,16 @@
         bookCreated: 'Cookbook "{name}" created successfully',
         bookUpdated: 'Cookbook "{name}" updated',
         bookDeleted: 'Cookbook deleted',
-        options: 'Cookbook options'
+        options: 'Cookbook options',
+        backToShelf: 'All cookbooks',
+        createCardTitle: 'Create cookbook',
+        addToCookbook: 'Add to cookbook',
+        bulkAddTitle: 'Add to Cookbooks',
+        bulkAddBtn: 'Add to selected',
+        bulkAddSuccess: 'Added {count} recipes to selected cookbooks.',
+        noCookbooksForBulk: 'No cookbooks created yet. Create one first.',
+        showMoreTags: 'Show more tags (+{count})',
+        showLessTags: 'Show fewer tags'
       },
       tags: {
         'Keto': 'Keto',

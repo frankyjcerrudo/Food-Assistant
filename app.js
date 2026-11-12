@@ -4836,7 +4836,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.81';
+  window.APP_VERSION = 'v1.82';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4883,7 +4883,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.81';
+    this.appVersion = window.APP_VERSION || 'v1.82';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -5270,6 +5270,7 @@ class FoodAssistantApp {
     this.modalCookbookDialog = document.getElementById('modal-cookbook-dialog');
     this.selectedCookbookId = 'all';
     this.editorSelectedCookbooks = new Set();
+    this.editorShowAllTags = false;
     this.modalGeminiInvoke = document.getElementById('modal-gemini-invoke');
     this.modalPlanRecipe = document.getElementById('modal-plan-recipe');
     this.modalOnboarding = document.getElementById('modal-onboarding');
@@ -7797,6 +7798,10 @@ class FoodAssistantApp {
     document.getElementById('btn-recipes-bulk-deselect-all')?.addEventListener('click', () => this.deselectAllRecipes());
     document.getElementById('btn-recipes-bulk-delete')?.addEventListener('click', () => this.deleteSelectedRecipes());
     document.getElementById('btn-recipes-bulk-cancel')?.addEventListener('click', () => this.toggleRecipeSelectMode(false));
+    document.getElementById('btn-recipes-bulk-add-to-cookbook')?.addEventListener('click', () => this.openBulkAddCookbookModal());
+    document.getElementById('btn-close-bulk-add-cookbook')?.addEventListener('click', () => this.closeBulkAddCookbookModal());
+    document.getElementById('btn-cancel-bulk-add-cookbook')?.addEventListener('click', () => this.closeBulkAddCookbookModal());
+    document.getElementById('btn-confirm-bulk-add-cookbook')?.addEventListener('click', () => this.handleBulkAddCookbook());
 
     // Recipe CRUD
     document.getElementById('btn-edit-switch-to-import')?.addEventListener('click', () => {
@@ -7867,12 +7872,18 @@ class FoodAssistantApp {
     this.renderCookbooksStrip();
     this.initRecipeTagFilters();
 
-    // US-31: Cookbooks strip & modal events
+    // US-31: Cookbooks strip, shelf, active view & modal events
     document.getElementById('btn-open-create-cookbook')?.addEventListener('click', () => this.openCreateCookbookModal());
     document.getElementById('btn-close-cookbook-dialog')?.addEventListener('click', () => this.closeCookbookModal());
     document.getElementById('btn-cancel-cookbook-dialog')?.addEventListener('click', () => this.closeCookbookModal());
     document.getElementById('form-cookbook')?.addEventListener('submit', (e) => this.handleSaveCookbook(e));
     document.getElementById('btn-delete-cookbook-dialog')?.addEventListener('click', () => this.handleDeleteCurrentCookbook());
+    document.getElementById('btn-back-to-all-cookbooks')?.addEventListener('click', () => this.exitCookbook());
+    document.getElementById('btn-cookbook-active-options')?.addEventListener('click', () => {
+      if (this.selectedCookbookId && this.selectedCookbookId !== 'all') {
+        this.openEditCookbookModal(this.selectedCookbookId);
+      }
+    });
 
     // US-34: Nevera reverse search events
     document.getElementById('btn-toggle-fridge-panel')?.addEventListener('click', () => this.toggleFridgePanel());
@@ -9197,6 +9208,11 @@ class FoodAssistantApp {
     if (btnDeleteText) {
       btnDeleteText.textContent = count > 0 ? `Eliminar (${count})` : 'Eliminar';
     }
+
+    const btnBulkAddCookbook = document.getElementById('btn-recipes-bulk-add-to-cookbook');
+    if (btnBulkAddCookbook) {
+      btnBulkAddCookbook.disabled = (count === 0);
+    }
   }
 
   async deleteSelectedRecipes() {
@@ -9248,82 +9264,267 @@ class FoodAssistantApp {
   }
 
   // ==========================================================================
-  // US-31: COLECCIONES Y LIBROS DE RECETAS (COOKBOOKS / CARPETAS - ESTILO RECIME)
+  // US-31: COLECCIONES Y LIBROS DE RECETAS (COOKBOOKS / CARPETAS EDITORIALES)
   // ==========================================================================
-  renderCookbooksStrip() {
-    const strip = document.getElementById('cookbooks-scroll-strip');
-    if (!strip) return;
+  renderCookbooksShelf() {
+    const carousel = document.getElementById('cookbooks-cards-carousel');
+    const shelfSection = document.getElementById('cookbooks-shelf-section');
+    const activeHeader = document.getElementById('cookbook-active-view-header');
 
     const books = Array.isArray(state.cookbooks) ? state.cookbooks : [];
-    const totalCount = Array.isArray(state.recipes) ? state.recipes.length : 0;
-    const isAllActive = !this.selectedCookbookId || this.selectedCookbookId === 'all';
-    const allLabel = window.I18n ? window.I18n.t('cookbooks.all') : 'Todas';
+    const isInActiveCookbook = Boolean(this.selectedCookbookId && this.selectedCookbookId !== 'all');
+
+    if (isInActiveCookbook) {
+      if (shelfSection) shelfSection.style.display = 'none';
+      if (activeHeader) {
+        activeHeader.style.display = 'flex';
+        const cb = books.find(c => c.id === this.selectedCookbookId);
+        if (cb) {
+          const titleEl = document.getElementById('cookbook-active-title');
+          const descEl = document.getElementById('cookbook-active-desc');
+          const countBadge = document.getElementById('cookbook-active-count-badge');
+          const coverWrap = document.getElementById('cookbook-active-cover-wrap');
+
+          if (titleEl) titleEl.textContent = cb.name;
+          if (descEl) descEl.textContent = cb.description || '';
+
+          const count = Array.isArray(state.recipes)
+            ? state.recipes.filter(r => Array.isArray(r.cookbooks) && r.cookbooks.includes(cb.id)).length
+            : 0;
+          const isEn = window.I18n && window.I18n.getLanguage() === 'en';
+          const countSuffix = count === 1 ? (isEn ? 'recipe' : 'receta') : (isEn ? 'recipes' : 'recetas');
+          if (countBadge) countBadge.textContent = `${count} ${countSuffix}`;
+
+          if (coverWrap) {
+            const firstWithImg = Array.isArray(state.recipes)
+              ? state.recipes.find(r => Array.isArray(r.cookbooks) && r.cookbooks.includes(cb.id) && r.imageUrl && typeof r.imageUrl === 'string' && !r.imageUrl.startsWith('data:image/svg'))
+              : null;
+            if (firstWithImg) {
+              coverWrap.innerHTML = `<img src="${escapeHtml(firstWithImg.imageUrl)}" alt="${escapeHtml(cb.name)}" class="cookbook-active-cover-img">`;
+            } else {
+              coverWrap.innerHTML = `<span class="material-symbols-outlined icon-28">${escapeHtml(cb.icon || 'auto_stories')}</span>`;
+            }
+          }
+        }
+      }
+    } else {
+      if (shelfSection) shelfSection.style.display = 'flex';
+      if (activeHeader) activeHeader.style.display = 'none';
+    }
+
+    if (!carousel) return;
+
+    const isEn = window.I18n && window.I18n.getLanguage() === 'en';
+    const createTitle = window.I18n ? window.I18n.t('cookbooks.newBookTitle') : 'Crear libro de recetas';
+    const createCardText = window.I18n ? window.I18n.t('cookbooks.createCardTitle') : 'Crear libro';
+    const optTitle = window.I18n ? window.I18n.t('cookbooks.options') : 'Opciones del libro';
 
     let html = `
-      <button type="button" class="cookbook-tab-btn ${isAllActive ? 'active' : ''}" role="tab" aria-selected="${isAllActive ? 'true' : 'false'}" data-cookbook-id="all">
-        <span class="material-symbols-outlined icon-16">menu_book</span>
-        <span>${escapeHtml(allLabel)}</span>
-        <span class="cookbook-tab-count">${totalCount}</span>
-      </button>
+      <div class="cookbook-card-create" role="button" tabindex="0" id="btn-card-create-cookbook" title="${escapeHtml(createTitle)}">
+        <div class="cookbook-card-create-icon">
+          <span class="material-symbols-outlined">add</span>
+        </div>
+        <span class="cookbook-card-create-text">${escapeHtml(createCardText)}</span>
+      </div>
     `;
 
     books.forEach(cb => {
-      const isActive = this.selectedCookbookId === cb.id;
       const count = Array.isArray(state.recipes)
         ? state.recipes.filter(r => Array.isArray(r.cookbooks) && r.cookbooks.includes(cb.id)).length
         : 0;
+      const countSuffix = count === 1 ? (isEn ? 'recipe' : 'receta') : (isEn ? 'recipes' : 'recetas');
       const icon = cb.icon || 'auto_stories';
-      const optTitle = window.I18n ? window.I18n.t('cookbooks.options') : 'Opciones del libro';
+      const firstWithImg = Array.isArray(state.recipes)
+        ? state.recipes.find(r => Array.isArray(r.cookbooks) && r.cookbooks.includes(cb.id) && r.imageUrl && typeof r.imageUrl === 'string' && !r.imageUrl.startsWith('data:image/svg'))
+        : null;
 
       html += `
-        <button type="button" class="cookbook-tab-btn ${isActive ? 'active' : ''}" role="tab" aria-selected="${isActive ? 'true' : 'false'}" data-cookbook-id="${escapeHtml(cb.id)}" title="${escapeHtml(cb.description || cb.name)}">
-          <span class="material-symbols-outlined icon-16">${escapeHtml(icon)}</span>
-          <span>${escapeHtml(cb.name)}</span>
-          <span class="cookbook-tab-count">${count}</span>
-          <span role="button" tabindex="0" class="cookbook-tab-options-btn" data-cookbook-action="edit" data-cookbook-id="${escapeHtml(cb.id)}" title="${escapeHtml(optTitle)}" aria-label="${escapeHtml(optTitle)}">
-            <span class="material-symbols-outlined icon-14">more_vert</span>
-          </span>
-        </button>
+        <div class="cookbook-book-card" role="button" tabindex="0" data-cookbook-id="${escapeHtml(cb.id)}" title="${escapeHtml(cb.description || cb.name)}">
+          ${firstWithImg ? `<img src="${escapeHtml(firstWithImg.imageUrl)}" alt="${escapeHtml(cb.name)}" class="cookbook-book-cover" loading="lazy">` : `<div class="cookbook-book-placeholder"><span class="material-symbols-outlined">${escapeHtml(icon)}</span></div>`}
+          <div class="cookbook-book-gradient"></div>
+          <button type="button" class="cookbook-book-options-btn" data-cookbook-action="edit" data-cookbook-id="${escapeHtml(cb.id)}" title="${escapeHtml(optTitle)}" aria-label="${escapeHtml(optTitle)}">
+            <span class="material-symbols-outlined icon-18">more_vert</span>
+          </button>
+          <div class="cookbook-book-content">
+            <span class="cookbook-book-icon-pill">
+              <span class="material-symbols-outlined icon-12">${escapeHtml(icon)}</span>
+              <span>${escapeHtml(cb.name)}</span>
+            </span>
+            <h4 class="cookbook-book-title">${escapeHtml(cb.name)}</h4>
+            <span class="cookbook-book-badge">${count} ${countSuffix}</span>
+          </div>
+        </div>
       `;
     });
 
-    strip.innerHTML = html;
+    carousel.innerHTML = html;
 
-    // Event listeners en cada pestaña y botón de opciones
-    strip.querySelectorAll('.cookbook-tab-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const optBtn = e.target.closest('.cookbook-tab-options-btn');
+    const cardCreate = carousel.querySelector('#btn-card-create-cookbook');
+    if (cardCreate) {
+      cardCreate.addEventListener('click', () => this.openCreateCookbookModal());
+      cardCreate.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          this.openCreateCookbookModal();
+        }
+      });
+    }
+
+    carousel.querySelectorAll('.cookbook-book-card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        const optBtn = e.target.closest('.cookbook-book-options-btn');
         if (optBtn) {
           e.stopPropagation();
           const cbId = optBtn.dataset.cookbookId;
           this.openEditCookbookModal(cbId);
           return;
         }
-        const cbId = btn.dataset.cookbookId;
-        this.selectCookbook(cbId);
+        const cbId = card.dataset.cookbookId;
+        this.enterCookbook(cbId);
       });
 
-      // Teclado para options btn
-      const optBtn = btn.querySelector('.cookbook-tab-options-btn');
-      if (optBtn) {
-        optBtn.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          const optBtn = e.target.closest('.cookbook-book-options-btn');
+          if (optBtn) {
             e.preventDefault();
             e.stopPropagation();
             this.openEditCookbookModal(optBtn.dataset.cookbookId);
+            return;
+          }
+          if (e.target === card) {
+            e.preventDefault();
+            this.enterCookbook(card.dataset.cookbookId);
+          }
+        }
+      });
+    });
+  }
+
+  renderCookbooksStrip() {
+    this.renderCookbooksShelf();
+  }
+
+  enterCookbook(cookbookId) {
+    this.selectedCookbookId = cookbookId || 'all';
+    this.renderCookbooksShelf();
+    this.applyRecipeFilters();
+  }
+
+  exitCookbook() {
+    this.selectedCookbookId = 'all';
+    this.renderCookbooksShelf();
+    this.applyRecipeFilters();
+  }
+
+  selectCookbook(cookbookId) {
+    this.enterCookbook(cookbookId);
+  }
+
+  openBulkAddCookbookModal() {
+    if (!this.selectedRecipeIds || this.selectedRecipeIds.size === 0) {
+      this.showToast('Selecciona al menos una receta.', 'warning');
+      return;
+    }
+
+    const books = Array.isArray(state.cookbooks) ? state.cookbooks : [];
+    if (books.length === 0) {
+      const msg = window.I18n ? window.I18n.t('cookbooks.noCookbooksForBulk') : 'No hay libros creados todavía. Crea uno primero.';
+      this.showToast(msg, 'info');
+      return;
+    }
+
+    const modal = document.getElementById('modal-bulk-add-cookbook');
+    const list = document.getElementById('bulk-add-cookbooks-list');
+    const desc = document.getElementById('bulk-add-cookbook-desc');
+
+    const count = this.selectedRecipeIds.size;
+    if (desc) {
+      const isEn = window.I18n && window.I18n.getLanguage() === 'en';
+      desc.textContent = isEn
+        ? `Select the cookbooks to add ${count} ${count === 1 ? 'recipe' : 'recipes'} to:`
+        : `Selecciona los libros a los que añadir ${count} ${count === 1 ? 'receta' : 'recetas'}:`;
+    }
+
+    if (list) {
+      list.innerHTML = books.map(cb => {
+        const recipeCount = Array.isArray(state.recipes)
+          ? state.recipes.filter(r => Array.isArray(r.cookbooks) && r.cookbooks.includes(cb.id)).length
+          : 0;
+        return `
+          <label class="bulk-add-cookbook-item" for="bulk-cb-${escapeHtml(cb.id)}">
+            <input type="checkbox" id="bulk-cb-${escapeHtml(cb.id)}" value="${escapeHtml(cb.id)}">
+            <span class="bulk-add-cookbook-item-label">
+              <span class="material-symbols-outlined icon-20 icon-primary">${escapeHtml(cb.icon || 'auto_stories')}</span>
+              <span>${escapeHtml(cb.name)}</span>
+            </span>
+            <span class="bulk-add-cookbook-item-count">${recipeCount}</span>
+          </label>
+        `;
+      }).join('');
+    }
+
+    if (modal) {
+      this.openDialogModal(modal);
+    }
+  }
+
+  closeBulkAddCookbookModal() {
+    const modal = document.getElementById('modal-bulk-add-cookbook');
+    if (modal) {
+      this.closeDialogModal(modal);
+    }
+  }
+
+  handleBulkAddCookbook() {
+    const list = document.getElementById('bulk-add-cookbooks-list');
+    if (!list) return;
+
+    const checkedInputs = Array.from(list.querySelectorAll('input[type="checkbox"]:checked'));
+    if (checkedInputs.length === 0) {
+      this.showToast('Selecciona al menos un libro de recetas.', 'warning');
+      return;
+    }
+
+    const selectedCbIds = checkedInputs.map(input => input.value);
+    const count = this.selectedRecipeIds ? this.selectedRecipeIds.size : 0;
+
+    let modified = false;
+    (state.recipes || []).forEach(recipe => {
+      if (this.selectedRecipeIds.has(recipe.id)) {
+        if (!Array.isArray(recipe.cookbooks)) {
+          recipe.cookbooks = [];
+        }
+        selectedCbIds.forEach(cbId => {
+          if (!recipe.cookbooks.includes(cbId)) {
+            recipe.cookbooks.push(cbId);
+            modified = true;
           }
         });
       }
     });
-  }
 
-  selectCookbook(cookbookId) {
-    this.selectedCookbookId = cookbookId || 'all';
-    this.renderCookbooksStrip();
+    if (modified) {
+      if (typeof state.save === 'function') {
+        state.save('fa_recipes', state.recipes);
+      }
+      this.scheduleSyncWithCloud();
+    }
+
+    this.closeBulkAddCookbookModal();
+    this.selectedRecipeIds.clear();
+    this.isRecipeSelectMode = false;
+    this.updateRecipeSelectModeUI();
+    this.renderCookbooksShelf();
     this.applyRecipeFilters();
+
+    const successMsg = window.I18n
+      ? window.I18n.t('cookbooks.bulkAddSuccess', { count })
+      : `Se han añadido ${count} recetas a los libros seleccionados.`;
+    this.showToast(successMsg, 'success');
   }
 
-  openCreateCookbookModal() {
+    openCreateCookbookModal() {
     const dialog = this.modalCookbookDialog || document.getElementById('modal-cookbook-dialog');
     if (!dialog) return;
 
@@ -9489,6 +9690,7 @@ class FoodAssistantApp {
     if (this.selectedCookbookId === id) {
       this.selectedCookbookId = 'all';
     }
+    this.renderCookbooksShelf();
 
     this.closeCookbookModal();
     this.renderCookbooksStrip();
@@ -10460,6 +10662,7 @@ class FoodAssistantApp {
     if (proEl) proEl.value = "";
     if (carbEl) carbEl.value = "";
     if (fatEl) fatEl.value = "";
+    this.editorShowAllTags = false;
     this.editorSelectedTags = new Set(["Cena", "Saludable"]);
     this.renderRecipeEditorChips();
     this.editorSelectedCookbooks = new Set();
@@ -10522,6 +10725,7 @@ class FoodAssistantApp {
     if (proEl) proEl.value = (nut && nut.protein > 0) ? nut.protein : "";
     if (carbEl) carbEl.value = (nut && nut.carbs > 0) ? nut.carbs : "";
     if (fatEl) fatEl.value = (nut && nut.fat > 0) ? nut.fat : "";
+    this.editorShowAllTags = false;
     this.editorSelectedTags = new Set(Array.isArray(r.tags) ? r.tags : []);
     this.renderRecipeEditorChips();
     this.editorSelectedCookbooks = new Set(Array.isArray(r.cookbooks) ? r.cookbooks : []);
@@ -10740,13 +10944,60 @@ class FoodAssistantApp {
     renderGroup(dietaryContainer, PREDEFINED_DIETARY_TAGS);
     renderGroup(occasionContainer, PREDEFINED_OCCASION_TAGS);
 
-    const practicalPlusCustom = [...PREDEFINED_PRACTICAL_TAGS];
-    (state.customTags || []).forEach(ct => {
-      if (!practicalPlusCustom.includes(ct) && !PREDEFINED_DIETARY_TAGS.includes(ct) && !PREDEFINED_OCCASION_TAGS.includes(ct)) {
-        practicalPlusCustom.push(ct);
+    // Prune and limit custom tags to prevent clutter (US-31)
+    const activeRecipeTags = new Set();
+    (state.recipes || []).forEach(r => {
+      if (Array.isArray(r.tags)) {
+        r.tags.forEach(t => {
+          if (typeof t === 'string' && t.trim()) activeRecipeTags.add(t.trim());
+        });
       }
     });
-    renderGroup(practicalContainer, practicalPlusCustom);
+
+    const practicalPlusCustom = [...PREDEFINED_PRACTICAL_TAGS];
+    const validCustomTags = (state.customTags || []).filter(ct =>
+      activeRecipeTags.has(ct) &&
+      !practicalPlusCustom.includes(ct) &&
+      !PREDEFINED_DIETARY_TAGS.includes(ct) &&
+      !PREDEFINED_OCCASION_TAGS.includes(ct)
+    );
+
+    const allPracticalAndCustom = practicalPlusCustom.concat(validCustomTags);
+    const MAX_TAGS_COLLAPSED = 10;
+    const hasOverflow = allPracticalAndCustom.length > MAX_TAGS_COLLAPSED;
+
+    if (hasOverflow && !this.editorShowAllTags) {
+      const visibleTags = allPracticalAndCustom.slice(0, MAX_TAGS_COLLAPSED);
+      const remaining = allPracticalAndCustom.length - MAX_TAGS_COLLAPSED;
+      renderGroup(practicalContainer, visibleTags);
+
+      const moreBtn = document.createElement('button');
+      moreBtn.type = 'button';
+      moreBtn.className = 'editor-tags-toggle-btn';
+      moreBtn.id = 'btn-toggle-more-tags';
+      const moreText = window.I18n ? window.I18n.t('cookbooks.showMoreTags', { count: remaining }) : `Ver más etiquetas (+${remaining})`;
+      moreBtn.innerHTML = `<span class="material-symbols-outlined icon-14">expand_more</span> <span>${escapeHtml(moreText)}</span>`;
+      moreBtn.addEventListener('click', () => {
+        this.editorShowAllTags = true;
+        this.renderRecipeEditorChips();
+      });
+      practicalContainer.appendChild(moreBtn);
+    } else {
+      renderGroup(practicalContainer, allPracticalAndCustom);
+      if (hasOverflow && this.editorShowAllTags) {
+        const lessBtn = document.createElement('button');
+        lessBtn.type = 'button';
+        lessBtn.className = 'editor-tags-toggle-btn';
+        lessBtn.id = 'btn-toggle-more-tags';
+        const lessText = window.I18n ? window.I18n.t('cookbooks.showLessTags') : 'Ver menos etiquetas';
+        lessBtn.innerHTML = `<span class="material-symbols-outlined icon-14">expand_less</span> <span>${escapeHtml(lessText)}</span>`;
+        lessBtn.addEventListener('click', () => {
+          this.editorShowAllTags = false;
+          this.renderRecipeEditorChips();
+        });
+        practicalContainer.appendChild(lessBtn);
+      }
+    }
   }
 
   toggleEditorTag(tag) {

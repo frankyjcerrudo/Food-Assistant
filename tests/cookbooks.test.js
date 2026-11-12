@@ -39,6 +39,7 @@ describe('US-31: Colecciones y Libros de Recetas Personalizados (Cookbooks / Car
       {
         id: 'rec-1',
         title: 'Tortilla Rápida de Espinacas',
+        imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c',
         cookbooks: ['cb-cenas-rapidas'],
         ingredients: [{ name: 'Huevos', amount: 3, unit: 'ud', aisle: 'dairy' }],
         instructions: [{ step: 1, text: 'Batir y cocinar 5 min.' }],
@@ -47,6 +48,7 @@ describe('US-31: Colecciones y Libros de Recetas Personalizados (Cookbooks / Car
       {
         id: 'rec-2',
         title: 'Tarta de Manzana y Canela',
+        imageUrl: 'https://images.unsplash.com/photo-1568571780765-9276ac8b75a2',
         cookbooks: ['cb-postres'],
         ingredients: [{ name: 'Manzanas', amount: 2, unit: 'ud', aisle: 'produce' }],
         instructions: [{ step: 1, text: 'Hornear 30 min.' }],
@@ -55,6 +57,7 @@ describe('US-31: Colecciones y Libros de Recetas Personalizados (Cookbooks / Car
       {
         id: 'rec-3',
         title: 'Pollo Asado Clásico',
+        imageUrl: '',
         cookbooks: ['cb-cenas-rapidas', 'cb-postres'], // En múltiples colecciones
         ingredients: [{ name: 'Pollo', amount: 1, unit: 'kg', aisle: 'meat' }],
         instructions: [{ step: 1, text: 'Hornear 45 min.' }],
@@ -63,6 +66,7 @@ describe('US-31: Colecciones y Libros de Recetas Personalizados (Cookbooks / Car
       {
         id: 'rec-4',
         title: 'Sopa Huérfana',
+        imageUrl: '',
         cookbooks: [], // Sin asignar a ningún libro
         ingredients: [{ name: 'Caldo', amount: 500, unit: 'ml', aisle: 'pantry' }],
         instructions: [{ step: 1, text: 'Hervir 10 min.' }],
@@ -124,60 +128,76 @@ describe('US-31: Colecciones y Libros de Recetas Personalizados (Cookbooks / Car
     });
   });
 
-  describe('2. UI: Selector de Libros / Strip Horizontal (Estilo ReciMe)', () => {
-    it('renderCookbooksStrip renderiza la pestaña "Todas" con el total de recetas y atributos ARIA', () => {
-      appInstance.renderCookbooksStrip();
-      const strip = document.getElementById('cookbooks-scroll-strip');
-      expect(strip).not.toBeNull();
-      expect(strip.getAttribute('role')).toBe('tablist');
+  describe('2. UI: Estantería Editorial de Libros y Vista Inmersiva', () => {
+    it('renderCookbooksShelf renderiza la tarjeta de creación y las tarjetas de libros en el carrusel', () => {
+      appInstance.renderCookbooksShelf();
+      const carousel = document.getElementById('cookbooks-cards-carousel');
+      expect(carousel).not.toBeNull();
 
-      const allTab = strip.querySelector('[data-cookbook-id="all"]');
-      expect(allTab).not.toBeNull();
-      expect(allTab.getAttribute('role')).toBe('tab');
-      expect(allTab.getAttribute('aria-selected')).toBe('true');
-      expect(allTab.classList.contains('active')).toBe(true);
-      expect(allTab.textContent).toContain('4'); // Total 4 recetas
+      const createCard = carousel.querySelector('#btn-card-create-cookbook');
+      expect(createCard).not.toBeNull();
+      expect(createCard.textContent).toContain('Crear libro');
+
+      const cards = carousel.querySelectorAll('.cookbook-book-card');
+      expect(cards.length).toBe(2);
+
+      const cenasCard = carousel.querySelector('[data-cookbook-id="cb-cenas-rapidas"]');
+      expect(cenasCard).not.toBeNull();
+      expect(cenasCard.textContent).toContain('Cenas Rápidas');
+      expect(cenasCard.textContent).toContain('2 recetas');
+
+      // Portada con imagen de la primera receta
+      const coverImg = cenasCard.querySelector('.cookbook-book-cover');
+      expect(coverImg).not.toBeNull();
+      expect(coverImg.getAttribute('src')).toBe('https://images.unsplash.com/photo-1546069901-ba9599a7e63c');
     });
 
-    it('renderiza pestañas para cada libro con su icono, nombre, contador y botón de opciones', () => {
-      appInstance.renderCookbooksStrip();
-      const strip = document.getElementById('cookbooks-scroll-strip');
+    it('al pulsar una tarjeta de libro entra en la vista inmersiva (enterCookbook)', () => {
+      appInstance.renderCookbooksShelf();
+      const carousel = document.getElementById('cookbooks-cards-carousel');
+      const postresCard = carousel.querySelector('[data-cookbook-id="cb-postres"]');
 
-      const cenasTab = strip.querySelector('[data-cookbook-id="cb-cenas-rapidas"]');
-      expect(cenasTab).not.toBeNull();
-      expect(cenasTab.textContent).toContain('Cenas Rápidas');
-      expect(cenasTab.textContent).toContain('2'); // rec-1 y rec-3 tienen este libro
-
-      const postresTab = strip.querySelector('[data-cookbook-id="cb-postres"]');
-      expect(postresTab).not.toBeNull();
-      expect(postresTab.textContent).toContain('Postres Caseros');
-      expect(postresTab.textContent).toContain('2'); // rec-2 y rec-3
-
-      const optBtn = cenasTab.querySelector('.cookbook-tab-options-btn');
-      expect(optBtn).not.toBeNull();
-      expect(optBtn.getAttribute('aria-label')).toBeTruthy();
-    });
-
-    it('al pulsar una pestaña de libro, filtra las recetas en 1 toque (applyRecipeFilters)', () => {
-      appInstance.renderCookbooksStrip();
-      const strip = document.getElementById('cookbooks-scroll-strip');
-      const postresTab = strip.querySelector('[data-cookbook-id="cb-postres"]');
-
-      postresTab.click();
+      postresCard.click();
 
       expect(appInstance.selectedCookbookId).toBe('cb-postres');
-      const activeTab = strip.querySelector('[data-cookbook-id="cb-postres"]');
-      expect(activeTab.getAttribute('aria-selected')).toBe('true');
-      expect(activeTab.classList.contains('active')).toBe(true);
+
+      const shelfSection = document.getElementById('cookbooks-shelf-section');
+      const activeHeader = document.getElementById('cookbook-active-view-header');
+      expect(shelfSection.style.display).toBe('none');
+      expect(activeHeader.style.display).toBe('flex');
+
+      const titleEl = document.getElementById('cookbook-active-title');
+      expect(titleEl.textContent).toBe('Postres Caseros');
+
+      const badgeEl = document.getElementById('cookbook-active-count-badge');
+      expect(badgeEl.textContent).toContain('2');
 
       const visible = appInstance.currentRenderedRecipesList;
       expect(visible.length).toBe(2);
       expect(visible.map(r => r.id).sort()).toEqual(['rec-2', 'rec-3']);
     });
 
+    it('al pulsar el botón volver en la cabecera inmersiva, sale del libro y regresa a la estantería', () => {
+      appInstance.enterCookbook('cb-postres');
+      expect(appInstance.selectedCookbookId).toBe('cb-postres');
+
+      const backBtn = document.getElementById('btn-back-to-all-cookbooks');
+      expect(backBtn).not.toBeNull();
+      backBtn.click();
+
+      expect(appInstance.selectedCookbookId).toBe('all');
+      const shelfSection = document.getElementById('cookbooks-shelf-section');
+      const activeHeader = document.getElementById('cookbook-active-view-header');
+      expect(shelfSection.style.display).toBe('flex');
+      expect(activeHeader.style.display).toBe('none');
+
+      const visible = appInstance.currentRenderedRecipesList;
+      expect(visible.length).toBe(4);
+    });
+
     it('muestra un empty state específico y elegante si un libro no tiene recetas aún', () => {
       state.addCookbook({ id: 'cb-vacio', name: 'Libro Vacío', icon: 'auto_stories' });
-      appInstance.selectCookbook('cb-vacio');
+      appInstance.enterCookbook('cb-vacio');
 
       const grid = document.getElementById('recipes-cards-grid');
       expect(grid.innerHTML).toContain('No hay recetas en este libro todavía');
@@ -248,7 +268,36 @@ describe('US-31: Colecciones y Libros de Recetas Personalizados (Cookbooks / Car
     });
   });
 
-  describe('4. Integración en Editor y Detalle de Receta', () => {
+  describe('4. Editor Full-Screen, Saturación de Etiquetas y Detalle de Receta', () => {
+    it('el modal de edición utiliza el contenedor full-screen expansivo', () => {
+      const editModal = document.getElementById('modal-recipe-edit');
+      const content = editModal.querySelector('.recipe-editor-full-modal');
+      expect(content).not.toBeNull();
+      const headerBar = content.querySelector('.recipe-editor-header-bar');
+      expect(headerBar).not.toBeNull();
+    });
+
+    it('renderRecipeEditorChips controla la saturación de etiquetas limitando la lista inicial', () => {
+      state.customTags = ['Extra1', 'Extra2', 'Extra3', 'Extra4', 'Extra5', 'Extra6', 'Extra7', 'Extra8', 'Extra9', 'Extra10'];
+      // Asegurar que las recetas contengan estas etiquetas para que pasen el filtro de tags activos
+      state.recipes[0].tags = ['Extra1', 'Extra2', 'Extra3', 'Extra4', 'Extra5', 'Extra6', 'Extra7', 'Extra8', 'Extra9', 'Extra10'];
+
+      appInstance.editorSelectedTags = new Set();
+      appInstance.editorShowAllTags = false;
+      appInstance.renderRecipeEditorChips();
+
+      const practicalContainer = document.getElementById('editor-practical-chips');
+      const toggleBtn = practicalContainer.querySelector('#btn-toggle-more-tags');
+      expect(toggleBtn).not.toBeNull();
+      expect(toggleBtn.textContent).toContain('Ver más etiquetas');
+
+      // Al pulsar ver más, expande
+      toggleBtn.click();
+      expect(appInstance.editorShowAllTags).toBe(true);
+      const toggleLessBtn = practicalContainer.querySelector('#btn-toggle-more-tags');
+      expect(toggleLessBtn.textContent).toContain('Ver menos etiquetas');
+    });
+
     it('renderEditorCookbooksChips muestra chips de selección para todos los libros', () => {
       appInstance.editorSelectedCookbooks = new Set(['cb-cenas-rapidas']);
       appInstance.renderEditorCookbooksChips();
@@ -299,13 +348,57 @@ describe('US-31: Colecciones y Libros de Recetas Personalizados (Cookbooks / Car
     });
   });
 
-  describe('5. Soporte Bilingüe Completo (i18n ES / EN)', () => {
-    it('traduce la barra de libros, empty state y modales al cambiar de idioma', () => {
+  describe('5. Acción Masiva: Añadir Recetas Seleccionadas a Libros (Bulk Action)', () => {
+    it('el botón de acción masiva se habilita solo cuando hay recetas seleccionadas', () => {
+      appInstance.selectedRecipeIds = new Set();
+      appInstance.updateRecipeSelectModeUI();
+      const btnBulkAdd = document.getElementById('btn-recipes-bulk-add-to-cookbook');
+      expect(btnBulkAdd.disabled).toBe(true);
+
+      appInstance.selectedRecipeIds.add('rec-4');
+      appInstance.updateRecipeSelectModeUI();
+      expect(btnBulkAdd.disabled).toBe(false);
+    });
+
+    it('openBulkAddCookbookModal abre el modal y lista los libros con checkboxes', () => {
+      appInstance.selectedRecipeIds = new Set(['rec-4']);
+      appInstance.openBulkAddCookbookModal();
+
+      const modal = document.getElementById('modal-bulk-add-cookbook');
+      expect(modal.classList.contains('active')).toBe(true);
+
+      const list = document.getElementById('bulk-add-cookbooks-list');
+      const checkboxes = list.querySelectorAll('input[type="checkbox"]');
+      expect(checkboxes.length).toBe(2);
+    });
+
+    it('handleBulkAddCookbook asigna las recetas seleccionadas a los libros marcados', () => {
+      appInstance.selectedRecipeIds = new Set(['rec-4']);
+      appInstance.openBulkAddCookbookModal();
+
+      const list = document.getElementById('bulk-add-cookbooks-list');
+      const cbCenas = list.querySelector('#bulk-cb-cb-cenas-rapidas');
+      cbCenas.checked = true;
+
+      appInstance.handleBulkAddCookbook();
+
+      const rec4 = state.recipes.find(r => r.id === 'rec-4');
+      expect(rec4.cookbooks).toContain('cb-cenas-rapidas');
+      expect(appInstance.selectedRecipeIds.size).toBe(0);
+      expect(appInstance.isRecipeSelectMode).toBe(false);
+    });
+  });
+
+  describe('6. Soporte Bilingüe Completo (i18n ES / EN)', () => {
+    it('traduce la estantería, cabecera inmersiva y modales al cambiar de idioma', () => {
       window.I18n.setPreference('en');
       appInstance.updateLanguageUI('en');
 
-      const strip = document.getElementById('cookbooks-scroll-strip');
-      expect(strip.querySelector('[data-cookbook-id="all"]').textContent).toContain('All recipes');
+      const shelfTitle = document.querySelector('[data-i18n="cookbooks.shelfTitle"]');
+      expect(shelfTitle.textContent).toBe('My Cookbooks');
+
+      const backBtn = document.getElementById('btn-back-to-all-cookbooks');
+      expect(backBtn.textContent).toContain('All cookbooks');
 
       const titleEl = document.getElementById('cookbook-dialog-title');
       appInstance.openCreateCookbookModal();
@@ -314,18 +407,22 @@ describe('US-31: Colecciones y Libros de Recetas Personalizados (Cookbooks / Car
       // Volver a español
       window.I18n.setPreference('es');
       appInstance.updateLanguageUI('es');
-      expect(strip.querySelector('[data-cookbook-id="all"]').textContent).toContain('Todas las recetas');
+      expect(shelfTitle.textContent).toBe('Mis Libros de Cocina');
+      expect(backBtn.textContent).toContain('Todos los libros');
     });
   });
 
-  describe('6. Sistema de Diseño y Micro-interacciones (CSS)', () => {
-    it('define estilos para la barra de libros, tabs, contadores y chips en styles.css', () => {
+  describe('7. Sistema de Diseño y Micro-interacciones (CSS)', () => {
+    it('define estilos para la estantería, tarjeta libro, editor full modal y bulk dialog en styles.css', () => {
       const css = fs.readFileSync(stylesPath, 'utf-8');
-      expect(css).toContain('.cookbooks-bar-container');
-      expect(css).toContain('.cookbooks-scroll-strip');
-      expect(css).toContain('.cookbook-tab-btn');
-      expect(css).toContain('.cookbook-tab-btn:active:not(:disabled)');
-      expect(css).toContain('transform: scale(0.97)');
+      expect(css).toContain('.cookbooks-shelf-section');
+      expect(css).toContain('.cookbooks-cards-carousel');
+      expect(css).toContain('.cookbook-book-card');
+      expect(css).toContain('.cookbook-book-card:hover');
+      expect(css).toContain('.cookbook-active-view-header');
+      expect(css).toContain('.recipe-editor-full-modal');
+      expect(css).toContain('.editor-tags-toggle-btn');
+      expect(css).toContain('.bulk-add-cookbooks-list');
       expect(css).toContain('.tag-chip-cookbook');
       expect(css).toContain('.cookbook-select-chip');
     });
