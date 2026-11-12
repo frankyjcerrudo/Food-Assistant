@@ -4841,7 +4841,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.86';
+  window.APP_VERSION = 'v1.87';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4888,7 +4888,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.86';
+    this.appVersion = window.APP_VERSION || 'v1.87';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -7874,6 +7874,7 @@ class FoodAssistantApp {
     document.getElementById('btn-recipes-bulk-delete')?.addEventListener('click', () => this.deleteSelectedRecipes());
     document.getElementById('btn-recipes-bulk-cancel')?.addEventListener('click', () => this.toggleRecipeSelectMode(false));
     document.getElementById('btn-recipes-bulk-add-to-cookbook')?.addEventListener('click', () => this.openBulkAddCookbookModal());
+    document.getElementById('btn-recipes-bulk-remove-from-cookbook')?.addEventListener('click', () => this.handleBulkRemoveFromCookbook());
     document.getElementById('btn-close-bulk-add-cookbook')?.addEventListener('click', () => this.closeBulkAddCookbookModal());
     document.getElementById('btn-cancel-bulk-add-cookbook')?.addEventListener('click', () => this.closeBulkAddCookbookModal());
     document.getElementById('btn-confirm-bulk-add-cookbook')?.addEventListener('click', () => this.handleBulkAddCookbook());
@@ -9288,6 +9289,18 @@ class FoodAssistantApp {
     if (btnBulkAddCookbook) {
       btnBulkAddCookbook.disabled = (count === 0);
     }
+
+    const btnBulkRemoveCookbook = document.getElementById('btn-recipes-bulk-remove-from-cookbook');
+    const btnBulkRemoveText = document.getElementById('btn-recipes-bulk-remove-text');
+    const isInCookbook = Boolean(this.selectedCookbookId && this.selectedCookbookId !== 'all');
+    if (btnBulkRemoveCookbook) {
+      btnBulkRemoveCookbook.style.display = isInCookbook ? 'inline-flex' : 'none';
+      btnBulkRemoveCookbook.disabled = (count === 0);
+    }
+    if (btnBulkRemoveText) {
+      const baseRemoveText = window.I18n ? window.I18n.t('cookbooks.removeFromCookbook') : 'Quitar del libro';
+      btnBulkRemoveText.textContent = count > 0 ? `${baseRemoveText} (${count})` : baseRemoveText;
+    }
   }
 
   async deleteSelectedRecipes() {
@@ -9602,6 +9615,63 @@ class FoodAssistantApp {
         ? window.I18n.t('cookbooks.bulkAddSuccess', { count })
         : `Se han añadido ${count} recetas a los libros seleccionados.`;
       this.showToast(successMsg, 'success');
+    }
+
+    async handleBulkRemoveFromCookbook() {
+      if (!this.selectedRecipeIds || this.selectedRecipeIds.size === 0) {
+        this.showToast('Selecciona al menos una receta.', 'warning');
+        return;
+      }
+      const activeCbId = this.selectedCookbookId;
+      if (!activeCbId || activeCbId === 'all') return;
+
+      const cb = (state.cookbooks || []).find(c => c.id === activeCbId);
+      const cbName = cb ? cb.name : 'este libro';
+      const count = this.selectedRecipeIds.size;
+      const recipesText = count === 1 ? 'receta' : 'recetas';
+
+      const confirmMsg = window.I18n
+        ? window.I18n.t('cookbooks.removeFromCookbookConfirm', { count, recipesText, name: cbName })
+        : `¿Quitar ${count} ${recipesText} del libro "${cbName}"? Las recetas seguirán guardadas en tu recetario general.`;
+
+      const confirmed = await this.showConfirmDialog({
+        title: window.I18n ? window.I18n.t('cookbooks.removeFromCookbook') : 'Quitar del libro',
+        message: confirmMsg,
+        confirmText: window.I18n ? window.I18n.t('cookbooks.removeFromCookbook') : 'Quitar del libro',
+        cancelText: window.I18n ? window.I18n.t('common.cancel') : 'Cancelar',
+        danger: false,
+        icon: 'bookmark_remove'
+      });
+
+      if (!confirmed) return;
+
+      let modified = false;
+      (state.recipes || []).forEach(recipe => {
+        if (this.selectedRecipeIds.has(recipe.id)) {
+          if (Array.isArray(recipe.cookbooks) && recipe.cookbooks.includes(activeCbId)) {
+            recipe.cookbooks = recipe.cookbooks.filter(id => id !== activeCbId);
+            modified = true;
+          }
+        }
+      });
+
+      if (modified) {
+        if (typeof state.save === 'function') {
+          state.save('fa_recipes', state.recipes);
+        }
+        this.scheduleSyncWithCloud();
+      }
+
+      this.selectedRecipeIds.clear();
+      this.isRecipeSelectMode = false;
+      this.updateRecipeSelectModeUI();
+      this.renderCookbooksShelf();
+      this.applyRecipeFilters();
+
+      const successMsg = window.I18n
+        ? window.I18n.t('cookbooks.removeFromCookbookSuccess', { count, name: cbName })
+        : `Se han quitado ${count} recetas del libro "${cbName}".`;
+      this.showToast(successMsg, 'info');
     }
 
     openCreateCookbookModal() {

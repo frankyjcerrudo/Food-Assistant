@@ -388,6 +388,39 @@ describe('US-31: Colecciones y Libros de Recetas Personalizados (Cookbooks / Car
       expect(appInstance.selectedRecipeIds.size).toBe(0);
       expect(appInstance.isRecipeSelectMode).toBe(false);
     });
+
+    it('updateRecipeSelectModeUI muestra el botón "Quitar del libro" solo cuando se navega dentro de un libro', () => {
+      const removeBtn = document.getElementById('btn-recipes-bulk-remove-from-cookbook');
+      expect(removeBtn).not.toBeNull();
+
+      // En el recetario general ('all'), el botón está oculto
+      appInstance.selectedCookbookId = 'all';
+      appInstance.updateRecipeSelectModeUI();
+      expect(removeBtn.style.display).toBe('none');
+
+      // Dentro de un libro activo, se muestra
+      appInstance.selectedCookbookId = 'cb-cenas-rapidas';
+      appInstance.updateRecipeSelectModeUI();
+      expect(removeBtn.style.display).toBe('inline-flex');
+    });
+
+    it('handleBulkRemoveFromCookbook elimina la receta del libro pero la conserva intacta en el recetario general', async () => {
+      vi.spyOn(appInstance, 'showConfirmDialog').mockResolvedValue(true);
+
+      appInstance.selectedCookbookId = 'cb-cenas-rapidas';
+      const rec = state.recipes[0];
+      expect(rec.cookbooks).toContain('cb-cenas-rapidas');
+
+      appInstance.selectedRecipeIds = new Set([rec.id]);
+      await appInstance.handleBulkRemoveFromCookbook();
+
+      // La receta ya no está en el libro 'cb-cenas-rapidas'
+      expect(rec.cookbooks).not.toContain('cb-cenas-rapidas');
+      // La receta SIGUE existiendo en el catálogo general
+      expect(state.recipes.some(r => r.id === rec.id)).toBe(true);
+      expect(appInstance.selectedRecipeIds.size).toBe(0);
+      expect(appInstance.isRecipeSelectMode).toBe(false);
+    });
   });
 
   describe('6. Soporte Bilingüe Completo (i18n ES / EN)', () => {
