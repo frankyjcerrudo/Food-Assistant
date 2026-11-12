@@ -36,7 +36,7 @@
   <meta name="apple-mobile-web-app-title" content="Sabory">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="manifest" href="manifest.json?v=1.82">
+  <link rel="manifest" href="manifest.json?v=1.83">
   <meta name="theme-color" content="#FAF7F2">
   <script>
     (function() {
@@ -84,17 +84,17 @@
     href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..600&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Google+Sans:wght@400;500;700&display=swap">
   <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=1.82">
-  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.82">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.82">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.82">
+  <link rel="stylesheet" href="styles.css?v=1.83">
+  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.83">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.83">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.83">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <!-- US-41: versión fija + Subresource Integrity (sha384) para el SDK de Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"
     integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"
     referrerpolicy="no-referrer"></script>
   <!-- US-12: i18n Core Engine (in head for instant zero-flash localization) -->
-  <script src="i18n.js?v=1.82"></script>
+  <script src="i18n.js?v=1.83"></script>
 </head>
 
 <body>
@@ -171,7 +171,7 @@
     <aside class="pwa-smart-banner" id="pwa-smart-banner" hidden aria-label="Instalación de la app en la pantalla de inicio">
       <div class="pwa-smart-banner-content">
         <div class="pwa-smart-banner-icon" aria-hidden="true">
-          <img src="icon-192.png?v=1.82" alt="" width="28" height="28" class="pwa-smart-banner-img">
+          <img src="icon-192.png?v=1.83" alt="" width="28" height="28" class="pwa-smart-banner-img">
         </div>
         <div class="pwa-smart-banner-texts">
           <strong class="pwa-smart-banner-title" data-i18n="pwa.bannerTitle">Prueba Sabory como App</strong>
@@ -216,9 +216,18 @@
     <!-- VIEW 2: RECIPES -->
     <section class="view-panel" id="view-recipes">
       <div class="section-header recipes-section-header" style="margin-bottom: 8px;">
-        <div>
+        <div class="recipes-header-title-group">
+          <div class="recipes-header-top-row">
+            <button type="button" class="btn btn-ghost btn-sm btn-back-cookbook" id="btn-back-to-all-cookbooks" hidden>
+              <span class="material-symbols-outlined icon-sm">arrow_back</span>
+              <span data-i18n="cookbooks.backToAllCookbooks">Volver a todos los libros</span>
+            </button>
+            <button type="button" class="btn btn-ghost btn-icon btn-sm" id="btn-cookbook-active-options" title="Opciones del libro" aria-label="Opciones del libro" hidden>
+              <span class="material-symbols-outlined">more_vert</span>
+            </button>
+          </div>
           <h2 class="section-title">
-            <span data-i18n="recipes.title">Recetario</span>
+            <span id="recipes-section-title-text" data-i18n="recipes.title">Recetario</span>
             <span class="recipes-header-count-pill" id="recipes-count-badge">0</span>
           </h2>
           <p class="section-subtitle" id="recipes-count-subtitle" data-i18n="recipes.subtitle">Tu colección culinaria personal.</p>
@@ -278,11 +287,8 @@
       <div class="cookbooks-shelf-section" id="cookbooks-shelf-section">
         <div class="cookbooks-shelf-header">
           <div class="cookbooks-shelf-title-wrap">
-            <span class="material-symbols-outlined icon-20 icon-primary">menu_book</span>
-            <div>
-              <h3 class="cookbooks-shelf-title" data-i18n="cookbooks.shelfTitle">Mis Libros de Cocina</h3>
-              <p class="cookbooks-shelf-subtitle" data-i18n="cookbooks.shelfSubtitle">Tus carpetas culinarias y colecciones temáticas</p>
-            </div>
+            <span class="material-symbols-outlined icon-18 icon-primary">menu_book</span>
+            <h3 class="cookbooks-shelf-title" data-i18n="cookbooks.shelfTitle">Mis Libros de Cocina</h3>
           </div>
           <button type="button" class="btn btn-ghost btn-xs btn-add-cookbook" id="btn-open-create-cookbook"
             title="Crear un nuevo libro de recetas" aria-label="Nuevo libro">
@@ -292,29 +298,6 @@
         </div>
         <div class="cookbooks-cards-carousel" id="cookbooks-cards-carousel" role="region" aria-label="Estantería de libros de recetas">
           <!-- Rendered dynamically via JS -->
-        </div>
-      </div>
-
-      <!-- US-31: Cabecera Inmersiva al Entrar a un Libro de Recetas -->
-      <div class="cookbook-active-view-header" id="cookbook-active-view-header" style="display: none;">
-        <div class="cookbook-active-top-bar">
-          <button type="button" class="btn btn-ghost btn-sm btn-back-cookbook" id="btn-back-to-all-cookbooks">
-            <span class="material-symbols-outlined icon-sm">arrow_back</span>
-            <span data-i18n="cookbooks.backToShelf">Todos los libros</span>
-          </button>
-          <button type="button" class="btn btn-ghost btn-icon btn-sm" id="btn-cookbook-active-options" title="Opciones del libro" aria-label="Opciones del libro">
-            <span class="material-symbols-outlined">more_vert</span>
-          </button>
-        </div>
-        <div class="cookbook-active-info-card">
-          <div class="cookbook-active-cover-wrap" id="cookbook-active-cover-wrap">
-            <span class="material-symbols-outlined icon-28" id="cookbook-active-icon">auto_stories</span>
-          </div>
-          <div class="cookbook-active-meta">
-            <h2 class="cookbook-active-title" id="cookbook-active-title">Libro</h2>
-            <p class="cookbook-active-desc" id="cookbook-active-desc"></p>
-            <span class="cookbook-active-count-badge" id="cookbook-active-count-badge">0 recetas</span>
-          </div>
         </div>
       </div>
 
@@ -992,8 +975,8 @@
             </h3>
             <p
               style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-              <span data-i18n="settings.installedVersion">Versión instalada:</span> <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.82</strong>
-              <span class="app-version-badge" id="app-version-badge">v1.82</span>
+              <span data-i18n="settings.installedVersion">Versión instalada:</span> <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.83</strong>
+              <span class="app-version-badge" id="app-version-badge">v1.83</span>
             </p>
             <div
               style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;" data-i18n="settings.versionCacheNotice">
@@ -2469,6 +2452,13 @@
           <input type="text" class="form-input" id="input-cookbook-desc" maxlength="120"
             placeholder="Breve nota sobre qué recetas reúne este libro..." data-i18n-placeholder="cookbooks.bookDescPlaceholder">
         </div>
+        <div class="form-group" id="cookbook-cover-selector-group">
+          <label class="form-label" data-i18n="cookbooks.coverImageSection">Foto de portada</label>
+          <input type="hidden" id="input-cookbook-cover-image" value="auto">
+          <div class="cookbook-cover-selector" id="cookbook-cover-selector" role="radiogroup" aria-label="Seleccionar foto de portada">
+            <!-- Populated dynamically via JS -->
+          </div>
+        </div>
         <div class="cookbook-dialog-actions">
           <button type="button" class="btn btn-secondary btn-sm" id="btn-cancel-cookbook-dialog" data-i18n="common.cancel">Cancelar</button>
           <button type="button" class="btn btn-danger btn-sm" id="btn-delete-cookbook-dialog" style="display: none;" data-i18n="cookbooks.deleteBook">Eliminar libro</button>
@@ -2784,8 +2774,8 @@
     </div>
   </div>
 
-  <script src="config.js?v=1.82"></script>
-  <script src="app.js?v=1.82"></script>
+  <script src="config.js?v=1.83"></script>
+  <script src="app.js?v=1.83"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

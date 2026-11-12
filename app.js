@@ -2551,6 +2551,7 @@ class StateStore {
       name: (cookbook.name || '').trim(),
       icon: cookbook.icon || 'auto_stories',
       description: (cookbook.description || '').trim(),
+      coverImage: cookbook.coverImage || 'auto',
       createdAt: cookbook.createdAt || new Date().toISOString()
     };
     this.cookbooks.push(newBook);
@@ -4836,7 +4837,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.82';
+  window.APP_VERSION = 'v1.83';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4883,7 +4884,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.82';
+    this.appVersion = window.APP_VERSION || 'v1.83';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -9269,47 +9270,38 @@ class FoodAssistantApp {
   renderCookbooksShelf() {
     const carousel = document.getElementById('cookbooks-cards-carousel');
     const shelfSection = document.getElementById('cookbooks-shelf-section');
-    const activeHeader = document.getElementById('cookbook-active-view-header');
+    const backBtn = document.getElementById('btn-back-to-all-cookbooks');
+    const activeOptionsBtn = document.getElementById('btn-cookbook-active-options');
+    const titleText = document.getElementById('recipes-section-title-text');
+    const subtitleText = document.getElementById('recipes-count-subtitle');
 
     const books = Array.isArray(state.cookbooks) ? state.cookbooks : [];
     const isInActiveCookbook = Boolean(this.selectedCookbookId && this.selectedCookbookId !== 'all');
 
     if (isInActiveCookbook) {
       if (shelfSection) shelfSection.style.display = 'none';
-      if (activeHeader) {
-        activeHeader.style.display = 'flex';
-        const cb = books.find(c => c.id === this.selectedCookbookId);
-        if (cb) {
-          const titleEl = document.getElementById('cookbook-active-title');
-          const descEl = document.getElementById('cookbook-active-desc');
-          const countBadge = document.getElementById('cookbook-active-count-badge');
-          const coverWrap = document.getElementById('cookbook-active-cover-wrap');
+      if (backBtn) backBtn.hidden = false;
+      if (activeOptionsBtn) activeOptionsBtn.hidden = false;
 
-          if (titleEl) titleEl.textContent = cb.name;
-          if (descEl) descEl.textContent = cb.description || '';
-
-          const count = Array.isArray(state.recipes)
-            ? state.recipes.filter(r => Array.isArray(r.cookbooks) && r.cookbooks.includes(cb.id)).length
-            : 0;
-          const isEn = window.I18n && window.I18n.getLanguage() === 'en';
-          const countSuffix = count === 1 ? (isEn ? 'recipe' : 'receta') : (isEn ? 'recipes' : 'recetas');
-          if (countBadge) countBadge.textContent = `${count} ${countSuffix}`;
-
-          if (coverWrap) {
-            const firstWithImg = Array.isArray(state.recipes)
-              ? state.recipes.find(r => Array.isArray(r.cookbooks) && r.cookbooks.includes(cb.id) && r.imageUrl && typeof r.imageUrl === 'string' && !r.imageUrl.startsWith('data:image/svg'))
-              : null;
-            if (firstWithImg) {
-              coverWrap.innerHTML = `<img src="${escapeHtml(firstWithImg.imageUrl)}" alt="${escapeHtml(cb.name)}" class="cookbook-active-cover-img">`;
-            } else {
-              coverWrap.innerHTML = `<span class="material-symbols-outlined icon-28">${escapeHtml(cb.icon || 'auto_stories')}</span>`;
-            }
-          }
-        }
+      const cb = books.find(c => c.id === this.selectedCookbookId);
+      if (cb && titleText) {
+        titleText.textContent = window.I18n
+          ? window.I18n.t('cookbooks.bookTitlePrefix', { name: cb.name })
+          : `Libro: ${cb.name}`;
+      }
+      if (cb && subtitleText) {
+        subtitleText.textContent = cb.description || (window.I18n && window.I18n.getLanguage() === 'en' ? 'Personal cookbook' : 'Libro de recetas personal.');
       }
     } else {
       if (shelfSection) shelfSection.style.display = 'flex';
-      if (activeHeader) activeHeader.style.display = 'none';
+      if (backBtn) backBtn.hidden = true;
+      if (activeOptionsBtn) activeOptionsBtn.hidden = true;
+      if (titleText) {
+        titleText.textContent = window.I18n ? window.I18n.t('recipes.title') : 'Recetario';
+      }
+      if (subtitleText) {
+        subtitleText.textContent = window.I18n ? window.I18n.t('recipes.subtitle') : 'Tu colección culinaria personal.';
+      }
     }
 
     if (!carousel) return;
@@ -9334,13 +9326,22 @@ class FoodAssistantApp {
         : 0;
       const countSuffix = count === 1 ? (isEn ? 'recipe' : 'receta') : (isEn ? 'recipes' : 'recetas');
       const icon = cb.icon || 'auto_stories';
-      const firstWithImg = Array.isArray(state.recipes)
-        ? state.recipes.find(r => Array.isArray(r.cookbooks) && r.cookbooks.includes(cb.id) && r.imageUrl && typeof r.imageUrl === 'string' && !r.imageUrl.startsWith('data:image/svg'))
-        : null;
+
+      let coverImgUrl = null;
+      if (cb.coverImage && cb.coverImage !== 'none' && cb.coverImage !== 'auto') {
+        coverImgUrl = cb.coverImage;
+      } else if (cb.coverImage !== 'none') {
+        const firstWithImg = Array.isArray(state.recipes)
+          ? state.recipes.find(r => Array.isArray(r.cookbooks) && r.cookbooks.includes(cb.id) && r.imageUrl && typeof r.imageUrl === 'string' && !r.imageUrl.startsWith('data:image/svg'))
+          : null;
+        if (firstWithImg) {
+          coverImgUrl = firstWithImg.imageUrl;
+        }
+      }
 
       html += `
         <div class="cookbook-book-card" role="button" tabindex="0" data-cookbook-id="${escapeHtml(cb.id)}" title="${escapeHtml(cb.description || cb.name)}">
-          ${firstWithImg ? `<img src="${escapeHtml(firstWithImg.imageUrl)}" alt="${escapeHtml(cb.name)}" class="cookbook-book-cover" loading="lazy">` : `<div class="cookbook-book-placeholder"><span class="material-symbols-outlined">${escapeHtml(icon)}</span></div>`}
+          ${coverImgUrl ? `<img src="${escapeHtml(coverImgUrl)}" alt="${escapeHtml(cb.name)}" class="cookbook-book-cover" loading="lazy">` : `<div class="cookbook-book-placeholder"><span class="material-symbols-outlined">${escapeHtml(icon)}</span></div>`}
           <div class="cookbook-book-gradient"></div>
           <button type="button" class="cookbook-book-options-btn" data-cookbook-action="edit" data-cookbook-id="${escapeHtml(cb.id)}" title="${escapeHtml(optTitle)}" aria-label="${escapeHtml(optTitle)}">
             <span class="material-symbols-outlined icon-18">more_vert</span>
@@ -9524,7 +9525,7 @@ class FoodAssistantApp {
     this.showToast(successMsg, 'success');
   }
 
-    openCreateCookbookModal() {
+  openCreateCookbookModal() {
     const dialog = this.modalCookbookDialog || document.getElementById('modal-cookbook-dialog');
     if (!dialog) return;
 
@@ -9532,6 +9533,7 @@ class FoodAssistantApp {
     const nameInput = document.getElementById('input-cookbook-name');
     const descInput = document.getElementById('input-cookbook-desc');
     const iconInput = document.getElementById('input-cookbook-icon');
+    const coverInput = document.getElementById('input-cookbook-cover-image');
     const titleEl = document.getElementById('cookbook-dialog-title');
     const headerIcon = document.getElementById('cookbook-dialog-header-icon');
     const deleteBtn = document.getElementById('btn-delete-cookbook-dialog');
@@ -9540,6 +9542,7 @@ class FoodAssistantApp {
     if (nameInput) nameInput.value = '';
     if (descInput) descInput.value = '';
     if (iconInput) iconInput.value = 'auto_stories';
+    if (coverInput) coverInput.value = 'auto';
     if (headerIcon) headerIcon.textContent = 'auto_stories';
     if (deleteBtn) deleteBtn.style.display = 'none';
     if (titleEl) {
@@ -9547,6 +9550,7 @@ class FoodAssistantApp {
     }
 
     this.renderCookbookIconSelector('auto_stories');
+    this.renderCookbookCoverSelector(null, 'auto');
     this.openDialogModal(dialog);
     if (nameInput) {
       setTimeout(() => nameInput.focus(), 80);
@@ -9564,15 +9568,18 @@ class FoodAssistantApp {
     const nameInput = document.getElementById('input-cookbook-name');
     const descInput = document.getElementById('input-cookbook-desc');
     const iconInput = document.getElementById('input-cookbook-icon');
+    const coverInput = document.getElementById('input-cookbook-cover-image');
     const titleEl = document.getElementById('cookbook-dialog-title');
     const headerIcon = document.getElementById('cookbook-dialog-header-icon');
     const deleteBtn = document.getElementById('btn-delete-cookbook-dialog');
 
     const icon = cb.icon || 'auto_stories';
+    const cover = cb.coverImage || 'auto';
     if (idInput) idInput.value = cb.id;
     if (nameInput) nameInput.value = cb.name || '';
     if (descInput) descInput.value = cb.description || '';
     if (iconInput) iconInput.value = icon;
+    if (coverInput) coverInput.value = cover;
     if (headerIcon) headerIcon.textContent = icon;
     if (deleteBtn) deleteBtn.style.display = 'inline-flex';
     if (titleEl) {
@@ -9580,6 +9587,7 @@ class FoodAssistantApp {
     }
 
     this.renderCookbookIconSelector(icon);
+    this.renderCookbookCoverSelector(cb.id, cover);
     this.openDialogModal(dialog);
     if (nameInput) {
       setTimeout(() => nameInput.focus(), 80);
@@ -9591,6 +9599,68 @@ class FoodAssistantApp {
     if (dialog) {
       this.closeDialogModal(dialog);
     }
+  }
+
+  renderCookbookCoverSelector(cookbookId, selectedCover = 'auto') {
+    const container = document.getElementById('cookbook-cover-selector');
+    const coverInput = document.getElementById('input-cookbook-cover-image');
+    if (!container) return;
+
+    if (coverInput) coverInput.value = selectedCover;
+
+    let recipesWithImages = [];
+    if (cookbookId) {
+      recipesWithImages = (state.recipes || []).filter(r =>
+        Array.isArray(r.cookbooks) &&
+        r.cookbooks.includes(cookbookId) &&
+        r.imageUrl &&
+        typeof r.imageUrl === 'string' &&
+        !r.imageUrl.startsWith('data:image/svg')
+      );
+    }
+
+    const isAuto = !selectedCover || selectedCover === 'auto';
+    const isNone = selectedCover === 'none';
+
+    const autoText = window.I18n ? window.I18n.t('cookbooks.coverAuto') : 'Automática (primera receta con foto)';
+    const noneText = window.I18n ? window.I18n.t('cookbooks.coverNone') : 'Solo icono y degradado';
+
+    let html = `
+      <div class="cookbook-cover-modes">
+        <button type="button" class="cookbook-cover-chip ${isAuto ? 'active' : ''}" data-cover="auto">
+          <span class="material-symbols-outlined icon-14">auto_awesome</span>
+          <span>${escapeHtml(autoText)}</span>
+        </button>
+        <button type="button" class="cookbook-cover-chip ${isNone ? 'active' : ''}" data-cover="none">
+          <span class="material-symbols-outlined icon-14">palette</span>
+          <span>${escapeHtml(noneText)}</span>
+        </button>
+      </div>
+    `;
+
+    if (recipesWithImages.length > 0) {
+      html += `<div class="cookbook-cover-thumbs-row">`;
+      recipesWithImages.forEach(r => {
+        const isSel = selectedCover === r.imageUrl;
+        html += `
+          <button type="button" class="cookbook-cover-thumb-btn ${isSel ? 'active' : ''}" data-cover="${escapeHtml(r.imageUrl)}" title="${escapeHtml(r.title)}">
+            <img src="${escapeHtml(r.imageUrl)}" alt="${escapeHtml(r.title)}">
+          </button>
+        `;
+      });
+      html += `</div>`;
+    }
+
+    container.innerHTML = html;
+
+    container.querySelectorAll('[data-cover]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const coverVal = btn.dataset.cover;
+        if (coverInput) coverInput.value = coverVal;
+        container.querySelectorAll('[data-cover]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
   }
 
   renderCookbookIconSelector(selectedIcon = 'auto_stories') {
@@ -9645,13 +9715,15 @@ class FoodAssistantApp {
     const desc = descInput?.value.trim() || '';
     const iconInput = document.getElementById('input-cookbook-icon');
     const icon = iconInput?.value.trim() || 'auto_stories';
+    const coverInput = document.getElementById('input-cookbook-cover-image');
+    const coverImage = coverInput?.value.trim() || 'auto';
 
     if (id) {
-      state.updateCookbook(id, { name, description: desc, icon });
+      state.updateCookbook(id, { name, description: desc, icon, coverImage });
       const msg = window.I18n ? window.I18n.t('cookbooks.bookUpdated', { name }) : `Libro "${name}" actualizado.`;
       this.showToast(msg, 'success');
     } else {
-      const newBook = state.addCookbook({ name, description: desc, icon });
+      const newBook = state.addCookbook({ name, description: desc, icon, coverImage });
       this.selectedCookbookId = newBook.id;
       const msg = window.I18n ? window.I18n.t('cookbooks.bookCreated', { name }) : `Libro "${name}" creado con éxito.`;
       this.showToast(msg, 'success');
