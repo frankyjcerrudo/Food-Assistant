@@ -951,5 +951,123 @@ describe('US-77: Modo Familia / Espacio Colaborativo del Hogar (Family Mode)', (
       expect(state.mealPlan['2026-11-09'].lunch).toBe('rec-garbanzos');
       expect(state.mealPlan['2026-11-10'].lunch).toBe('rec-tostadas');
     });
+
+    it('16. Sincronización colaborativa de libros de recetas en el Hogar y preservación limpia al salir (US-31 & US-77)', async () => {
+      state.cloudUser = { id: 'user-aroa-222', email: 'aroa@sabory.food', name: 'Aroa' };
+      state.household = { id: 'hh-family-999', name: 'Casa Aroa y Fran', ownerId: 'user-franky-111', role: 'member', members: [
+        { userId: 'user-franky-111', name: 'Franky' },
+        { userId: 'user-aroa-222', name: 'Aroa' }
+      ] };
+
+      state.recipes = [
+        { id: 'rec-shared-franky', title: 'Tarta de Franky', ownerUserId: 'user-franky-111', cookbooks: ['cb-postres-familia'], instructions: [{ text: 'Hornear' }] },
+        { id: 'rec-own-aroa', title: 'Brownie de Aroa', ownerUserId: 'user-aroa-222', cookbooks: ['cb-postres-familia'], instructions: [{ text: 'Mezclar' }] }
+      ];
+
+      state.cookbooks = [
+        { id: 'cb-postres-familia', name: 'Postres Familiares', icon: 'cake', householdId: 'hh-family-999' }
+      ];
+
+      const pushedPayloads = {};
+      appInstance.supabaseClient = {
+        from: vi.fn().mockImplementation((table) => {
+          return {
+            select: vi.fn().mockReturnValue({
+              or: vi.fn().mockReturnValue({
+                limit: vi.fn().mockImplementation(() => {
+                  if (table === 'recipes') {
+                    return Promise.resolve({
+                      data: [
+                        { id: 'rec-shared-franky', title: 'Tarta de Franky', user_id: 'user-franky-111', household_id: 'hh-family-999', cookbooks: ['cb-postres-familia'] },
+                        { id: 'rec-own-aroa', title: 'Brownie de Aroa', user_id: 'user-aroa-222', household_id: 'hh-family-999', cookbooks: ['cb-postres-familia'] }
+                      ],
+                      error: null
+                    });
+                  }
+                  if (table === 'meal_plans') {
+                    return Promise.resolve({
+                      data: [
+                        {
+                          id: '__household_prefs__',
+                          plan_date: '__household_prefs__',
+                          custom_slots: [
+                            {
+                              type: 'household_cookbooks',
+                              cookbooks: [
+                                { id: 'cb-postres-familia', name: 'Postres Familiares', icon: 'cake', updatedAt: '2026-11-12T12:00:00Z' }
+                              ]
+                            }
+                          ]
+                        }
+                      ],
+                      error: null
+                    });
+                  }
+                  return Promise.resolve({ data: [], error: null });
+                })
+              })
+            }),
+            upsert: vi.fn().mockImplementation((payload) => {
+              pushedPayloads[table] = payload;
+              return Promise.resolve({ data: payload, error: null });
+            }),
+            delete: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ error: null })
+              }),
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ error: null })
+              })
+            })
+          };
+        }),
+        auth: {
+          updateUser: vi.fn().mockResolvedValue({ data: {}, error: null })
+        }
+      };
+
+      // 1. pushToCloud sube las recetas con _cookbooks y los libros en __household_prefs__
+      state.lastSyncedAt = null;
+      await appInstance.pushToCloud(true);
+      while (appInstance.isPushingToCloud) {
+        await new Promise(r => setTimeout(r, 10));
+      }
+
+      expect(pushedPayloads['recipes']).toBeDefined();
+      const recBrownie = pushedPayloads['recipes'].find(r => r.id === 'rec-own-aroa');
+      expect(recBrownie).toBeDefined();
+      expect(recBrownie.instructions[0]._cookbooks).toContain('cb-postres-familia');
+
+      expect(pushedPayloads['meal_plans']).toBeDefined();
+      const hhPrefs = pushedPayloads['meal_plans'].find(r => r.id === '__household_prefs__');
+      expect(hhPrefs).toBeDefined();
+      const cbSlot = hhPrefs.custom_slots.find(s => s.type === 'household_cookbooks');
+      expect(cbSlot).toBeDefined();
+      expect(cbSlot.cookbooks[0].name).toBe('Postres Familiares');
+
+      // 2. pullFromCloud adopta libros remotos
+      await appInstance.pullFromCloud();
+      expect(state.cookbooks.some(c => c.id === 'cb-postres-familia')).toBe(true);
+
+      // 3. Al salir del hogar: Aroa conserva el libro en su espacio personal, pero sin recetas ajenas
+      const leaveRes = await appInstance.leaveHousehold(true);
+      expect(leaveRes.success).toBe(true);
+      expect(state.household).toBeNull();
+
+      // El libro sigue en su catálogo personal, sin householdId
+      const personalBook = state.cookbooks.find(c => c.id === 'cb-postres-familia');
+      expect(personalBook).toBeDefined();
+      expect(personalBook.householdId).toBeUndefined();
+
+      // Las recetas de Franky ya no están en su catálogo, solo las suyas
+      expect(state.recipes.some(r => r.id === 'rec-own-aroa')).toBe(true);
+      expect(state.recipes.some(r => r.id === 'rec-shared-franky')).toBe(false);
+
+      // Al filtrar por el libro en modo personal, solo lista sus propias recetas
+      appInstance.enterCookbook('cb-postres-familia');
+      const filtered = state.recipes.filter(r => (r.cookbooks || []).includes('cb-postres-familia'));
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0].id).toBe('rec-own-aroa');
+    });
   });
 });

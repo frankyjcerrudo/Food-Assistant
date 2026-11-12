@@ -2552,7 +2552,10 @@ class StateStore {
       icon: cookbook.icon || 'auto_stories',
       description: (cookbook.description || '').trim(),
       coverImage: cookbook.coverImage || 'auto',
-      createdAt: cookbook.createdAt || new Date().toISOString()
+      createdAt: cookbook.createdAt || new Date().toISOString(),
+      updatedAt: cookbook.updatedAt || new Date().toISOString(),
+      ownerUserId: cookbook.ownerUserId || this.cloudUser?.id || null,
+      householdId: cookbook.householdId || this.household?.id || null
     };
     this.cookbooks.push(newBook);
     this.saveCookbooks(this.cookbooks);
@@ -2566,6 +2569,7 @@ class StateStore {
     this.cookbooks[idx] = {
       ...this.cookbooks[idx],
       ...updates,
+      updatedAt: new Date().toISOString(),
       id
     };
     this.saveCookbooks(this.cookbooks);
@@ -4837,7 +4841,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.85';
+  window.APP_VERSION = 'v1.86';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4884,7 +4888,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.85';
+    this.appVersion = window.APP_VERSION || 'v1.86';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -6433,12 +6437,17 @@ class FoodAssistantApp {
             ? !!remoteRow.is_favorite
             : !!remoteRow.instructions?.[0]?._isFavorite;
 
+          const remoteCookbooks = Array.isArray(remoteRow.cookbooks)
+            ? remoteRow.cookbooks
+            : (Array.isArray(remoteRow.instructions?.[0]?._cookbooks) ? remoteRow.instructions[0]._cookbooks : []);
+
           const cleanInstructions = Array.isArray(remoteRow.instructions)
             ? remoteRow.instructions.map((inst, idx) => {
-              if (idx === 0 && inst && typeof inst === 'object' && ('_nutrition' in inst || '_isFavorite' in inst)) {
+              if (idx === 0 && inst && typeof inst === 'object' && ('_nutrition' in inst || '_isFavorite' in inst || '_cookbooks' in inst)) {
                 const copy = { ...inst };
                 delete copy._nutrition;
                 delete copy._isFavorite;
+                delete copy._cookbooks;
                 return copy;
               }
               return inst;
@@ -6460,6 +6469,7 @@ class FoodAssistantApp {
             instructions: cleanInstructions.length > 0 ? cleanInstructions : (Array.isArray(remoteRow.instructions) ? remoteRow.instructions : []),
             nutrition: remoteNutrition,
             isFavorite: remoteFavorite,
+            cookbooks: remoteCookbooks,
             createdAt: remoteRow.created_at || remoteRow.updated_at || null,
             updatedAt: remoteRow.updated_at
           };
@@ -6475,12 +6485,15 @@ class FoodAssistantApp {
             const remoteHasNutrition = !!remoteRecipe.nutrition;
             const localHasNutrition = !!local.nutrition;
             const tagsDiffer = JSON.stringify(local.tags || []) !== JSON.stringify(remoteRecipe.tags || []);
+            const cookbooksDiffer = Array.isArray(remoteRecipe.cookbooks) && remoteRecipe.cookbooks.length > 0 &&
+              JSON.stringify(remoteRecipe.cookbooks) !== JSON.stringify(local.cookbooks || []);
 
             if (remoteDate > localDate) {
               state.recipes[localIdx] = {
                 ...local,
                 ...remoteRecipe,
-                nutrition: remoteRecipe.nutrition || local.nutrition || null
+                nutrition: remoteRecipe.nutrition || local.nutrition || null,
+                cookbooks: Array.isArray(remoteRecipe.cookbooks) && remoteRecipe.cookbooks.length > 0 ? remoteRecipe.cookbooks : (local.cookbooks || [])
               };
               stateChanged = true;
             } else if (remoteDate === localDate || remoteDate >= localDate) {
@@ -6491,6 +6504,10 @@ class FoodAssistantApp {
               }
               if (tagsDiffer) {
                 local.tags = remoteRecipe.tags;
+                updated = true;
+              }
+              if (cookbooksDiffer) {
+                local.cookbooks = remoteRecipe.cookbooks;
                 updated = true;
               }
               if (remoteRecipe.ownerUserId && !local.ownerUserId) {
@@ -6866,6 +6883,52 @@ class FoodAssistantApp {
         }
       }
 
+      // US-31 & US-77: Sincronización de libros de recetas (Cookbooks) colaborativos y multi-dispositivo
+      let remoteCookbooks = null;
+      if ((activeHouseholdId || state.household?.id) && remoteHouseholdPrefsRow) {
+        const hhCookbooksSlot = Array.isArray(remoteHouseholdPrefsRow.custom_slots)
+          ? remoteHouseholdPrefsRow.custom_slots.find(s => s && s.type === 'household_cookbooks')
+          : null;
+        if (hhCookbooksSlot && Array.isArray(hhCookbooksSlot.cookbooks)) {
+          remoteCookbooks = hhCookbooksSlot.cookbooks;
+        }
+      }
+      if (!remoteCookbooks && Array.isArray(state.cloudUser?.user_metadata?.cookbooks)) {
+        remoteCookbooks = state.cloudUser.user_metadata.cookbooks;
+      }
+
+      if (Array.isArray(remoteCookbooks) && remoteCookbooks.length > 0) {
+        let cbChanged = false;
+        if (!Array.isArray(state.cookbooks)) state.cookbooks = [];
+        const isOnlySeed = state.cookbooks.every(cb => SEED_COOKBOOKS.some(s => s.id === cb.id));
+        if (isOnlySeed) {
+          state.cookbooks = remoteCookbooks;
+          cbChanged = true;
+        } else {
+          remoteCookbooks.forEach(rBook => {
+            if (!rBook || !rBook.id) return;
+            const localIdx = state.cookbooks.findIndex(c => c.id === rBook.id);
+            if (localIdx === -1) {
+              state.cookbooks.push(rBook);
+              cbChanged = true;
+            } else {
+              const rTime = new Date(rBook.updatedAt || rBook.createdAt || 0).getTime();
+              const lTime = new Date(state.cookbooks[localIdx].updatedAt || state.cookbooks[localIdx].createdAt || 0).getTime();
+              if (rTime > lTime) {
+                state.cookbooks[localIdx] = { ...state.cookbooks[localIdx], ...rBook };
+                cbChanged = true;
+              }
+            }
+          });
+        }
+        if (cbChanged) {
+          state.saveCookbooks(state.cookbooks);
+          this.renderCookbooksShelf();
+          this.renderCookbooksStrip();
+          stateChanged = true;
+        }
+      }
+
       if (remoteGoals && typeof remoteGoals === 'object') {
         const localGoalsJson = JSON.stringify(state.settings?.nutritionGoals || {});
         const remoteGoalsJson = JSON.stringify(remoteGoals);
@@ -7164,8 +7227,8 @@ class FoodAssistantApp {
             })
             : [];
 
-          // Adjuntar _nutrition e _isFavorite como metadato seguro en instructions[0] para persistencia ante fallbacks de esquema
-          if (recipe.nutrition || recipe.isFavorite !== undefined) {
+          // Adjuntar _nutrition, _isFavorite y _cookbooks como metadato seguro en instructions[0] para persistencia ante fallbacks de esquema
+          if (recipe.nutrition || recipe.isFavorite !== undefined || (Array.isArray(recipe.cookbooks) && recipe.cookbooks.length > 0)) {
             if (instructionsCopy.length === 0) {
               instructionsCopy.push({ text: '' });
             }
@@ -7174,6 +7237,9 @@ class FoodAssistantApp {
             }
             if (recipe.isFavorite !== undefined) {
               instructionsCopy[0]._isFavorite = !!recipe.isFavorite;
+            }
+            if (Array.isArray(recipe.cookbooks) && recipe.cookbooks.length > 0) {
+              instructionsCopy[0]._cookbooks = recipe.cookbooks;
             }
           }
 
@@ -7201,6 +7267,7 @@ class FoodAssistantApp {
             instructions: instructionsCopy,
             nutrition: recipe.nutrition || null,
             is_favorite: !!recipe.isFavorite,
+            cookbooks: Array.isArray(recipe.cookbooks) ? recipe.cookbooks : [],
             created_at: recipe.createdAt || recipe.updatedAt || new Date().toISOString(),
             updated_at: recipe.updatedAt || new Date().toISOString()
           };
@@ -7283,6 +7350,11 @@ class FoodAssistantApp {
         if (effectiveGeminiKey) {
           hhPrefSlotPayload.sharedGeminiApiKey = effectiveGeminiKey;
         }
+        const hhCookbooksSlotPayload = {
+          type: 'household_cookbooks',
+          cookbooks: Array.isArray(state.cookbooks) ? state.cookbooks : [],
+          updatedAt: new Date().toISOString()
+        };
         mealPlansPayload.push({
           id: '__household_prefs__',
           user_id: state.household?.ownerId || state.cloudUser.id,
@@ -7292,7 +7364,7 @@ class FoodAssistantApp {
           lunch_recipe_id: null,
           snack_recipe_id: null,
           dinner_recipe_id: null,
-          custom_slots: [hhPrefSlotPayload],
+          custom_slots: [hhPrefSlotPayload, hhCookbooksSlotPayload],
           household_id: activeHouseholdId,
           updated_at: hhDietaryUpdatedAt
         });
@@ -7329,7 +7401,7 @@ class FoodAssistantApp {
         if (!sRes.success) throw sRes.error;
       }
 
-      // 5. Preferencias Dietéticas, Tags Personalizados, Objetivos y Clave Gemini (Sincronización multi-dispositivo)
+      // 5. Preferencias Dietéticas, Tags Personalizados, Libros, Objetivos y Clave Gemini (Sincronización multi-dispositivo)
       if (this.supabaseClient?.auth && typeof this.supabaseClient.auth.updateUser === 'function') {
         try {
           const metaPayload = {
@@ -7337,6 +7409,7 @@ class FoodAssistantApp {
             custom_tags: state.customTags || [],
             nutrition_goals: state.settings?.nutritionGoals || null,
             gemini_api_key: state.settings?.geminiApiKey || '',
+            cookbooks: state.cookbooks || [],
             dietary_updated_at: state.dietaryUpdatedAt || new Date().toISOString()
           };
           await this.supabaseClient.auth.updateUser({ data: metaPayload });
@@ -7361,6 +7434,7 @@ class FoodAssistantApp {
             custom_tags: state.customTags || [],
             nutrition_goals: state.settings?.nutritionGoals || null,
             default_servings: state.settings?.defaultServings || 2,
+            cookbooks: state.cookbooks || [],
             updated_at: state.dietaryUpdatedAt || new Date().toISOString()
           };
           // US-69: solo se envía si este dispositivo conoce el token (evita pisarlo con null)
@@ -18758,6 +18832,14 @@ REGLAS CRÍTICAS:
           delete copy.householdId;
           return copy;
         });
+    }
+
+    // US-31 & US-77: Conservar copia personal de los libros de recetas del hogar desvinculando householdId
+    if (Array.isArray(state.cookbooks)) {
+      state.cookbooks.forEach(cb => {
+        delete cb.householdId;
+      });
+      state.saveCookbooks(state.cookbooks);
     }
 
     state.saveHousehold(null);
