@@ -462,4 +462,151 @@ describe('US-31: Colecciones y Libros de Recetas Personalizados (Cookbooks / Car
       expect(css).toContain('.bulk-add-cookbooks-list');
     });
   });
+
+  describe('8. Sincronización en la Nube Multi-dispositivo y en Familia (US-31, US-77)', () => {
+    it('pushToCloud y pullFromCloud sincronizan libros entre distintos dispositivos de la misma cuenta', async () => {
+      state.cloudUser = { id: 'user-franky-1', email: 'franky@test.com', name: 'Franky' };
+      state.household = null;
+      state.cookbooks = [
+        { id: 'cb-batch', name: 'Batch Cooking', icon: 'bolt', description: 'Tuppers', coverImage: 'auto' }
+      ];
+
+      const pushedPayloads = {};
+      let updatedUserMetadata = null;
+
+      appInstance.supabaseClient = {
+        from: vi.fn().mockImplementation((table) => ({
+          delete: vi.fn().mockReturnValue({ in: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }) }),
+          upsert: vi.fn().mockImplementation(async (payload) => {
+            pushedPayloads[table] = payload;
+            return { data: payload, error: null };
+          }),
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue({ data: [], error: null })
+            })
+          })
+        })),
+        auth: {
+          updateUser: vi.fn().mockImplementation(async ({ data }) => {
+            updatedUserMetadata = data;
+            return { data: {}, error: null };
+          }),
+          getUser: vi.fn().mockImplementation(async () => ({
+            data: {
+              user: {
+                id: 'user-franky-1',
+                email: 'franky@test.com',
+                user_metadata: updatedUserMetadata || { cookbooks: state.cookbooks }
+              }
+            },
+            error: null
+          }))
+        }
+      };
+
+      // 1. Dispositivo 1 sube libros
+      await appInstance.pushToCloud(true);
+      while (appInstance.isPushingToCloud) {
+        await new Promise(r => setTimeout(r, 10));
+      }
+
+      // Debe guardarse en user_metadata y en __user_prefs__ de meal_plans
+      expect(updatedUserMetadata).toBeDefined();
+      expect(updatedUserMetadata.cookbooks).toHaveLength(1);
+      expect(updatedUserMetadata.cookbooks[0].name).toBe('Batch Cooking');
+
+      expect(pushedPayloads['meal_plans']).toBeDefined();
+      const userPrefsRow = pushedPayloads['meal_plans'].find(r => r.id === '__user_prefs__');
+      expect(userPrefsRow).toBeDefined();
+      const cbSlot = userPrefsRow.custom_slots.find(s => s.type === 'user_cookbooks');
+      expect(cbSlot).toBeDefined();
+      expect(cbSlot.cookbooks[0].id).toBe('cb-batch');
+
+      // 2. Dispositivo 2 descarga datos (inicia con catálogo vacío)
+      state.cookbooks = [];
+      appInstance.supabaseClient.from = vi.fn().mockImplementation((table) => ({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            limit: vi.fn().mockImplementation(async () => {
+              if (table === 'meal_plans') {
+                return { data: [userPrefsRow], error: null };
+              }
+              return { data: [], error: null };
+            })
+          })
+        })
+      }));
+
+      await appInstance.pullFromCloud();
+      expect(state.cookbooks.some(c => c.id === 'cb-batch')).toBe(true);
+      expect(state.cookbooks.find(c => c.id === 'cb-batch').name).toBe('Batch Cooking');
+    });
+
+    it('en Modo Familia, la subida utiliza el id del usuario actual sin violar RLS y se sincroniza con otros miembros', async () => {
+      // Franky (miembro, no dueño) crea un libro familiar
+      state.cloudUser = { id: 'user-member-2', email: 'member@test.com', name: 'Miembro' };
+      state.household = { id: 'hh-family-99', name: 'Familia', ownerId: 'user-owner-1', role: 'member' };
+      state.cookbooks = [
+        { id: 'cb-familia-asados', name: 'Asados Familiares', icon: 'outdoor_grill', description: 'Barbacoas' }
+      ];
+
+      const pushedPayloads = {};
+      appInstance.supabaseClient = {
+        from: vi.fn().mockImplementation((table) => ({
+          delete: vi.fn().mockReturnValue({ in: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }) }),
+          upsert: vi.fn().mockImplementation(async (payload) => {
+            pushedPayloads[table] = payload;
+            return { data: payload, error: null };
+          }),
+          select: vi.fn().mockReturnValue({
+            or: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue({ data: [], error: null })
+            })
+          })
+        })),
+        auth: {
+          updateUser: vi.fn().mockResolvedValue({ data: {}, error: null }),
+          getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-member-2', user_metadata: {} } }, error: null })
+        }
+      };
+
+      await appInstance.pushToCloud(true);
+      while (appInstance.isPushingToCloud) {
+        await new Promise(r => setTimeout(r, 10));
+      }
+
+      const hhPrefsRow = pushedPayloads['meal_plans'].find(r => r.id === '__household_prefs__');
+      expect(hhPrefsRow).toBeDefined();
+      // user_id DEBE ser el del usuario autenticado (user-member-2) para cumplir RLS
+      expect(hhPrefsRow.user_id).toBe('user-member-2');
+      expect(hhPrefsRow.household_id).toBe('hh-family-99');
+      const cbSlot = hhPrefsRow.custom_slots.find(s => s.type === 'household_cookbooks');
+      expect(cbSlot.cookbooks[0].name).toBe('Asados Familiares');
+    });
+
+    it('handleRealtimeCookbooksBroadcast actualiza libros en vivo vía WebSocket', () => {
+      state.cookbooks = [{ id: 'cb-1', name: 'Viejo Libro' }];
+      appInstance.clientId = 'client-local-1';
+
+      // Mensaje de otro cliente
+      appInstance.handleRealtimeCookbooksBroadcast({
+        clientId: 'client-remote-2',
+        cookbooks: [
+          { id: 'cb-1', name: 'Viejo Libro' },
+          { id: 'cb-2', name: 'Nuevo Libro en Tiempo Real' }
+        ]
+      });
+
+      expect(state.cookbooks).toHaveLength(2);
+      expect(state.cookbooks.some(c => c.id === 'cb-2')).toBe(true);
+
+      // Mensaje emitido por el propio cliente se ignora
+      appInstance.handleRealtimeCookbooksBroadcast({
+        clientId: 'client-local-1',
+        cookbooks: [{ id: 'cb-ignored', name: 'No debe entrar' }]
+      });
+      expect(state.cookbooks.some(c => c.id === 'cb-ignored')).toBe(false);
+    });
+  });
 });

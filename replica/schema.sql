@@ -181,6 +181,7 @@ create table if not exists public.user_settings (
 );
 
 alter table public.user_settings add column if not exists nutrition_goals jsonb default '{}'::jsonb;
+alter table public.user_settings add column if not exists cookbooks jsonb default '[]'::jsonb;
 
 alter table public.user_settings enable row level security;
 
@@ -233,6 +234,7 @@ alter table public.recipes add column if not exists is_private boolean not null 
 alter table public.meal_plans add column if not exists household_id uuid references public.households(id) on delete set null;
 alter table public.shopping_items add column if not exists household_id uuid references public.households(id) on delete set null;
 alter table public.user_settings add column if not exists active_household_id uuid references public.households(id) on delete set null;
+alter table public.households add column if not exists cookbooks jsonb default '[]'::jsonb;
 
 -- Asegurar clave primaria compuesta (user_id, id) en recipes, meal_plans y shopping_items para multi-usuario
 do $$

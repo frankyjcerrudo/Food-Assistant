@@ -2393,7 +2393,8 @@ class StateStore {
     this.deletedRecords = this.load('fa_deleted_records', {
       recipes: [],
       mealPlans: [],
-      shoppingItems: []
+      shoppingItems: [],
+      cookbooks: []
     });
 
     let savedRecipes = this.load('fa_recipes', null);
@@ -2537,11 +2538,14 @@ class StateStore {
       this.save('fa_cookbooks', savedCookbooks);
     }
     this.cookbooks = Array.isArray(savedCookbooks) ? savedCookbooks : [];
+    this.cookbooksUpdatedAt = this.load('fa_cookbooks_updated_at', null);
   }
 
   saveCookbooks(cookbooks) {
     this.cookbooks = Array.isArray(cookbooks) ? cookbooks : [];
+    this.cookbooksUpdatedAt = new Date().toISOString();
     this.save('fa_cookbooks', this.cookbooks);
+    this.save('fa_cookbooks_updated_at', this.cookbooksUpdatedAt);
   }
 
   addCookbook(cookbook) {
@@ -2557,6 +2561,9 @@ class StateStore {
       ownerUserId: cookbook.ownerUserId || this.cloudUser?.id || null,
       householdId: cookbook.householdId || this.household?.id || null
     };
+    if (this.deletedRecords.cookbooks?.includes(newBook.id)) {
+      this.clearDeletedRecords('cookbooks', [newBook.id]);
+    }
     this.cookbooks.push(newBook);
     this.saveCookbooks(this.cookbooks);
     return newBook;
@@ -2580,6 +2587,7 @@ class StateStore {
     if (!Array.isArray(this.cookbooks)) return false;
     this.cookbooks = this.cookbooks.filter(c => c.id !== id);
     this.saveCookbooks(this.cookbooks);
+    this.trackDeletion('cookbooks', id);
     if (Array.isArray(this.recipes)) {
       let changed = false;
       this.recipes.forEach(r => {
@@ -4841,7 +4849,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.88';
+  window.APP_VERSION = 'v1.89';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4888,7 +4896,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.88';
+    this.appVersion = window.APP_VERSION || 'v1.89';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -5804,7 +5812,8 @@ class FoodAssistantApp {
               email: session.user.email,
               name: session.user.user_metadata?.full_name || session.user.email.split('@')[0],
               id: session.user.id,
-              provider: session.user.app_metadata?.provider || 'email'
+              provider: session.user.app_metadata?.provider || 'email',
+              user_metadata: session.user.user_metadata || {}
             };
             state.save('fa_cloud_user', state.cloudUser);
             this.updateUserAccountUI();
@@ -5822,7 +5831,8 @@ class FoodAssistantApp {
               email: session.user.email,
               name: session.user.user_metadata?.full_name || session.user.email.split('@')[0],
               id: session.user.id,
-              provider: session.user.app_metadata?.provider || 'email'
+              provider: session.user.app_metadata?.provider || 'email',
+              user_metadata: session.user.user_metadata || {}
             };
             state.save('fa_cloud_user', state.cloudUser);
             this.updateUserAccountUI();
@@ -5835,7 +5845,8 @@ class FoodAssistantApp {
               email: session.user.email,
               name: session.user.user_metadata?.full_name || session.user.email.split('@')[0],
               id: session.user.id,
-              provider: session.user.app_metadata?.provider || 'email'
+              provider: session.user.app_metadata?.provider || 'email',
+              user_metadata: session.user.user_metadata || {}
             };
             state.save('fa_cloud_user', state.cloudUser);
             this.updateUserAccountUI();
@@ -6109,14 +6120,24 @@ class FoodAssistantApp {
             this.showToast("Revisa tu correo para confirmar la cuenta antes de iniciar sesión.", 'info');
             return;
           }
-          state.cloudUser = { email: data.user.email, name: name || email.split('@')[0], id: data.user.id };
+          state.cloudUser = {
+            email: data.user.email,
+            name: name || email.split('@')[0],
+            id: data.user.id,
+            user_metadata: data.user.user_metadata || {}
+          };
         } else {
           const { data, error } = await this.supabaseClient.auth.signInWithPassword({
             email,
             password
           });
           if (error) throw error;
-          state.cloudUser = { email: data.user.email, name: data.user.user_metadata?.full_name || email.split('@')[0], id: data.user.id };
+          state.cloudUser = {
+            email: data.user.email,
+            name: data.user.user_metadata?.full_name || email.split('@')[0],
+            id: data.user.id,
+            user_metadata: data.user.user_metadata || {}
+          };
         }
       } catch (err) {
         if (errBox) {
@@ -6485,7 +6506,7 @@ class FoodAssistantApp {
             const remoteHasNutrition = !!remoteRecipe.nutrition;
             const localHasNutrition = !!local.nutrition;
             const tagsDiffer = JSON.stringify(local.tags || []) !== JSON.stringify(remoteRecipe.tags || []);
-            const cookbooksDiffer = Array.isArray(remoteRecipe.cookbooks) && remoteRecipe.cookbooks.length > 0 &&
+            const cookbooksDiffer = Array.isArray(remoteRecipe.cookbooks) &&
               JSON.stringify(remoteRecipe.cookbooks) !== JSON.stringify(local.cookbooks || []);
 
             if (remoteDate > localDate) {
@@ -6493,7 +6514,7 @@ class FoodAssistantApp {
                 ...local,
                 ...remoteRecipe,
                 nutrition: remoteRecipe.nutrition || local.nutrition || null,
-                cookbooks: Array.isArray(remoteRecipe.cookbooks) && remoteRecipe.cookbooks.length > 0 ? remoteRecipe.cookbooks : (local.cookbooks || [])
+                cookbooks: Array.isArray(remoteRecipe.cookbooks) ? remoteRecipe.cookbooks : (local.cookbooks || [])
               };
               stateChanged = true;
             } else if (remoteDate === localDate || remoteDate >= localDate) {
@@ -6551,13 +6572,16 @@ class FoodAssistantApp {
       if (state.mealPlan && state.mealPlan['__household_prefs__']) {
         delete state.mealPlan['__household_prefs__'];
       }
+      if (state.mealPlan && state.mealPlan['__user_prefs__']) {
+        delete state.mealPlan['__user_prefs__'];
+      }
 
       if (Array.isArray(planRes.data)) {
         const dedupedPlansMap = new Map();
         planRes.data.forEach(row => {
           const dKey = row?.plan_date || row?.id;
           if (!dKey) return;
-          if (dKey === '__household_prefs__') {
+          if (dKey === '__household_prefs__' || dKey === '__user_prefs__') {
             if (!remoteHouseholdPrefsRow || new Date(row.updated_at || 0).getTime() >= new Date(remoteHouseholdPrefsRow.updated_at || 0).getTime()) {
               remoteHouseholdPrefsRow = row;
             }
@@ -6613,7 +6637,7 @@ class FoodAssistantApp {
 
         remotePlansList.forEach(remoteRow => {
           const dateKey = remoteRow.plan_date || remoteRow.id;
-          if (!dateKey || dateKey === '__household_prefs__' || state.deletedRecords.mealPlans?.includes(dateKey)) return;
+          if (!dateKey || dateKey === '__household_prefs__' || dateKey === '__user_prefs__' || state.deletedRecords.mealPlans?.includes(dateKey)) return;
 
           const localPlan = state.mealPlan[dateKey];
           const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
@@ -6751,6 +6775,8 @@ class FoodAssistantApp {
       let remoteDietaryUpdatedAt = null;
       let remoteGoals = null;
       let remoteGeminiKey = null;
+      let sRowCookbooks = null;
+      let sRowCookbooksUpdatedAt = null;
 
       try {
         if (this.supabaseClient?.from) {
@@ -6762,6 +6788,10 @@ class FoodAssistantApp {
             if (sRow.nutrition_goals && typeof sRow.nutrition_goals === 'object') remoteGoals = sRow.nutrition_goals;
             if (typeof sRow.gemini_api_key === 'string' && sRow.gemini_api_key.trim()) remoteGeminiKey = sRow.gemini_api_key.trim();
             if (sRow.updated_at) remoteDietaryUpdatedAt = sRow.updated_at;
+            if (Array.isArray(sRow.cookbooks)) {
+              sRowCookbooks = sRow.cookbooks;
+              sRowCookbooksUpdatedAt = sRow.updated_at;
+            }
             // US-69: adoptar el acceso externo configurado desde otro dispositivo
             if (typeof sRow.agent_token_hash === 'string' && sRow.agent_token_hash && !state.settings?.agentTokenHash) {
               if (!state.settings) state.settings = {};
@@ -6781,6 +6811,8 @@ class FoodAssistantApp {
         // Ignorar si la tabla user_settings no existe
       }
 
+      let metaCookbooks = null;
+      let metaCookbooksUpdatedAt = null;
       if (this.supabaseClient?.auth && typeof this.supabaseClient.auth.getUser === 'function') {
         try {
           const authRes = await this.supabaseClient.auth.getUser();
@@ -6804,6 +6836,17 @@ class FoodAssistantApp {
             }
             if (typeof meta.gemini_api_key === 'string' && meta.gemini_api_key.trim()) {
               remoteGeminiKey = meta.gemini_api_key.trim();
+            }
+            if (Array.isArray(meta.cookbooks)) {
+              metaCookbooks = meta.cookbooks;
+              metaCookbooksUpdatedAt = meta.cookbooks_updated_at || meta.dietary_updated_at || null;
+            }
+            if (state.cloudUser) {
+              state.cloudUser.user_metadata = {
+                ...(state.cloudUser.user_metadata || {}),
+                ...meta
+              };
+              state.save('fa_cloud_user', state.cloudUser);
             }
           }
         } catch (authErr) {
@@ -6885,41 +6928,70 @@ class FoodAssistantApp {
 
       // US-31 & US-77: Sincronización de libros de recetas (Cookbooks) colaborativos y multi-dispositivo
       let remoteCookbooks = null;
-      if ((activeHouseholdId || state.household?.id) && remoteHouseholdPrefsRow) {
-        const hhCookbooksSlot = Array.isArray(remoteHouseholdPrefsRow.custom_slots)
-          ? remoteHouseholdPrefsRow.custom_slots.find(s => s && s.type === 'household_cookbooks')
-          : null;
+      let remoteCookbooksUpdatedAt = null;
+
+      if (remoteHouseholdPrefsRow && Array.isArray(remoteHouseholdPrefsRow.custom_slots)) {
+        const hhCookbooksSlot = remoteHouseholdPrefsRow.custom_slots.find(s => s && (s.type === 'household_cookbooks' || s.type === 'user_cookbooks'));
         if (hhCookbooksSlot && Array.isArray(hhCookbooksSlot.cookbooks)) {
           remoteCookbooks = hhCookbooksSlot.cookbooks;
+          remoteCookbooksUpdatedAt = hhCookbooksSlot.updatedAt || remoteHouseholdPrefsRow.updated_at;
         }
+      }
+      if (!remoteCookbooks && Array.isArray(sRowCookbooks)) {
+        remoteCookbooks = sRowCookbooks;
+        remoteCookbooksUpdatedAt = sRowCookbooksUpdatedAt;
+      }
+      if (!remoteCookbooks && Array.isArray(metaCookbooks)) {
+        remoteCookbooks = metaCookbooks;
+        remoteCookbooksUpdatedAt = metaCookbooksUpdatedAt;
       }
       if (!remoteCookbooks && Array.isArray(state.cloudUser?.user_metadata?.cookbooks)) {
         remoteCookbooks = state.cloudUser.user_metadata.cookbooks;
+        remoteCookbooksUpdatedAt = state.cloudUser.user_metadata.cookbooks_updated_at || null;
       }
 
-      if (Array.isArray(remoteCookbooks) && remoteCookbooks.length > 0) {
+      if (Array.isArray(remoteCookbooks)) {
         let cbChanged = false;
         if (!Array.isArray(state.cookbooks)) state.cookbooks = [];
         const isOnlySeed = state.cookbooks.every(cb => SEED_COOKBOOKS.some(s => s.id === cb.id));
-        if (isOnlySeed) {
-          state.cookbooks = remoteCookbooks;
+        if (isOnlySeed && remoteCookbooks.length > 0) {
+          state.cookbooks = remoteCookbooks.map(cb => ({ ...cb }));
           cbChanged = true;
         } else {
           remoteCookbooks.forEach(rBook => {
             if (!rBook || !rBook.id) return;
+            if (state.deletedRecords.cookbooks?.includes(rBook.id) ||
+              (typeof state.isTombstoned === 'function' && state.isTombstoned('cookbooks', rBook.id))) {
+              return;
+            }
             const localIdx = state.cookbooks.findIndex(c => c.id === rBook.id);
             if (localIdx === -1) {
-              state.cookbooks.push(rBook);
+              state.cookbooks.push({ ...rBook });
               cbChanged = true;
             } else {
               const rTime = new Date(rBook.updatedAt || rBook.createdAt || 0).getTime();
               const lTime = new Date(state.cookbooks[localIdx].updatedAt || state.cookbooks[localIdx].createdAt || 0).getTime();
-              if (rTime > lTime) {
+              if (rTime > lTime || JSON.stringify(state.cookbooks[localIdx]) !== JSON.stringify(rBook)) {
                 state.cookbooks[localIdx] = { ...state.cookbooks[localIdx], ...rBook };
                 cbChanged = true;
               }
             }
           });
+
+          // Si la lista remota tiene timestamp más reciente, eliminar los libros locales que hayan sido borrados remotamente
+          if (remoteCookbooksUpdatedAt) {
+            const remoteSyncTime = new Date(remoteCookbooksUpdatedAt).getTime();
+            const remoteIds = new Set(remoteCookbooks.map(c => c.id));
+            const beforeCount = state.cookbooks.length;
+            state.cookbooks = state.cookbooks.filter(localBook => {
+              if (remoteIds.has(localBook.id)) return true;
+              const localTime = new Date(localBook.updatedAt || localBook.createdAt || 0).getTime();
+              return localTime > remoteSyncTime;
+            });
+            if (state.cookbooks.length !== beforeCount) {
+              cbChanged = true;
+            }
+          }
         }
         if (cbChanged) {
           state.saveCookbooks(state.cookbooks);
@@ -7297,7 +7369,7 @@ class FoodAssistantApp {
 
       // 3. Batch Upsert Meal Plans (BUG-23, BUG-24 & US-77 Modo Familia)
       const planKeys = Object.keys(state.mealPlan || {}).filter(dateKey => {
-        if (!dateKey || dateKey === '__household_prefs__') return false;
+        if (!dateKey || dateKey === '__household_prefs__' || dateKey === '__user_prefs__') return false;
         const day = state.mealPlan[dateKey];
         if (!day || typeof day !== 'object') return false;
         const hasMeals = !!(day.breakfast || day.lunch || day.snack || day.dinner || (Array.isArray(day.customSlots) && day.customSlots.some(cs => cs && cs.recipeId)));
@@ -7353,11 +7425,11 @@ class FoodAssistantApp {
         const hhCookbooksSlotPayload = {
           type: 'household_cookbooks',
           cookbooks: Array.isArray(state.cookbooks) ? state.cookbooks : [],
-          updatedAt: new Date().toISOString()
+          updatedAt: state.cookbooksUpdatedAt || new Date().toISOString()
         };
         mealPlansPayload.push({
           id: '__household_prefs__',
-          user_id: state.household?.ownerId || state.cloudUser.id,
+          user_id: state.cloudUser.id,
           plan_date: '__household_prefs__',
           day_name: 'Preferencias del Hogar',
           breakfast_recipe_id: null,
@@ -7367,6 +7439,31 @@ class FoodAssistantApp {
           custom_slots: [hhPrefSlotPayload, hhCookbooksSlotPayload],
           household_id: activeHouseholdId,
           updated_at: hhDietaryUpdatedAt
+        });
+      } else {
+        const userCookbooksUpdatedAt = state.cookbooksUpdatedAt || new Date().toISOString();
+        const userCookbooksSlotPayload = {
+          type: 'user_cookbooks',
+          cookbooks: Array.isArray(state.cookbooks) ? state.cookbooks : [],
+          updatedAt: userCookbooksUpdatedAt
+        };
+        const userPrefSlotPayload = {
+          type: 'user_prefs',
+          dietaryPreferences: Array.isArray(state.dietaryPreferences) ? [...state.dietaryPreferences] : [],
+          customTags: Array.isArray(state.customTags) ? [...state.customTags] : [],
+          updatedAt: state.dietaryUpdatedAt || new Date().toISOString()
+        };
+        mealPlansPayload.push({
+          id: '__user_prefs__',
+          user_id: state.cloudUser.id,
+          plan_date: '__user_prefs__',
+          day_name: 'Preferencias de Usuario',
+          breakfast_recipe_id: null,
+          lunch_recipe_id: null,
+          snack_recipe_id: null,
+          dinner_recipe_id: null,
+          custom_slots: [userPrefSlotPayload, userCookbooksSlotPayload],
+          updated_at: userCookbooksUpdatedAt
         });
       }
 
@@ -7410,6 +7507,7 @@ class FoodAssistantApp {
             nutrition_goals: state.settings?.nutritionGoals || null,
             gemini_api_key: state.settings?.geminiApiKey || '',
             cookbooks: state.cookbooks || [],
+            cookbooks_updated_at: state.cookbooksUpdatedAt || new Date().toISOString(),
             dietary_updated_at: state.dietaryUpdatedAt || new Date().toISOString()
           };
           await this.supabaseClient.auth.updateUser({ data: metaPayload });
@@ -9881,6 +9979,9 @@ class FoodAssistantApp {
         this.closeCookbookModal();
         this.renderCookbooksStrip();
         this.applyRecipeFilters();
+        if (typeof this.broadcastRealtimeChange === 'function') {
+          this.broadcastRealtimeChange('cookbooks_change', { cookbooks: state.cookbooks });
+        }
         this.scheduleSyncWithCloud();
       }
 
@@ -9918,6 +10019,9 @@ class FoodAssistantApp {
         this.applyRecipeFilters();
         const msg = window.I18n ? window.I18n.t('cookbooks.bookDeleted') : 'Libro eliminado.';
         this.showToast(msg, 'info');
+        if (typeof this.broadcastRealtimeChange === 'function') {
+          this.broadcastRealtimeChange('cookbooks_change', { cookbooks: state.cookbooks });
+        }
         this.scheduleSyncWithCloud();
       }
 
@@ -19033,6 +19137,9 @@ REGLAS CRÍTICAS:
           })
           .on('broadcast', { event: 'planner_change' }, (msg) => {
             this.handleRealtimePlannerBroadcast(msg?.payload);
+          })
+          .on('broadcast', { event: 'cookbooks_change' }, (msg) => {
+            this.handleRealtimeCookbooksBroadcast(msg?.payload);
           });
 
         // 2. CDC fallback (postgres_changes)
@@ -19239,6 +19346,21 @@ REGLAS CRÍTICAS:
       this._householdRealtimeDebounce = null;
       await this.pullFromCloud();
     }, 500);
+  }
+
+  handleRealtimeCookbooksBroadcast(payload) {
+    if (!payload || !Array.isArray(payload.cookbooks)) return;
+    if (payload.clientId && this.clientId && payload.clientId === this.clientId) {
+      return;
+    }
+    const remoteCookbooks = payload.cookbooks;
+    if (JSON.stringify(state.cookbooks || []) !== JSON.stringify(remoteCookbooks)) {
+      state.cookbooks = remoteCookbooks.map(cb => ({ ...cb }));
+      state.saveCookbooks(state.cookbooks);
+      this.renderCookbooksShelf();
+      this.renderCookbooksStrip();
+      this.applyRecipeFilters();
+    }
   }
 
   handleHouseholdRealtimeEvent(payload) {
