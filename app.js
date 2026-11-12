@@ -4841,7 +4841,7 @@ function parseRecipeOrigins(rawOrigin, knownRecipes = []) {
 
 if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
-  window.APP_VERSION = 'v1.87';
+  window.APP_VERSION = 'v1.88';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4888,7 +4888,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.87';
+    this.appVersion = window.APP_VERSION || 'v1.88';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -5057,16 +5057,16 @@ class FoodAssistantApp {
         changed = true;
       }
 
-      // 2. Añadir automáticamente todas las etiquetas inferidas que falten
-      const currentLower = new Set(r.tags.map(t => String(t).toLowerCase().trim()));
-      inferred.forEach(tag => {
-        const lower = tag.toLowerCase().trim();
-        if (!currentLower.has(lower) && lower !== 'general') {
-          r.tags.push(tag);
-          currentLower.add(lower);
-          changed = true;
-        }
-      });
+      // 2. Añadir automáticamente etiquetas inferidas SOLO si la receta no tiene etiquetas aún y no han sido fijadas explícitamente
+      if (r.tags.length === 0 && !r.isExplicitTags) {
+        inferred.forEach(tag => {
+          const lower = tag.toLowerCase().trim();
+          if (lower !== 'general') {
+            r.tags.push(tag);
+            changed = true;
+          }
+        });
+      }
     });
 
     if (changed) {
@@ -11850,24 +11850,16 @@ class FoodAssistantApp {
           sourceUrl: baseRecipe.sourceUrl || updatedRecipe.sourceUrl || '',
           sourceDomain: baseRecipe.sourceDomain || updatedRecipe.sourceDomain || '',
           createdAt: baseRecipe.createdAt || baseRecipe.updatedAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
+          isExplicitTags: true
         };
 
         if (ingredients.length > 0 && typeof analyzeAndInferRecipeTags === 'function') {
           const inferred = analyzeAndInferRecipeTags(finalRecipe);
-          if (finalRecipe.tags.includes('Alta en Proteínas') && !inferred.includes('Alta en Proteínas')) {
+          if (finalRecipe.tags.includes('Alta en Proteínas') && !inferred.includes('Alta en Proteínas') && !finalRecipe.isExplicitNutrition) {
             finalRecipe.tags = finalRecipe.tags.filter(t => t !== 'Alta en Proteínas');
           }
-          const existingLower = new Set(finalRecipe.tags.map(t => String(t).toLowerCase().trim()));
-          inferred.forEach(tag => {
-            const lower = tag.toLowerCase().trim();
-            if (!existingLower.has(lower) && lower !== 'general') {
-              finalRecipe.tags.push(tag);
-              existingLower.add(lower);
-              state.addCustomTag && state.addCustomTag(tag);
-            }
-          });
-    }
+        }
 
     if (existingIdx >= 0) {
       state.recipes[existingIdx] = finalRecipe;
@@ -15614,11 +15606,11 @@ ${isEn
         }
       }
 
-      prevDinnerId = dinnerId;
-
       // Deduplicación almuerzo vs cena en el mismo día
       const safeDinnerPool = dinnerList.filter(r => r.id !== lunchId);
       const safeDinnerId = safeDinnerPool.length > 0 ? pick(safeDinnerPool, 0) : dinnerId;
+
+      prevDinnerId = safeDinnerId;
 
       const isWeekendDay = String(wDay.dayName || '').toLowerCase().includes('sáb') ||
         String(wDay.dayName || '').toLowerCase().includes('sab') ||

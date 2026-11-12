@@ -233,6 +233,31 @@ describe('US-02: Filtros Dietéticos, Selector de Chips & Advertencias Nutricion
       expect(created).toBeDefined();
       expect(created.tags).toEqual(['Keto', 'Rápida']);
     });
+
+    it('BUG-TAGS: saveRecipeEdit respeta las etiquetas elegidas y no vuelve a inyectar etiquetas inferidas eliminadas (ej. Desayuno en tostadas)', () => {
+      const toastRecipe = {
+        id: 'rec-tostada-test',
+        title: 'Tostada con aguacate y jamón',
+        tags: ['Desayuno', 'Cena'],
+        ingredients: [{ name: 'Pan', amount: 1, unit: 'rebanada' }],
+        instructions: [{ step: 1, text: 'Tostar y servir' }]
+      };
+      state.recipes.push(toastRecipe);
+
+      app.openEditRecipeModal('rec-tostada-test');
+      // El usuario quita 'Desayuno' y deja solo 'Cena'
+      app.editorSelectedTags = new Set(['Cena']);
+      app.saveRecipeEdit();
+
+      const saved = state.recipes.find(r => r.id === 'rec-tostada-test');
+      expect(saved.tags).toContain('Cena');
+      expect(saved.tags).not.toContain('Desayuno');
+      expect(saved.isExplicitTags).toBe(true);
+
+      // Comprobar que sanitizeRecipeProteinTags posterior tampoco la resucita
+      app.sanitizeRecipeProteinTags();
+      expect(saved.tags).not.toContain('Desayuno');
+    });
   });
 
   describe('4. Filtro Múltiple Combinado con Buscador en Catálogo', () => {
