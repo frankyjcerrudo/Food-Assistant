@@ -4893,7 +4893,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v1.97';
+  window.APP_VERSION = 'v1.98';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4940,7 +4940,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.97';
+    this.appVersion = window.APP_VERSION || 'v1.98';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -15642,7 +15642,12 @@ ${isEn
     const btnLogin = document.getElementById('btn-plan-login');
     const isPro = plan.plan === 'pro';
     const fmtDate = (iso) => {
-      try { return new Date(iso).toLocaleDateString(); } catch (e) { return ''; }
+      try {
+        const locale = window.I18n?.resolvedLang === 'en' ? 'en-GB' : 'es-ES';
+        return new Date(iso).toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' });
+      } catch (e) {
+        return '';
+      }
     };
 
     let badgeText = this.tr('plan.free', undefined, 'Free');
@@ -15715,6 +15720,19 @@ ${isEn
     if (btnUpgrade) btnUpgrade.style.display = loggedIn && !isPro ? '' : 'none';
     if (btnManage) btnManage.style.display = loggedIn && isPro && plan.source === 'play' ? '' : 'none';
     if (btnLogin) btnLogin.style.display = loggedIn ? 'none' : '';
+
+    const headerPlanBadge = document.getElementById('header-plan-badge');
+    if (headerPlanBadge) {
+      if (loggedIn) {
+        headerPlanBadge.textContent = isPro ? 'PRO' : 'FREE';
+        headerPlanBadge.classList.toggle('is-pro', isPro);
+        headerPlanBadge.removeAttribute('hidden');
+      } else {
+        headerPlanBadge.textContent = '';
+        headerPlanBadge.classList.remove('is-pro');
+        headerPlanBadge.setAttribute('hidden', '');
+      }
+    }
   }
 
   renderAiQuotaHints() {

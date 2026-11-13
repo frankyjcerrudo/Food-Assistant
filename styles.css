@@ -10019,3 +10019,5 @@ body.is-mobile-device .app-container {
 .paywall-option { width: 100%; display: flex; justify-content: space-between; align-items: center; }
 .paywall-save { font-size: 11px; font-weight: 600; }
 .paywall-trial, .paywall-web-notice { font-size: 12px; color: var(--m3-on-surface-variant); text-align: center; margin: 10px 0 0; }
+.user-plan-badge { display: inline-flex; align-items: center; padding: 1px 6px; border-radius: var(--radius-full); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; background: var(--m3-surface-variant); color: var(--m3-on-surface-variant); line-height: 1.4; }
+.user-plan-badge.is-pro { background: var(--m3-primary); color: var(--m3-on-primary, #fff); }

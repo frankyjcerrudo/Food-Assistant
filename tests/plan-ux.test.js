@@ -21,6 +21,7 @@ const mkPlan = (over = {}) => ({
 });
 
 const DOM = `
+  <span id="header-plan-badge" hidden></span>
   <div id="card-plan">
     <span id="plan-badge"></span>
     <p id="plan-detail"></p>
@@ -147,6 +148,20 @@ describe('US-79d: Experiencia Free / Pro', () => {
       state.aiPlan = mkPlan({ plan: 'pro', source: 'admin' });
       app.renderPlanCard();
       expect(document.getElementById('plan-badge').textContent).toMatch(/Regalo|Gift/);
+      expect(document.getElementById('header-plan-badge').textContent).toBe('PRO');
+      expect(document.getElementById('header-plan-badge').hasAttribute('hidden')).toBe(false);
+    });
+
+    it('header-plan-badge muestra FREE en cuenta free y se oculta si es anónimo', () => {
+      state.aiPlan = mkPlan({ plan: 'free' });
+      app.renderPlanCard();
+      expect(document.getElementById('header-plan-badge').textContent).toBe('FREE');
+      expect(document.getElementById('header-plan-badge').hasAttribute('hidden')).toBe(false);
+
+      state.cloudUser = null;
+      state.aiPlan = mkPlan({ plan: 'anonymous' });
+      app.renderPlanCard();
+      expect(document.getElementById('header-plan-badge').hasAttribute('hidden')).toBe(true);
     });
   });
 
