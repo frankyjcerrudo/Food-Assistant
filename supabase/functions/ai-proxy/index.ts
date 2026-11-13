@@ -2,6 +2,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
   extractUsage,
+  mapQuotaResult,
   MAX_PAYLOAD_BYTES,
   resolveModelChain,
   sanitizePayload,
@@ -71,17 +72,30 @@ Deno.serve(async (req: Request) => {
     return json({ ok: false, code: 'UPSTREAM_ERROR', message: 'Missing Gemini API key on server' }, 502);
   }
 
-  // Provisional en US-79a; en US-79c se sustituye por la RPC de cuotas
-  const plan = 'pro';
   const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-  let usageId: number | null = null;
-  const { data: insertedUsage } = await adminClient
-    .from('ai_usage')
-    .insert({ user_id: user.id, feature: body.feature, status: 'pending' })
-    .select('id')
-    .single();
-  if (insertedUsage?.id) usageId = insertedUsage.id;
+  const { data: quotaRpc, error: quotaErr } = await adminClient.rpc('consume_ai_quota', {
+    p_user: user.id,
+    p_feature: body.feature
+  });
+  if (quotaErr) {
+    return json({ ok: false, code: 'QUOTA_CHECK_ERROR', message: quotaErr.message }, 502);
+  }
+  const mappedQuota = mapQuotaResult(quotaRpc);
+  if (mappedQuota) {
+    return json(mappedQuota.body, mappedQuota.status);
+  }
+
+  const plan = quotaRpc.plan === 'pro' ? 'pro' : 'free';
+  const usageId: number | null = quotaRpc.usage_id ?? null;
+  const quotaInfo = {
+    feature: quotaRpc.feature ?? body.feature,
+    used: quotaRpc.used ?? null,
+    limit: quotaRpc.limit ?? null,
+    remaining: quotaRpc.remaining ?? null,
+    period: quotaRpc.period ?? null,
+    plan
+  };
 
   const cleanPayload = sanitizePayload(body.payload);
   const models = resolveModelChain(plan);
@@ -134,7 +148,7 @@ Deno.serve(async (req: Request) => {
         ok: true,
         model,
         data: geminiData,
-        quota: null
+        quota: quotaInfo
       });
     } catch (err: any) {
       lastError = err?.name === 'AbortError' ? `Timeout on ${model}` : (err?.message || 'Fetch error');

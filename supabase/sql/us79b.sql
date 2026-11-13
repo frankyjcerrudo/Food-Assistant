@@ -7,3 +7,4 @@ alter table public.user_settings drop column if exists agent_enabled;
 alter table public.user_settings drop column if exists gemini_api_key;
 
 notify pgrst, 'reload schema';
+

@@ -512,6 +512,9 @@
         syncedMemberSingle: 'miembro sincronizado',
         syncedMemberPlural: 'miembros sincronizados'
       },
+      paywall: {
+        familyPro: 'Modo Familia es una función Sabory Pro. Mejora tu plan para crear o unirte a un Hogar.'
+      },
       shopping: {
         title: 'Lista de la Compra',
         byAisles: 'Por Pasillos',
@@ -1187,6 +1190,9 @@
         you: '(You)',
         syncedMemberSingle: 'synced member',
         syncedMemberPlural: 'synced members'
+      },
+      paywall: {
+        familyPro: 'Family Mode is a Sabory Pro feature. Upgrade to create or join a Household.'
       },
       shopping: {
         title: 'Shopping List',

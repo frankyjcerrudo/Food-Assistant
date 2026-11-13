@@ -71,6 +71,16 @@ describe('US-77: Modo Familia / Espacio Colaborativo del Hogar (Family Mode)', (
       email: 'franky@sabory.food',
       name: 'Franky'
     };
+    state.aiPlan = {
+      plan: 'pro',
+      source: 'admin',
+      status: 'active',
+      periodEnd: null,
+      isTrial: false,
+      viaHousehold: false,
+      quotas: {},
+      fetchedAt: null
+    };
     state.saveHousehold(null);
     state.personalBackup = null;
     state.lastSyncedAt = null;

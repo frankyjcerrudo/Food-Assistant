@@ -2522,6 +2522,16 @@ class StateStore {
     this.customTags = this.load('fa_custom_tags', []);
     this.theme = localStorage.getItem('fa_theme_mode') || 'light';
     this.cloudUser = this.load('fa_cloud_user', null);
+    this.aiPlan = this.load('fa_ai_plan', null) || {
+      plan: this.cloudUser?.id ? 'free' : 'anonymous',
+      source: 'none',
+      status: null,
+      periodEnd: null,
+      isTrial: false,
+      viaHousehold: false,
+      quotas: {},
+      fetchedAt: null
+    };
     this.household = this.load('fa_household', null);
     const legacyHouseholdKey = 'shared' + 'GeminiApiKey';
     if (this.household && Object.prototype.hasOwnProperty.call(this.household, legacyHouseholdKey)) {
@@ -4883,7 +4893,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v1.95';
+  window.APP_VERSION = 'v1.96';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4930,7 +4940,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.95';
+    this.appVersion = window.APP_VERSION || 'v1.96';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -5852,6 +5862,7 @@ class FoodAssistantApp {
             state.save('fa_cloud_user', state.cloudUser);
             this.updateUserAccountUI();
             // US-35: Descarga y sincronización automática al abrir la app con sesión activa
+            this.loadAiPlanStatus();
             this.syncDataWithCloud(true);
             this.initHouseholdRealtimeSubscription();
             this.processPendingHouseholdJoin();
@@ -5870,6 +5881,7 @@ class FoodAssistantApp {
             };
             state.save('fa_cloud_user', state.cloudUser);
             this.updateUserAccountUI();
+            this.loadAiPlanStatus();
             this.syncDataWithCloud(true);
             this.initHouseholdRealtimeSubscription();
             this.processPendingHouseholdJoin();
@@ -5887,6 +5899,17 @@ class FoodAssistantApp {
           } else if (event === 'SIGNED_OUT') {
             state.cloudUser = null;
             state.save('fa_cloud_user', null);
+            state.aiPlan = {
+              plan: 'anonymous',
+              source: 'none',
+              status: null,
+              periodEnd: null,
+              isTrial: false,
+              viaHousehold: false,
+              quotas: {},
+              fetchedAt: null
+            };
+            state.save('fa_ai_plan', null);
             this.updateUserAccountUI();
           }
         });
@@ -5918,6 +5941,7 @@ class FoodAssistantApp {
             const nowMs = Date.now();
             if (!this._lastVisibilitySyncAt || nowMs - this._lastVisibilitySyncAt > 2000) {
               this._lastVisibilitySyncAt = nowMs;
+              this.loadAiPlanStatus();
               this.syncDataWithCloud(true);
             }
           }
@@ -15490,6 +15514,55 @@ ${isEn
     return (await this.supabaseClient?.auth?.getSession())?.data?.session?.access_token || null;
   }
 
+  isPro() {
+    return state.aiPlan?.plan === 'pro';
+  }
+
+  openPaywall(reason = 'pro') {
+    const msg = reason === 'family'
+      ? (window.I18n ? window.I18n.t('paywall.familyPro') : 'Modo Familia es una función Sabory Pro. Mejora tu plan para compartir hogar.')
+      : (window.I18n ? window.I18n.t('paywall.familyPro') : 'Esta función requiere Sabory Pro.');
+    this.showToast(msg, 'info');
+    return { reason, shown: true };
+  }
+
+  async loadAiPlanStatus() {
+    if (!this.supabaseClient?.rpc || !state.cloudUser?.id) {
+      state.aiPlan = {
+        plan: 'anonymous',
+        source: 'none',
+        status: null,
+        periodEnd: null,
+        isTrial: false,
+        viaHousehold: false,
+        quotas: {},
+        fetchedAt: null
+      };
+      return state.aiPlan;
+    }
+    try {
+      const { data, error } = await this.supabaseClient.rpc('get_ai_quota_status');
+      if (error || !data) {
+        return state.aiPlan;
+      }
+      state.aiPlan = {
+        plan: data.plan || 'free',
+        source: data.source || 'none',
+        status: data.status || null,
+        periodEnd: data.period_end || null,
+        isTrial: Boolean(data.is_trial),
+        viaHousehold: Boolean(data.via_household),
+        quotas: data.quotas && typeof data.quotas === 'object' ? data.quotas : {},
+        fetchedAt: new Date().toISOString()
+      };
+      state.save('fa_ai_plan', state.aiPlan);
+      return state.aiPlan;
+    } catch (err) {
+      console.warn('[AI Plan] Error al cargar estado del plan:', err);
+      return state.aiPlan;
+    }
+  }
+
   async invokeAiProxy(feature, payload) {
     if (!state.cloudUser) {
       return { ok: false, code: 'AUTH_REQUIRED' };
@@ -15525,6 +15598,23 @@ ${isEn
       });
       clearTimeout(timeoutId);
       const json = await response.json().catch(() => ({}));
+      if (json?.quota && state.aiPlan) {
+        if (!state.aiPlan.quotas || typeof state.aiPlan.quotas !== 'object') {
+          state.aiPlan.quotas = {};
+        }
+        const qKey = json.quota.feature || feature;
+        state.aiPlan.quotas[qKey] = {
+          used: json.quota.used ?? null,
+          limit: json.quota.limit ?? null,
+          remaining: json.quota.remaining ?? null,
+          period: json.quota.period ?? null
+        };
+        if (json.quota.plan) {
+          state.aiPlan.plan = json.quota.plan;
+        }
+        state.aiPlan.fetchedAt = new Date().toISOString();
+        state.save('fa_ai_plan', state.aiPlan);
+      }
       return {
         ...json,
         ok: response.ok && json.ok !== false,
@@ -18398,6 +18488,11 @@ REGLAS CRÍTICAS:
       return { success: false, reason: 'auth_required' };
     }
 
+    if (!this.isPro()) {
+      this.openPaywall('family');
+      return { success: false, reason: 'pro_required' };
+    }
+
     const householdId = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
       ? crypto.randomUUID()
       : generateId('hh-');
@@ -18437,6 +18532,10 @@ REGLAS CRÍTICAS:
         }
       } catch (err) {
         console.warn('[Household] Error al crear hogar en Supabase:', err);
+        if (err?.code === '42501') {
+          this.openPaywall('family');
+          return { success: false, reason: 'pro_required', error: err };
+        }
         this.showToast('Error al crear el hogar en la nube: ' + (err.message || 'Fallo de red'), 'error');
         return { success: false, reason: 'cloud_error', error: err };
       }
@@ -18496,6 +18595,7 @@ REGLAS CRÍTICAS:
     this.render();
     this.initHouseholdRealtimeSubscription();
     await this.pushToCloud(true);
+    this.loadAiPlanStatus();
 
     this.showToast(`¡Hogar "${cleanName}" creado! Código de invitación: ${inviteCode}`, 'success');
     return { success: true, household: newHousehold };
@@ -18530,6 +18630,11 @@ REGLAS CRÍTICAS:
       return { success: false, reason: 'no_supabase' };
     }
 
+    if (!this.isPro()) {
+      this.openPaywall('family');
+      return { success: false, reason: 'pro_required' };
+    }
+
     try {
       const hhQuery = this.supabaseClient.from('households').select('*').eq('invite_code', cleanCode);
       const hhRes = typeof hhQuery.maybeSingle === 'function'
@@ -18562,7 +18667,7 @@ REGLAS CRÍTICAS:
       const myRole = remoteHousehold.owner_id === state.cloudUser.id ? 'owner' : 'member';
       const myDisplayName = state.cloudUser.name || (state.cloudUser.email ? state.cloudUser.email.split('@')[0] : 'Miembro');
 
-      await this.supabaseClient.from('household_members').upsert({
+      const memUpsertRes = await this.supabaseClient.from('household_members').upsert({
         household_id: remoteHousehold.id,
         user_id: state.cloudUser.id,
         role: myRole,
@@ -18570,6 +18675,9 @@ REGLAS CRÍTICAS:
         email: state.cloudUser.email || '',
         joined_at: nowIso
       }, { onConflict: 'household_id,user_id' });
+      if (memUpsertRes?.error) {
+        throw memUpsertRes.error;
+      }
 
       let membersList = [
         {
@@ -18631,10 +18739,15 @@ REGLAS CRÍTICAS:
       this.renderHouseholdSettings();
       this.renderDietaryPreferencesSettings();
       this.render();
+      this.loadAiPlanStatus();
       this.showToast(`¡Te has unido a "${joinedHousehold.name}"! Menú, recetas y compra sincronizados.`, 'success');
       return { success: true, household: joinedHousehold };
     } catch (err) {
       console.warn('[Household] Error al unirse al hogar:', err);
+      if (err?.code === '42501') {
+        this.openPaywall('family');
+        return { success: false, reason: 'pro_required', error: err };
+      }
       this.showToast('Error al unirse al hogar: ' + (err.message || 'Fallo de conexión'), 'error');
       return { success: false, reason: 'cloud_error', error: err };
     }
@@ -18847,6 +18960,7 @@ REGLAS CRÍTICAS:
 
     this.renderHouseholdSettings();
     this.render();
+    this.loadAiPlanStatus();
     this.showToast(`Has salido de "${hh.name}". Estás de nuevo en tu Modo Personal.`, 'info');
     return { success: true };
   }

@@ -53,3 +53,31 @@ export function extractUsage(geminiData) {
 export function timeoutForModel(model) {
   return model === 'gemini-3.8-flash' ? 16000 : 20000;
 }
+
+const QUOTA_ERROR_STATUS = {
+  PRO_REQUIRED: 403,
+  QUOTA_EXCEEDED: 402,
+  RATE_LIMITED: 429,
+  INVALID_FEATURE: 400
+};
+
+export function mapQuotaResult(rpc) {
+  if (rpc?.allowed) return null;
+  const code = rpc?.code || 'QUOTA_ERROR';
+  const status = QUOTA_ERROR_STATUS[code] ?? 400;
+  return {
+    status,
+    body: {
+      ok: false,
+      code,
+      quota: {
+        feature: rpc?.feature ?? null,
+        used: rpc?.used ?? null,
+        limit: rpc?.limit ?? null,
+        remaining: rpc?.remaining ?? null,
+        period: rpc?.period ?? null,
+        plan: rpc?.plan ?? 'free'
+      }
+    }
+  };
+}
