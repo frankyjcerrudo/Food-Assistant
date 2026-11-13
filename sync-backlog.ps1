@@ -152,7 +152,7 @@ foreach ($line in $lines) {
     }
 
     # User Story
-    if (-not $inBugSection -and $line -match '^\s*\|\s*\*\*?(US-\d+)\*\*?\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*`?(.*?)`?\s*\|\s*(.*?)\s*\|$') {
+    if (-not $inBugSection -and $line -match '^\s*\|\s*\*\*?(US-\d+[a-zA-Z]*)\*\*?\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*`?(.*?)`?\s*\|\s*(.*?)\s*\|$') {
         $id = $matches[1].Trim()
         $title = $matches[2].Trim()
         $prioRaw = $matches[3].Trim()
@@ -217,7 +217,7 @@ $dodFormatted
     }
 
     # Bug
-    if ($inBugSection -and $line -match '^\s*\|\s*\*\*?(BUG-\d+)\*\*?\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*`?(.*?)`?\s*\|\s*(.*?)\s*\|$') {
+    if ($inBugSection -and $line -match '^\s*\|\s*\*\*?(BUG-\d+[a-zA-Z]*)\*\*?\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*`?(.*?)`?\s*\|\s*(.*?)\s*\|$') {
         $id = $matches[1].Trim()
         $desc = $matches[2].Trim()
         $sevRaw = $matches[3].Trim()
@@ -279,7 +279,7 @@ while ($true) {
     $batch = Invoke-RestMethod -Uri $url -Headers $headersRest
     if (-not $batch -or $batch.Count -eq 0) { break }
     foreach ($iss in $batch) {
-        if ($iss.title -match '\b(US-\d+|BUG-\d+)\b') {
+        if ($iss.title -match '\b(US-\d+[a-zA-Z]*|BUG-\d+[a-zA-Z]*)\b') {
             $existingMap[$matches[1]] = $iss
         }
     }
