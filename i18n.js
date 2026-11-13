@@ -514,7 +514,9 @@
         speaking: 'Sous Chef hablando...',
         clickToStopVoice: 'Haz clic para detener la voz del Sous Chef',
         assistantThinking: 'El Sous Chef está pensando...',
-        consultingAssistant: 'Consultando al Sous Chef...'
+        consultingAssistant: 'Consultando al Sous Chef...',
+        loginRequired: 'Inicia sesión para usar el Sous Chef',
+        quotaExceeded: 'Has alcanzado tu límite de IA'
       },
       household: {
         personalMode: 'Modo Personal',
@@ -1211,7 +1213,9 @@
         speaking: 'Sous Chef speaking...',
         clickToStopVoice: 'Click to stop Sous Chef voice',
         assistantThinking: 'Sous Chef is thinking...',
-        consultingAssistant: 'Consulting Sous Chef...'
+        consultingAssistant: 'Consulting Sous Chef...',
+        loginRequired: 'Sign in to use the Sous Chef',
+        quotaExceeded: "You've reached your AI limit"
       },
       household: {
         personalMode: 'Personal Mode',

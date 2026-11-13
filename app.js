@@ -4879,7 +4879,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v1.93';
+  window.APP_VERSION = 'v1.94';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4926,7 +4926,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.93';
+    this.appVersion = window.APP_VERSION || 'v1.94';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -8339,7 +8339,7 @@ class FoodAssistantApp {
         const input = document.getElementById('gemini-invoke-input');
         if (input && chip.dataset.prompt) {
           input.value = chip.dataset.prompt;
-          this.handleGeminiInvokeSubmit();
+          this.handleGeminiInvokeSubmit(false, { feature: 'guided_query' });
         }
       });
     });
@@ -10425,14 +10425,14 @@ class FoodAssistantApp {
         if (legacyAiPanel && legacyInput) {
           this.switchView('view-ai');
           legacyInput.value = promptText;
-          this.handleAiChatSubmit();
+          this.handleAiChatSubmit(false, { feature: 'guided_query' });
           return;
         }
         this.openGeminiInvokeModal(false);
         const invokeInput = document.getElementById('gemini-invoke-input');
         if (invokeInput) {
           invokeInput.value = promptText;
-          this.handleGeminiInvokeSubmit();
+          this.handleGeminiInvokeSubmit(false, { feature: 'guided_query' });
         }
       }
 
@@ -15567,32 +15567,70 @@ ${isEn
     return '';
   }
 
-  async callGeminiAgent(prompt, systemInstruction = "", enableTools = true) {
-    const provider = state.settings?.aiProvider || 'gemini';
-    if (provider === 'openai') {
-      return this.callOpenAiAgent(prompt, systemInstruction, enableTools);
+  getAiProxyEndpoint() {
+    const rawUrl = (typeof APP_CONFIG !== 'undefined' && APP_CONFIG?.supabaseUrl)
+      || (typeof window !== 'undefined' && window.APP_CONFIG?.supabaseUrl)
+      || (typeof localStorage !== 'undefined' ? localStorage.getItem('fa_sb_url') : '')
+      || '';
+    const base = String(rawUrl).trim().replace(/\/+$/, '');
+    return base ? `${base}/functions/v1/ai-proxy` : '';
+  }
+
+  async getAiAuthToken() {
+    return (await this.supabaseClient?.auth?.getSession())?.data?.session?.access_token || null;
+  }
+
+  async invokeAiProxy(feature, payload) {
+    if (!state.cloudUser) {
+      return { ok: false, code: 'AUTH_REQUIRED' };
     }
-    if (provider === 'claude') {
-      return this.callClaudeAgent(prompt, systemInstruction, enableTools);
+    const token = await this.getAiAuthToken();
+    if (!token) {
+      return { ok: false, code: 'AUTH_REQUIRED' };
+    }
+    const endpoint = this.getAiProxyEndpoint();
+    if (!endpoint) {
+      return { ok: false, code: 'NETWORK_ERROR', message: 'Missing Supabase endpoint' };
     }
 
-    const apiKey = this.getEffectiveGeminiApiKey();
-    if (!apiKey) {
-      return this.simulateGeminiAgentResponse(prompt);
+    const anonKey = (typeof APP_CONFIG !== 'undefined' && APP_CONFIG?.supabaseAnonKey)
+      || (typeof window !== 'undefined' && window.APP_CONFIG?.supabaseAnonKey)
+      || '';
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    };
+    if (anonKey) {
+      headers['apikey'] = anonKey;
     }
 
-    let rawModel = state.settings.geminiModel || 'gemini-3.8-flash';
-    if (rawModel === 'gemini-2.5-flash-lite' || rawModel === 'gemini-1.5-flash') {
-      rawModel = 'gemini-3.8-flash';
-      state.settings.geminiModel = 'gemini-3.8-flash';
-      state.save && state.save('fa_settings', state.settings);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ feature, payload }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      const json = await response.json().catch(() => ({}));
+      return {
+        ...json,
+        ok: response.ok && json.ok !== false,
+        status: response.status
+      };
+    } catch (err) {
+      clearTimeout(timeoutId);
+      return {
+        ok: false,
+        code: 'NETWORK_ERROR',
+        message: err?.name === 'AbortError' ? 'Tiempo de espera agotado' : (err?.message || 'Error de red')
+      };
     }
-    // Secuencia multi-modelo: Probar el modelo configurado (o 3.8 Flash) y ante cualquier problema
-    // (timeout, cuota 429, o alta demanda 503) conmutar inmediatamente a 3.5 Flash-Lite en la misma llamada
-    const candidateModels = (rawModel === 'gemini-3.5-flash-lite')
-      ? ['gemini-3.5-flash-lite', 'gemini-3.8-flash']
-      : [rawModel, 'gemini-3.5-flash-lite'];
+  }
 
+  async callGeminiAgent(prompt, systemInstruction = "", enableTools = true, options = {}) {
     const historyTurns = Array.isArray(this.aiChatHistory)
       ? this.aiChatHistory.slice(-6).map(m => ({
         role: m.role === 'model' ? 'model' : 'user',
@@ -15621,81 +15659,48 @@ ${isEn
       };
     }
 
-    let lastErrMsg = "Error al conectar con Gemini API";
-    let data = null;
+    const feature = options?.feature || 'chat';
+    const res = await this.invokeAiProxy(feature, payload);
 
-    for (let i = 0; i < candidateModels.length; i++) {
-      const model = candidateModels[i];
-      // US-39: La clave nunca va en la URL (?key=), se envía en la cabecera x-goog-api-key
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-
-      const controller = new AbortController();
-      const timeoutMs = (model === 'gemini-3.8-flash') ? 16000 : 20000;
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-      let response;
-
-      try {
-        response = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": apiKey
-          },
-          body: JSON.stringify(payload),
-          signal: controller.signal
-        });
-      } catch (fetchErr) {
-        clearTimeout(timeoutId);
-        lastErrMsg = fetchErr.name === 'AbortError' ? `Tiempo de espera agotado en modelo ${model}` : fetchErr.message;
-        console.warn(`[FoodAssistant] Fallo de conexión o timeout con ${model}: ${lastErrMsg}. Conmutando a siguiente modelo...`);
-        continue;
-      }
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        data = await response.json();
-        break;
-      }
-
-      let errMsg = "Error al conectar con Gemini API";
-      try {
-        const err = await response.json();
-        errMsg = err.error?.message || errMsg;
-      } catch (e) { }
-      lastErrMsg = errMsg;
-
-      console.warn(`[FoodAssistant] Error devuelto por ${model} (${response.status}): ${errMsg}. Conmutando a siguiente modelo...`);
-
-      if (model === 'gemini-2.5-flash' && (/not available.*(new users|new projects)|not supported for new|permission denied|deprecated|not found/i.test(errMsg) || response.status === 404)) {
-        state.settings.geminiModel = 'gemini-3.5-flash-lite';
-        state.save && state.save('fa_settings', state.settings);
-      }
-
-      // Si es un error de clave inválida (400/401/403 API key not valid), no reintentar con otros modelos
-      if (/api key not valid|invalid api key/i.test(errMsg)) {
-        break;
-      }
-
-      // Pequeña pausa de alivio ante 429/503
-      if (response.status === 429 || response.status === 503) {
-        await new Promise(res => setTimeout(res, 300));
-      }
+    if (res.code === 'AUTH_REQUIRED') {
+      const text = window.I18n ? window.I18n.t('ai.loginRequired') : 'Inicia sesión para usar el Sous Chef';
+      return { text, requiresLogin: true, toolCalls: [], functionCalls: [] };
     }
 
-    if (!data) {
-      const isDemandOrTimeoutOrQuota = /quota|exceeded|rate limit|429|resource exhausted|high demand|overloaded|try again later|503|tiempo de espera|timeout|abort|network|fetch/i.test(lastErrMsg);
-      if (isDemandOrTimeoutOrQuota) {
-        console.warn(`[FoodAssistant] Gemini saturado o cuota superada (${lastErrMsg}). Activando motor inteligente local.`);
+    if (res.status === 402 || res.status === 403 || res.status === 429) {
+      const text = window.I18n ? window.I18n.t('ai.quotaExceeded') : 'Has alcanzado tu límite de IA';
+      if (res.quota !== undefined && res.quota !== null) {
+        this.lastAiQuota = res.quota;
+      }
+      return {
+        text,
+        quotaExceeded: true,
+        code: res.code,
+        quota: res.quota ?? null,
+        toolCalls: [],
+        functionCalls: []
+      };
+    }
+
+    if (!res.ok) {
+      const originalError = res.message || res.code || 'Error al conectar con AI Proxy';
+      if (res.code === 'UPSTREAM_ERROR' || res.code === 'NETWORK_ERROR' || (res.status >= 500)) {
+        console.warn(`[FoodAssistant] AI Proxy no disponible (${originalError}). Activando motor inteligente local.`);
         const sim = this.simulateGeminiAgentResponse(prompt);
         return {
           ...sim,
           isSimulatedFallback: true,
-          originalError: lastErrMsg
+          originalError
         };
       }
-      throw new Error(lastErrMsg);
+      throw new Error(originalError);
     }
 
+    if (res.quota !== undefined && res.quota !== null) {
+      this.lastAiQuota = res.quota;
+    }
+
+    const data = res.data || {};
     const parts = data.candidates?.[0]?.content?.parts || [];
     const textParts = [];
     const toolCalls = [];
@@ -15719,8 +15724,8 @@ ${isEn
     };
   }
 
-  async callGeminiApi(prompt, systemInstruction = "") {
-    const res = await this.callGeminiAgent(prompt, systemInstruction, false);
+  async callGeminiApi(prompt, systemInstruction = "", options = {}) {
+    const res = await this.callGeminiAgent(prompt, systemInstruction, false, options);
     return res.text || "";
   }
 
@@ -16803,7 +16808,7 @@ ${isEn
     return results;
   }
 
-  async handleAiChatSubmit(fromVoice = false) {
+  async handleAiChatSubmit(fromVoice = false, options = {}) {
     this.stopSpeech();
     const input = document.getElementById('ai-chat-input');
     const text = input?.value.trim() || '';
@@ -16829,8 +16834,14 @@ ${isEn
     history.scrollTop = history.scrollHeight;
 
     try {
+      const feature = options?.feature || (fromVoice ? 'voice' : 'chat');
       const systemPrompt = this.buildAiSystemInstruction(text);
-      const agentResult = await this.callGeminiAgent(text, systemPrompt, true);
+      const agentResult = await this.callGeminiAgent(text, systemPrompt, true, { feature });
+      if (agentResult?.requiresLogin) {
+        aiBubble.textContent = agentResult.text || (window.I18n ? window.I18n.t('ai.loginRequired') : 'Inicia sesión para usar el Sous Chef');
+        this.openAuthModal?.();
+        return;
+      }
       const isSingleDay = this.isSingleDayPrompt(text);
       const isWeekend = this.isWeekendPrompt(text);
       const isWeeklyIntent = !isSingleDay && !isWeekend && this.isWeeklyPlanPrompt(text);
@@ -17232,7 +17243,7 @@ ${isEn
     if (modal) this.closeDialogModal(modal);
   }
 
-  async handleGeminiInvokeSubmit(isVoice = false) {
+  async handleGeminiInvokeSubmit(isVoice = false, options = {}) {
     this.stopSpeech();
     const input = document.getElementById('gemini-invoke-input');
     const prompt = input?.value?.trim();
@@ -17265,8 +17276,19 @@ ${isEn
     if (sendBtn) sendBtn.disabled = true;
 
     try {
+      const feature = options?.feature || (isVoice ? 'voice' : 'chat');
       const systemPrompt = this.buildAiSystemInstruction(prompt);
-      const response = await this.callGeminiAgent(prompt, systemPrompt, true);
+      const response = await this.callGeminiAgent(prompt, systemPrompt, true, { feature });
+      if (response?.requiresLogin) {
+        if (transcription) transcription.textContent = `"${prompt}"`;
+        if (resultBox && resultText) {
+          resultBox.style.display = 'flex';
+          resultText.textContent = response.text || (window.I18n ? window.I18n.t('ai.loginRequired') : 'Inicia sesión para usar el Sous Chef');
+        }
+        if (resultActions) resultActions.innerHTML = '';
+        this.openAuthModal?.();
+        return;
+      }
       let executedToolsCount = 0;
       let primaryActionTarget = null; // 'view-shopping' | 'view-planner' | 'view-recipes'
       const createdRecipes = [];
@@ -17506,7 +17528,7 @@ ${isEn
     const input = document.getElementById('ai-chat-input');
     if (input) {
       input.value = "Planifica mi menú semanal equilibrado de lunes a domingo con mis recetas guardadas.";
-      this.handleAiChatSubmit();
+      this.handleAiChatSubmit(false, { feature: 'weekly_plan' });
     }
   }
 
@@ -17518,7 +17540,7 @@ ${isEn
     const input = document.getElementById('ai-chat-input');
     if (input) {
       input.value = `Crea recetas nuevas de ${gapTags} que cumplan con ${prefs} y asígnalas en mi Plan semanal.`;
-      this.handleAiChatSubmit();
+      this.handleAiChatSubmit(false, { feature: 'guided_query' });
     }
   }
 
@@ -17798,33 +17820,6 @@ ${isEn
   }
 
   async extractRecipeWithGemini({ text = '', imageBase64 = null, mimeType = 'image/jpeg', sourceUrl = '' } = {}) {
-    const apiKey = this.getEffectiveGeminiApiKey();
-    if (!apiKey) {
-      // Fallback simulado cuando el usuario no tiene clave
-      const sampleText = text || 'Receta extraída de foto';
-      const isProteic = /prote[ií]n/i.test(sampleText);
-      return this.normalizeAiExtractedRecipe({
-        title: isProteic ? "Bowl Fitness Proteico Multimodal" : "Plato Casero Tradicional Multimodal",
-        description: "Receta procesada e interpretada automáticamente a partir del contenido multimedia proporcionado.",
-        prepTimeMinutes: 10,
-        cookTimeMinutes: 15,
-        servings: state.settings?.defaultServings || 2,
-        tags: ["Saludable", isProteic ? "Alta en Proteínas" : "Almuerzo"],
-        ingredients: [
-          { name: "Pechuga de pollo o tofu", amount: 250, unit: "g" },
-          { name: "Verduras variadas salteadas", amount: 200, unit: "g" },
-          { name: "Aceite de oliva virgen extra", amount: 15, unit: "ml" },
-          { name: "Arroz integral o quinoa", amount: 150, unit: "g" }
-        ],
-        instructions: [
-          { step: 1, text: "Cocina el arroz o base de cereal según indicaciones del paquete.", timerMinutes: 12 },
-          { step: 2, text: "Saltea el pollo o tofu en dados en una sartén caliente con aceite de oliva.", timerMinutes: 6 },
-          { step: 3, text: "Añade las verduras troceadas, salpimenta al gusto y combina todos los ingredientes en un plato o bowl.", timerMinutes: 4 }
-        ],
-        nutrition: { calories: 430, protein: 42, carbs: 38, fat: 12 }
-      }, sourceUrl);
-    }
-
     const parts = [];
     if (imageBase64) {
       parts.push({
@@ -17862,63 +17857,37 @@ REGLAS CRÍTICAS:
 }`;
     parts.push({ text: promptText });
 
-    let rawModel = state.settings.geminiModel || 'gemini-3.8-flash';
-    if (rawModel === 'gemini-2.5-flash-lite' || rawModel === 'gemini-1.5-flash' || rawModel === 'gemini-2.5-flash') {
-      rawModel = 'gemini-3.8-flash';
-      state.settings.geminiModel = 'gemini-3.8-flash';
-      state.save && state.save('fa_settings', state.settings);
+    const res = await this.invokeAiProxy('import_ai', {
+      contents: [{ role: 'user', parts }],
+      generationConfig: { maxOutputTokens: 4096 }
+    });
+
+    if (res.code === 'AUTH_REQUIRED') {
+      const err = new Error(window.I18n ? window.I18n.t('ai.loginRequired') : 'Inicia sesión para usar el Sous Chef');
+      err.code = 'AUTH_REQUIRED';
+      err.requiresLogin = true;
+      throw err;
     }
-    const candidateModels = (rawModel === 'gemini-3.5-flash-lite')
-      ? ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-3.1-flash-lite']
-      : ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
 
-    let lastError = null;
-    let data = null;
-
-    for (const model of candidateModels) {
-      const controller = new AbortController();
-      const timeoutMs = (model === 'gemini-3.8-flash') ? 16000 : 20000;
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-        const resp = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": apiKey
-          },
-          body: JSON.stringify({
-            contents: [{ parts }]
-          }),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (resp.ok) {
-          data = await resp.json();
-          break;
-        }
-        const errJson = await resp.json().catch(() => ({}));
-        const errMsg = errJson.error?.message || `HTTP ${resp.status}`;
-        lastError = new Error(errMsg);
-
-        if (/api key not valid|invalid api key/i.test(errMsg)) {
-          break;
-        }
-
-        if (resp.status === 503 || resp.status === 429) {
-          await new Promise(r => setTimeout(r, 300));
-        }
-      } catch (e) {
-        clearTimeout(timeoutId);
-        lastError = e.name === 'AbortError' ? new Error(`Tiempo de espera agotado al analizar con Gemini (${model})`) : e;
-      }
+    if (res.status === 402 || res.status === 403 || res.status === 429) {
+      const err = new Error(window.I18n ? window.I18n.t('ai.quotaExceeded') : 'Has alcanzado tu límite de IA');
+      err.code = res.code || 'QUOTA_EXCEEDED';
+      err.quotaExceeded = true;
+      err.quota = res.quota ?? null;
+      throw err;
     }
+
+    if (res.quota !== undefined && res.quota !== null) {
+      this.lastAiQuota = res.quota;
+    }
+
+    const data = res.ok ? res.data : null;
 
     if (!data) {
-      const isDemandOrTimeoutOrQuota = /quota|exceeded|rate limit|429|resource exhausted|high demand|overloaded|try again later|503|tiempo de espera|timeout|abort|network|fetch/i.test(lastError?.message || '');
+      const errMsg = res.message || res.code || 'No se pudo conectar con Gemini para extraer la receta.';
+      const isDemandOrTimeoutOrQuota = res.code === 'UPSTREAM_ERROR' || res.code === 'NETWORK_ERROR' || (res.status >= 500) || /tiempo de espera|timeout|abort|network|fetch/i.test(errMsg);
       if (isDemandOrTimeoutOrQuota) {
-        console.warn(`[FoodAssistant] Gemini saturado o con alta demanda (${lastError?.message}). Activando extracción asistida de borrador con foto/datos adjuntos.`);
+        console.warn(`[FoodAssistant] Gemini saturado o con alta demanda (${errMsg}). Activando extracción asistida de borrador con foto/datos adjuntos.`);
         const sampleText = text || 'Receta extraída de foto';
         const isProteic = /prote[ií]n/i.test(sampleText);
         const parsedFromText = text ? RecipeParser.parseRecipeText(text) : null;
@@ -17951,10 +17920,10 @@ REGLAS CRÍTICAS:
         }, sourceUrl);
 
         draftRecipe._isHighDemandFallback = true;
-        draftRecipe._highDemandOriginalError = lastError?.message;
+        draftRecipe._highDemandOriginalError = errMsg;
         return draftRecipe;
       }
-      throw lastError || new Error("No se pudo conectar con Gemini para extraer la receta.");
+      throw new Error(errMsg);
     }
 
     const rawResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';

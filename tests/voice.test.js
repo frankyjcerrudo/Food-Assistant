@@ -229,27 +229,46 @@ describe('Camino B (US-17 & BUG-26): Asistente de Voz Integrado, Plurales y Fin 
     });
 
     it('handleGeminiInvokeSubmit ejecuta acción de añadir a la lista de compra y muestra resultado completo', async () => {
-      const input = document.getElementById('gemini-invoke-input');
-      input.value = 'Apunta 1kg de arroz a la compra';
-      const initialCount = state.shoppingList.length;
+      state.cloudUser = { id: 'u1', email: 'a@b.c' };
+      localStorage.setItem('fa_sb_url', 'https://test.supabase.co');
+      app.getAiAuthToken = vi.fn().mockResolvedValue('tok');
+      const origFetch = globalThis.fetch;
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        json: async () => ({ ok: false, code: 'UPSTREAM_ERROR', message: 'Simulated fallback' })
+      });
+      try {
+        const input = document.getElementById('gemini-invoke-input');
+        input.value = 'Apunta 1kg de arroz a la compra';
+        const initialCount = state.shoppingList.length;
 
-      await app.handleGeminiInvokeSubmit(false);
+        await app.handleGeminiInvokeSubmit(false);
 
-      expect(state.shoppingList.length).toBeGreaterThan(initialCount);
-      const resultCard = document.getElementById('gemini-invoke-result');
-      expect(resultCard.style.display).toBe('flex');
-      expect(resultCard.textContent.toLowerCase()).toContain('arroz');
+        expect(state.shoppingList.length).toBeGreaterThan(initialCount);
+        const resultCard = document.getElementById('gemini-invoke-result');
+        expect(resultCard.style.display).toBe('flex');
+        expect(resultCard.textContent.toLowerCase()).toContain('arroz');
+      } finally {
+        globalThis.fetch = origFetch;
+      }
     });
 
     it('callGeminiAgent utiliza mode: AUTO para permitir razonamiento conversacional fluido', async () => {
-      state.settings.geminiApiKey = 'AIzaSyTestAutoMode';
+      state.cloudUser = { id: 'u1', email: 'a@b.c' };
+      localStorage.setItem('fa_sb_url', 'https://test.supabase.co');
+      app.getAiAuthToken = vi.fn().mockResolvedValue('tok');
       const origFetch = globalThis.fetch;
       const fetchSpy = vi.fn().mockResolvedValue({
         ok: true,
+        status: 200,
         json: async () => ({
-          candidates: [{
-            content: { parts: [{ text: 'Para una cena ligera te sugiero salmón a la plancha con verduras.' }] }
-          }]
+          ok: true,
+          data: {
+            candidates: [{
+              content: { parts: [{ text: 'Para una cena ligera te sugiero salmón a la plancha con verduras.' }] }
+            }]
+          }
         })
       });
       globalThis.fetch = fetchSpy;
@@ -257,49 +276,55 @@ describe('Camino B (US-17 & BUG-26): Asistente de Voz Integrado, Plurales y Fin 
         const res = await app.callGeminiAgent('¿Qué me sugieres para cenar ligero?');
         expect(res.text).toContain('salmón');
         const [url, opts] = fetchSpy.mock.calls[0];
+        expect(url).toMatch(/\/functions\/v1\/ai-proxy$/);
         const body = JSON.parse(opts.body);
-        expect(body.toolConfig.functionCallingConfig.mode).toBe('AUTO');
+        expect(body.payload.toolConfig.functionCallingConfig.mode).toBe('AUTO');
       } finally {
         globalThis.fetch = origFetch;
       }
     });
 
     it('v0.89: flujo multi-turno de recomendación y guardado de receta nueva con botón de acción directa', async () => {
-      state.settings.geminiApiKey = 'AIzaSyTestCreateRecipeFlow';
+      state.cloudUser = { id: 'u1', email: 'a@b.c' };
+      localStorage.setItem('fa_sb_url', 'https://test.supabase.co');
+      app.getAiAuthToken = vi.fn().mockResolvedValue('tok');
       const origFetch = globalThis.fetch;
       const initialRecipesCount = state.recipes.length;
 
-      // Turno 1: el usuario pide recomendaciones y el asistente responde con recetas en texto
       const fetchSpy = vi.fn().mockResolvedValue({
         ok: true,
+        status: 200,
         json: async () => ({
-          candidates: [{
-            content: {
-              parts: [{
-                functionCall: {
-                  name: 'create_and_save_recipe',
-                  args: {
-                    title: 'Pollo al Limón con Romero y Quinoa',
-                    description: 'Receta recomendada saludable y muy sabrosa.',
-                    prepTimeMinutes: 10,
-                    cookTimeMinutes: 15,
-                    servings: 2,
-                    tags: ['Cena', 'Saludable', 'Alta en Proteínas'],
-                    ingredients: [
-                      { name: 'Pechuga de pollo', amount: 300, unit: 'g' },
-                      { name: 'Quinoa cocida', amount: 150, unit: 'g' },
-                      { name: 'Zumo de limón', amount: 30, unit: 'ml' }
-                    ],
-                    instructions: [
-                      { step: 1, text: 'Saltea el pollo con el zumo de limón y romero.' },
-                      { step: 2, text: 'Sirve caliente sobre la cama de quinoa.' }
-                    ],
-                    nutrition: { calories: 380, protein: 44, carbs: 28, fat: 10 }
+          ok: true,
+          data: {
+            candidates: [{
+              content: {
+                parts: [{
+                  functionCall: {
+                    name: 'create_and_save_recipe',
+                    args: {
+                      title: 'Pollo al Limón con Romero y Quinoa',
+                      description: 'Receta recomendada saludable y muy sabrosa.',
+                      prepTimeMinutes: 10,
+                      cookTimeMinutes: 15,
+                      servings: 2,
+                      tags: ['Cena', 'Saludable', 'Alta en Proteínas'],
+                      ingredients: [
+                        { name: 'Pechuga de pollo', amount: 300, unit: 'g' },
+                        { name: 'Quinoa cocida', amount: 150, unit: 'g' },
+                        { name: 'Zumo de limón', amount: 30, unit: 'ml' }
+                      ],
+                      instructions: [
+                        { step: 1, text: 'Saltea el pollo con el zumo de limón y romero.' },
+                        { step: 2, text: 'Sirve caliente sobre la cama de quinoa.' }
+                      ],
+                      nutrition: { calories: 380, protein: 44, carbs: 28, fat: 10 }
+                    }
                   }
-                }
-              }]
-            }
-          }]
+                }]
+              }
+            }]
+          }
         })
       });
       globalThis.fetch = fetchSpy;
@@ -321,21 +346,33 @@ describe('Camino B (US-17 & BUG-26): Asistente de Voz Integrado, Plurales y Fin 
       }
     });
     it('v0.90: handleGeminiInvokeSubmit limpia automáticamente el campo de texto y preserva memoria multi-turno en modal', async () => {
-      state.settings.geminiApiKey = '';
-      const input = document.getElementById('gemini-invoke-input');
-      input.value = '¿Qué me sugieres para cenar?';
-      
-      await app.handleGeminiInvokeSubmit(false);
-      
-      // Campo de texto debe limpiarse automáticamente
-      expect(input.value).toBe('');
-      // Memoria conversacional multi-turno debe acumular la interacción
-      expect(app.aiChatHistory.length).toBeGreaterThanOrEqual(2);
-      expect(app.aiChatHistory[app.aiChatHistory.length - 2].text).toBe('¿Qué me sugieres para cenar?');
-      
-      // El modal muestra el resultado
-      const resultCard = document.getElementById('gemini-invoke-result');
-      expect(resultCard.style.display).toBe('flex');
+      state.cloudUser = { id: 'u1', email: 'a@b.c' };
+      localStorage.setItem('fa_sb_url', 'https://test.supabase.co');
+      app.getAiAuthToken = vi.fn().mockResolvedValue('tok');
+      const origFetch = globalThis.fetch;
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        json: async () => ({ ok: false, code: 'UPSTREAM_ERROR', message: 'Simulated fallback' })
+      });
+      try {
+        const input = document.getElementById('gemini-invoke-input');
+        input.value = '¿Qué me sugieres para cenar?';
+        
+        await app.handleGeminiInvokeSubmit(false);
+        
+        // Campo de texto debe limpiarse automáticamente
+        expect(input.value).toBe('');
+        // Memoria conversacional multi-turno debe acumular la interacción
+        expect(app.aiChatHistory.length).toBeGreaterThanOrEqual(2);
+        expect(app.aiChatHistory[app.aiChatHistory.length - 2].text).toBe('¿Qué me sugieres para cenar?');
+        
+        // El modal muestra el resultado
+        const resultCard = document.getElementById('gemini-invoke-result');
+        expect(resultCard.style.display).toBe('flex');
+      } finally {
+        globalThis.fetch = origFetch;
+      }
     });
   });
 });

@@ -55,18 +55,24 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
     expect(safeHtml).toContain('• Lunes: Pollo');
   });
 
-  it('US-39: callGeminiAgent envía la clave en la cabecera x-goog-api-key y nunca en la URL (?key=)', async () => {
-    state.settings.geminiApiKey = 'AIzaSyTestSecretKey123';
+  it('US-39: callGeminiAgent envía Authorization Bearer al ai-proxy y nunca la clave en URL o x-goog-api-key', async () => {
+    state.cloudUser = { id: 'u1', email: 'a@b.c' };
+    localStorage.setItem('fa_sb_url', 'https://test.supabase.co');
+    appInstance.getAiAuthToken = vi.fn().mockResolvedValue('tok');
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true,
+      status: 200,
       json: async () => ({
-        candidates: [
-          {
-            content: {
-              parts: [{ text: 'Respuesta segura desde Gemini.' }]
+        ok: true,
+        data: {
+          candidates: [
+            {
+              content: {
+                parts: [{ text: 'Respuesta segura desde Gemini.' }]
+              }
             }
-          }
-        ]
+          ]
+        }
       })
     });
     const origFetch = globalThis.fetch;
@@ -79,13 +85,14 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
 
       const [calledUrl, calledOptions] = fetchSpy.mock.calls[0];
       expect(calledUrl).not.toContain('key=');
-      expect(calledUrl).toContain('models/gemini-3.8-flash:generateContent');
-      expect(calledUrl).not.toContain('AIzaSyTestSecretKey123');
-      expect(calledOptions.headers['x-goog-api-key']).toBe('AIzaSyTestSecretKey123');
+      expect(calledUrl).toMatch(/\/functions\/v1\/ai-proxy$/);
+      expect(calledOptions.headers['Authorization']).toBe('Bearer tok');
+      expect(calledOptions.headers['x-goog-api-key']).toBeUndefined();
 
       const bodyObj = JSON.parse(calledOptions.body);
-      expect(Array.isArray(bodyObj.tools)).toBe(true);
-      expect(bodyObj.tools[0].functionDeclarations.length).toBe(AI_TOOLS_DECLARATIONS.length);
+      expect(bodyObj.feature).toBe('chat');
+      expect(Array.isArray(bodyObj.payload.tools)).toBe(true);
+      expect(bodyObj.payload.tools[0].functionDeclarations.length).toBe(AI_TOOLS_DECLARATIONS.length);
     } finally {
       globalThis.fetch = origFetch;
     }
@@ -219,18 +226,30 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
     const input = document.getElementById('ai-chat-input');
     const history = document.getElementById('chat-history-container');
 
-    input.value = 'Añade aguacates y leche a la compra';
-    await appInstance.handleAiChatSubmit();
-
-    expect(state.shoppingList.length).toBeGreaterThanOrEqual(2);
-    expect(history.textContent).toContain('Aguacates');
-
-    // Simular error con intento de inyección HTML en err.message (US-37)
-    state.settings.geminiApiKey = 'bad-key';
+    state.cloudUser = { id: 'u1', email: 'a@b.c' };
+    localStorage.setItem('fa_sb_url', 'https://test.supabase.co');
+    appInstance.getAiAuthToken = vi.fn().mockResolvedValue('tok');
     const origFetch = globalThis.fetch;
-    globalThis.fetch = vi.fn().mockRejectedValue(new Error('<img src=x onerror=alert(1)> Fallo de red'));
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => ({ ok: false, code: 'UPSTREAM_ERROR', message: 'Fallback local' })
+    });
 
     try {
+      input.value = 'Añade aguacates y leche a la compra';
+      await appInstance.handleAiChatSubmit();
+
+      expect(state.shoppingList.length).toBeGreaterThanOrEqual(2);
+      expect(history.textContent).toContain('Aguacates');
+
+      // Simular error con intento de inyección HTML en err.message (US-37)
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({ ok: false, code: 'INVALID_PAYLOAD', message: '<img src=x onerror=alert(1)> Fallo de red' })
+      });
+
       input.value = 'Hola';
       await appInstance.handleAiChatSubmit();
       const lastBubble = history.lastElementChild;
@@ -275,108 +294,7 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
     expect(state.settings.geminiApiKey).toBe('AIzaSyFromCloudDevice777');
   });
 
-  it('US-17: callGeminiAgent conecta con gemini-3.8-flash, conmuta a gemini-3.5-flash-lite ante 503, y si ambos fallan activa fallback inteligente', async () => {
-    state.settings.geminiApiKey = 'AIzaSyTestFallbackKey';
-    let callCount = 0;
-    const calledModels = [];
-    const origFetch = globalThis.fetch;
-    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
-      callCount++;
-      calledModels.push(url);
-      return {
-        ok: false,
-        status: 503,
-        json: async () => ({
-          error: { message: 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.' }
-        })
-      };
-    });
-
-    try {
-      const res = await appInstance.callGeminiAgent('Planifica mi semana');
-      expect(res.isSimulatedFallback).toBe(true);
-      expect(callCount).toBeGreaterThanOrEqual(2);
-      expect(calledModels[0]).toContain('gemini-3.8-flash');
-      expect(calledModels[1]).toContain('gemini-3.5-flash-lite');
-      expect(res.toolCalls.length).toBeGreaterThan(0);
-    } finally {
-      globalThis.fetch = origFetch;
-    }
-  });
-
-  it('v0.96: callGeminiAgent se recupera de forma transparente con gemini-3.5-flash-lite cuando gemini-3.8-flash devuelve 503 (alta demanda)', async () => {
-    state.settings.geminiApiKey = 'AIzaSyLiveHighDemandKey';
-    state.settings.geminiModel = 'gemini-3.8-flash';
-    const calledUrls = [];
-    const origFetch = globalThis.fetch;
-
-    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
-      calledUrls.push(url);
-      if (url.includes('gemini-3.8-flash')) {
-        return {
-          ok: false,
-          status: 503,
-          json: async () => ({
-            error: {
-              code: 503,
-              message: 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.',
-              status: 'UNAVAILABLE'
-            }
-          })
-        };
-      }
-      return {
-        ok: true,
-        json: async () => ({
-          candidates: [{ content: { parts: [{ text: '¡Hola Franky! Respuesta real desde Gemini 3.5 Flash-Lite con razonamiento activo.' }] } }]
-        })
-      };
-    });
-
-    try {
-      const res = await appInstance.callGeminiAgent('Planifica mi semana');
-      expect(calledUrls.length).toBe(2);
-      expect(calledUrls[0]).toContain('gemini-3.8-flash');
-      expect(calledUrls[1]).toContain('gemini-3.5-flash-lite');
-      expect(res.isSimulatedFallback).toBeFalsy();
-      expect(res.text).toContain('Gemini 3.5 Flash-Lite');
-    } finally {
-      globalThis.fetch = origFetch;
-    }
-  });
-
-  it('v0.98: callGeminiAgent conmuta de inmediato a gemini-3.5-flash-lite si gemini-3.8-flash da timeout (AbortError)', async () => {
-    state.settings.geminiApiKey = 'AIzaSyTimeoutTestKey';
-    state.settings.geminiModel = 'gemini-3.8-flash';
-    const calledUrls = [];
-    const origFetch = globalThis.fetch;
-
-    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
-      calledUrls.push(url);
-      if (url.includes('gemini-3.8-flash')) {
-        const abortErr = new Error('The operation was aborted');
-        abortErr.name = 'AbortError';
-        throw abortErr;
-      }
-      return {
-        ok: true,
-        json: async () => ({
-          candidates: [{ content: { parts: [{ text: '¡Listo Franky! Respuesta recuperada desde Gemini 3.5 Flash-Lite tras timeout de 3.8.' }] } }]
-        })
-      };
-    });
-
-    try {
-      const res = await appInstance.callGeminiAgent('Crea un plan semanal');
-      expect(calledUrls.length).toBe(2);
-      expect(calledUrls[0]).toContain('gemini-3.8-flash');
-      expect(calledUrls[1]).toContain('gemini-3.5-flash-lite');
-      expect(res.isSimulatedFallback).toBeFalsy();
-      expect(res.text).toContain('Gemini 3.5 Flash-Lite');
-    } finally {
-      globalThis.fetch = origFetch;
-    }
-  });
+  // US-79a: Tests de conmutación de modelos en cliente (US-17, v0.96, v0.98) eliminados porque ahora los gestiona ai-proxy en servidor.
 
   it('US-17 & BUG-15: formatSafeAiMarkdown limpia códigos internos (rec-...) y formatea cursivas (*plato*) sin dejar asteriscos crudos', () => {
     const raw = '• **Lunes (26 Oct)**: Desayuno: *Porridge cremoso de avena* (*rec-porridge-bowl*) | Merienda: Batido de proteínas (`rec-aafe6e6d-45e5-4328-b41c-b62ec9e3e69a`)';
@@ -421,23 +339,28 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
   });
 
   it('US-17 & BUG-15: handleAiChatSubmit utiliza functionCallingConfig AUTO y aplica el plan automáticamente si el modelo propone comidas', async () => {
-    state.settings.geminiApiKey = 'AIzaSyTestForcePlan';
+    state.cloudUser = { id: 'u1', email: 'a@b.c' };
+    localStorage.setItem('fa_sb_url', 'https://test.supabase.co');
+    appInstance.getAiAuthToken = vi.fn().mockResolvedValue('tok');
     const origFetch = globalThis.fetch;
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
       json: async () => ({
-        candidates: [
-          {
-            content: {
-              parts: [
-                {
-                  text: '• Lunes: Desayuno: Porridge Cremoso de Avena | Almuerzo: Salmón a la Plancha | Merienda: Tostas de Hummus | Cena: Pasta al Pesto'
-                }
-              ]
+        ok: true,
+        data: {
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: '• Lunes: Desayuno: Porridge Cremoso de Avena | Almuerzo: Salmón a la Plancha | Merienda: Tostas de Hummus | Cena: Pasta al Pesto'
+                  }
+                ]
+              }
             }
-          }
-        ]
+          ]
+        }
       })
     });
     globalThis.fetch = fetchSpy;
@@ -449,8 +372,8 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
       await appInstance.handleAiChatSubmit();
 
       const [, calledOpts] = fetchSpy.mock.calls[0];
-      const payloadSent = JSON.parse(calledOpts.body);
-      expect(payloadSent.toolConfig?.functionCallingConfig?.mode).toBe('AUTO');
+      const bodySent = JSON.parse(calledOpts.body);
+      expect(bodySent.payload.toolConfig?.functionCallingConfig?.mode).toBe('AUTO');
 
       const weekDays = appInstance.getPlannerWeekDates();
       weekDays.forEach(w => {
@@ -472,13 +395,27 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
     const gaps = appInstance.getDietarySlotGaps();
     expect(gaps.map(g => g.tag)).toContain('Desayuno');
 
-    const input = document.getElementById('ai-chat-input');
-    const history = document.getElementById('chat-history-container');
-    input.value = 'Planifica mi semana';
-    await appInstance.handleAiChatSubmit();
+    state.cloudUser = { id: 'u1', email: 'a@b.c' };
+    localStorage.setItem('fa_sb_url', 'https://test.supabase.co');
+    appInstance.getAiAuthToken = vi.fn().mockResolvedValue('tok');
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => ({ ok: false, code: 'UPSTREAM_ERROR', message: 'Fallback local' })
+    });
 
-    expect(history.textContent).toContain('Crear');
-    expect(history.textContent).toContain('a medida');
+    try {
+      const input = document.getElementById('ai-chat-input');
+      const history = document.getElementById('chat-history-container');
+      input.value = 'Planifica mi semana';
+      await appInstance.handleAiChatSubmit();
+
+      expect(history.textContent).toContain('Crear');
+      expect(history.textContent).toContain('a medida');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
 
     // Verificar que al crear una receta nueva sin imagen no se añade foto de Unsplash por defecto
     const createdRes = appInstance.executeAiToolCall({
@@ -597,13 +534,25 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     expect(normalized.sourceDomain).toBe('instagram.com');
   });
 
-  it('US-30: extractRecipeWithGemini devuelve receta limpia en modo simulado cuando no hay API key', async () => {
-    state.settings.geminiApiKey = '';
-    const res = await appInstance.extractRecipeWithGemini({ text: 'Bowl alto en proteínas con pollo y arroz' });
-    expect(res).toBeTruthy();
-    expect(res.title).toContain('Multimodal');
-    expect(res.ingredients.length).toBeGreaterThan(0);
-    expect(res.instructions.length).toBeGreaterThan(0);
+  it('US-30: extractRecipeWithGemini devuelve borrador limpio en fallback si ai-proxy devuelve 502', async () => {
+    state.cloudUser = { id: 'u1', email: 'a@b.c' };
+    localStorage.setItem('fa_sb_url', 'https://test.supabase.co');
+    appInstance.getAiAuthToken = vi.fn().mockResolvedValue('tok');
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => ({ ok: false, code: 'UPSTREAM_ERROR', message: 'Upstream unavailable' })
+    });
+    try {
+      const res = await appInstance.extractRecipeWithGemini({ text: 'Bowl alto en proteínas con pollo y arroz' });
+      expect(res).toBeTruthy();
+      expect(res._isHighDemandFallback).toBe(true);
+      expect(res.ingredients.length).toBeGreaterThan(0);
+      expect(res.instructions.length).toBeGreaterThan(0);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
   });
 
   it('US-30: compressImageToBase64 se recupera con fallback si la lectura directa de FileReader falla', async () => {
@@ -714,16 +663,17 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     expect(cleaned).toContain('Salmón');
   });
 
-  it('v0.77: callGeminiAgent activa fallback local automático si Gemini devuelve error de alta demanda (503)', async () => {
-    state.settings.geminiApiKey = 'AIzaSyTestHighDemand';
+  it('v0.77: callGeminiAgent activa fallback local automático si ai-proxy devuelve 502 UPSTREAM_ERROR', async () => {
+    state.cloudUser = { id: 'u1', email: 'a@b.c' };
+    localStorage.setItem('fa_sb_url', 'https://test.supabase.co');
+    appInstance.getAiAuthToken = vi.fn().mockResolvedValue('tok');
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: false,
-      status: 503,
+      status: 502,
       json: async () => ({
-        error: {
-          code: 503,
-          message: 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.'
-        }
+        ok: false,
+        code: 'UPSTREAM_ERROR',
+        message: 'This model is currently experiencing high demand.'
       })
     });
     const origFetch = globalThis.fetch;
@@ -823,39 +773,12 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     });
   });
 
-  it('v0.78: Modelos obsoletos como gemini-2.5-flash-lite se migran automáticamente a gemini-3.8-flash y nunca se llaman en fetch', async () => {
-    state.settings.geminiModel = 'gemini-2.5-flash-lite';
-    state.settings.geminiApiKey = 'test-key';
+  // US-79a: Test v0.78 de migración de modelos en cliente eliminado porque ahora el servidor elige los modelos.
 
-    const calledEndpoints = [];
-    const origFetch = globalThis.fetch;
-    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
-      calledEndpoints.push(url);
-      return {
-        ok: true,
-        json: async () => ({
-          candidates: [{ content: { parts: [{ text: '{"title": "Receta Test", "ingredients": [{"name": "Pollo", "amount": 100, "unit": "g"}], "instructions": [{"step": 1, "text": "Cocinar"}]}' }] } }]
-        })
-      };
-    });
-
-    try {
-      await appInstance.extractRecipeWithGemini({ text: 'Pollo salteado' });
-      expect(state.settings.geminiModel).toBe('gemini-3.8-flash');
-      expect(calledEndpoints.length).toBeGreaterThan(0);
-      calledEndpoints.forEach(ep => {
-        expect(ep).not.toContain('gemini-2.5-flash-lite');
-        expect(ep).not.toContain('gemini-2.5');
-        expect(ep).toContain('gemini-3.8-flash');
-      });
-    } finally {
-      globalThis.fetch = origFetch;
-    }
-  });
-
-  it('v1.27: extractRecipeWithGemini se recupera ante error 503 (high demand) creando borrador asistido con foto adjunta', async () => {
-    state.settings.geminiApiKey = 'test-key-503';
-    state.settings.geminiModel = 'gemini-3.8-flash';
+  it('v1.27: extractRecipeWithGemini se recupera ante error 502 de ai-proxy creando borrador asistido con foto adjunta', async () => {
+    state.cloudUser = { id: 'u1', email: 'a@b.c' };
+    localStorage.setItem('fa_sb_url', 'https://test.supabase.co');
+    appInstance.getAiAuthToken = vi.fn().mockResolvedValue('tok');
     const origFetch = globalThis.fetch;
     const calledEndpoints = [];
 
@@ -863,12 +786,11 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
       calledEndpoints.push(url);
       return {
         ok: false,
-        status: 503,
+        status: 502,
         json: async () => ({
-          error: {
-            code: 503,
-            message: 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.'
-          }
+          ok: false,
+          code: 'UPSTREAM_ERROR',
+          message: 'This model is currently experiencing high demand.'
         })
       };
     });
@@ -886,29 +808,28 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
       expect(res.imageUrl).toContain('data:image/png;base64');
       expect(res.title).toBeTruthy();
       expect(res.ingredients.length).toBeGreaterThan(0);
-      expect(calledEndpoints.length).toBeGreaterThanOrEqual(2);
-      expect(calledEndpoints[0]).toContain('gemini-3.8-flash');
-      expect(calledEndpoints[1]).toContain('gemini-3.5-flash-lite');
+      expect(calledEndpoints.length).toBe(1);
+      expect(calledEndpoints[0]).toMatch(/\/functions\/v1\/ai-proxy$/);
     } finally {
       globalThis.fetch = origFetch;
     }
   });
 
-  it('v0.84: callGeminiAgent recupera automáticamente ante error 429 (Quota exceeded limit 20) activando fallback sin romper la UI', async () => {
-    state.settings.geminiApiKey = 'AIzaSyQuotaTestKey';
-    state.settings.aiProvider = 'gemini';
+  it('v0.84: callGeminiAgent recupera automáticamente ante 502 de ai-proxy activando fallback sin romper la UI', async () => {
+    state.cloudUser = { id: 'u1', email: 'a@b.c' };
+    localStorage.setItem('fa_sb_url', 'https://test.supabase.co');
+    appInstance.getAiAuthToken = vi.fn().mockResolvedValue('tok');
     const origFetch = globalThis.fetch;
-    const quotaErrorMsg = 'Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_requests, limit: 20, model: gemini-3.8-flash, description: Generate content requests per day limit exceeded on Free Tier. Please retry in 14h3m40s.';
 
-    globalThis.fetch = vi.fn().mockImplementation(async () => {
-      return {
+    globalThis.fetch = vi.fn().mockImplementation(async () => ({
+      ok: false,
+      status: 502,
+      json: async () => ({
         ok: false,
-        status: 429,
-        json: async () => ({
-          error: { message: quotaErrorMsg }
-        })
-      };
-    });
+        code: 'UPSTREAM_ERROR',
+        message: 'Quota exceeded on upstream'
+      })
+    }));
 
     try {
       const res = await appInstance.callGeminiAgent('dime recetas interesantes para Hall');
@@ -978,172 +899,26 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     document.body.removeChild(status);
   });
 
-  it('v0.85: callGeminiAgent usa gemini-2.5-flash con 1.500 peticiones/día cuando está configurado', async () => {
-    state.settings.geminiApiKey = 'AIzaSyTestKey25';
-    state.settings.geminiModel = 'gemini-2.5-flash';
-    state.settings.aiProvider = 'gemini';
-
-    const origFetch = globalThis.fetch;
-    let calledUrl = null;
-    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
-      calledUrl = url;
-      return {
-        ok: true,
-        json: async () => ({
-          candidates: [{ content: { parts: [{ text: '¡Hola Franky! Respuesta con 1.500 peticiones diarias.' }] } }]
-        })
-      };
-    });
-
-    try {
-      const res = await appInstance.callGeminiAgent('Hola');
-      expect(calledUrl).toContain('models/gemini-2.5-flash:generateContent');
-      expect(res.text).toContain('Respuesta con 1.500 peticiones diarias');
-    } finally {
-      globalThis.fetch = origFetch;
-    }
-  });
-
-  it('v0.90: callGeminiAgent en gemini-3.8-flash conmuta a gemini-3.5-flash-lite ante error 429 de cuota (20 req/día)', async () => {
-    state.settings.geminiApiKey = 'AIzaSyTestKeyFailover';
-    state.settings.geminiModel = 'gemini-3.8-flash';
-    state.settings.aiProvider = 'gemini';
-
-    const calledUrls = [];
-    const origFetch = globalThis.fetch;
-    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
-      calledUrls.push(url);
-      if (url.includes('gemini-3.8-flash')) {
-        return {
-          ok: false,
-          status: 429,
-          json: async () => ({
-            error: { message: 'Quota exceeded for metric: limit: 20, model: gemini-3.8-flash' }
-          })
-        };
-      }
-      return {
-        ok: true,
-        json: async () => ({
-          candidates: [{ content: { parts: [{ text: 'Recuperado con éxito en gemini-3.5-flash-lite.' }] } }]
-        })
-      };
-    });
-
-    try {
-      const res = await appInstance.callGeminiAgent('Recetas');
-      expect(calledUrls.length).toBe(2);
-      expect(calledUrls[0]).toContain('gemini-3.8-flash');
-      expect(calledUrls[1]).toContain('gemini-3.5-flash-lite');
-      expect(res.text).toContain('Recuperado con éxito en gemini-3.5-flash-lite');
-    } finally {
-      globalThis.fetch = origFetch;
-    }
-  });
-
-  it('v0.86: callGeminiAgent conecta con gemini-2.5-pro para cuentas Pro o con facturación', async () => {
-    state.settings.geminiApiKey = 'AIzaSyProKey';
-    state.settings.geminiModel = 'gemini-2.5-pro';
-    state.settings.aiProvider = 'gemini';
-
-    const origFetch = globalThis.fetch;
-    let calledUrl = null;
-    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
-      calledUrl = url;
-      return {
-        ok: true,
-        json: async () => ({
-          candidates: [{ content: { parts: [{ text: '¡Hola Franky! Respuesta generada por Gemini 2.5 Pro.' }] } }]
-        })
-      };
-    });
-
-    try {
-      const res = await appInstance.callGeminiAgent('Asesoramiento nutricional');
-      expect(calledUrl).toContain('models/gemini-2.5-pro:generateContent');
-      expect(res.text).toContain('Gemini 2.5 Pro');
-    } finally {
-      globalThis.fetch = origFetch;
-    }
-  });
-
-  it('v0.90: callGeminiAgent usa gemini-3.8-flash por defecto cuando no hay modelo explícito configurado', async () => {
-    state.settings.geminiApiKey = 'AIzaSyLiteDefault';
-    delete state.settings.geminiModel;
-    state.settings.aiProvider = 'gemini';
-
-    const origFetch = globalThis.fetch;
-    let calledUrl = null;
-    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
-      calledUrl = url;
-      return {
-        ok: true,
-        json: async () => ({
-          candidates: [{ content: { parts: [{ text: '¡Hola Franky! Respuesta desde Gemini 3.8 Flash.' }] } }]
-        })
-      };
-    });
-
-    try {
-      const res = await appInstance.callGeminiAgent('Hola');
-      expect(calledUrl).toContain('models/gemini-3.8-flash:generateContent');
-      expect(res.text).toContain('Gemini 3.8 Flash');
-    } finally {
-      globalThis.fetch = origFetch;
-    }
-  });
-
-  it('v0.87: callGeminiAgent recupera automáticamente si gemini-2.5-flash devuelve error "not available to new users", conmutando a gemini-3.5-flash-lite', async () => {
-    state.settings.geminiApiKey = 'AIzaSyNewProjectKey';
-    state.settings.geminiModel = 'gemini-2.5-flash';
-    state.settings.aiProvider = 'gemini';
-
-    const calledUrls = [];
-    const origFetch = globalThis.fetch;
-    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
-      calledUrls.push(url);
-      if (url.includes('gemini-2.5-flash')) {
-        return {
-          ok: false,
-          status: 404,
-          json: async () => ({
-            error: {
-              code: 404,
-              message: 'The model models/gemini-2.5-flash is not available to new users. Please use gemini-3.5-flash-lite or gemini-3.8-flash.',
-              status: 'NOT_FOUND'
-            }
-          })
-        };
-      }
-      return {
-        ok: true,
-        json: async () => ({
-          candidates: [{ content: { parts: [{ text: '¡Hola Franky! Asistente activo con Gemini 3.5 Flash-Lite.' }] } }]
-        })
-      };
-    });
-
-    try {
-      const res = await appInstance.callGeminiAgent('Planifica mi semana');
-      expect(calledUrls.length).toBe(2);
-      expect(calledUrls[0]).toContain('gemini-2.5-flash');
-      expect(calledUrls[1]).toContain('gemini-3.5-flash-lite');
-      expect(res.text).toContain('Gemini 3.5 Flash-Lite');
-      // Verifica que la configuración se actualiza permanentemente
-      expect(state.settings.geminiModel).toBe('gemini-3.5-flash-lite');
-    } finally {
-      globalThis.fetch = origFetch;
-    }
-  });
+  // US-79a: Tests de selección/conmutación de modelos en cliente (v0.85, v0.90, v0.86, v0.87) eliminados porque ahora el servidor elige y conmuta los modelos en ai-proxy.
   it('v0.90: consultas de ideas para cenar ("dame ideas para cenar hoy") no sobre-planifican el día completo ni tocan desayuno/almuerzo/merienda', async () => {
-    state.settings.geminiApiKey = ''; // activar simulador inteligente local
-    const todayBefore = state.getDayPlan('2026-11-01', 'Domingo');
-    
-    const res = await appInstance.callGeminiAgent('dame ideas para cenar hoy');
-    expect(res.toolCalls.length).toBe(0); // No debe ejecutar set_day_plan para las 4 comidas
-    expect(res.text.toLowerCase()).toContain('cenar');
-    expect(res.text).not.toContain('Desayuno:');
-    expect(res.text).not.toContain('Merienda:');
+    state.cloudUser = { id: 'u1', email: 'a@b.c' };
+    localStorage.setItem('fa_sb_url', 'https://test.supabase.co');
+    appInstance.getAiAuthToken = vi.fn().mockResolvedValue('tok');
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => ({ ok: false, code: 'UPSTREAM_ERROR', message: 'Fallback local' })
+    });
+    try {
+      const res = await appInstance.callGeminiAgent('dame ideas para cenar hoy');
+      expect(res.toolCalls.length).toBe(0); // No debe ejecutar set_day_plan para las 4 comidas
+      expect(res.text.toLowerCase()).toContain('cenar');
+      expect(res.text).not.toContain('Desayuno:');
+      expect(res.text).not.toContain('Merienda:');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
   });
 
 
@@ -1409,9 +1184,10 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
     expect(res.text).toContain('proteína');
   });
 
-  it('v1.03: callGeminiAgent envía payload estándar limpio sin parámetros inválidos y con timeout ampliado a 25s', async () => {
-    state.settings.geminiApiKey = 'AIzaSyStandardPayloadTest';
-    state.settings.geminiModel = 'gemini-3.8-flash';
+  it('v1.03: callGeminiAgent envía payload estándar limpio sin parámetros inválidos', async () => {
+    state.cloudUser = { id: 'u1', email: 'a@b.c' };
+    localStorage.setItem('fa_sb_url', 'https://test.supabase.co');
+    appInstance.getAiAuthToken = vi.fn().mockResolvedValue('tok');
     const origFetch = globalThis.fetch;
     let sentBody = null;
 
@@ -1419,8 +1195,12 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
       sentBody = JSON.parse(opts.body);
       return {
         ok: true,
+        status: 200,
         json: async () => ({
-          candidates: [{ content: { parts: [{ text: 'Respuesta inmediata' }] } }]
+          ok: true,
+          data: {
+            candidates: [{ content: { parts: [{ text: 'Respuesta inmediata' }] } }]
+          }
         })
       };
     });
@@ -1429,9 +1209,201 @@ describe('Épica 6 (Fase 2): Importador Multimodal IA, Nevera Inteligente y Batc
       await appInstance.callGeminiAgent('Planifica mi dia de hoy');
       expect(sentBody).not.toBeNull();
       // No debe enviar thinkingConfig que provoque "Request contains an invalid argument" en generateContent
-      expect(sentBody.generationConfig?.thinkingConfig).toBeUndefined();
+      expect(sentBody.payload?.generationConfig?.thinkingConfig).toBeUndefined();
     } finally {
       globalThis.fetch = origFetch;
     }
+  });
+});
+
+describe('US-79a: AiGateway', () => {
+  let appInstance;
+
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem('fa_sb_url', 'https://test.supabase.co');
+    state.recipes = typeof structuredClone === 'function' ? structuredClone(SEED_RECIPES) : JSON.parse(JSON.stringify(SEED_RECIPES));
+    state.mealPlan = state.generateInitialMealPlan();
+    state.cloudUser = { id: 'u1', email: 'a@b.c' };
+    appInstance = new FoodAssistantApp();
+    appInstance.getAiAuthToken = vi.fn().mockResolvedValue('tok');
+    window.app = appInstance;
+  });
+
+  it('callGeminiAgent("hola") llama a /functions/v1/ai-proxy con Bearer tok, feature=chat y sin x-goog-api-key', async () => {
+    const origFetch = globalThis.fetch;
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ok: true,
+        data: { candidates: [{ content: { parts: [{ text: 'ok' }] } }] }
+      })
+    });
+    globalThis.fetch = fetchSpy;
+    try {
+      const res = await appInstance.callGeminiAgent('hola');
+      expect(res.text).toBe('ok');
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const [url, opts] = fetchSpy.mock.calls[0];
+      expect(url).toMatch(/\/functions\/v1\/ai-proxy$/);
+      expect(opts.method).toBe('POST');
+      expect(opts.headers['Authorization']).toBe('Bearer tok');
+      expect(opts.headers['x-goog-api-key']).toBeUndefined();
+      const body = JSON.parse(opts.body);
+      expect(body.feature).toBe('chat');
+      expect(body.payload.contents[body.payload.contents.length - 1].parts[0].text).toBe('hola');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it('sin state.cloudUser devuelve requiresLogin: true y no llama a fetch', async () => {
+    state.cloudUser = null;
+    const origFetch = globalThis.fetch;
+    const fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy;
+    try {
+      const res = await appInstance.callGeminiAgent('hola');
+      expect(res.requiresLogin).toBe(true);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it('una respuesta 402 devuelve quotaExceeded: true', async () => {
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 402,
+      json: async () => ({ ok: false, code: 'QUOTA_EXCEEDED', quota: { remaining: 0 } })
+    });
+    try {
+      const res = await appInstance.callGeminiAgent('hola');
+      expect(res.quotaExceeded).toBe(true);
+      expect(res.code).toBe('QUOTA_EXCEEDED');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it('una respuesta 502 devuelve isSimulatedFallback: true', async () => {
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => ({ ok: false, code: 'UPSTREAM_ERROR', message: 'Upstream error' })
+    });
+    try {
+      const res = await appInstance.callGeminiAgent('hola');
+      expect(res.isSimulatedFallback).toBe(true);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it('propaga feature por flujo: weekly_plan, guided_query (nevera y chip) y voice', async () => {
+    const origFetch = globalThis.fetch;
+    const featuresSent = [];
+    globalThis.fetch = vi.fn().mockImplementation(async (_url, opts) => {
+      const body = JSON.parse(opts.body);
+      featuresSent.push(body.feature);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          data: { candidates: [{ content: { parts: [{ text: 'ok' }] } }] }
+        })
+      };
+    });
+
+    try {
+      // weekly_plan
+      appInstance.triggerGeminiAutoPlan();
+      await new Promise(r => setTimeout(r, 10));
+
+      // guided_query via fridge
+      appInstance.fridgeIngredients = ['pollo'];
+      appInstance.generateRecipeFromFridgeWithAi();
+      await new Promise(r => setTimeout(r, 10));
+
+      // guided_query via chip
+      let chip = document.querySelector('#gemini-invoke-chips .gemini-chip');
+      let invokeInput = document.getElementById('gemini-invoke-input');
+      let tempContainer = null;
+      if (!invokeInput || !chip) {
+        tempContainer = document.createElement('div');
+        tempContainer.innerHTML = `
+          <input id="gemini-invoke-input" />
+          <div id="gemini-invoke-chips">
+            <button type="button" class="gemini-chip" data-prompt="Sugerencia rápida">Chip</button>
+          </div>
+          <div id="gemini-invoke-transcription"></div>
+          <div id="gemini-invoke-result"><div id="gemini-invoke-result-text"></div><div id="gemini-invoke-result-actions"></div></div>
+        `;
+        document.body.appendChild(tempContainer);
+        invokeInput = document.getElementById('gemini-invoke-input');
+        chip = tempContainer.querySelector('.gemini-chip');
+        chip.addEventListener('click', () => {
+          invokeInput.value = chip.dataset.prompt;
+          appInstance.handleGeminiInvokeSubmit(false, { feature: 'guided_query' });
+        });
+      }
+
+      chip.click();
+      await new Promise(r => setTimeout(r, 10));
+
+      // voice
+      invokeInput.value = 'dime algo';
+      await appInstance.handleGeminiInvokeSubmit(true);
+
+      if (tempContainer) {
+        tempContainer.remove();
+      }
+
+      expect(featuresSent).toEqual(['weekly_plan', 'guided_query', 'guided_query', 'voice']);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it('extractRecipeWithGemini envía feature=import_ai e incluye inlineData', async () => {
+    const origFetch = globalThis.fetch;
+    let sentBody = null;
+    globalThis.fetch = vi.fn().mockImplementation(async (_url, opts) => {
+      sentBody = JSON.parse(opts.body);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          data: {
+            candidates: [{
+              content: {
+                parts: [{
+                  text: '{"title":"Tortilla","ingredients":[{"name":"Huevo","amount":2,"unit":"ud"}],"instructions":[{"step":1,"text":"Batir"}]}'
+                }]
+              }
+            }]
+          }
+        })
+      };
+    });
+
+    try {
+      const res = await appInstance.extractRecipeWithGemini({ imageBase64: 'xx' });
+      expect(res.title).toBe('Tortilla');
+      expect(sentBody.feature).toBe('import_ai');
+      expect(sentBody.payload.contents[0].parts.some(p => p.inlineData?.data === 'xx')).toBe(true);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it('estático: app.js no contiene generativelanguage.googleapis.com', () => {
+    const appSource = fs.readFileSync(path.resolve(process.cwd(), 'app.js'), 'utf8');
+    expect(appSource).not.toContain('generativelanguage.googleapis.com');
   });
 });
