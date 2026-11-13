@@ -12,6 +12,8 @@ describe('Épica 5 (Fase 1): Agente IA con Function Calling, Control Total y Seg
   let appInstance;
 
   beforeEach(() => {
+    state.cloudUser = { id: 'u1', email: 'a@b.c', name: 'Franky' };
+    state.aiPlan = { plan: 'pro', source: 'admin', status: 'active', periodEnd: null, isTrial: false, viaHousehold: false, quotas: {}, fetchedAt: null };
     localStorage.clear();
     state.recipes = JSON.parse(JSON.stringify(SEED_RECIPES));
     state.mealPlan = state.generateInitialMealPlan();

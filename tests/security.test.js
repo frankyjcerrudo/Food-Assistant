@@ -20,6 +20,8 @@ describe('Fase 1: Seguridad y Endurecimiento (US-36, US-38, US-40)', () => {
   let app;
 
   beforeEach(() => {
+    window.state.cloudUser = { id: 'u1', email: 'a@b.c', name: 'Franky' };
+    window.state.aiPlan = { plan: 'pro', source: 'admin', status: 'active', periodEnd: null, isTrial: false, viaHousehold: false, quotas: {}, fetchedAt: null };
     localStorage.clear();
     document.body.innerHTML = `
       <header>

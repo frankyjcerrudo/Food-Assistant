@@ -25,6 +25,8 @@ describe('Camino B (US-17 & BUG-26): Asistente de Voz Integrado, Plurales y Fin 
   let app;
 
   beforeEach(() => {
+    window.state.cloudUser = { id: 'u1', email: 'a@b.c', name: 'Franky' };
+    window.state.aiPlan = { plan: 'pro', source: 'admin', status: 'active', periodEnd: null, isTrial: false, viaHousehold: false, quotas: {}, fetchedAt: null };
     localStorage.clear();
     state.recipes = typeof structuredClone === 'function' ? structuredClone(SEED_RECIPES) : JSON.parse(JSON.stringify(SEED_RECIPES));
     state.mealPlan = state.generateInitialMealPlan();

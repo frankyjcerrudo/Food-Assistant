@@ -9993,3 +9993,29 @@ body.is-mobile-device .app-container {
   color: var(--m3-on-surface-variant);
 }
 
+
+/* ==========================================================================
+   US-79d: Tu plan, paywall y contadores Free / Pro
+   ========================================================================== */
+.plan-card-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.plan-card-title { font-size: 14px; font-weight: 500; margin: 0; display: flex; align-items: center; gap: 6px; }
+.plan-badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: var(--radius-full); font-size: 12px; font-weight: 600; background: var(--m3-surface-variant); color: var(--m3-on-surface-variant); }
+.plan-badge.is-pro { background: var(--m3-primary); color: var(--m3-on-primary, #fff); }
+.plan-detail { font-size: 12px; color: var(--m3-on-surface-variant); margin: 6px 0 10px; }
+.plan-detail:empty { display: none; }
+.plan-quotas { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.plan-quota-row { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.plan-quota-head { display: flex; justify-content: space-between; color: var(--m3-on-surface); }
+.plan-quota-bar { height: 6px; border-radius: 3px; background: var(--m3-surface-variant); overflow: hidden; }
+.plan-quota-bar > span { display: block; height: 100%; background: var(--m3-primary); }
+.plan-card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.gemini-invoke-quota { font-size: 12px; color: var(--m3-on-surface-variant); padding: 0 4px 8px; }
+.import-tab-quota { font-size: 10px; margin-left: 4px; opacity: 0.8; }
+.household-paused-banner { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; margin: 8px 0; border-radius: var(--radius-md, 12px); background: var(--m3-surface-variant); color: var(--m3-on-surface); font-size: 12px; }
+.paywall-reason { font-size: 13px; color: var(--m3-on-surface-variant); margin: 0 0 12px; }
+.paywall-reason:empty { display: none; }
+.paywall-benefits { margin: 0 0 16px; padding-left: 18px; font-size: 13px; display: flex; flex-direction: column; gap: 6px; }
+.paywall-options { display: flex; flex-direction: column; gap: 8px; }
+.paywall-option { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+.paywall-save { font-size: 11px; font-weight: 600; }
+.paywall-trial, .paywall-web-notice { font-size: 12px; color: var(--m3-on-surface-variant); text-align: center; margin: 10px 0 0; }

@@ -36,7 +36,7 @@
   <meta name="apple-mobile-web-app-title" content="Sabory">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="manifest" href="manifest.json?v=1.96">
+  <link rel="manifest" href="manifest.json?v=1.97">
   <meta name="theme-color" content="#FAF7F2">
   <script>
     (function() {
@@ -84,17 +84,17 @@
     href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..600&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Google+Sans:wght@400;500;700&display=swap">
   <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=1.96">
-  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.96">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.96">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.96">
+  <link rel="stylesheet" href="styles.css?v=1.97">
+  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.97">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.97">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.97">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <!-- US-41: versión fija + Subresource Integrity (sha384) para el SDK de Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"
     integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"
     referrerpolicy="no-referrer"></script>
   <!-- US-12: i18n Core Engine (in head for instant zero-flash localization) -->
-  <script src="i18n.js?v=1.96"></script>
+  <script src="i18n.js?v=1.97"></script>
 </head>
 
 <body>
@@ -171,7 +171,7 @@
     <aside class="pwa-smart-banner" id="pwa-smart-banner" hidden aria-label="Instalación de la app en la pantalla de inicio">
       <div class="pwa-smart-banner-content">
         <div class="pwa-smart-banner-icon" aria-hidden="true">
-          <img src="icon-192.png?v=1.96" alt="" width="28" height="28" class="pwa-smart-banner-img">
+          <img src="icon-192.png?v=1.97" alt="" width="28" height="28" class="pwa-smart-banner-img">
         </div>
         <div class="pwa-smart-banner-texts">
           <strong class="pwa-smart-banner-title" data-i18n="pwa.bannerTitle">Prueba Sabory como App</strong>
@@ -478,6 +478,24 @@
       </div>
 
       <!-- TIER 1: MIS PREFERENCIAS CULINARIAS (USO FRECUENTE) -->
+      <!-- 0: TU PLAN (US-79d) -->
+      <div class="card plan-card" id="card-plan">
+        <div class="plan-card-header">
+          <h3 class="plan-card-title">
+            <span class="material-symbols-outlined" style="color: var(--m3-primary);">workspace_premium</span>
+            <span data-i18n="plan.title">Tu plan</span>
+          </h3>
+          <span class="plan-badge" id="plan-badge">Free</span>
+        </div>
+        <p class="plan-detail" id="plan-detail"></p>
+        <div class="plan-quotas" id="plan-quotas"></div>
+        <div class="plan-card-actions">
+          <button type="button" class="btn btn-primary btn-sm" id="btn-plan-upgrade" data-i18n="plan.upgrade">Hazte Pro</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-plan-manage" style="display: none;" data-i18n="plan.manage">Gestionar suscripción</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-plan-login" style="display: none;" data-i18n="plan.login">Iniciar sesión</button>
+        </div>
+      </div>
+
       <!-- 1: USER ACCOUNT & CLOUD -->
       <div class="card">
         <h3
@@ -524,6 +542,12 @@
             </p>
           </div>
           <span class="household-mode-badge" id="household-status-badge">Modo Personal</span>
+        </div>
+
+        <div class="household-paused-banner" id="household-paused-banner" style="display: none;">
+          <span class="material-symbols-outlined icon-sm">pause_circle</span>
+          <span data-i18n="plan.householdPaused">El Pro del hogar ha caducado: la colaboración está en pausa</span>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-household-paused-upgrade" data-i18n="plan.upgrade">Hazte Pro</button>
         </div>
 
         <!-- Estado 1: Sin Hogar (Crear o Unirse) -->
@@ -900,8 +924,8 @@
             </h3>
             <p
               style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-              <span data-i18n="settings.installedVersion">Versión instalada:</span> <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.96</strong>
-              <span class="app-version-badge" id="app-version-badge">v1.96</span>
+              <span data-i18n="settings.installedVersion">Versión instalada:</span> <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.97</strong>
+              <span class="app-version-badge" id="app-version-badge">v1.97</span>
             </p>
             <div
               style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;" data-i18n="settings.versionCacheNotice">
@@ -1026,6 +1050,7 @@
       </div>
 
       <!-- Quick action prompt chips -->
+      <div class="gemini-invoke-quota" id="gemini-invoke-quota" style="display: none;"></div>
       <div class="gemini-quick-chips" id="gemini-invoke-chips">
         <button type="button" class="gemini-chip"
           data-prompt="Apunta medio kilo de tomates, 6 huevos y pechuga de pollo a la compra">
@@ -1079,6 +1104,42 @@
           <!-- Action buttons injected dynamically -->
         </div>
       </div>
+    </div>
+  </dialog>
+
+  <!-- MODAL: PAYWALL SABORY PRO (US-79d) -->
+  <dialog class="modal-overlay" id="modal-paywall" closedby="any" aria-labelledby="paywall-title">
+    <div class="modal-content paywall-content" style="padding: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="material-symbols-outlined" style="color: var(--m3-primary); font-size: 24px;">workspace_premium</span>
+          <h3 style="font-size: 18px; font-weight: 500;" id="paywall-title" data-i18n="paywall.title">Sabory Pro</h3>
+        </div>
+        <button type="button" class="btn btn-ghost btn-icon" id="btn-close-paywall" aria-label="Cerrar">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <p class="paywall-reason" id="paywall-reason"></p>
+      <ul class="paywall-benefits">
+        <li data-i18n="paywall.benefitPlans">Menús semanales ilimitados con el mejor modelo</li>
+        <li data-i18n="paywall.benefitChat">Chat y voz libres con el Sous Chef</li>
+        <li data-i18n="paywall.benefitScan">Escaneo e importación con IA ilimitados</li>
+        <li data-i18n="paywall.benefitFamily">Modo Familia para todo el hogar</li>
+      </ul>
+      <div class="paywall-options">
+        <button type="button" class="btn btn-primary paywall-option" id="btn-paywall-monthly">
+          <strong data-i18n="paywall.monthly">2,99 €/mes</strong>
+        </button>
+        <button type="button" class="btn btn-secondary paywall-option" id="btn-paywall-annual">
+          <strong data-i18n="paywall.annual">24,99 €/año</strong>
+          <span class="paywall-save" data-i18n="paywall.save">Ahorra 30 %</span>
+        </button>
+      </div>
+      <p class="paywall-trial" data-i18n="paywall.trial">14 días gratis, cancela cuando quieras</p>
+      <p class="paywall-web-notice" id="paywall-web-notice" style="display: none;">
+        <span data-i18n="paywall.webNotice">Hazte Pro desde la app Android</span>
+        <a href="https://play.google.com/store/apps/details?id=food.sabory.app" target="_blank" rel="noopener" data-i18n="paywall.playLink">Abrir en Google Play</a>
+      </p>
     </div>
   </dialog>
 
@@ -1635,6 +1696,7 @@
           aria-controls="section-import-ai">
           <span class="material-symbols-outlined">auto_awesome</span>
           <span class="import-tab-label" data-i18n="import.tabAi">Foto / IA</span>
+          <span class="import-tab-quota" id="import-ai-quota-badge" style="display: none;"></span>
         </button>
       </div>
 
@@ -2699,8 +2761,8 @@
     </div>
   </div>
 
-  <script src="config.js?v=1.96"></script>
-  <script src="app.js?v=1.96"></script>
+  <script src="config.js?v=1.97"></script>
+  <script src="app.js?v=1.97"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

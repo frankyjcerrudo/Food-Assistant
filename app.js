@@ -4893,7 +4893,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v1.96';
+  window.APP_VERSION = 'v1.97';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4940,7 +4940,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.96';
+    this.appVersion = window.APP_VERSION || 'v1.97';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -8287,6 +8287,31 @@ class FoodAssistantApp {
         }
       });
     });
+
+    // US-79d: Tu plan, paywall y bloqueos Free
+    document.getElementById('btn-plan-upgrade')?.addEventListener('click', () => this.openPaywall('pro'));
+    document.getElementById('btn-household-paused-upgrade')?.addEventListener('click', () => this.openPaywall('family'));
+    document.getElementById('btn-plan-login')?.addEventListener('click', () => this.openAuthModal?.());
+    document.getElementById('btn-plan-manage')?.addEventListener('click', () => {
+      window.open('https://play.google.com/store/account/subscriptions?package=food.sabory.app', '_blank', 'noopener');
+    });
+    document.getElementById('btn-close-paywall')?.addEventListener('click', () => this.closePaywall());
+    ['btn-paywall-monthly', 'btn-paywall-annual'].forEach(id => {
+      document.getElementById(id)?.addEventListener('click', () => {
+        const notice = document.getElementById('paywall-web-notice');
+        if (notice && !this.isPlayBillingAvailable()) notice.style.display = 'block';
+      });
+    });
+    ['gemini-invoke-input', 'ai-chat-input'].forEach(id => {
+      document.getElementById(id)?.addEventListener('click', (e) => {
+        if (state.cloudUser?.id && state.aiPlan?.plan === 'free') {
+          e.preventDefault();
+          e.target.blur?.();
+          this.openPaywall('chat');
+        }
+      });
+    });
+    this.refreshPlanUI();
 
     // Web Share Target (US-59): ?url= / ?text= / ?title= compartidos desde otras apps de Android
     this.handleShareTargetLaunch();
@@ -15518,15 +15543,239 @@ ${isEn
     return state.aiPlan?.plan === 'pro';
   }
 
+  tr(key, params, fallback = '') {
+    try {
+      if (window.I18n) {
+        const v = window.I18n.t(key, params);
+        if (v && v !== key) return v;
+      }
+    } catch (e) { }
+    return fallback || key;
+  }
+
+  isPlayBillingAvailable() {
+    return typeof window !== 'undefined' && 'getDigitalGoodsService' in window;
+  }
+
+  getAiQuotaRemaining(feature) {
+    const q = state.aiPlan?.quotas?.[feature];
+    if (!q) return null;
+    if (q.remaining !== undefined && q.remaining !== null) return q.remaining;
+    if (q.limit === null || q.limit === undefined) return null;
+    return Math.max(0, q.limit - (q.used || 0));
+  }
+
+  ensureAiAccess(feature) {
+    const plan = state.aiPlan?.plan;
+    if (!state.cloudUser?.id || plan === 'anonymous') {
+      this.showToast(this.tr('ai.loginRequired', undefined, 'Inicia sesión para usar el Sous Chef'), 'info');
+      this.openAuthModal?.();
+      return false;
+    }
+    if (plan === 'pro') return true;
+    if (feature === 'chat' || feature === 'voice') {
+      this.openPaywall(feature);
+      return false;
+    }
+    if (this.getAiQuotaRemaining(feature) === 0) {
+      this.openPaywall('quota_' + feature);
+      return false;
+    }
+    return true;
+  }
+
   openPaywall(reason = 'pro') {
-    const msg = reason === 'family'
-      ? (window.I18n ? window.I18n.t('paywall.familyPro') : 'Modo Familia es una función Sabory Pro. Mejora tu plan para compartir hogar.')
-      : (window.I18n ? window.I18n.t('paywall.familyPro') : 'Esta función requiere Sabory Pro.');
-    this.showToast(msg, 'info');
+    const dialog = document.getElementById('modal-paywall');
+    if (!dialog) {
+      const msg = reason === 'family'
+        ? this.tr('paywall.familyPro', undefined, 'Modo Familia es una función Sabory Pro.')
+        : this.tr('paywall.reasonPro', undefined, 'Esta función requiere Sabory Pro.');
+      this.showToast(msg, 'info');
+      return { reason, shown: true };
+    }
+    const reasonKeys = {
+      chat: 'paywall.reasonChat',
+      voice: 'paywall.reasonVoice',
+      quota_guided_query: 'paywall.reasonQuotaGuidedQuery',
+      quota_weekly_plan: 'paywall.reasonQuotaWeeklyPlan',
+      quota_import_ai: 'paywall.reasonQuotaImportAi',
+      family: 'paywall.reasonFamily'
+    };
+    const reasonEl = document.getElementById('paywall-reason');
+    if (reasonEl) {
+      reasonEl.textContent = this.tr(reasonKeys[reason] || 'paywall.reasonPro');
+    }
+    dialog.dataset.reason = reason;
+    const webNotice = document.getElementById('paywall-web-notice');
+    if (webNotice) webNotice.style.display = this.isPlayBillingAvailable() ? 'none' : 'block';
+    this.openDialogModal(dialog);
     return { reason, shown: true };
   }
 
+  closePaywall() {
+    this.closeDialogModal(document.getElementById('modal-paywall'));
+  }
+
+  handleAiProxyRejection(res, feature) {
+    if (!res) return;
+    if (res.status === 429) {
+      this.showToast(this.tr('paywall.rateLimited', undefined, 'Demasiadas peticiones seguidas.'), 'warning');
+      return;
+    }
+    if (res.status === 403) {
+      this.openPaywall(feature === 'voice' ? 'voice' : (feature === 'chat' ? 'chat' : 'pro'));
+    } else if (res.status === 402) {
+      this.openPaywall('quota_' + feature);
+    }
+  }
+
+  renderPlanCard() {
+    const card = document.getElementById('card-plan');
+    if (!card) return;
+    const plan = state.aiPlan || {};
+    const loggedIn = !!state.cloudUser?.id && plan.plan !== 'anonymous';
+    const badge = document.getElementById('plan-badge');
+    const detail = document.getElementById('plan-detail');
+    const quotasEl = document.getElementById('plan-quotas');
+    const btnUpgrade = document.getElementById('btn-plan-upgrade');
+    const btnManage = document.getElementById('btn-plan-manage');
+    const btnLogin = document.getElementById('btn-plan-login');
+    const isPro = plan.plan === 'pro';
+    const fmtDate = (iso) => {
+      try { return new Date(iso).toLocaleDateString(); } catch (e) { return ''; }
+    };
+
+    let badgeText = this.tr('plan.free', undefined, 'Free');
+    let detailText = '';
+    if (!loggedIn) {
+      badgeText = this.tr('plan.free', undefined, 'Free');
+      detailText = this.tr('plan.loginToUse', undefined, 'Inicia sesión para usar la IA');
+    } else if (isPro) {
+      if (plan.viaHousehold) {
+        badgeText = this.tr('plan.proHousehold', undefined, 'Pro · Hogar');
+        detailText = this.tr('plan.includedByHousehold', undefined, 'Incluido por el hogar');
+      } else if (plan.isTrial) {
+        badgeText = this.tr('plan.proTrial', undefined, 'Pro · Prueba');
+        if (plan.periodEnd) detailText = this.tr('plan.renewsOn', { date: fmtDate(plan.periodEnd) });
+      } else if (plan.source === 'admin' || plan.source === 'gift') {
+        badgeText = this.tr('plan.proGift', undefined, 'Pro · Regalo');
+        detailText = plan.periodEnd
+          ? this.tr('plan.giftUntil', { date: fmtDate(plan.periodEnd) })
+          : this.tr('plan.giftForever', undefined, 'Regalo permanente');
+      } else {
+        badgeText = this.tr('plan.pro', undefined, 'Pro');
+        if (plan.periodEnd) detailText = this.tr('plan.renewsOn', { date: fmtDate(plan.periodEnd) });
+      }
+    }
+
+    if (badge) {
+      badge.textContent = badgeText;
+      badge.classList.toggle('is-pro', loggedIn && isPro);
+    }
+    if (detail) detail.textContent = detailText;
+
+    if (quotasEl) {
+      quotasEl.innerHTML = '';
+      if (loggedIn) {
+        const rows = [
+          ['weekly_plan', 'plan.quotaWeeklyPlan', 'plan.usedWeek'],
+          ['guided_query', 'plan.quotaGuidedQuery', 'plan.usedDay'],
+          ['import_ai', 'plan.quotaImportAi', 'plan.usedMonth']
+        ];
+        rows.forEach(([feature, labelKey, usedKey]) => {
+          const q = plan.quotas?.[feature];
+          const row = document.createElement('div');
+          row.className = 'plan-quota-row';
+          row.dataset.feature = feature;
+          const head = document.createElement('div');
+          head.className = 'plan-quota-head';
+          const label = document.createElement('span');
+          label.textContent = this.tr(labelKey);
+          const value = document.createElement('span');
+          row.appendChild(head);
+          head.appendChild(label);
+          head.appendChild(value);
+          if (isPro || !q || q.limit === null || q.limit === undefined) {
+            value.textContent = isPro || !q ? this.tr('plan.unlimited', undefined, 'Ilimitado') : '';
+          } else {
+            const used = Math.min(q.used || 0, q.limit);
+            value.textContent = this.tr(usedKey, { used, limit: q.limit });
+            const bar = document.createElement('div');
+            bar.className = 'plan-quota-bar';
+            const fill = document.createElement('span');
+            fill.style.width = `${q.limit > 0 ? Math.round((used / q.limit) * 100) : 100}%`;
+            bar.appendChild(fill);
+            row.appendChild(bar);
+          }
+          quotasEl.appendChild(row);
+        });
+      }
+    }
+
+    if (btnUpgrade) btnUpgrade.style.display = loggedIn && !isPro ? '' : 'none';
+    if (btnManage) btnManage.style.display = loggedIn && isPro && plan.source === 'play' ? '' : 'none';
+    if (btnLogin) btnLogin.style.display = loggedIn ? 'none' : '';
+  }
+
+  renderAiQuotaHints() {
+    const plan = state.aiPlan || {};
+    const isFree = !!state.cloudUser?.id && plan.plan === 'free';
+
+    const sheetQuota = document.getElementById('gemini-invoke-quota');
+    if (sheetQuota) {
+      if (isFree) {
+        const remaining = this.getAiQuotaRemaining('guided_query');
+        const n = remaining === null ? (plan.quotas?.guided_query?.limit ?? 3) : remaining;
+        sheetQuota.textContent = this.tr('plan.remainingToday', { n });
+        sheetQuota.style.display = '';
+      } else {
+        sheetQuota.style.display = 'none';
+      }
+    }
+
+    const importBadge = document.getElementById('import-ai-quota-badge');
+    if (importBadge) {
+      const q = plan.quotas?.import_ai;
+      if (isFree && q && q.limit !== null && q.limit !== undefined) {
+        importBadge.textContent = `${Math.min(q.used || 0, q.limit)}/${q.limit}`;
+        importBadge.style.display = '';
+      } else {
+        importBadge.style.display = 'none';
+      }
+    }
+
+    const locked = isFree;
+    const lockedText = this.tr('paywall.chatLocked', undefined, 'El chat libre es Pro ✨');
+    ['gemini-invoke-input', 'ai-chat-input'].forEach(id => {
+      const input = document.getElementById(id);
+      if (!input) return;
+      if (locked) {
+        if (input.dataset.proPlaceholder === undefined) input.dataset.proPlaceholder = input.getAttribute('placeholder') || '';
+        input.setAttribute('placeholder', lockedText);
+      } else if (input.dataset.proPlaceholder !== undefined) {
+        input.setAttribute('placeholder', input.dataset.proPlaceholder);
+        delete input.dataset.proPlaceholder;
+      }
+    });
+  }
+
+  refreshPlanUI() {
+    this.renderPlanCard();
+    this.renderAiQuotaHints();
+    if (typeof this.renderHouseholdSettings === 'function') this.renderHouseholdSettings();
+  }
+
   async loadAiPlanStatus() {
+    const prevPlan = state.aiPlan?.plan;
+    const result = await this._loadAiPlanStatusInner();
+    this.refreshPlanUI();
+    if (state.household?.id && prevPlan !== state.aiPlan?.plan && this.supabaseClient) {
+      this.initHouseholdRealtimeSubscription();
+    }
+    return result;
+  }
+
+  async _loadAiPlanStatusInner() {
     if (!this.supabaseClient?.rpc || !state.cloudUser?.id) {
       state.aiPlan = {
         plan: 'anonymous',
@@ -15614,6 +15863,7 @@ ${isEn
         }
         state.aiPlan.fetchedAt = new Date().toISOString();
         state.save('fa_ai_plan', state.aiPlan);
+        this.refreshPlanUI();
       }
       return {
         ...json,
@@ -15672,6 +15922,7 @@ ${isEn
       if (res.quota !== undefined && res.quota !== null) {
         this.lastAiQuota = res.quota;
       }
+      this.handleAiProxyRejection(res, feature);
       return {
         text,
         quotaExceeded: true,
@@ -16721,6 +16972,7 @@ ${isEn
     const input = document.getElementById('ai-chat-input');
     const text = input?.value.trim() || '';
     if (!text) return;
+    if (!this.ensureAiAccess(options?.feature || (fromVoice ? 'voice' : 'chat'))) return;
 
     const history = document.getElementById('chat-history-container');
     if (!history) return;
@@ -17043,6 +17295,7 @@ ${isEn
       this.isListeningVoice = false;
       this.updateVoiceUI(false);
     } else {
+      if (!this.ensureAiAccess('voice')) return;
       if (!isInvokeModal) {
         this.switchView('view-ai');
         const chatInput = document.getElementById('ai-chat-input');
@@ -17109,6 +17362,7 @@ ${isEn
     this.stopSpeech();
     const modal = document.getElementById('modal-gemini-invoke');
     if (!modal) return;
+    this.renderAiQuotaHints?.();
     this.openDialogModal(modal);
 
     const input = document.getElementById('gemini-invoke-input');
@@ -17156,6 +17410,7 @@ ${isEn
     const input = document.getElementById('gemini-invoke-input');
     const prompt = input?.value?.trim();
     if (!prompt) return;
+    if (!this.ensureAiAccess(options?.feature || (isVoice ? 'voice' : 'chat'))) return;
     if (input) input.value = '';
 
     if (this.isListeningVoice) {
@@ -17779,6 +18034,7 @@ REGLAS CRÍTICAS:
 
     if (res.status === 402 || res.status === 403 || res.status === 429) {
       const err = new Error(window.I18n ? window.I18n.t('ai.quotaExceeded') : 'Has alcanzado tu límite de IA');
+      this.handleAiProxyRejection(res, 'import_ai');
       err.code = res.code || 'QUOTA_EXCEEDED';
       err.quotaExceeded = true;
       err.quota = res.quota ?? null;
@@ -18287,6 +18543,7 @@ REGLAS CRÍTICAS:
 
   // SETTINGS
   renderSettings() {
+    this.renderPlanCard?.();
     const switchTts = document.getElementById('switch-tts-voice');
     if (switchTts) {
       switchTts.checked = state.settings.ttsEnabled !== false;
@@ -18392,6 +18649,11 @@ REGLAS CRÍTICAS:
 
     if (emptyView) emptyView.style.display = isActive ? 'none' : 'block';
     if (activeView) activeView.style.display = isActive ? 'block' : 'none';
+
+    const pausedBanner = document.getElementById('household-paused-banner');
+    if (pausedBanner) {
+      pausedBanner.style.display = isActive && !this.isPro() ? 'flex' : 'none';
+    }
 
     if (!isActive) return;
 
@@ -19055,6 +19317,10 @@ REGLAS CRÍTICAS:
 
   initHouseholdRealtimeSubscription() {
     this.teardownHouseholdRealtimeSubscription();
+    if (state.household?.id && !this.isPro()) {
+      // US-79d: Pro del hogar caducado => colaboración en pausa (los datos locales se mantienen)
+      return null;
+    }
     if (!this.supabaseClient || typeof this.supabaseClient.channel !== 'function') {
       return null;
     }
