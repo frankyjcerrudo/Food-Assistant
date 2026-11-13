@@ -555,34 +555,11 @@ describe('US-12: Módulo Core de Internacionalización (i18n.js)', () => {
     expect(onboardingDietaryContainer.textContent).toContain('Vegano');
     expect(onboardingDietaryContainer.textContent).toContain('Sin Gluten');
 
-    // 3. AI Provider translations
-    expect(I18n.t('settings.aiOptGemini')).toBe('Google Gemini (Gratuito hasta 1.500 req/día)');
+    // 3. Settings translations
     I18n.setPreference('en');
-    expect(I18n.t('settings.aiOptGemini')).toBe('Google Gemini (Free up to 1,500 req/day)');
     expect(I18n.t('settings.syncedAt')).toBe('Synced at');
 
-    // 4. External Agent Guide in English
-    const guideEl = document.getElementById('external-agent-guide') || (() => {
-      const el = document.createElement('pre');
-      el.id = 'external-agent-guide';
-      document.body.appendChild(el);
-      return el;
-    })();
-    const statusEl = document.getElementById('external-agent-status') || (() => {
-      const el = document.createElement('div');
-      el.id = 'external-agent-status';
-      document.body.appendChild(el);
-      return el;
-    })();
-
-    appInstance.renderExternalAgentSettings();
-    expect(guideEl.textContent).toContain('# 1) Natural language command');
-    expect(guideEl.textContent).toContain('Add milk and avocados to the shopping list');
-
     I18n.setPreference('es');
-    appInstance.renderExternalAgentSettings();
-    expect(guideEl.textContent).toContain('# 1) Comando en lenguaje natural');
-    expect(guideEl.textContent).toContain('Añade leche y aguacates a la compra');
   });
 
   it('traduce slots vacíos del planificador y modal selector de recetas (v1.67)', () => {

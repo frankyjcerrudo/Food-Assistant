@@ -2499,9 +2499,7 @@ class StateStore {
     }
 
     this.settings = this.load('fa_settings', {
-      geminiApiKey: '',
       defaultServings: 2,
-      geminiModel: 'gemini-3.8-flash',
       ttsEnabled: true,
       nutritionGoals: {
         enabled: false,
@@ -2511,8 +2509,9 @@ class StateStore {
         fat: 65
       }
     });
-    if (!this.settings.geminiModel || this.settings.geminiModel === 'gemini-2.5-flash-lite' || this.settings.geminiModel === 'gemini-1.5-flash') {
-      this.settings.geminiModel = 'gemini-3.8-flash';
+    const legacySettingKeys = ['geminiApiKey', 'geminiModel', 'aiProvider', 'defaultGeminiApiKey', 'agentTokenHash', 'agentTokenHint', 'agentEnabled'];
+    if (legacySettingKeys.some(k => Object.prototype.hasOwnProperty.call(this.settings, k))) {
+      legacySettingKeys.forEach(k => delete this.settings[k]);
       this.save('fa_settings', this.settings);
     }
     if (!this.settings.nutritionGoals) {
@@ -2524,6 +2523,11 @@ class StateStore {
     this.theme = localStorage.getItem('fa_theme_mode') || 'light';
     this.cloudUser = this.load('fa_cloud_user', null);
     this.household = this.load('fa_household', null);
+    const legacyHouseholdKey = 'shared' + 'GeminiApiKey';
+    if (this.household && Object.prototype.hasOwnProperty.call(this.household, legacyHouseholdKey)) {
+      delete this.household[legacyHouseholdKey];
+      this.save('fa_household', this.household);
+    }
     this.personalBackup = this.load('fa_personal_backup', null);
     this.supabaseConfig = {
       url: window.APP_CONFIG?.supabaseUrl || localStorage.getItem('fa_sb_url') || '',
@@ -4879,7 +4883,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v1.94';
+  window.APP_VERSION = 'v1.95';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4926,7 +4930,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v1.94';
+    this.appVersion = window.APP_VERSION || 'v1.95';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -6219,10 +6223,6 @@ class FoodAssistantApp {
     }
     state.cloudUser = null;
     state.save('fa_cloud_user', null);
-    if (state.settings?.defaultGeminiApiKey) {
-      delete state.settings.defaultGeminiApiKey;
-      state.save('fa_settings', state.settings);
-    }
     this.updateUserAccountUI();
     this.closeAuthModal();
     this.showToast("Has cerrado sesión. Tus datos continúan disponibles localmente.", 'info');
@@ -6254,8 +6254,7 @@ class FoodAssistantApp {
           this.supabaseClient.from('recipes').delete().eq('user_id', uid),
           this.supabaseClient.from('meal_plans').delete().eq('user_id', uid),
           this.supabaseClient.from('shopping_items').delete().eq('user_id', uid),
-          this.supabaseClient.from('user_settings').delete().eq('user_id', uid),
-          this.supabaseClient.from('external_agent_tokens').delete().eq('user_id', uid)
+          this.supabaseClient.from('user_settings').delete().eq('user_id', uid)
         ]);
       } catch (err) {
         console.warn('[Supabase] Error al limpiar tablas remotas:', err);
@@ -6818,7 +6817,6 @@ class FoodAssistantApp {
       let remoteCustomTags = null;
       let remoteDietaryUpdatedAt = null;
       let remoteGoals = null;
-      let remoteGeminiKey = null;
       let sRowCookbooks = null;
       let sRowCookbooksUpdatedAt = null;
 
@@ -6830,19 +6828,10 @@ class FoodAssistantApp {
             if (Array.isArray(sRow.dietary_preferences)) remoteDietary = sRow.dietary_preferences;
             if (Array.isArray(sRow.custom_tags)) remoteCustomTags = sRow.custom_tags;
             if (sRow.nutrition_goals && typeof sRow.nutrition_goals === 'object') remoteGoals = sRow.nutrition_goals;
-            if (typeof sRow.gemini_api_key === 'string' && sRow.gemini_api_key.trim()) remoteGeminiKey = sRow.gemini_api_key.trim();
             if (sRow.updated_at) remoteDietaryUpdatedAt = sRow.updated_at;
             if (Array.isArray(sRow.cookbooks)) {
               sRowCookbooks = sRow.cookbooks;
               sRowCookbooksUpdatedAt = sRow.updated_at;
-            }
-            // US-69: adoptar el acceso externo configurado desde otro dispositivo
-            if (typeof sRow.agent_token_hash === 'string' && sRow.agent_token_hash && !state.settings?.agentTokenHash) {
-              if (!state.settings) state.settings = {};
-              state.settings.agentTokenHash = sRow.agent_token_hash;
-              state.settings.agentEnabled = !!sRow.agent_enabled;
-              state.save('fa_settings', state.settings);
-              stateChanged = true;
             }
             // US-77: Adoptar Hogar activo si el usuario inicia sesión desde un dispositivo nuevo
             if (sRow.active_household_id && !state.household?.id && typeof this.loadHouseholdByIdFromCloud === 'function') {
@@ -6878,9 +6867,6 @@ class FoodAssistantApp {
             if (meta.nutrition_goals && typeof meta.nutrition_goals === 'object') {
               if (!remoteGoals) remoteGoals = meta.nutrition_goals;
             }
-            if (typeof meta.gemini_api_key === 'string' && meta.gemini_api_key.trim()) {
-              remoteGeminiKey = meta.gemini_api_key.trim();
-            }
             if (Array.isArray(meta.cookbooks)) {
               metaCookbooks = meta.cookbooks;
               metaCookbooksUpdatedAt = meta.cookbooks_updated_at || meta.dietary_updated_at || null;
@@ -6898,6 +6884,13 @@ class FoodAssistantApp {
         }
       }
 
+      // US-79b: Limpieza remota única de clave heredada en user_metadata
+      if (state.cloudUser?.user_metadata?.gemini_api_key && this.supabaseClient?.auth?.updateUser) {
+        this.supabaseClient.auth.updateUser({ data: { gemini_api_key: null } }).catch(() => { });
+        delete state.cloudUser.user_metadata.gemini_api_key;
+        state.save('fa_cloud_user', state.cloudUser);
+      }
+
       if (!remoteDietary && Array.isArray(state.cloudUser?.user_metadata?.dietary_preferences)) {
         remoteDietary = state.cloudUser.user_metadata.dietary_preferences;
         remoteDietaryUpdatedAt = state.cloudUser.user_metadata.dietary_updated_at;
@@ -6913,29 +6906,12 @@ class FoodAssistantApp {
           remoteDietary = hhPrefSlot.dietaryPreferences;
           remoteDietaryUpdatedAt = hhPrefSlot.updatedAt || remoteHouseholdPrefsRow.updated_at || remoteDietaryUpdatedAt;
         }
-        if (hhPrefSlot && typeof hhPrefSlot.sharedGeminiApiKey === 'string' && hhPrefSlot.sharedGeminiApiKey.trim()) {
-          const sharedKey = hhPrefSlot.sharedGeminiApiKey.trim();
-          if (state.household && state.household.sharedGeminiApiKey !== sharedKey) {
-            state.household.sharedGeminiApiKey = sharedKey;
-            state.saveHousehold(state.household);
-            stateChanged = true;
-          }
-          if (!state.settings) state.settings = {};
-          if (state.settings.defaultGeminiApiKey !== sharedKey) {
-            state.settings.defaultGeminiApiKey = sharedKey;
-            state.save('fa_settings', state.settings);
-            stateChanged = true;
-          }
-        }
       }
       if (!remoteCustomTags && Array.isArray(state.cloudUser?.user_metadata?.custom_tags)) {
         remoteCustomTags = state.cloudUser.user_metadata.custom_tags;
       }
       if (!remoteGoals && state.cloudUser?.user_metadata?.nutrition_goals) {
         remoteGoals = state.cloudUser.user_metadata.nutrition_goals;
-      }
-      if (!remoteGeminiKey && typeof state.cloudUser?.user_metadata?.gemini_api_key === 'string') {
-        remoteGeminiKey = state.cloudUser.user_metadata.gemini_api_key.trim();
       }
 
       if (Array.isArray(remoteDietary)) {
@@ -7068,29 +7044,6 @@ class FoodAssistantApp {
         if (localGoalsJson !== remoteGoalsJson) {
           state.saveNutritionGoals(remoteGoals);
           stateChanged = true;
-        }
-      }
-
-      if (remoteGeminiKey && remoteGeminiKey !== (state.settings?.geminiApiKey || '')) {
-        if (!state.settings) state.settings = {};
-        state.settings.geminiApiKey = remoteGeminiKey;
-        state.save('fa_settings', state.settings);
-        stateChanged = true;
-      }
-
-      // Clave IA por defecto para usuarios autenticados sin clave propia (tabla public.app_config)
-      if (!this.getEffectiveGeminiApiKey() && this.supabaseClient?.from) {
-        try {
-          const cfgRes = await this.supabaseClient.from('app_config').select('*').eq('key', 'default_gemini_api_key');
-          const cfgRow = Array.isArray(cfgRes?.data) ? cfgRes.data[0] : cfgRes?.data;
-          if (cfgRow && typeof cfgRow.value === 'string' && cfgRow.value.trim()) {
-            if (!state.settings) state.settings = {};
-            state.settings.defaultGeminiApiKey = cfgRow.value.trim();
-            state.save('fa_settings', state.settings);
-            stateChanged = true;
-          }
-        } catch (cfgErr) {
-          // Ignorar silenciosamente si la tabla app_config aún no ha sido creada en Supabase
         }
       }
 
@@ -7469,20 +7422,12 @@ class FoodAssistantApp {
       });
 
       if (activeHouseholdId) {
-        const effectiveGeminiKey = this.getEffectiveGeminiApiKey();
-        if (effectiveGeminiKey && state.household && !state.household.sharedGeminiApiKey) {
-          state.household.sharedGeminiApiKey = effectiveGeminiKey;
-          state.saveHousehold(state.household);
-        }
         const hhDietaryUpdatedAt = state.dietaryUpdatedAt || state.household?.dietaryUpdatedAt || new Date().toISOString();
         const hhPrefSlotPayload = {
           type: 'household_prefs',
           dietaryPreferences: Array.isArray(state.dietaryPreferences) ? [...state.dietaryPreferences] : [],
           updatedAt: hhDietaryUpdatedAt
         };
-        if (effectiveGeminiKey) {
-          hhPrefSlotPayload.sharedGeminiApiKey = effectiveGeminiKey;
-        }
         const hhCookbooksSlotPayload = {
           type: 'household_cookbooks',
           cookbooks: Array.isArray(state.cookbooks) ? state.cookbooks : [],
@@ -7573,14 +7518,13 @@ class FoodAssistantApp {
         if (!sRes.success) throw sRes.error;
       }
 
-      // 5. Preferencias Dietéticas, Tags Personalizados, Libros, Objetivos y Clave Gemini (Sincronización multi-dispositivo)
+      // 5. Preferencias Dietéticas, Tags Personalizados, Libros y Objetivos (Sincronización multi-dispositivo)
       if (this.supabaseClient?.auth && typeof this.supabaseClient.auth.updateUser === 'function') {
         try {
           const metaPayload = {
             dietary_preferences: state.dietaryPreferences || [],
             custom_tags: state.customTags || [],
             nutrition_goals: state.settings?.nutritionGoals || null,
-            gemini_api_key: state.settings?.geminiApiKey || '',
             cookbooks: state.cookbooks || [],
             cookbooks_updated_at: state.cookbooksUpdatedAt || new Date().toISOString(),
             dietary_updated_at: state.dietaryUpdatedAt || new Date().toISOString()
@@ -7612,11 +7556,6 @@ class FoodAssistantApp {
               ? state.cookbooksUpdatedAt
               : (state.dietaryUpdatedAt || new Date().toISOString())
           };
-          // US-69: solo se envía si este dispositivo conoce el token (evita pisarlo con null)
-          if (state.settings?.agentTokenHash !== undefined) {
-            settingsRow.agent_token_hash = state.settings.agentTokenHash || null;
-            settingsRow.agent_enabled = !!state.settings.agentEnabled;
-          }
           // US-77: sincronizar el hogar activo del usuario si pertenece a uno
           if (activeHouseholdId) {
             settingsRow.active_household_id = activeHouseholdId;
@@ -7625,20 +7564,6 @@ class FoodAssistantApp {
         }
       } catch (tableErr) {
         // user_settings es opcional, user_metadata garantiza la persistencia multi-dispositivo
-      }
-
-      // Clave IA por defecto para usuarios autenticados (tabla public.app_config)
-      const personalGeminiKey = typeof state.settings?.geminiApiKey === 'string' ? state.settings.geminiApiKey.trim() : '';
-      if (personalGeminiKey && this.supabaseClient?.from) {
-        try {
-          await this.supabaseClient.from('app_config').upsert([{
-            key: 'default_gemini_api_key',
-            value: personalGeminiKey,
-            updated_at: new Date().toISOString()
-          }], { onConflict: 'key' });
-        } catch (appCfgErr) {
-          // Ignorar silenciosamente si la tabla app_config aún no ha sido creada en Supabase
-        }
       }
 
       // 6. Éxito confirmado: actualizar marca temporal
@@ -8218,11 +8143,6 @@ class FoodAssistantApp {
     document.getElementById('btn-planner-ai-auto')?.addEventListener('click', () => this.triggerGeminiAutoPlan());
 
     // Settings
-    document.getElementById('btn-save-gemini-key')?.addEventListener('click', () => this.saveGeminiKey());
-    document.getElementById('btn-generate-agent-token')?.addEventListener('click', () => this.generateExternalAgentToken());
-    document.getElementById('btn-revoke-agent-token')?.addEventListener('click', () => this.revokeExternalAgentToken());
-    document.getElementById('btn-copy-agent-token')?.addEventListener('click', () => this.copyExternalAgentText(document.getElementById('external-agent-token')?.value || ''));
-    document.getElementById('btn-copy-agent-guide')?.addEventListener('click', () => this.copyExternalAgentText(document.getElementById('external-agent-guide')?.textContent || ''));
     document.getElementById('btn-save-nutrition-goals')?.addEventListener('click', () => this.saveNutritionGoalsFromSettings());
     document.getElementById('btn-export-backup')?.addEventListener('click', () => this.exportBackup());
     document.getElementById('input-import-backup')?.addEventListener('change', (e) => this.importBackup(e));
@@ -15557,16 +15477,6 @@ ${isEn
         : `10. IDIOMA: Responde a ${userRef} en español natural, cálido y conciso.`}`;
   }
 
-  getEffectiveGeminiApiKey() {
-    const ownKey = typeof state.settings?.geminiApiKey === 'string' ? state.settings.geminiApiKey.trim() : '';
-    if (ownKey) return ownKey;
-    const householdKey = typeof state.household?.sharedGeminiApiKey === 'string' ? state.household.sharedGeminiApiKey.trim() : '';
-    if (householdKey) return householdKey;
-    const defaultKey = typeof state.settings?.defaultGeminiApiKey === 'string' ? state.settings.defaultGeminiApiKey.trim() : '';
-    if (defaultKey) return defaultKey;
-    return '';
-  }
-
   getAiProxyEndpoint() {
     const rawUrl = (typeof APP_CONFIG !== 'undefined' && APP_CONFIG?.supabaseUrl)
       || (typeof window !== 'undefined' && window.APP_CONFIG?.supabaseUrl)
@@ -15838,98 +15748,6 @@ ${isEn
     });
 
     return { mode, days, isBatchCooking };
-  }
-
-  async callOpenAiAgent(prompt, systemInstruction = "", enableTools = true) {
-    const apiKey = this.getEffectiveGeminiApiKey();
-    if (!apiKey) return this.simulateGeminiAgentResponse(prompt);
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-      const messages = [];
-      const effectiveSystemInstruction = systemInstruction || this.buildAiSystemInstruction();
-      if (effectiveSystemInstruction) {
-        messages.push({ role: 'system', content: effectiveSystemInstruction });
-      }
-      if (Array.isArray(this.aiChatHistory)) {
-        this.aiChatHistory.slice(-6).forEach(m => {
-          messages.push({ role: m.role === 'model' ? 'assistant' : 'user', content: String(m.text || '') });
-        });
-      }
-      messages.push({ role: 'user', content: prompt });
-
-      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages
-        }),
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-      if (resp.ok) {
-        const data = await resp.json();
-        const content = data.choices?.[0]?.message?.content || '';
-        return { text: content, toolCalls: [] };
-      }
-      const err = await resp.json().catch(() => ({}));
-      const msg = err.error?.message || `Error HTTP ${resp.status}`;
-      console.warn('[FoodAssistant] Fallback OpenAI:', msg);
-      return { ...this.simulateGeminiAgentResponse(prompt), isSimulatedFallback: true, originalError: msg };
-    } catch (e) {
-      console.warn('[FoodAssistant] Error conexión OpenAI, fallback local:', e.message);
-      return { ...this.simulateGeminiAgentResponse(prompt), isSimulatedFallback: true, originalError: e.message };
-    }
-  }
-
-  async callClaudeAgent(prompt, systemInstruction = "", enableTools = true) {
-    const apiKey = this.getEffectiveGeminiApiKey();
-    if (!apiKey) return this.simulateGeminiAgentResponse(prompt);
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-      const messages = [];
-      if (Array.isArray(this.aiChatHistory)) {
-        this.aiChatHistory.slice(-6).forEach(m => {
-          messages.push({ role: m.role === 'model' ? 'assistant' : 'user', content: String(m.text || '') });
-        });
-      }
-      messages.push({ role: 'user', content: prompt });
-
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        },
-        body: JSON.stringify({
-          model: 'claude-3-5-haiku-20241022',
-          max_tokens: 1024,
-          system: systemInstruction || this.buildAiSystemInstruction(),
-          messages
-        }),
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-      if (resp.ok) {
-        const data = await resp.json();
-        const text = data.content?.[0]?.text || '';
-        return { text, toolCalls: [] };
-      }
-      const err = await resp.json().catch(() => ({}));
-      const msg = err.error?.message || `Error HTTP ${resp.status}`;
-      console.warn('[FoodAssistant] Fallback Claude:', msg);
-      return { ...this.simulateGeminiAgentResponse(prompt), isSimulatedFallback: true, originalError: msg };
-    } catch (e) {
-      console.warn('[FoodAssistant] Error conexión Claude, fallback local:', e.message);
-      return { ...this.simulateGeminiAgentResponse(prompt), isSimulatedFallback: true, originalError: e.message };
-    }
   }
 
   simulateGeminiAgentResponse(prompt) {
@@ -18379,34 +18197,6 @@ REGLAS CRÍTICAS:
 
   // SETTINGS
   renderSettings() {
-    const selectProvider = document.getElementById('select-ai-provider');
-    const inputKey = document.getElementById('input-gemini-key');
-    const status = document.getElementById('gemini-key-status');
-
-    if (selectProvider) {
-      selectProvider.value = state.settings.aiProvider || 'gemini';
-      selectProvider.onchange = (e) => {
-        state.settings.aiProvider = e.target.value;
-        state.save && state.save('fa_settings', state.settings);
-        this.renderSettings();
-      };
-    }
-
-    const currentProvider = state.settings.aiProvider || 'gemini';
-    const modelWrapper = document.getElementById('wrapper-gemini-model');
-    const selectModel = document.getElementById('select-gemini-model');
-    if (modelWrapper) {
-      modelWrapper.style.display = 'none';
-    }
-    if (selectModel) {
-      selectModel.value = state.settings.geminiModel || 'gemini-3.5-flash-lite';
-      selectModel.onchange = (e) => {
-        state.settings.geminiModel = e.target.value;
-        state.save && state.save('fa_settings', state.settings);
-        this.renderSettings();
-      };
-    }
-
     const switchTts = document.getElementById('switch-tts-voice');
     if (switchTts) {
       switchTts.checked = state.settings.ttsEnabled !== false;
@@ -18417,29 +18207,6 @@ REGLAS CRÍTICAS:
           this.stopSpeech();
         }
       };
-    }
-
-    const isEn = window.I18n && window.I18n.getLanguage() === 'en';
-    if (inputKey) {
-      inputKey.value = state.settings.geminiApiKey || '';
-      if (currentProvider === 'openai') {
-        inputKey.placeholder = isEn ? 'sk-proj-... (OpenAI Key)' : 'sk-proj-... (Clave de OpenAI)';
-      } else if (currentProvider === 'claude') {
-        inputKey.placeholder = isEn ? 'sk-ant-... (Anthropic Claude Key)' : 'sk-ant-... (Clave de Anthropic Claude)';
-      } else {
-        inputKey.placeholder = isEn ? 'AIzaSy... (Google Gemini Key)' : 'AIzaSy... (Clave de Google Gemini)';
-      }
-    }
-
-    if (status) {
-      const provName = currentProvider === 'openai' ? 'OpenAI ChatGPT' : (currentProvider === 'claude' ? 'Anthropic Claude' : 'Google Gemini');
-      if (state.settings.geminiApiKey) {
-        status.innerHTML = `<span class="u-text-brand-medium">✓ ${window.I18n ? window.I18n.t('settings.apiKeyConfigured', { provider: provName }) : `Clave configurada (${provName} activo)`}</span>`;
-      } else if (this.getEffectiveGeminiApiKey()) {
-        status.innerHTML = `<span class="u-text-brand-medium">✓ ${window.I18n ? window.I18n.t('settings.apiKeySharedActive', { provider: provName }) : `IA de Sabory activa automáticamente (${provName} · clave propia opcional)`}</span>`;
-      } else {
-        status.innerHTML = `<span class="u-text-muted">${window.I18n ? window.I18n.t('settings.apiKeyIntegrated') : 'Modo Sous Chef Integrado activo (sin coste ni clave requerida)'}</span>`;
-      }
     }
 
     const selectServings = document.getElementById('select-default-servings');
@@ -18453,7 +18220,6 @@ REGLAS CRÍTICAS:
 
     this.renderDietaryPreferencesSettings();
     this.renderNutritionGoalsSettings();
-    this.renderExternalAgentSettings();
     this.renderHouseholdSettings();
     this.updateUserAccountUI();
   }
@@ -19554,128 +19320,6 @@ REGLAS CRÍTICAS:
     }, 250);
   }
 
-  // ==========================================================================
-  // US-69 (Fase 3): Control externo por voz / IA / MCP sin abrir la app
-  // ==========================================================================
-  getExternalAgentEndpoint() {
-    const base = (window.APP_CONFIG?.supabaseUrl || localStorage.getItem('fa_sb_url') || '').replace(/\/+$/, '');
-    return base ? `${base}/functions/v1/food-assistant-agent` : '';
-  }
-
-  async hashAgentToken(token) {
-    const bytes = new TextEncoder().encode(String(token));
-    const digest = await crypto.subtle.digest('SHA-256', bytes);
-    return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-
-  async generateExternalAgentToken() {
-    if (!state.cloudUser?.id) {
-      this.showToast('Inicia sesión en tu cuenta para activar el control externo.', 'warning');
-      return null;
-    }
-    const uuid = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}${Math.random()}`).replace(/-/g, '');
-    const token = `fa_live_${uuid}`;
-    state.settings.agentTokenHash = await this.hashAgentToken(token);
-    state.settings.agentTokenHint = token.slice(-4);
-    state.settings.agentEnabled = true;
-    state.save('fa_settings', state.settings);
-    this.renderExternalAgentSettings(token);
-    this.scheduleSyncWithCloud();
-    return token;
-  }
-
-  revokeExternalAgentToken() {
-    state.settings.agentTokenHash = '';
-    state.settings.agentTokenHint = '';
-    state.settings.agentEnabled = false;
-    state.save('fa_settings', state.settings);
-    this.renderExternalAgentSettings();
-    this.scheduleSyncWithCloud();
-    this.showToast('Token revocado. Los asistentes externos ya no tienen acceso.', 'success');
-  }
-
-  toggleExternalAgentEnabled(enabled) {
-    if (!state.settings.agentTokenHash) return;
-    state.settings.agentEnabled = !!enabled;
-    state.save('fa_settings', state.settings);
-    this.renderExternalAgentSettings();
-    this.scheduleSyncWithCloud();
-  }
-
-  async copyExternalAgentText(text) {
-    try {
-      await navigator.clipboard.writeText(text);
-      this.showToast('Copiado al portapapeles.', 'success');
-    } catch (e) {
-      this.showToast('No se pudo copiar automáticamente.', 'warning');
-    }
-  }
-
-  // `freshToken` solo existe justo tras generarlo: es la única vez que se muestra completo.
-  renderExternalAgentSettings(freshToken = null) {
-    const statusEl = document.getElementById('external-agent-status');
-    if (!statusEl) return;
-    const hasToken = !!state.settings?.agentTokenHash;
-    const enabled = hasToken && !!state.settings.agentEnabled;
-
-    const toggle = document.getElementById('toggle-external-agent');
-    if (toggle) {
-      toggle.checked = enabled;
-      toggle.disabled = !hasToken;
-      toggle.onchange = (e) => this.toggleExternalAgentEnabled(e.target.checked);
-    }
-
-    const endpoint = this.getExternalAgentEndpoint();
-    const isEn = window.I18n && window.I18n.getLanguage() === 'en';
-    const activeLabel = isEn ? '✓ External access active' : '✓ Acceso externo activo';
-    const pausedLabel = isEn ? 'External access paused' : 'Acceso externo en pausa';
-    const noTokenLabel = isEn ? 'No token. Generate one to connect external assistants.' : 'Sin token. Genera uno para conectar asistentes externos.';
-    statusEl.innerHTML = hasToken
-      ? `<span class="${enabled ? 'u-text-brand-medium' : 'u-text-muted-medium'}">${enabled ? activeLabel : pausedLabel} · token fa_live_••••${state.settings.agentTokenHint || ''}</span>`
-      : `<span class="u-text-muted">${noTokenLabel}</span>`;
-
-    const reveal = document.getElementById('external-agent-token-reveal');
-    const tokenInput = document.getElementById('external-agent-token');
-    if (reveal && tokenInput) {
-      reveal.style.display = freshToken ? 'block' : 'none';
-      tokenInput.value = freshToken || '';
-    }
-
-    const guide = document.getElementById('external-agent-guide');
-    if (guide) {
-      const tk = freshToken || (isEn ? 'fa_live_YOUR_TOKEN' : 'fa_live_TU_TOKEN');
-      guide.textContent = isEn
-        ? `# 1) Natural language command (Voice shortcuts / HTTP Shortcuts / Telegram)
-POST ${endpoint}/command
-Authorization: Bearer ${tk}
-Content-Type: application/json
-{"command": "Add milk and avocados to the shopping list"}
-→ responds {"ok":true,"speech":"..."} (read "speech" out loud)
-
-# 2) Claude / MCP clients (remote MCP server)
-URL:  ${endpoint}/mcp
-Header: Authorization: Bearer ${tk}
-
-# 3) ChatGPT (Custom GPT → Actions)
-Import schema from: ${endpoint}/openapi.json
-Authentication: API Key → Bearer → ${tk}`
-        : `# 1) Comando en lenguaje natural (Atajos de voz / HTTP Shortcuts / Telegram)
-POST ${endpoint}/command
-Authorization: Bearer ${tk}
-Content-Type: application/json
-{"command": "Añade leche y aguacates a la compra"}
-→ responde {"ok":true,"speech":"..."}  (lee "speech" en voz alta)
-
-# 2) Claude / clientes MCP  (servidor MCP remoto)
-URL:  ${endpoint}/mcp
-Header: Authorization: Bearer ${tk}
-
-# 3) ChatGPT (Custom GPT → Actions)
-Importar esquema desde: ${endpoint}/openapi.json
-Autenticación: API Key → Bearer → ${tk}`;
-    }
-  }
-
   // US-02: Preferencias dietéticas activas en Ajustes
   renderDietaryPreferencesSettings() {
     const container = document.getElementById('settings-dietary-chips');
@@ -19861,19 +19505,6 @@ Autenticación: API Key → Bearer → ${tk}`;
     }
 
     return { updatedCount, totalTagsAdded };
-  }
-
-  saveGeminiKey() {
-    const key = document.getElementById('input-gemini-key').value.trim();
-    state.settings.geminiApiKey = key;
-    const provider = document.getElementById('select-ai-provider')?.value || 'gemini';
-    state.settings.aiProvider = provider;
-    const model = 'gemini-3.8-flash';
-    state.settings.geminiModel = model;
-    state.save('fa_settings', state.settings);
-    this.renderSettings();
-    this.scheduleSyncWithCloud();
-    this.showToast("Configuración de Inteligencia Artificial guardada.", 'success');
   }
 
   exportBackup() {

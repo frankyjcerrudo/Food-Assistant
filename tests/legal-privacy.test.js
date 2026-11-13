@@ -160,7 +160,6 @@ describe('Fase 3 Google Play: Requisitos Legales y Políticas (US-74 & US-75)', 
         expect(fromMock).toHaveBeenCalledWith('meal_plans');
         expect(fromMock).toHaveBeenCalledWith('shopping_items');
         expect(fromMock).toHaveBeenCalledWith('user_settings');
-        expect(fromMock).toHaveBeenCalledWith('external_agent_tokens');
         expect(deleteEqMock).toHaveBeenCalledWith('user_id', 'usr-123');
         expect(signOutMock).toHaveBeenCalled();
         expect(window.state.cloudUser).toBeNull();

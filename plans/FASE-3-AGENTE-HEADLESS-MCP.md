@@ -1,3 +1,5 @@
+> ⚠️ Retirado en US-79b (v1.95): el agente externo se eliminó. Se conserva como histórico.
+
 # 🌐 Plan Detallado — Fase 3: Agente Externo "Sin Abrir la App" (Headless AI API, MCP & Voz Móvil)
 
 > **Historia cubierta**: `US-69` (🔴 Alta) — *Agente IA Externo "Sin Abrir la App" (Headless AI API, Servidor MCP y Supabase Edge Function para Gemini / Voz Móvil / Bots)*  

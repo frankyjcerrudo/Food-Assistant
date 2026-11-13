@@ -36,7 +36,7 @@
   <meta name="apple-mobile-web-app-title" content="Sabory">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="manifest" href="manifest.json?v=1.94">
+  <link rel="manifest" href="manifest.json?v=1.95">
   <meta name="theme-color" content="#FAF7F2">
   <script>
     (function() {
@@ -84,17 +84,17 @@
     href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..600&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Google+Sans:wght@400;500;700&display=swap">
   <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=1.94">
-  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.94">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.94">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.94">
+  <link rel="stylesheet" href="styles.css?v=1.95">
+  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.95">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1.95">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.95">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <!-- US-41: versión fija + Subresource Integrity (sha384) para el SDK de Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"
     integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"
     referrerpolicy="no-referrer"></script>
   <!-- US-12: i18n Core Engine (in head for instant zero-flash localization) -->
-  <script src="i18n.js?v=1.94"></script>
+  <script src="i18n.js?v=1.95"></script>
 </head>
 
 <body>
@@ -171,7 +171,7 @@
     <aside class="pwa-smart-banner" id="pwa-smart-banner" hidden aria-label="Instalación de la app en la pantalla de inicio">
       <div class="pwa-smart-banner-content">
         <div class="pwa-smart-banner-icon" aria-hidden="true">
-          <img src="icon-192.png?v=1.94" alt="" width="28" height="28" class="pwa-smart-banner-img">
+          <img src="icon-192.png?v=1.95" alt="" width="28" height="28" class="pwa-smart-banner-img">
         </div>
         <div class="pwa-smart-banner-texts">
           <strong class="pwa-smart-banner-title" data-i18n="pwa.bannerTitle">Prueba Sabory como App</strong>
@@ -873,43 +873,9 @@
             </div>
           </div>
 
-          <!-- AI MOTOR & BYOK SETTINGS -->
-          <div class="card" id="card-ai-settings">
-            <h3
-              style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-              <span class="material-symbols-outlined" style="color: var(--m3-primary);">smart_toy</span> <span data-i18n="settings.aiMotorTitle">Motor de
-              Inteligencia Artificial (BYOK Opcional)</span>
-            </h3>
-            <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 10px;" data-i18n="settings.aiMotorDesc">
-              El Sous Chef incluye un motor inteligente integrado sin coste. Si lo deseas, puedes vincular tu propia
-              clave (Bring Your Own Key) para conectar con Google Gemini, OpenAI o Claude y consumir de tu plan
-              personal.
-            </p>
-            <div style="margin-bottom: 8px;">
-              <label for="select-ai-provider"
-                style="font-size: 12px; font-weight: 500; display: block; margin-bottom: 4px; color: var(--m3-on-surface-variant);" data-i18n="settings.aiProviderLabel">Proveedor
-                de Inteligencia Artificial:</label>
-              <select class="form-input" id="select-ai-provider"
-                style="padding: 6px 10px; font-size: 13px; margin-bottom: 6px;">
-                <option value="gemini" data-i18n="settings.aiOptGemini">Google Gemini (Gratuito hasta 1.500 req/día)</option>
-                <option value="openai" data-i18n="settings.aiOptOpenAi">OpenAI ChatGPT (GPT-4o mini / GPT-4o)</option>
-                <option value="claude" data-i18n="settings.aiOptClaude">Anthropic Claude (Claude 3.5 Sonnet / Haiku)</option>
-              </select>
-            </div>
-            <div id="wrapper-gemini-model" style="display: none;">
-              <label for="select-gemini-model"
-                style="font-size: 12px; font-weight: 500; display: block; margin-bottom: 4px; color: var(--m3-on-surface-variant);" data-i18n="settings.geminiModelLabel">Modelo
-                de Google Gemini:</label>
-              <select class="form-input" id="select-gemini-model"
-                style="padding: 6px 10px; font-size: 13px; margin-bottom: 6px;">
-                <option value="gemini-3.5-flash-lite" data-i18n="settings.geminiModelFlashLite">Gemini 3.5 Flash-Lite (Recomendado Google - Nuevos y existentes)</option>
-                <option value="gemini-3.8-flash" data-i18n="settings.geminiModelFlash">Gemini 3.8 Flash (Razonamiento Avanzado)</option>
-                <option value="gemini-2.5-pro" data-i18n="settings.geminiModelPro">Gemini 2.5 Pro (Cuentas con facturación / Pro)</option>
-                <option value="gemini-2.5-flash" data-i18n="settings.geminiModelFlashOld">Gemini 2.5 Flash (Proyectos antiguos autorizados)</option>
-              </select>
-            </div>
-            <div
-              style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding: 6px 0; border-top: 1px solid var(--m3-outline-variant, rgba(0,0,0,0.08));">
+          <!-- SOUS CHEF VOICE (TTS) SETTINGS -->
+          <div class="card" id="card-tts-settings">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
               <div>
                 <label for="switch-tts-voice"
                   style="font-size: 13px; font-weight: 500; display: block; color: var(--m3-on-surface);" data-i18n="settings.aiTtsVoice">Voz del
@@ -923,46 +889,6 @@
                 <span class="slider round"></span>
               </label>
             </div>
-            <div style="display: flex; gap: 8px; margin-bottom: 6px;">
-              <input type="password" class="form-input" id="input-gemini-key" aria-label="Clave de API de inteligencia artificial" placeholder="AIzaSy... o sk-...">
-              <button class="btn btn-primary btn-sm" id="btn-save-gemini-key" data-i18n="common.save">Guardar</button>
-            </div>
-            <div id="gemini-key-status" style="font-size: 11px;"></div>
-          </div>
-
-          <!-- CONTROL EXTERNO POR VOZ / IA / MCP (US-69) -->
-          <div class="card" id="card-external-agent">
-            <h3
-              style="font-size: 14px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-              <span class="material-symbols-outlined" style="color: var(--m3-primary);">record_voice_over</span> <span data-i18n="settings.externalAgentTitle">Control
-              Externo por Voz e IA (sin abrir la app)</span>
-            </h3>
-            <p style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 10px;" data-i18n="settings.externalAgentDesc">
-              Conecta Claude, ChatGPT, Gemini o un atajo de voz de tu móvil para crear recetas, planificar y llenar la
-              compra directamente en tu cuenta.
-            </p>
-            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 8px;">
-              <input type="checkbox" id="toggle-external-agent" aria-label="Habilitar control por agentes externos" disabled> <span data-i18n="settings.externalAgentAllow">Permitir acceso a asistentes externos</span>
-            </label>
-            <div id="external-agent-status" style="font-size: 12px; margin-bottom: 8px;"></div>
-            <div id="external-agent-token-reveal" style="display: none; margin-bottom: 8px;">
-              <p style="font-size: 11px; color: var(--m3-on-surface-variant); margin-bottom: 4px;" data-i18n="settings.tokenNotice">Copia este token
-                ahora: no volverá a mostrarse completo.</p>
-              <div style="display: flex; gap: 8px;">
-                <input type="text" class="form-input" id="external-agent-token" aria-label="Token personal para asistentes de IA externos" readonly>
-                <button class="btn btn-primary btn-sm" id="btn-copy-agent-token" data-i18n="common.copy">Copiar</button>
-              </div>
-            </div>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
-              <button class="btn btn-primary btn-sm" id="btn-generate-agent-token" data-i18n="settings.generateToken">Generar / Regenerar token</button>
-              <button class="btn btn-sm" id="btn-revoke-agent-token" data-i18n="settings.revokeToken">Revocar</button>
-            </div>
-            <details>
-              <summary style="font-size: 12px; cursor: pointer;" data-i18n="settings.quickGuide">Guía rápida de conexión</summary>
-              <pre id="external-agent-guide"
-                style="font-size: 11px; white-space: pre-wrap; word-break: break-all; margin: 8px 0;"></pre>
-              <button class="btn btn-sm" id="btn-copy-agent-guide" data-i18n="settings.copyGuide">Copiar guía</button>
-            </details>
           </div>
 
           <!-- APP VERSION & CACHE MANAGEMENT -->
@@ -974,8 +900,8 @@
             </h3>
             <p
               style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-              <span data-i18n="settings.installedVersion">Versión instalada:</span> <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.94</strong>
-              <span class="app-version-badge" id="app-version-badge">v1.94</span>
+              <span data-i18n="settings.installedVersion">Versión instalada:</span> <strong id="settings-app-version-text" style="color: var(--m3-primary);">v1.95</strong>
+              <span class="app-version-badge" id="app-version-badge">v1.95</span>
             </p>
             <div
               style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;" data-i18n="settings.versionCacheNotice">
@@ -2773,8 +2699,8 @@
     </div>
   </div>
 
-  <script src="config.js?v=1.94"></script>
-  <script src="app.js?v=1.94"></script>
+  <script src="config.js?v=1.95"></script>
+  <script src="app.js?v=1.95"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

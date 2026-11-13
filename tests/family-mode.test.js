@@ -512,50 +512,6 @@ describe('US-77: Modo Familia / Espacio Colaborativo del Hogar (Family Mode)', (
       expect(state.settings.nutritionGoals.protein).toBe(120);
     });
 
-    it('8. Debe activar la clave Gemini por defecto de Sabory para nuevas cuentas o miembros del Hogar sin requerir clave propia (BYOK opcional)', async () => {
-      state.cloudUser = { id: 'user-aroa-222', email: 'aroa@sabory.app', name: 'Aroa' };
-      state.settings.geminiApiKey = '';
-      delete state.settings.defaultGeminiApiKey;
-      state.household = null;
-
-      expect(appInstance.getEffectiveGeminiApiKey()).toBe('');
-
-      appInstance.supabaseClient = {
-        from: vi.fn((table) => {
-          if (table === 'app_config') {
-            return {
-              select: vi.fn().mockReturnValue({
-                eq: vi.fn().mockResolvedValue({
-                  data: [{ key: 'default_gemini_api_key', value: 'AIzaSyDefaultAppKey123' }],
-                  error: null
-                })
-              })
-            };
-          }
-          return {
-            select: vi.fn().mockReturnValue({
-              or: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue({ data: [], error: null }) }),
-              eq: vi.fn().mockReturnValue({
-                limit: vi.fn().mockResolvedValue({ data: [], error: null }),
-                then: (cb) => Promise.resolve({ data: [], error: null }).then(cb)
-              })
-            })
-          };
-        })
-      };
-
-      await appInstance.pullFromCloud();
-
-      // El campo personal sigue vacío, pero la clave efectiva de la app queda activa automáticamente
-      expect(state.settings.geminiApiKey).toBe('');
-      expect(state.settings.defaultGeminiApiKey).toBe('AIzaSyDefaultAppKey123');
-      expect(appInstance.getEffectiveGeminiApiKey()).toBe('AIzaSyDefaultAppKey123');
-
-      // Si el usuario decide introducir su propia clave personal opcional, esta tiene prioridad
-      state.settings.geminiApiKey = 'AIzaSyPersonalOverride999';
-      expect(appInstance.getEffectiveGeminiApiKey()).toBe('AIzaSyPersonalOverride999');
-    });
-
     it('9. US-81: toggleGroceryCheck envía inmediatamente el upsert a Supabase sin esperar debounce', async () => {
       appInstance.supabaseClient = {
         from: vi.fn()

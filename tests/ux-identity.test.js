@@ -171,8 +171,7 @@ describe('US-73: Auditoría Integral de UX, Arquitectura de Información e Ident
     expect(advancedAccordion).not.toBeNull();
     expect(advancedAccordion.tagName.toLowerCase()).toBe('details');
     expect(advancedAccordion.hasAttribute('open')).toBe(false);
-    expect(advancedAccordion.querySelector('#card-ai-settings')).not.toBeNull();
-    expect(advancedAccordion.querySelector('#card-external-agent')).not.toBeNull();
+    expect(advancedAccordion.querySelector('#card-tts-settings')).not.toBeNull();
     expect(advancedAccordion.querySelector('#card-app-version')).not.toBeNull();
   });
 });

@@ -200,11 +200,8 @@ drop policy if exists "Users own settings delete" on public.user_settings;
 create policy "Users own settings delete" on public.user_settings for delete using (auth.uid() = user_id);
 
 
--- 5. CONTROL EXTERNO POR IA / VOZ / MCP (US-69, Fase 3)
-alter table public.user_settings add column if not exists agent_token_hash text default null;
-alter table public.user_settings add column if not exists agent_enabled boolean not null default false;
+-- 5. PREFERENCIAS ADICIONALES DE USUARIO (US-69 retirado en US-79b; se conserva default_servings)
 alter table public.user_settings add column if not exists default_servings integer not null default 2;
-create index if not exists user_settings_agent_token_hash_idx on public.user_settings (agent_token_hash) where agent_token_hash is not null;
 
 -- 6. MODO FAMILIA / ESPACIO COLABORATIVO DEL HOGAR (US-77)
 create table if not exists public.households (
@@ -391,28 +388,8 @@ create policy "Users own shopping delete" on public.shopping_items
   for delete using (auth.uid() = user_id or (household_id is not null and public.is_household_member(household_id)));
 
 -- -----------------------------------------------------------------------------
--- 7. CONFIGURACIÓN GLOBAL DE APLICACIÓN (CLAVE IA POR DEFECTO PARA CUENTAS)
+-- 7. (Retirado en US-79b: app_config eliminada)
 -- -----------------------------------------------------------------------------
-create table if not exists public.app_config (
-  key text primary key,
-  value text not null,
-  updated_at timestamptz not null default now()
-);
-
-alter table public.app_config enable row level security;
-
-drop policy if exists "Authenticated users can read app_config" on public.app_config;
-create policy "Authenticated users can read app_config" on public.app_config
-  for select using (auth.uid() is not null);
-
-drop policy if exists "Authenticated users can insert app_config" on public.app_config;
-create policy "Authenticated users can insert app_config" on public.app_config
-  for insert with check (auth.uid() is not null);
-
-drop policy if exists "Authenticated users can update app_config" on public.app_config;
-create policy "Authenticated users can update app_config" on public.app_config
-  for update using (auth.uid() is not null)
-  with check (auth.uid() is not null);
 
 -- -----------------------------------------------------------------------------
 -- 8. SUPABASE REALTIME (PUBLICACIÓN Y REPLICA IDENTITY PARA CDC)
@@ -453,6 +430,16 @@ alter table public.ai_usage enable row level security;
 drop policy if exists "Users read own ai_usage" on public.ai_usage;
 create policy "Users read own ai_usage" on public.ai_usage for select using (auth.uid() = user_id);
 -- Sin políticas de insert/update/delete: solo escribe la Edge Function con service_role.
+
+-- -----------------------------------------------------------------------------
+-- 10. LIMPIEZA BYOK / AGENTE EXTERNO (US-79b)
+-- -----------------------------------------------------------------------------
+drop table if exists public.app_config;
+drop table if exists public.external_agent_tokens;
+drop index if exists public.user_settings_agent_token_hash_idx;
+alter table public.user_settings drop column if exists agent_token_hash;
+alter table public.user_settings drop column if exists agent_enabled;
+alter table public.user_settings drop column if exists gemini_api_key;
 
 -- Recargar caché de esquema de PostgREST / Supabase API
 notify pgrst, 'reload schema';
