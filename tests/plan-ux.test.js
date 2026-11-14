@@ -191,4 +191,25 @@ describe('US-79d: Experiencia Free / Pro', () => {
       });
     });
   });
+
+  describe('Aislamiento entre cuentas al cerrar sesión', () => {
+    it('logoutCloudUser limpia hogar, plan, libros, lastSyncedAt y plan IA', () => {
+      state.household = { id: 'hh-1', name: 'Casa Aroa y Fran', members: [], role: 'owner' };
+      state.lastSyncedAt = '2026-11-13T10:00:00.000Z';
+      state.cookbooks = [{ id: 'cb-custom', name: 'Desayunos' }];
+      state.mealPlan = { '2099-01-01': { breakfast: 'rec-1', updatedAt: '2026-11-13T10:00:00.000Z' } };
+      state.aiPlan = mkPlan({ plan: 'pro', source: 'admin' });
+      localStorage.setItem('fa_last_cloud_user_id', 'u1');
+
+      app.logoutCloudUser();
+
+      expect(state.cloudUser).toBeNull();
+      expect(state.household).toBeNull();
+      expect(state.lastSyncedAt).toBeNull();
+      expect(state.cookbooks.some(c => c.id === 'cb-custom')).toBe(false);
+      expect(state.mealPlan['2099-01-01']).toBeUndefined();
+      expect(state.aiPlan.plan).toBe('anonymous');
+      expect(localStorage.getItem('fa_last_cloud_user_id')).toBeNull();
+    });
+  });
 });
