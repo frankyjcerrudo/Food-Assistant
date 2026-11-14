@@ -4893,7 +4893,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.01';
+  window.APP_VERSION = 'v2.02';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4940,7 +4940,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.01';
+    this.appVersion = window.APP_VERSION || 'v2.02';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -5907,7 +5907,9 @@ class FoodAssistantApp {
             state.save('fa_cloud_user', state.cloudUser);
             this.updateUserAccountUI();
           } else if (event === 'SIGNED_OUT') {
-            this.resetAccountLocalWorkspace();
+            if (!this._isLoggingOut && state.cloudUser) {
+              this.resetAccountLocalWorkspace();
+            }
           }
         });
       } catch (err) {
@@ -6292,13 +6294,23 @@ class FoodAssistantApp {
     this.render?.();
   }
 
-  logoutCloudUser() {
-    if (this.supabaseClient) {
-      this.supabaseClient.auth.signOut().catch(() => { });
+  async logoutCloudUser() {
+    this._isLoggingOut = true;
+    try {
+      if (this.supabaseClient && state.cloudUser?.id && !state.cloudUser.isDemo) {
+        if (this.syncDebounceTimer) {
+          clearTimeout(this.syncDebounceTimer);
+          this.syncDebounceTimer = null;
+        }
+        try { await this.pushToCloud(true); } catch (e) { }
+        try { await this.supabaseClient.auth.signOut(); } catch (e) { }
+      }
+      this.resetAccountLocalWorkspace();
+      this.closeAuthModal();
+      this.showToast("Has cerrado sesión.", 'info');
+    } finally {
+      this._isLoggingOut = false;
     }
-    this.resetAccountLocalWorkspace();
-    this.closeAuthModal();
-    this.showToast("Has cerrado sesión.", 'info');
   }
 
   // US-74: Eliminación de Cuenta y Datos en la Nube (Google Play Account Deletion Policy & GDPR)
