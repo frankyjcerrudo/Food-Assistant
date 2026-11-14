@@ -106,6 +106,7 @@ function Get-EpicInfo([int]$epicNum) {
         10 { return @{ Prefix = "[SECURITY]";  Label = "security" } }
         11 { return @{ Prefix = "[ARCH]";      Label = "architecture" } }
         12 { return @{ Prefix = "[A11Y/PWA]";  Label = "accessibility" } }
+        13 { return @{ Prefix = "[ADMIN]";     Label = "enhancement" } }
         default { return @{ Prefix = "[FEAT]"; Label = "enhancement" } }
     }
 }
