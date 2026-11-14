@@ -811,7 +811,8 @@ describe('US-12: Módulo Core de Internacionalización (i18n.js)', () => {
     expect(document.getElementById('confirm-dialog-title')?.textContent?.trim()).toBe('Confirm action');
     expect(document.getElementById('picker-modal-title')?.textContent?.trim()).toBe('Select Dish');
     expect(document.getElementById('bulk-add-cookbook-desc')?.textContent?.trim()).toBe('Select the cookbooks where you want to include the selected recipes:');
-    expect(document.getElementById('create-household-help')?.textContent?.trim()).toBe('Your current meal plan and shopping list will be the family starting point.');
+    expect(document.getElementById('create-household-help')?.textContent?.trim()).toBe('Exclusive to Pro accounts. If a family member has Pro, join with their invite code.');
+    expect(I18n.t('household.createHelp')).toBe('Your current meal plan and shopping list will be the family starting point.');
     expect(document.getElementById('input-create-household-name')?.getAttribute('placeholder')).toBe('e.g. Smith Family');
     expect(document.getElementById('join-household-help')?.textContent?.trim()).toBe('Enter the invite code shared by your family member or partner.');
   });

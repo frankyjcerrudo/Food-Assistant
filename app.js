@@ -4907,7 +4907,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.03';
+  window.APP_VERSION = 'v2.04';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4954,7 +4954,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.03';
+    this.appVersion = window.APP_VERSION || 'v2.04';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -18796,6 +18796,29 @@ REGLAS CRÍTICAS:
       pausedBanner.style.display = isActive && !this.isPro() ? 'flex' : 'none';
     }
 
+    const canCreate = this.isPro();
+    const createForm = document.getElementById('form-create-household');
+    const createInput = document.getElementById('input-create-household-name');
+    const createBtn = document.getElementById('btn-create-household');
+    const createHelp = document.getElementById('create-household-help');
+    const joinInput = document.getElementById('input-join-household-code');
+    const joinBtn = document.getElementById('btn-join-household');
+
+    if (createForm) createForm.classList.toggle('is-pro-locked', !canCreate);
+    if (createInput) createInput.disabled = !canCreate;
+    if (createBtn) createBtn.disabled = !canCreate;
+    if (createHelp) {
+      const helpKey = canCreate ? 'household.createHelp' : 'household.createProOnlyHelp';
+      createHelp.setAttribute('data-i18n', helpKey);
+      createHelp.textContent = window.I18n
+        ? window.I18n.t(helpKey)
+        : (canCreate
+          ? 'Tu plan y lista actuales serán el punto de partida familiar.'
+          : 'Exclusivo para cuentas Pro. Si un familiar tiene Pro, únete con su código.');
+    }
+    if (joinInput) joinInput.disabled = false;
+    if (joinBtn) joinBtn.disabled = false;
+
     if (!isActive) return;
 
     const activeNameEl = document.getElementById('household-active-name');
@@ -19031,11 +19054,6 @@ REGLAS CRÍTICAS:
     if (!this.supabaseClient?.from) {
       this.showToast('La unión a un Hogar requiere conexión con Supabase.', 'warning');
       return { success: false, reason: 'no_supabase' };
-    }
-
-    if (!this.isPro()) {
-      this.openPaywall('family');
-      return { success: false, reason: 'pro_required' };
     }
 
     try {

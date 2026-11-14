@@ -139,15 +139,112 @@ describe('US-79c: Entitlements, cuotas atómicas, Pro compartido y gate de Modo 
       expect(appInstance.showToast).toHaveBeenCalled();
     });
 
-    it('joinHouseholdByCode bloquea usuarios Free sin llamar a Supabase y abre paywall', async () => {
-      const selectSpy = vi.fn();
-      appInstance.supabaseClient = { from: vi.fn(() => ({ select: selectSpy })) };
+    it('joinHouseholdByCode permite a usuarios Free unirse con código a un Hogar activo y maneja 42501 si el anfitrión no tiene Pro', async () => {
+      const householdRow = {
+        id: 'hh-pro-1',
+        name: 'Casa Cerrudo',
+        invite_code: 'SAB-4F8K',
+        owner_id: 'user-owner-pro',
+        created_at: '2026-11-01T10:00:00Z'
+      };
+      const membersRows = [
+        { household_id: 'hh-pro-1', user_id: 'user-owner-pro', role: 'owner', display_name: 'Aroa', email: 'aroa@example.com' },
+        { household_id: 'hh-pro-1', user_id: 'user-1', role: 'member', display_name: 'Franky', email: 'franky@example.com' }
+      ];
 
-      const res = await appInstance.joinHouseholdByCode('SAB-4F8K');
-      expect(res.success).toBe(false);
-      expect(res.reason).toBe('pro_required');
-      expect(selectSpy).not.toHaveBeenCalled();
-      expect(appInstance.showToast).toHaveBeenCalled();
+      appInstance.supabaseClient = {
+        rpc: vi.fn().mockResolvedValue({ data: { plan: 'pro', via_household: true, quotas: {} }, error: null }),
+        from: vi.fn((table) => {
+          if (table === 'households') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ data: [householdRow], error: null })
+              })
+            };
+          }
+          if (table === 'household_members') {
+            return {
+              upsert: vi.fn().mockResolvedValue({ data: [], error: null }),
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ data: membersRows, error: null })
+              })
+            };
+          }
+          return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: [], error: null }) }) };
+        })
+      };
+
+      const resOk = await appInstance.joinHouseholdByCode('SAB-4F8K');
+      expect(resOk.success).toBe(true);
+      expect(state.household?.id).toBe('hh-pro-1');
+      expect(state.household?.role).toBe('member');
+
+      // Caso 2: si el anfitrión ya no tiene Pro vigente, Supabase RLS devuelve 42501 y se abre el paywall
+      state.saveHousehold(null);
+      appInstance.openPaywall = vi.fn();
+      appInstance.supabaseClient = {
+        from: vi.fn((table) => {
+          if (table === 'households') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ data: [householdRow], error: null })
+              })
+            };
+          }
+          if (table === 'household_members') {
+            return {
+              upsert: vi.fn().mockResolvedValue({ error: { code: '42501', message: 'RLS denied: host is not Pro' } })
+            };
+          }
+          return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: [], error: null }) }) };
+        })
+      };
+
+      const resDenied = await appInstance.joinHouseholdByCode('SAB-4F8K');
+      expect(resDenied.success).toBe(false);
+      expect(resDenied.reason).toBe('pro_required');
+      expect(appInstance.openPaywall).toHaveBeenCalledWith('family');
+    });
+
+    it('renderHouseholdSettings deshabilita Crear Hogar para cuentas Free pero mantiene Unirse habilitado', () => {
+      document.body.innerHTML = `
+        <div id="card-family-household">
+          <span id="household-status-badge"></span>
+          <div id="household-paused-banner" style="display:none"></div>
+          <div id="household-empty-view">
+            <form id="form-create-household" class="household-subcard">
+              <span id="create-household-help"></span>
+              <input id="input-create-household-name" type="text">
+              <button id="btn-create-household" type="submit">Crear Hogar</button>
+            </form>
+            <form id="form-join-household" class="household-subcard">
+              <input id="input-join-household-code" type="text">
+              <button id="btn-join-household" type="submit">Unirse</button>
+            </form>
+          </div>
+          <div id="household-active-view" style="display:none"></div>
+        </div>
+      `;
+      delete appInstance.renderHouseholdSettings;
+
+      state.household = null;
+      state.aiPlan.plan = 'free';
+      appInstance.renderHouseholdSettings();
+
+      expect(document.getElementById('form-create-household').classList.contains('is-pro-locked')).toBe(true);
+      expect(document.getElementById('input-create-household-name').disabled).toBe(true);
+      expect(document.getElementById('btn-create-household').disabled).toBe(true);
+      expect(document.getElementById('create-household-help').getAttribute('data-i18n')).toBe('household.createProOnlyHelp');
+      expect(document.getElementById('input-join-household-code').disabled).toBe(false);
+      expect(document.getElementById('btn-join-household').disabled).toBe(false);
+
+      state.aiPlan.plan = 'pro';
+      appInstance.renderHouseholdSettings();
+
+      expect(document.getElementById('form-create-household').classList.contains('is-pro-locked')).toBe(false);
+      expect(document.getElementById('input-create-household-name').disabled).toBe(false);
+      expect(document.getElementById('btn-create-household').disabled).toBe(false);
+      expect(document.getElementById('create-household-help').getAttribute('data-i18n')).toBe('household.createHelp');
     });
 
     it('createHousehold permite crear Hogar si el usuario es Pro y maneja 42501 como fallback', async () => {
