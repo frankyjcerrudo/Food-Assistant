@@ -1482,6 +1482,20 @@ function deduplicateShoppingBreakdown(item) {
   return item;
 }
 
+function localizeRecipeOrigin(rawOrigin) {
+  const manualText = (typeof window !== 'undefined' && window.I18n)
+    ? window.I18n.t('shopping.addedManually')
+    : 'Añadido manualmente';
+  if (!rawOrigin) return manualText;
+  const trimmed = String(rawOrigin).trim();
+  if (!trimmed) return manualText;
+  const lower = trimmed.toLowerCase();
+  if (lower === 'añadido manualmente' || lower === 'anadido manualmente' || lower === 'added manually') {
+    return manualText;
+  }
+  return trimmed;
+}
+
 function mergeOrAddShoppingItem(shoppingList, newItem) {
   if (!Array.isArray(shoppingList) || !newItem || !newItem.name) return null;
   const targetKey = getCanonicalIngredientKey(newItem.name);
@@ -1526,7 +1540,7 @@ function mergeOrAddShoppingItem(shoppingList, newItem) {
       const incAmt = parseCookingAmount(inc.amount);
 
       if (existingEntry) {
-        if (incRecipeKey === 'añadido manualmente' || incRecipeKey === 'anadido manualmente' || !incRecipeKey) {
+        if (incRecipeKey === 'añadido manualmente' || incRecipeKey === 'anadido manualmente' || incRecipeKey === 'added manually' || !incRecipeKey) {
           // Entradas manuales: acumular cantidades
           if (existingEntry.amount === null || existingEntry.amount === undefined || isNaN(existingEntry.amount)) {
             existingEntry.amount = incAmt;
@@ -4893,7 +4907,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.02';
+  window.APP_VERSION = 'v2.03';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4940,7 +4954,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.02';
+    this.appVersion = window.APP_VERSION || 'v2.03';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -5524,10 +5538,10 @@ class FoodAssistantApp {
     this.bindConfirmDialogEvents(dialog);
 
     const {
-      title = 'Confirmar acción',
+      title = window.I18n ? window.I18n.t('confirm.title') : 'Confirmar acción',
       message = '',
-      confirmText = 'Confirmar',
-      cancelText = 'Cancelar',
+      confirmText = window.I18n ? window.I18n.t('confirm.accept') : 'Confirmar',
+      cancelText = window.I18n ? window.I18n.t('confirm.cancel') : 'Cancelar',
       danger = false,
       icon = danger ? 'warning' : 'help',
       input = false,
@@ -6125,11 +6139,17 @@ class FoodAssistantApp {
     const nameGroup = document.getElementById('group-auth-name');
     const submitBtn = document.getElementById('btn-submit-auth');
     if (tabName === 'signup') {
-      nameGroup.style.display = 'block';
-      submitBtn.textContent = 'Crear Cuenta y Conectar';
+      if (nameGroup) nameGroup.style.display = 'block';
+      if (submitBtn) {
+        submitBtn.setAttribute('data-i18n', 'auth.createAndConnectBtn');
+        submitBtn.textContent = window.I18n ? window.I18n.t('auth.createAndConnectBtn') : 'Crear Cuenta y Conectar';
+      }
     } else {
-      nameGroup.style.display = 'none';
-      submitBtn.textContent = 'Iniciar Sesión';
+      if (nameGroup) nameGroup.style.display = 'none';
+      if (submitBtn) {
+        submitBtn.setAttribute('data-i18n', 'auth.signInTitle');
+        submitBtn.textContent = window.I18n ? window.I18n.t('auth.signInTitle') : 'Iniciar Sesión';
+      }
     }
   }
 
@@ -6307,7 +6327,7 @@ class FoodAssistantApp {
       }
       this.resetAccountLocalWorkspace();
       this.closeAuthModal();
-      this.showToast("Has cerrado sesión.", 'info');
+      this.showToast(window.I18n ? window.I18n.t('auth.signedOutToast') : "Has cerrado sesión.", 'info');
     } finally {
       this._isLoggingOut = false;
     }
@@ -6316,15 +6336,16 @@ class FoodAssistantApp {
   // US-74: Eliminación de Cuenta y Datos en la Nube (Google Play Account Deletion Policy & GDPR)
   async deleteAccountAndData(skipConfirm = false) {
     const isCloud = !!(this.supabaseClient && state.cloudUser?.id && !state.cloudUser.isDemo);
+    const t = window.I18n ? (k, p) => window.I18n.t(k, p) : null;
     const confirmMessage = isCloud
-      ? '¿Estás seguro de que deseas eliminar definitivamente tu cuenta y todos tus datos? Esta acción es irreversible: se borrarán de la nube todas tus recetas, planificaciones y listas de la compra, y se cerrará tu sesión.'
-      : '¿Estás seguro de que deseas eliminar todos tus datos? Esta acción es irreversible: se borrarán todas tus recetas personalizadas, planes semanales y listas de la compra locales.';
+      ? (t ? t('auth.deleteAccountCloudMsg') : '¿Estás seguro de que deseas eliminar definitivamente tu cuenta y todos tus datos? Esta acción es irreversible: se borrarán de la nube todas tus recetas, planificaciones y listas de la compra, y se cerrará tu sesión.')
+      : (t ? t('auth.deleteAccountLocalMsg') : '¿Estás seguro de que deseas eliminar todos tus datos? Esta acción es irreversible: se borrarán todas tus recetas personalizadas, planes semanales y listas de la compra locales.');
 
     const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
-      title: 'Eliminar cuenta y datos',
+      title: t ? t('auth.deleteAccountTitle') : 'Eliminar cuenta y datos',
       message: confirmMessage,
-      confirmText: 'Eliminar definitivamente',
-      cancelText: 'Cancelar',
+      confirmText: t ? t('auth.deleteAccountConfirm') : 'Eliminar definitivamente',
+      cancelText: t ? t('common.cancel') : 'Cancelar',
       danger: true,
       icon: 'delete_forever'
     });
@@ -6390,7 +6411,9 @@ class FoodAssistantApp {
     this.closeAuthModal();
     this.updateUserAccountUI();
     this.render();
-    this.showToast(isCloud ? "Tu cuenta y tus datos han sido eliminados de la nube." : "Tus datos locales han sido eliminados.", 'info');
+    this.showToast(isCloud
+      ? (window.I18n ? window.I18n.t('auth.deleteAccountCloudToast') : "Tu cuenta y tus datos han sido eliminados de la nube.")
+      : (window.I18n ? window.I18n.t('auth.deleteAccountLocalToast') : "Tus datos locales han sido eliminados."), 'info');
     return true;
   }
 
@@ -6427,14 +6450,16 @@ class FoodAssistantApp {
     try {
       // US-81: Resolver y adoptar el Hogar activo ANTES de consultar recetas, plan y compra
       let activeHouseholdId = state.household?.id || null;
+      let preResolvedHouseholdId = null;
       if (!activeHouseholdId && state.cloudUser?.id && this.supabaseClient?.from) {
         try {
           const sRes = await this.supabaseClient.from('user_settings').select('active_household_id').eq('user_id', state.cloudUser.id);
           if (Array.isArray(sRes?.data) && sRes.data[0]?.active_household_id) {
             const hId = sRes.data[0].active_household_id;
+            preResolvedHouseholdId = hId;
             if (typeof this.loadHouseholdByIdFromCloud === 'function') {
-              await this.loadHouseholdByIdFromCloud(hId);
-              activeHouseholdId = state.household?.id || hId;
+              const loadedHh = await this.loadHouseholdByIdFromCloud(hId);
+              activeHouseholdId = loadedHh?.id || state.household?.id || null;
             } else {
               activeHouseholdId = hId;
             }
@@ -6451,6 +6476,7 @@ class FoodAssistantApp {
       if (activeHouseholdId && typeof this.refreshHouseholdMembersFromCloud === 'function') {
         try {
           await this.refreshHouseholdMembersFromCloud(activeHouseholdId);
+          activeHouseholdId = state.household?.id || null;
         } catch (hhErr) { }
       }
 
@@ -6919,9 +6945,9 @@ class FoodAssistantApp {
               sRowCookbooksUpdatedAt = sRow.updated_at;
             }
             // US-77: Adoptar Hogar activo si el usuario inicia sesión desde un dispositivo nuevo
-            if (sRow.active_household_id && !state.household?.id && typeof this.loadHouseholdByIdFromCloud === 'function') {
-              await this.loadHouseholdByIdFromCloud(sRow.active_household_id);
-              stateChanged = true;
+            if (sRow.active_household_id && !state.household?.id && sRow.active_household_id !== preResolvedHouseholdId && typeof this.loadHouseholdByIdFromCloud === 'function') {
+              const adopted = await this.loadHouseholdByIdFromCloud(sRow.active_household_id);
+              if (adopted) stateChanged = true;
             }
           }
         }
@@ -7279,8 +7305,8 @@ class FoodAssistantApp {
           if (Array.isArray(sRes?.data) && sRes.data[0]?.active_household_id) {
             const hId = sRes.data[0].active_household_id;
             if (typeof this.loadHouseholdByIdFromCloud === 'function') {
-              await this.loadHouseholdByIdFromCloud(hId);
-              activeHouseholdId = state.household?.id || hId;
+              const loadedHh = await this.loadHouseholdByIdFromCloud(hId);
+              activeHouseholdId = loadedHh?.id || state.household?.id || null;
             } else {
               activeHouseholdId = hId;
             }
@@ -9513,17 +9539,21 @@ class FoodAssistantApp {
   }
 
   async deleteSelectedRecipes() {
+    const t = window.I18n ? (k, p) => window.I18n.t(k, p) : null;
     if (!this.selectedRecipeIds || this.selectedRecipeIds.size === 0) {
-      this.showToast('Selecciona al menos una receta para eliminar.', 'warning');
+      this.showToast(t ? t('recipes.deleteBulkSelectOne') : 'Selecciona al menos una receta para eliminar.', 'warning');
       return false;
     }
 
     const count = this.selectedRecipeIds.size;
+    const recipeLabel = count === 1
+      ? (t ? t('recipes.recipeSingular') : 'receta')
+      : (t ? t('recipes.recipePlural') : 'recetas');
     const confirmed = await this.showConfirmDialog({
-      title: `¿Eliminar ${count} ${count === 1 ? 'receta' : 'recetas'}?`,
-      message: `Se eliminarán permanentemente ${count} ${count === 1 ? 'receta' : 'recetas'} del catálogo. Esta acción no se puede deshacer.`,
-      confirmText: `Eliminar ${count}`,
-      cancelText: 'Cancelar',
+      title: t ? t('recipes.deleteBulkTitle', { count, label: recipeLabel }) : `¿Eliminar ${count} ${recipeLabel}?`,
+      message: t ? t('recipes.deleteBulkMsg', { count, label: recipeLabel }) : `Se eliminarán permanentemente ${count} ${recipeLabel} del catálogo. Esta acción no se puede deshacer.`,
+      confirmText: t ? t('recipes.deleteBulkConfirm', { count }) : `Eliminar ${count}`,
+      cancelText: t ? t('common.cancel') : 'Cancelar',
       danger: true,
       icon: 'delete_forever'
     });
@@ -11042,11 +11072,12 @@ class FoodAssistantApp {
   async deleteCurrentRecipe(skipConfirm = false) {
     if (!this.activeRecipe) return false;
     const recipeToDelete = this.activeRecipe;
+    const t = window.I18n ? (k, p) => window.I18n.t(k, p) : null;
     const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
-      title: 'Eliminar receta',
-      message: `¿Eliminar la receta "${recipeToDelete.title}" de tu recetario? Esta acción no se puede deshacer.`,
-      confirmText: 'Eliminar',
-      cancelText: 'Cancelar',
+      title: t ? t('recipes.deleteSingleTitle') : 'Eliminar receta',
+      message: t ? t('recipes.deleteSingleMsg', { title: recipeToDelete.title }) : `¿Eliminar la receta "${recipeToDelete.title}" de tu recetario? Esta acción no se puede deshacer.`,
+      confirmText: t ? t('common.delete') : 'Eliminar',
+      cancelText: t ? t('common.cancel') : 'Cancelar',
       danger: true,
       icon: 'delete'
     });
@@ -11057,7 +11088,7 @@ class FoodAssistantApp {
       state.trackDeletion('recipes', deletedId);
       this.closeRecipeModal();
       this.render();
-      this.showToast(`Receta "${recipeToDelete.title}" eliminada.`, 'info');
+      this.showToast(t ? t('recipes.deleteSingleToast', { title: recipeToDelete.title }) : `Receta "${recipeToDelete.title}" eliminada.`, 'info');
       // Propagar borrado inmediatamente a Supabase (BUG-23)
       this.pushToCloud(true);
       return true;
@@ -13078,11 +13109,12 @@ class FoodAssistantApp {
       if (isImmediatePrev || mKey === this.copyWeekSourceMondayKey || stats.mealCount > 0 || stats.customSlotsCount > 0) {
         const diffDays = Math.round((mDate.getTime() - targetMonday.getTime()) / (1000 * 60 * 60 * 24));
         const diffWeeks = Math.round(diffDays / 7);
-        let relativeLabel = 'Otra semana';
-        if (diffWeeks === -1) relativeLabel = 'Semana inmediatamente anterior';
-        else if (diffWeeks === 1) relativeLabel = 'Semana siguiente';
-        else if (diffWeeks < -1) relativeLabel = `Hace ${Math.abs(diffWeeks)} semanas`;
-        else if (diffWeeks > 1) relativeLabel = `Dentro de ${diffWeeks} semanas`;
+        const t = window.I18n ? (k, p) => window.I18n.t(k, p) : null;
+        let relativeLabel = t ? t('copyWeek.otherWeek') : 'Otra semana';
+        if (diffWeeks === -1) relativeLabel = t ? t('copyWeek.immediatePrevWeek') : 'Semana inmediatamente anterior';
+        else if (diffWeeks === 1) relativeLabel = t ? t('copyWeek.nextWeekLabel') : 'Semana siguiente';
+        else if (diffWeeks < -1) relativeLabel = t ? t('copyWeek.weeksAgo', { count: Math.abs(diffWeeks) }) : `Hace ${Math.abs(diffWeeks)} semanas`;
+        else if (diffWeeks > 1) relativeLabel = t ? t('copyWeek.inWeeks', { count: diffWeeks }) : `Dentro de ${diffWeeks} semanas`;
 
         candidates.push({
           mondayKey: mKey,
@@ -13184,11 +13216,16 @@ class FoodAssistantApp {
   }
 
   renderCopyWeekModal() {
+    const t = window.I18n ? (k, p) => window.I18n.t(k, p) : null;
     const targetWeekDays = this.getPlannerWeekDates();
     const targetLabelEl = document.getElementById('copy-week-target-label');
     if (targetLabelEl) {
-      targetLabelEl.textContent = `Destino: ${formatWeekRange(targetWeekDays)}`;
+      const rangeStr = formatWeekRange(targetWeekDays);
+      targetLabelEl.textContent = t ? t('copyWeek.targetPrefix', { range: rangeStr }) : `Destino: ${rangeStr}`;
     }
+
+    const mealSing = t ? t('planner.copyWeekMealSingular') : 'comida';
+    const mealPlur = t ? t('planner.copyWeekMealPlural') : 'comidas';
 
     const sourcesListEl = document.getElementById('copy-week-sources-list');
     const candidates = this.getAvailableSourceWeeks();
@@ -13209,7 +13246,7 @@ class FoodAssistantApp {
                 <span class="copy-source-range">${subtitleText}</span>
               </div>
             </div>
-            <span class="copy-week-badge">${c.mealCount} ${c.mealCount === 1 ? 'comida' : 'comidas'}</span>
+            <span class="copy-week-badge">${c.mealCount} ${c.mealCount === 1 ? mealSing : mealPlur}</span>
           </button>
         `;
       }).join('');
@@ -13224,18 +13261,21 @@ class FoodAssistantApp {
     const sourceStats = this.getWeekMealStats(sourceWeekDays);
 
     if (previewBadge) {
-      previewBadge.textContent = `${sourceStats.mealCount} ${sourceStats.mealCount === 1 ? 'comida' : 'comidas'}${sourceStats.customSlotsCount > 0 ? ` · ${sourceStats.customSlotsCount} extra` : ''}`;
+      previewBadge.textContent = `${sourceStats.mealCount} ${sourceStats.mealCount === 1 ? mealSing : mealPlur}${sourceStats.customSlotsCount > 0 ? ` · ${sourceStats.customSlotsCount} extra` : ''}`;
     }
 
     if (previewBox) {
       if (sourceStats.mealCount === 0 && sourceStats.customSlotsCount === 0) {
+        const rangeStr = formatWeekRange(sourceWeekDays);
         previewBox.innerHTML = `
           <div class="copy-week-empty-state">
             <span class="material-symbols-outlined copy-week-empty-icon">event_busy</span>
-            La semana seleccionada (${formatWeekRange(sourceWeekDays)}) no tiene platos ni momentos personalizados asignados.
+            ${t ? t('copyWeek.emptySourcePreview', { range: rangeStr }) : `La semana seleccionada (${rangeStr}) no tiene platos ni momentos personalizados asignados.`}
           </div>
         `;
       } else {
+        const noMealsLabel = t ? t('copyWeek.noMealsDay') : 'Sin comidas';
+        const defaultDishLabel = t ? t('planner.defaultRecipe') : 'Plato';
         previewBox.innerHTML = sourceWeekDays.map(wDay => {
           const day = state.mealPlan?.[wDay.dateKey];
           const entries = [];
@@ -13244,14 +13284,15 @@ class FoodAssistantApp {
               const rId = day[s.key];
               if (rId) {
                 const rec = state.recipes.find(r => r.id === rId);
-                entries.push(`${s.label}: <strong>${rec ? rec.title : 'Plato'}</strong>`);
+                const slotLabel = window.I18n ? window.I18n.getSlotLabel(s.key, s.label) : s.label;
+                entries.push(`${slotLabel}: <strong>${rec ? rec.title : defaultDishLabel}</strong>`);
               }
             });
             if (Array.isArray(day.customSlots)) {
               day.customSlots.forEach(cs => {
                 if (cs.recipeId) {
                   const rec = state.recipes.find(r => r.id === cs.recipeId);
-                  entries.push(`${cs.name || 'Extra'}: <strong>${rec ? rec.title : 'Plato'}</strong>`);
+                  entries.push(`${cs.name || 'Extra'}: <strong>${rec ? rec.title : defaultDishLabel}</strong>`);
                 } else {
                   entries.push(`${cs.name || 'Extra'} <em>(momento vacío)</em>`);
                 }
@@ -13261,7 +13302,7 @@ class FoodAssistantApp {
           return `
             <div class="copy-preview-day-row">
               <span class="copy-preview-day-name">${wDay.dayName}</span>
-              <span class="copy-preview-day-meals">${entries.length > 0 ? entries.join(' · ') : '<em class="copy-preview-empty-em">Sin comidas</em>'}</span>
+              <span class="copy-preview-day-meals">${entries.length > 0 ? entries.join(' · ') : `<em class="copy-preview-empty-em">${noMealsLabel}</em>`}</span>
             </div>
           `;
         }).join('');
@@ -13320,11 +13361,19 @@ class FoodAssistantApp {
 
     // Si la semana destino ya tiene platos y estamos en modo reemplazar, pedir confirmación segura (US-04 / US-18)
     if (mode === 'replace' && (targetStats.mealCount > 0 || targetStats.customSlotsCount > 0) && !skipConfirm) {
+      const t = window.I18n ? (k, p) => window.I18n.t(k, p) : null;
+      const targetRange = formatWeekRange(targetWeekDays);
+      const sourceRange = formatWeekRange(sourceWeekDays);
+      const mealCountLabel = targetStats.mealCount === 1
+        ? (t ? t('copyWeek.assignedMealSingular') : 'comida asignada')
+        : (t ? t('copyWeek.assignedMealPlural') : 'comidas asignadas');
       const confirmed = await this.showConfirmDialog({
-        title: '¿Reemplazar plan de la semana?',
-        message: `La semana de destino (${formatWeekRange(targetWeekDays)}) ya tiene ${targetStats.mealCount} ${targetStats.mealCount === 1 ? 'comida asignada' : 'comidas asignadas'}.\n\n¿Deseas reemplazarla con el plan del ${formatWeekRange(sourceWeekDays)}?`,
-        confirmText: 'Sí, reemplazar semana',
-        cancelText: 'Cancelar',
+        title: t ? t('copyWeek.replaceConfirmTitle') : '¿Reemplazar plan de la semana?',
+        message: t
+          ? t('copyWeek.replaceConfirmMsg', { target: targetRange, count: targetStats.mealCount, label: mealCountLabel, source: sourceRange })
+          : `La semana de destino (${targetRange}) ya tiene ${targetStats.mealCount} ${mealCountLabel}.\n\n¿Deseas reemplazarla con el plan del ${sourceRange}?`,
+        confirmText: t ? t('copyWeek.replaceConfirmBtn') : 'Sí, reemplazar semana',
+        cancelText: t ? t('common.cancel') : 'Cancelar',
         danger: true,
         icon: 'sync_alt'
       });
@@ -14211,7 +14260,7 @@ class FoodAssistantApp {
         if (item.isChecked) return;
         if (Array.isArray(item.recipeBreakdown) && item.recipeBreakdown.length > 0) {
           item.recipeBreakdown.forEach(b => {
-            const recipeLabel = b.recipe ? String(b.recipe).trim() : (isEn ? 'Added manually' : 'Añadido manualmente');
+            const recipeLabel = b.recipe ? localizeRecipeOrigin(b.recipe) : localizeRecipeOrigin('');
             if (!groupedByRecipe[recipeLabel]) groupedByRecipe[recipeLabel] = [];
             groupedByRecipe[recipeLabel].push({
               ...item,
@@ -14223,8 +14272,8 @@ class FoodAssistantApp {
         } else {
           const rawOrigin = item.recipeOrigin ? String(item.recipeOrigin).trim() : '';
           const origins = rawOrigin
-            ? rawOrigin.split(',').map(s => s.trim()).filter(Boolean)
-            : ['Añadido manualmente'];
+            ? rawOrigin.split(',').map(s => localizeRecipeOrigin(s)).filter(Boolean)
+            : [localizeRecipeOrigin('')];
           origins.forEach(originLabel => {
             if (!groupedByRecipe[originLabel]) groupedByRecipe[originLabel] = [];
             groupedByRecipe[originLabel].push({
@@ -14239,7 +14288,7 @@ class FoodAssistantApp {
 
       cards = Object.entries(groupedByRecipe).map(([recipeLabel, items]) => {
         const pendingInRecipe = items.filter(i => !i.isChecked).length;
-        const isManualGroup = /manualmente|otros|asistente|sous chef/i.test(recipeLabel);
+        const isManualGroup = /manualmente|manually|otros|other|asistente|sous chef/i.test(recipeLabel);
         const headerIcon = isManualGroup ? 'shopping_bag' : 'menu_book';
         const pendingRecipeText = isEn
           ? `${pendingInRecipe} pending`
@@ -14289,8 +14338,8 @@ class FoodAssistantApp {
       });
 
       cards.sort((a, b) => {
-        const isAManual = /manualmente|otros|asistente|sous chef/i.test(a.recipeLabel);
-        const isBManual = /manualmente|otros|asistente|sous chef/i.test(b.recipeLabel);
+        const isAManual = /manualmente|manually|otros|other|asistente|sous chef/i.test(a.recipeLabel);
+        const isBManual = /manualmente|manually|otros|other|asistente|sous chef/i.test(b.recipeLabel);
         if (isAManual && !isBManual) return 1;
         if (!isAManual && isBManual) return -1;
         return a.recipeLabel.localeCompare(b.recipeLabel, undefined, { sensitivity: 'base' });
@@ -14385,10 +14434,13 @@ class FoodAssistantApp {
                   `;
           } else if (breakdown && breakdown.length === 1) {
             const b = breakdown[0];
-            const nameDiff = b.name && b.name.toLowerCase().trim() !== item.name.toLowerCase().trim() ? ` (como "${escapeHtml(b.name)}")` : '';
-            subtextHtml = `<div class="grocery-origin-sub">Para: ${escapeHtml(b.recipe)}${nameDiff}</div>`;
+            const forPrefix = window.I18n ? window.I18n.t('common.forPrefix') : 'Para:';
+            const asWord = (window.I18n && window.I18n.getLanguage() === 'en') ? 'as' : 'como';
+            const nameDiff = b.name && b.name.toLowerCase().trim() !== item.name.toLowerCase().trim() ? ` (${asWord} "${escapeHtml(b.name)}")` : '';
+            subtextHtml = `<div class="grocery-origin-sub">${forPrefix} ${escapeHtml(localizeRecipeOrigin(b.recipe))}${nameDiff}</div>`;
           } else if (item.recipeOrigin) {
-            subtextHtml = `<div class="grocery-origin-sub">Para: ${escapeHtml(item.recipeOrigin)}</div>`;
+            const forPrefix = window.I18n ? window.I18n.t('common.forPrefix') : 'Para:';
+            subtextHtml = `<div class="grocery-origin-sub">${forPrefix} ${escapeHtml(localizeRecipeOrigin(item.recipeOrigin))}</div>`;
           }
 
           return `
@@ -14405,7 +14457,7 @@ class FoodAssistantApp {
                     </div>
                     <div class="u-flex-center-gap-8-shrink">
                       ${displayAmt ? `<span class="grocery-amount">${escapeHtml(displayAmt)}</span>` : ''}
-                      <button type="button" class="btn btn-ghost btn-sm btn-grocery-remove btn-remove-circle" onclick="app.deleteGroceryItem('${escapeHtml(item.id)}')" title="Eliminar artículo">
+                      <button type="button" class="btn btn-ghost btn-sm btn-grocery-remove btn-remove-circle" onclick="app.deleteGroceryItem('${escapeHtml(item.id)}')" title="${escapeHtml(window.I18n ? window.I18n.t('shopping.removeItemTitle') : 'Eliminar artículo')}">
                         <span class="material-symbols-outlined icon-sm">close</span>
                       </button>
                     </div>
@@ -14429,12 +14481,14 @@ class FoodAssistantApp {
       container.innerHTML = this._distributeShoppingCards(cards, 3);
     } else {
       // Todos los artículos están en el carrito / completados
+      const allInCartTitle = window.I18n ? window.I18n.t('shopping.allInCartTitle') : '¡Todo en el carrito!';
+      const allInCartDesc = window.I18n ? window.I18n.t('shopping.allInCartDesc') : 'Has completado todos los artículos de la lista. Puedes revisarlos abajo o limpiarlos cuando termines la compra.';
       container.innerHTML = `
         <div class="card shopping-empty-card shopping-all-done-card">
           <span class="material-symbols-outlined shopping-empty-icon u-text-success">task_alt</span>
-          <h3 class="shopping-empty-title">¡Todo en el carrito!</h3>
+          <h3 class="shopping-empty-title">${escapeHtml(allInCartTitle)}</h3>
           <p class="shopping-empty-desc">
-            Has completado todos los artículos de la lista. Puedes revisarlos abajo o limpiarlos cuando termines la compra.
+            ${escapeHtml(allInCartDesc)}
           </p>
         </div>
       `;
@@ -14470,7 +14524,7 @@ class FoodAssistantApp {
         const displayAmt = formatDisplayAmount(item.amount, item.unit, item.displayAmount);
         const localizedAisle = window.I18n ? window.I18n.getAisleName(item.aisle || 'other') : aisleMeta.label;
         const forPrefix = window.I18n ? window.I18n.t('common.forPrefix') : 'Para:';
-        const originInfo = item.recipeOrigin ? `${forPrefix} ${escapeHtml(item.recipeOrigin)}` : localizedAisle;
+        const originInfo = item.recipeOrigin ? `${forPrefix} ${escapeHtml(localizeRecipeOrigin(item.recipeOrigin))}` : localizedAisle;
         return `
                 <div class="grocery-item-row checked">
                   <div class="grocery-left" onclick="app.toggleGroceryCheck('${escapeHtml(item.id)}')">
@@ -14485,7 +14539,7 @@ class FoodAssistantApp {
                   </div>
                   <div class="u-flex-center-gap-8-shrink">
                     ${displayAmt ? `<span class="grocery-amount">${escapeHtml(displayAmt)}</span>` : ''}
-                    <button type="button" class="btn btn-ghost btn-sm btn-grocery-remove btn-remove-circle" onclick="app.deleteGroceryItem('${escapeHtml(item.id)}')" title="Eliminar artículo">
+                    <button type="button" class="btn btn-ghost btn-sm btn-grocery-remove btn-remove-circle" onclick="app.deleteGroceryItem('${escapeHtml(item.id)}')" title="${escapeHtml(window.I18n ? window.I18n.t('shopping.removeItemTitle') : 'Eliminar artículo')}">
                       <span class="material-symbols-outlined icon-sm">close</span>
                     </button>
                   </div>
@@ -14617,7 +14671,7 @@ class FoodAssistantApp {
     this._isClearingCompleted = true;
     try {
       if (!state.shoppingList || state.shoppingList.length === 0) {
-        this.showToast("La lista de la compra ya está vacía.", 'info');
+        this.showToast(window.I18n ? window.I18n.t('shopping.alreadyEmptyToast') : "La lista de la compra ya está vacía.", 'info');
         return false;
       }
 
@@ -14629,10 +14683,10 @@ class FoodAssistantApp {
         const total = state.shoppingList.length;
         if (count === total) {
           const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
-            title: 'Vaciar lista comprada',
-            message: `¿Eliminar los ${count} artículos comprados y vaciar la lista?`,
-            confirmText: 'Vaciar lista',
-            cancelText: 'Cancelar',
+            title: window.I18n ? window.I18n.t('shopping.clearBoughtTitle') : 'Vaciar lista comprada',
+            message: window.I18n ? window.I18n.t('shopping.clearBoughtMsg', { count }) : `¿Eliminar los ${count} artículos comprados y vaciar la lista?`,
+            confirmText: window.I18n ? window.I18n.t('shopping.clearBoughtConfirm') : 'Vaciar lista',
+            cancelText: window.I18n ? window.I18n.t('common.cancel') : 'Cancelar',
             danger: true,
             icon: 'delete_sweep'
           });
@@ -14653,15 +14707,15 @@ class FoodAssistantApp {
             this.scheduleSyncWithCloud();
             await this.flushSync();
             this.render();
-            this.showToast("Lista de la compra vaciada.", 'info');
+            this.showToast(window.I18n ? window.I18n.t('shopping.listEmptiedToast') : "Lista de la compra vaciada.", 'info');
             return true;
           }
         } else {
           const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
-            title: 'Limpiar comprados',
-            message: `¿Eliminar los ${count} artículos marcados como comprados?`,
-            confirmText: 'Eliminar comprados',
-            cancelText: 'Cancelar',
+            title: window.I18n ? window.I18n.t('shopping.clearCheckedTitle') : 'Limpiar comprados',
+            message: window.I18n ? window.I18n.t('shopping.clearCheckedMsg', { count }) : `¿Eliminar los ${count} artículos marcados como comprados?`,
+            confirmText: window.I18n ? window.I18n.t('shopping.clearCheckedConfirm') : 'Eliminar comprados',
+            cancelText: window.I18n ? window.I18n.t('common.cancel') : 'Cancelar',
             danger: true,
             icon: 'remove_done'
           });
@@ -14682,17 +14736,17 @@ class FoodAssistantApp {
             this.scheduleSyncWithCloud();
             await this.flushSync();
             this.render();
-            this.showToast(`Se eliminaron ${count} artículos comprados.`, 'info');
+            this.showToast(window.I18n ? window.I18n.t('shopping.removedCountToast', { count }) : `Se eliminaron ${count} artículos comprados.`, 'info');
             return true;
           }
         }
       } else {
         // Ningún artículo está marcado con el checkbox
         const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
-          title: 'Vaciar toda la lista',
-          message: "No hay artículos marcados como comprados.\n\n¿Deseas vaciar toda la lista de la compra?",
-          confirmText: 'Vaciar todo',
-          cancelText: 'Cancelar',
+          title: window.I18n ? window.I18n.t('shopping.clearAllTitle') : 'Vaciar toda la lista',
+          message: window.I18n ? window.I18n.t('shopping.clearAllMsg') : "No hay artículos marcados como comprados.\n\n¿Deseas vaciar toda la lista de la compra?",
+          confirmText: window.I18n ? window.I18n.t('shopping.clearAllConfirm') : 'Vaciar todo',
+          cancelText: window.I18n ? window.I18n.t('common.cancel') : 'Cancelar',
           danger: true,
           icon: 'delete_sweep'
         });
@@ -14713,7 +14767,7 @@ class FoodAssistantApp {
           this.scheduleSyncWithCloud();
           await this.flushSync();
           this.render();
-          this.showToast("Lista de la compra vaciada.", 'info');
+          this.showToast(window.I18n ? window.I18n.t('shopping.listEmptiedToast') : "Lista de la compra vaciada.", 'info');
           return true;
         }
       }
@@ -14824,8 +14878,8 @@ class FoodAssistantApp {
     const servingsVal = document.getElementById('shopping-preview-servings-val');
     const clearFirst = document.getElementById('shopping-preview-clear-first');
 
-    if (titleEl) titleEl.textContent = "Añadir a la Compra";
-    if (subtitleEl) subtitleEl.textContent = `Receta: ${recipe.title}`;
+    if (titleEl) titleEl.textContent = window.I18n ? window.I18n.t('shopping.previewTitle') : "Añadir a la Compra";
+    if (subtitleEl) subtitleEl.textContent = window.I18n ? window.I18n.t('shopping.previewRecipeSub', { title: recipe.title }) : `Receta: ${recipe.title}`;
     if (servingsVal) servingsVal.textContent = currentServings;
     if (clearFirst) clearFirst.checked = false;
 
@@ -14900,7 +14954,7 @@ class FoodAssistantApp {
 
         groups.push({
           recipeId: recipe.id,
-          recipeTitle: count > 1 ? `${recipe.title} (${count} comidas)` : recipe.title,
+          recipeTitle: count > 1 ? (window.I18n ? window.I18n.t('shopping.previewRecipeOccurs', { title: recipe.title, count }) : `${recipe.title} (${count} comidas)`) : recipe.title,
           recipeImage: recipe.imageUrl,
           baseServings: recipeBaseServings,
           occurrenceCount: count,
@@ -14934,8 +14988,8 @@ class FoodAssistantApp {
     const servingsVal = document.getElementById('shopping-preview-servings-val');
     const clearFirst = document.getElementById('shopping-preview-clear-first');
 
-    if (titleEl) titleEl.textContent = "Añadir a la Compra";
-    if (subtitleEl) subtitleEl.textContent = `Men\u00FA Semanal (${groups.length} recetas, ${plannedCount} comidas)`;
+    if (titleEl) titleEl.textContent = window.I18n ? window.I18n.t('shopping.previewTitle') : "Añadir a la Compra";
+    if (subtitleEl) subtitleEl.textContent = window.I18n ? window.I18n.t('shopping.previewPlanSub', { recipes: groups.length, meals: plannedCount }) : `Men\u00FA Semanal (${groups.length} recetas, ${plannedCount} comidas)`;
     if (servingsVal) servingsVal.textContent = currentServings;
     if (clearFirst) clearFirst.checked = false;
 
@@ -14958,12 +15012,19 @@ class FoodAssistantApp {
 
     const btnText = document.getElementById('btn-confirm-add-shopping-text');
     if (btnText) {
-      btnText.textContent = `Añadir a la Compra (${totalChecked})`;
+      btnText.textContent = window.I18n ? window.I18n.t('shopping.previewAddBtn', { count: totalChecked }) : `Añadir a la Compra (${totalChecked})`;
     }
+
+    const previewCheckLabel = window.I18n ? window.I18n.t('shopping.previewCheckRecipe') : 'Marcar receta';
+    const previewUncheckLabel = window.I18n ? window.I18n.t('shopping.previewUncheckRecipe') : 'Desmarcar receta';
+    const amountPlaceholder = window.I18n ? window.I18n.t('shopping.previewAmountPlaceholder') : 'Cant.';
 
     container.innerHTML = this.shoppingPreviewState.groups.map((group, groupIdx) => {
       const allChecked = group.items.length > 0 && group.items.every(i => i.checked);
       const checkedInGroup = group.items.filter(i => i.checked).length;
+      const selectedSubText = window.I18n
+        ? window.I18n.t('shopping.previewSelectedCount', { checked: checkedInGroup, total: group.items.length })
+        : `${checkedInGroup} de ${group.items.length} ingredientes seleccionados`;
 
       return `
         <div class="card shopping-preview-group-card">
@@ -14972,13 +15033,13 @@ class FoodAssistantApp {
             <div class="shopping-preview-group-title-wrap">
               ${group.recipeImage ? `<img src="${group.recipeImage}" alt="" class="shopping-preview-thumb">` : `<span class="material-symbols-outlined icon-primary">restaurant</span>`}
               <div class="u-flex-1-truncate">
-                <div class="shopping-preview-recipe-title">${group.recipeTitle}</div>
-                <div class="shopping-preview-count-sub">${checkedInGroup} de ${group.items.length} ingredientes seleccionados</div>
+                <div class="shopping-preview-recipe-title">${escapeHtml(group.recipeTitle)}</div>
+                <div class="shopping-preview-count-sub">${escapeHtml(selectedSubText)}</div>
               </div>
             </div>
             
             <button type="button" class="btn btn-ghost btn-sm btn-preview-toggle-group" onclick="app.toggleGroupShoppingPreview(${groupIdx}, ${!allChecked})">
-              ${allChecked ? 'Desmarcar receta' : 'Marcar receta'}
+              ${escapeHtml(allChecked ? previewUncheckLabel : previewCheckLabel)}
             </button>
           </div>
 
@@ -14986,6 +15047,7 @@ class FoodAssistantApp {
           <div class="shopping-preview-items-col">
             ${group.items.map((ing, itemIdx) => {
         const meta = AISLE_METADATA[ing.aisle] || AISLE_METADATA.other;
+        const localizedAisle = window.I18n ? window.I18n.getAisleName(ing.aisle || 'other') : meta.label;
         const isChecked = ing.checked !== false;
 
         return `
@@ -14994,17 +15056,17 @@ class FoodAssistantApp {
                     <input type="checkbox" class="grocery-checkbox u-shrink-0" ${isChecked ? 'checked' : ''} onchange="app.handleShoppingPreviewItemCheck(${groupIdx}, ${itemIdx}, this.checked)">
                     <div class="u-flex-1-truncate">
                       <span class="shopping-preview-item-name ${isChecked ? '' : 'is-unchecked'}">
-                        ${ing.name}
+                        ${escapeHtml(ing.name)}
                       </span>
                       <span class="shopping-preview-aisle-tag">
-                        <span class="material-symbols-outlined icon-sm icon-12">${meta.icon}</span> ${meta.label}
+                        <span class="material-symbols-outlined icon-sm icon-12">${meta.icon}</span> ${escapeHtml(localizedAisle)}
                       </span>
                     </div>
                   </label>
 
                   <div class="u-flex-center-gap-4-shrink">
                     <input type="number" step="any" min="0" value="${ing.amount !== null && ing.amount !== undefined ? ing.amount : ''}" 
-                      placeholder="Cant." 
+                      placeholder="${escapeHtml(amountPlaceholder)}" 
                       class="form-input shopping-preview-amount-input ${isChecked ? '' : 'is-unchecked'}" 
                       onchange="app.handleShoppingPreviewAmountChange(${groupIdx}, ${itemIdx}, this.value)"
                       ${isChecked ? '' : 'disabled'}>
@@ -15102,7 +15164,7 @@ class FoodAssistantApp {
     });
 
     if (selectedItems.length === 0) {
-      this.showToast("Por favor, selecciona al menos un ingrediente para añadir.", 'warning');
+      this.showToast(window.I18n ? window.I18n.t('shopping.previewSelectOne') : "Por favor, selecciona al menos un ingrediente para añadir.", 'warning');
       return;
     }
 
@@ -15134,7 +15196,7 @@ class FoodAssistantApp {
     this.closeShoppingPreviewModal();
     this.render();
     this.switchView('view-shopping');
-    this.showToast(`\u00A1Se han a\u00F1adido ${addedCount} ingredientes a tu lista de la compra!`, 'success');
+    this.showToast(window.I18n ? window.I18n.t('shopping.previewAddedToast', { count: addedCount }) : `\u00A1Se han a\u00F1adido ${addedCount} ingredientes a tu lista de la compra!`, 'success');
   }
 
   async copyShoppingList() {
@@ -19094,6 +19156,34 @@ REGLAS CRÍTICAS:
     }
   }
 
+  async _clearPhantomHouseholdState(householdId) {
+    if (typeof this.teardownHouseholdRealtimeSubscription === 'function') {
+      this.teardownHouseholdRealtimeSubscription();
+    }
+    state.saveHousehold(null);
+    try { localStorage.removeItem('fa_household'); } catch (e) { }
+    if (Array.isArray(state.cookbooks)) {
+      const filteredCbs = state.cookbooks.filter(cb => cb && cb.householdId !== householdId);
+      state.cookbooks = filteredCbs.length > 0
+        ? filteredCbs
+        : (typeof structuredClone === 'function' ? structuredClone(SEED_COOKBOOKS) : JSON.parse(JSON.stringify(SEED_COOKBOOKS)));
+      state.saveCookbooks(state.cookbooks);
+      this.renderCookbooksShelf();
+      this.renderCookbooksStrip();
+    }
+    const currentUserId = state.cloudUser?.id || '';
+    if (currentUserId && typeof this.upsertWithSchemaFallback === 'function') {
+      try {
+        await this.upsertWithSchemaFallback('user_settings', [{
+          user_id: currentUserId,
+          active_household_id: null,
+          updated_at: new Date().toISOString()
+        }]);
+      } catch (e) { }
+    }
+    this.renderHouseholdSettings();
+  }
+
   async refreshHouseholdMembersFromCloud(householdId = state.household?.id) {
     if (!householdId || !this.supabaseClient?.from || !state.household) return;
     try {
@@ -19102,6 +19192,15 @@ REGLAS CRÍTICAS:
         this.supabaseClient.from('household_members').select('*').eq('household_id', householdId)
       ]);
       const hhRow = Array.isArray(hhRes?.data) ? hhRes.data[0] : hhRes?.data;
+      const currentUserId = state.cloudUser?.id || '';
+      if (hhRow && hhRow.id && hhRow.owner_id && !memRes?.error && Array.isArray(memRes?.data)) {
+        const isOwner = Boolean(currentUserId && hhRow.owner_id === currentUserId);
+        const isMember = Boolean(currentUserId && memRes.data.some(m => (m.user_id || m.userId) === currentUserId));
+        if (currentUserId && !isOwner && !isMember) {
+          await this._clearPhantomHouseholdState(householdId);
+          return null;
+        }
+      }
       if (hhRow && hhRow.id) {
         state.household.name = hhRow.name || state.household.name;
         state.household.inviteCode = hhRow.invite_code || state.household.inviteCode;
@@ -19141,6 +19240,14 @@ REGLAS CRÍTICAS:
           joinedAt: m.joined_at
         }))
         : [];
+
+      const currentUserId = state.cloudUser?.id || '';
+      const isOwner = Boolean(currentUserId && hhRow.owner_id === currentUserId);
+      const isMember = Boolean(currentUserId && members.some(m => m.userId === currentUserId));
+      if (currentUserId && hhRow.owner_id && !memRes?.error && Array.isArray(memRes?.data) && !isOwner && !isMember) {
+        await this._clearPhantomHouseholdState(householdId);
+        return null;
+      }
 
       const loaded = {
         id: hhRow.id,
@@ -19220,13 +19327,18 @@ REGLAS CRÍTICAS:
     const isOwner = hh.role === 'owner' || hh.ownerId === currentUserId;
     const otherMembers = (hh.members || []).filter(m => (m.userId || m.user_id) !== currentUserId);
 
+    const t = window.I18n ? (k, p) => window.I18n.t(k, p) : null;
     const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
-      title: isOwner && otherMembers.length === 0 ? `¿Disolver "${hh.name}"?` : `¿Abandonar "${hh.name}"?`,
+      title: isOwner && otherMembers.length === 0
+        ? (t ? t('household.dissolveConfirmTitle', { name: hh.name }) : `¿Disolver "${hh.name}"?`)
+        : (t ? t('household.leaveConfirmTitle', { name: hh.name }) : `¿Abandonar "${hh.name}"?`),
       message: isOwner && otherMembers.length > 0
-        ? `Saldrás del hogar "${hh.name}" y la administración pasará automáticamente a ${otherMembers[0].name || 'otro miembro'}. Volverás a tu Modo Personal.`
-        : `Dejarás de compartir el menú semanal y la lista de la compra con "${hh.name}" y volverás a tu Modo Personal.`,
-      confirmText: isOwner && otherMembers.length === 0 ? 'Disolver hogar' : 'Salir del hogar',
-      cancelText: 'Cancelar',
+        ? (t ? t('household.leaveTransferMsg', { name: hh.name, nextOwner: otherMembers[0].name || (t ? t('household.memberRole') : 'otro miembro') }) : `Saldrás del hogar "${hh.name}" y la administración pasará automáticamente a ${otherMembers[0].name || 'otro miembro'}. Volverás a tu Modo Personal.`)
+        : (t ? t('household.leaveStandardMsg', { name: hh.name }) : `Dejarás de compartir el menú semanal y la lista de la compra con "${hh.name}" y volverás a tu Modo Personal.`),
+      confirmText: isOwner && otherMembers.length === 0
+        ? (t ? t('household.dissolveBtn') : 'Disolver hogar')
+        : (t ? t('household.leaveConfirmBtn') : 'Salir del hogar'),
+      cancelText: t ? t('common.cancel') : 'Cancelar',
       danger: true,
       icon: 'logout'
     });
@@ -20092,19 +20204,19 @@ REGLAS CRÍTICAS:
       statsContainer.innerHTML = `
         <div class="bulk-stat-card">
           <span class="bulk-stat-number">${total}</span>
-          <span class="bulk-stat-label">Encontradas</span>
+          <span class="bulk-stat-label">${escapeHtml(window.I18n ? window.I18n.t('bulkImport.statFound') : 'Encontradas')}</span>
         </div>
         <div class="bulk-stat-card bulk-stat-new">
           <span class="bulk-stat-number">${newCount}</span>
-          <span class="bulk-stat-label">Nuevas</span>
+          <span class="bulk-stat-label">${escapeHtml(window.I18n ? window.I18n.t('bulkImport.statNew') : 'Nuevas')}</span>
         </div>
         <div class="bulk-stat-card bulk-stat-dup">
           <span class="bulk-stat-number">${dupCount}</span>
-          <span class="bulk-stat-label">Duplicadas</span>
+          <span class="bulk-stat-label">${escapeHtml(window.I18n ? window.I18n.t('bulkImport.statDup') : 'Duplicadas')}</span>
         </div>
         <div class="bulk-stat-card bulk-stat-warn">
           <span class="bulk-stat-number">${warnCount}</span>
-          <span class="bulk-stat-label">Con avisos</span>
+          <span class="bulk-stat-label">${escapeHtml(window.I18n ? window.I18n.t('bulkImport.statWarn') : 'Con avisos')}</span>
         </div>
       `;
     }
@@ -20332,11 +20444,12 @@ REGLAS CRÍTICAS:
   }
 
   async resetDemoData(skipConfirm = false) {
+    const t = window.I18n ? (k, p) => window.I18n.t(k, p) : null;
     const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
-      title: 'Restablecer datos de demostración',
-      message: "¿Restablecer todas las recetas y el plan a los valores iniciales de demostración? Se perderán los cambios locales no exportados.",
-      confirmText: 'Restablecer datos',
-      cancelText: 'Cancelar',
+      title: t ? t('settings.resetDemoTitle') : 'Restablecer datos de demostración',
+      message: t ? t('settings.resetDemoMsg') : "¿Restablecer todas las recetas y el plan a los valores iniciales de demostración? Se perderán los cambios locales no exportados.",
+      confirmText: t ? t('settings.resetDemoConfirm') : 'Restablecer datos',
+      cancelText: t ? t('common.cancel') : 'Cancelar',
       danger: true,
       icon: 'restart_alt'
     });

@@ -1035,5 +1035,126 @@ describe('US-77: Modo Familia / Espacio Colaborativo del Hogar (Family Mode)', (
       expect(filtered).toHaveLength(1);
       expect(filtered[0].id).toBe('rec-own-aroa');
     });
+
+    it('17. Guardián anti-hogar fantasma: loadHouseholdByIdFromCloud rechaza hogar si el usuario no es owner ni miembro y limpia libros contaminados y user_settings', async () => {
+      state.cloudUser = { id: 'user-free-999', email: 'saboryfood@gmail.com' };
+      state.saveHousehold({ id: 'hh-aroa-fran-001', name: 'Casa Aroa y Fran', ownerId: 'user-franky-111' });
+      state.cookbooks = [
+        { id: 'cb-desayunos', name: 'Desayunos', householdId: 'hh-aroa-fran-001' },
+        { id: 'cb-personal', name: 'Mis Recetas' }
+      ];
+
+      const upsertedSettings = [];
+      appInstance.supabaseClient = {
+        from: vi.fn().mockImplementation((table) => {
+          if (table === 'households') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [{
+                    id: 'hh-aroa-fran-001',
+                    name: 'Casa Aroa y Fran',
+                    invite_code: 'SAB-CAW9',
+                    owner_id: 'user-franky-111',
+                    cookbooks: [{ id: 'cb-desayunos', name: 'Desayunos', householdId: 'hh-aroa-fran-001' }]
+                  }],
+                  error: null
+                })
+              })
+            };
+          }
+          if (table === 'household_members') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [],
+                  error: null
+                })
+              })
+            };
+          }
+          if (table === 'user_settings') {
+            return {
+              upsert: vi.fn().mockImplementation((payload) => {
+                const rows = Array.isArray(payload) ? payload : [payload];
+                upsertedSettings.push(...rows);
+                return Promise.resolve({ data: rows, error: null });
+              })
+            };
+          }
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null })
+            })
+          };
+        })
+      };
+
+      const res = await appInstance.loadHouseholdByIdFromCloud('hh-aroa-fran-001');
+
+      expect(res).toBeNull();
+      expect(state.household).toBeNull();
+      expect(localStorage.getItem('fa_household')).toBeNull();
+      expect(state.cookbooks.some(cb => cb.householdId === 'hh-aroa-fran-001')).toBe(false);
+      expect(state.cookbooks.some(cb => cb.id === 'cb-personal')).toBe(true);
+      expect(upsertedSettings.some(s => s.user_id === 'user-free-999' && s.active_household_id === null)).toBe(true);
+    });
+
+    it('18. Guardián anti-hogar fantasma: refreshHouseholdMembersFromCloud detecta hogar ajeno heredado y limpia state.household', async () => {
+      state.cloudUser = { id: 'user-free-999', email: 'saboryfood@gmail.com' };
+      state.saveHousehold({ id: 'hh-aroa-fran-001', name: 'Casa Aroa y Fran', ownerId: 'user-franky-111', members: [] });
+
+      const upsertedSettings = [];
+      appInstance.supabaseClient = {
+        from: vi.fn().mockImplementation((table) => {
+          if (table === 'households') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [{
+                    id: 'hh-aroa-fran-001',
+                    name: 'Casa Aroa y Fran',
+                    invite_code: 'SAB-CAW9',
+                    owner_id: 'user-franky-111'
+                  }],
+                  error: null
+                })
+              })
+            };
+          }
+          if (table === 'household_members') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [],
+                  error: null
+                })
+              })
+            };
+          }
+          if (table === 'user_settings') {
+            return {
+              upsert: vi.fn().mockImplementation((payload) => {
+                const rows = Array.isArray(payload) ? payload : [payload];
+                upsertedSettings.push(...rows);
+                return Promise.resolve({ data: rows, error: null });
+              })
+            };
+          }
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null })
+            })
+          };
+        })
+      };
+
+      const res = await appInstance.refreshHouseholdMembersFromCloud('hh-aroa-fran-001');
+
+      expect(res).toBeNull();
+      expect(state.household).toBeNull();
+      expect(localStorage.getItem('fa_household')).toBeNull();
+      expect(upsertedSettings.some(s => s.user_id === 'user-free-999' && s.active_household_id === null)).toBe(true);
+    });
   });
 });

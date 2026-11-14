@@ -766,4 +766,100 @@ describe('US-12: Módulo Core de Internacionalización (i18n.js)', () => {
     expect(I18n.t('ai.talkToAssistant')).toBe('Talk to Sous Chef');
     expect(I18n.t('settings.aiTtsVoice')).toBe('Sous Chef Voice (TTS)');
   });
+
+  it('mantiene paridad exacta del 100% de claves entre MESSAGES.es y MESSAGES.en', () => {
+    const collectLeafKeys = (obj, prefix = '') => {
+      const keys = [];
+      for (const [k, v] of Object.entries(obj || {})) {
+        const nextKey = prefix ? `${prefix}.${k}` : k;
+        if (v && typeof v === 'object' && !Array.isArray(v)) {
+          keys.push(...collectLeafKeys(v, nextKey));
+        } else {
+          keys.push(nextKey);
+        }
+      }
+      return keys;
+    };
+
+    const esKeys = new Set(collectLeafKeys(I18n.MESSAGES.es).filter(k => k !== 'testKey'));
+    const enKeys = new Set(collectLeafKeys(I18n.MESSAGES.en).filter(k => k !== 'testKey'));
+
+    const missingInEn = [...esKeys].filter(k => !enKeys.has(k));
+    const missingInEs = [...enKeys].filter(k => !esKeys.has(k));
+
+    expect(missingInEn).toEqual([]);
+    expect(missingInEs).toEqual([]);
+  });
+
+  it('traduce al inglés los modales de auth, preview de compra, importación masiva, confirmación, selector y hogar en index.html', () => {
+    const htmlPath = path.resolve(process.cwd(), 'index.html');
+    const html = fs.readFileSync(htmlPath, 'utf-8');
+    document.body.innerHTML = html;
+
+    I18n.setPreference('en');
+    I18n.applyTranslations();
+
+    expect(document.getElementById('auth-modal-title')?.textContent?.trim()).toBe('Cloud Account');
+    expect(document.querySelector('#modal-auth .auth-tab[data-tab="login"]')?.textContent?.trim()).toBe('Sign In');
+    expect(document.querySelector('#modal-auth .auth-tab[data-tab="signup"]')?.textContent?.trim()).toBe('Create Account');
+    expect(document.getElementById('btn-google-text')?.textContent?.trim()).toBe('Continue with Google');
+    expect(document.querySelector('#modal-auth [data-i18n="auth.syncSafeNote"]')?.textContent?.trim()).toBe('Your recipes and meal plans sync securely.');
+
+    expect(document.getElementById('shopping-preview-title')?.textContent?.trim()).toBe('Add to Shopping List');
+    expect(document.getElementById('btn-confirm-add-shopping-text')?.textContent?.trim()).toBe('Add to Shopping List');
+    expect(document.querySelector('#modal-bulk-import [data-i18n="bulkImport.title"]')?.textContent?.trim()).toBe('Import Recipe Collection');
+    expect(document.getElementById('confirm-dialog-title')?.textContent?.trim()).toBe('Confirm action');
+    expect(document.getElementById('picker-modal-title')?.textContent?.trim()).toBe('Select Dish');
+    expect(document.getElementById('bulk-add-cookbook-desc')?.textContent?.trim()).toBe('Select the cookbooks where you want to include the selected recipes:');
+    expect(document.getElementById('create-household-help')?.textContent?.trim()).toBe('Your current meal plan and shopping list will be the family starting point.');
+    expect(document.getElementById('input-create-household-name')?.getAttribute('placeholder')).toBe('e.g. Smith Family');
+    expect(document.getElementById('join-household-help')?.textContent?.trim()).toBe('Enter the invite code shared by your family member or partner.');
+  });
+
+  it('renderShoppingList y clearCompletedGroceries renderizan estados y diálogos en inglés cuando el idioma activo es EN', async () => {
+    const appPath = path.resolve(process.cwd(), 'app.js');
+    const appCode = fs.readFileSync(appPath, 'utf-8');
+    new Function(appCode)();
+
+    document.body.innerHTML = '<div id="shopping-aisles-container"></div>';
+    const appInstance = new window.FoodAssistantApp();
+    appInstance.scheduleSyncWithCloud = vi.fn();
+    appInstance.flushSync = vi.fn().mockResolvedValue();
+
+    I18n.setPreference('en');
+
+    // 1. Artículo completado añadido manualmente -> tarjeta "Everything in the cart!" + "For: Added manually" + diálogo "Clear purchased list"
+    state.shoppingList = [
+      { id: 'shop-1', name: 'Test', amount: 1, unit: 'ud', aisle: 'other', isChecked: true, recipeOrigin: 'Añadido manualmente' }
+    ];
+    appInstance.renderShoppingList();
+
+    const containerHtml = document.getElementById('shopping-aisles-container').innerHTML;
+    expect(containerHtml).toContain('Everything in the cart!');
+    expect(containerHtml).toContain('For: Added manually');
+
+    const confirmSpy = vi.fn().mockResolvedValue(false);
+    appInstance.showConfirmDialog = confirmSpy;
+    await appInstance.clearCompletedGroceries();
+
+    expect(confirmSpy).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Clear purchased list',
+      message: 'Remove all 1 purchased items and empty the list?',
+      confirmText: 'Empty list',
+      cancelText: 'Cancel'
+    }));
+
+    // 2. Solo artículos pendientes -> diálogo "Empty entire list"
+    state.shoppingList = [
+      { id: 'shop-2', name: 'Milk', amount: 1, unit: 'l', aisle: 'dairy', isChecked: false, recipeOrigin: 'Añadido manualmente' }
+    ];
+    confirmSpy.mockClear();
+    await appInstance.clearCompletedGroceries();
+
+    expect(confirmSpy).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Empty entire list',
+      confirmText: 'Empty all',
+      cancelText: 'Cancel'
+    }));
+  });
 });
