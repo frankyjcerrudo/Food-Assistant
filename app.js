@@ -2536,6 +2536,7 @@ class StateStore {
     this.customTags = this.load('fa_custom_tags', []);
     this.theme = localStorage.getItem('fa_theme_mode') || 'light';
     this.cloudUser = this.load('fa_cloud_user', null);
+    this.isSuperAdmin = false;
     this.aiPlan = this.load('fa_ai_plan', null) || {
       plan: this.cloudUser?.id ? 'free' : 'anonymous',
       source: 'none',
@@ -4907,7 +4908,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.06';
+  window.APP_VERSION = 'v2.07';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4954,7 +4955,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.06';
+    this.appVersion = window.APP_VERSION || 'v2.07';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -6115,10 +6116,42 @@ class FoodAssistantApp {
       if (authTabs) authTabs.style.display = 'flex';
       if (authForms) authForms.style.display = 'block';
       if (authLoggedIn) authLoggedIn.style.display = 'none';
+      state.isSuperAdmin = false;
     }
+    this.updateAdminAccessUI();
     if (typeof this.renderHouseholdSettings === 'function') {
       this.renderHouseholdSettings();
     }
+  }
+
+  async checkAdminRoleStatus() {
+    if (!this.supabaseClient?.from || !state.cloudUser?.id || state.cloudUser.isDemo) {
+      state.isSuperAdmin = false;
+      this.updateAdminAccessUI();
+      return false;
+    }
+    try {
+      const query = this.supabaseClient
+        .from('admin_users')
+        .select('role')
+        .eq('user_id', state.cloudUser.id);
+      const { data, error } = typeof query?.maybeSingle === 'function'
+        ? await query.maybeSingle()
+        : (typeof query?.single === 'function' ? await query.single() : { data: null, error: null });
+      state.isSuperAdmin = !error && data?.role === 'superadmin';
+    } catch (_) {
+      state.isSuperAdmin = false;
+    }
+    this.updateAdminAccessUI();
+    return Boolean(state.isSuperAdmin);
+  }
+
+  updateAdminAccessUI() {
+    const isSuper = Boolean(state.cloudUser?.id && !state.cloudUser?.isDemo && state.isSuperAdmin);
+    ['btn-header-admin', 'btn-settings-open-admin', 'btn-auth-open-admin'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.hidden = !isSuper;
+    });
   }
 
   openAuthModal() {
@@ -6237,6 +6270,7 @@ class FoodAssistantApp {
     state.save('fa_cloud_user', state.cloudUser);
     this.updateUserAccountUI();
     this.closeAuthModal();
+    this.checkAdminRoleStatus();
     this.syncDataWithCloud(true);
     this.processPendingHouseholdJoin();
     this.showToast(`¡Bienvenido a Food Assistant, ${state.cloudUser.name}! Tu cuenta está conectada.`, 'success');
@@ -6269,6 +6303,7 @@ class FoodAssistantApp {
       this.teardownHouseholdRealtimeSubscription();
     }
     state.cloudUser = null;
+    state.isSuperAdmin = false;
     state.aiPlan = {
       plan: 'anonymous',
       source: 'none',
@@ -6375,6 +6410,7 @@ class FoodAssistantApp {
       this.teardownHouseholdRealtimeSubscription();
     }
     state.cloudUser = null;
+    state.isSuperAdmin = false;
     state.save('fa_cloud_user', null);
     if (typeof state.saveHousehold === 'function') {
       state.saveHousehold(null);
@@ -15910,6 +15946,7 @@ ${isEn
     const prevPlan = state.aiPlan?.plan;
     const result = await this._loadAiPlanStatusInner();
     this.refreshPlanUI();
+    this.checkAdminRoleStatus();
     if (state.household?.id && prevPlan !== state.aiPlan?.plan && this.supabaseClient) {
       this.initHouseholdRealtimeSubscription();
     }

@@ -10634,3 +10634,26 @@ body.is-mobile-device .app-container {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Acceso directo exclusivo para superadmin en la app principal */
+.admin-access-shortcut[hidden],
+.admin-access-btn[hidden],
+.admin-access-modal-btn[hidden] {
+  display: none !important;
+}
+
+.admin-access-shortcut {
+  color: var(--m3-primary);
+  text-decoration: none;
+}
+
+.admin-access-btn,
+.admin-access-modal-btn {
+  text-decoration: none;
+}
+
+.admin-access-modal-btn {
+  width: 100%;
+  padding: 12px;
+  justify-content: center;
+}

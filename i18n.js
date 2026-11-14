@@ -140,7 +140,8 @@
         resetDemoTitle: 'Restablecer datos de demostración',
         resetDemoMsg: '¿Restablecer todas las recetas y el plan a los valores iniciales de demostración? Se perderán los cambios locales no exportados.',
         resetDemoConfirm: 'Restablecer datos',
-        resetDemoDone: 'Datos restablecidos a los valores iniciales.'
+        resetDemoDone: 'Datos restablecidos a los valores iniciales.',
+        openAdminConsole: 'Sabory Admin'
       },
       today: {
         title: 'Comidas de Hoy',
@@ -1043,7 +1044,8 @@
         resetDemoTitle: 'Reset demo data',
         resetDemoMsg: 'Reset all recipes and the meal plan to the initial demo values? Unexported local changes will be lost.',
         resetDemoConfirm: 'Reset data',
-        resetDemoDone: 'Data reset to initial demo values.'
+        resetDemoDone: 'Data reset to initial demo values.',
+        openAdminConsole: 'Sabory Admin'
       },
       today: {
         title: "Today's Meals",

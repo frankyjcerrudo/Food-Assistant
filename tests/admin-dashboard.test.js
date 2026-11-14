@@ -307,4 +307,70 @@ describe('US-87b: Sabory Admin Portal (/admin.html), Auth Guard y Dashboard KPIs
       expect(localStorage.getItem('fa_theme_mode')).toBe('dark');
     });
   });
+
+  describe('4. Acceso directo desde la App Principal exclusivo para superadmin', () => {
+    const indexHtmlRaw = readFile('index.html');
+    const appCode = readFile('app.js');
+
+    function mockMainSupabaseWithRole(role) {
+      const maybeSingle = vi.fn().mockResolvedValue(
+        role ? { data: { role }, error: null } : { data: null, error: null }
+      );
+      const eq = vi.fn(() => ({ maybeSingle }));
+      const select = vi.fn(() => ({ eq }));
+      return {
+        from: vi.fn((table) => {
+          if (table === 'admin_users') return { select };
+          return { select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }) })) })) };
+        }),
+        rpc: vi.fn().mockResolvedValue({ data: null, error: null })
+      };
+    }
+
+    it('index.html declara los accesos directos ocultos por defecto con hidden y enlace a admin.html', () => {
+      document.body.innerHTML = extractBodyHtml(indexHtmlRaw);
+      ['btn-header-admin', 'btn-settings-open-admin', 'btn-auth-open-admin'].forEach((id) => {
+        const el = document.getElementById(id);
+        expect(el).not.toBeNull();
+        expect(el.hidden).toBe(true);
+        expect(el.getAttribute('href')).toBe('admin.html');
+      });
+    });
+
+    it('mantiene ocultos los accesos para invitados, usuarios normales o rol distinto a superadmin, y los muestra solo con role === superadmin', async () => {
+      document.body.innerHTML = extractBodyHtml(indexHtmlRaw);
+      new Function(appCode)();
+      const app = new window.FoodAssistantApp();
+      const ids = ['btn-header-admin', 'btn-settings-open-admin', 'btn-auth-open-admin'];
+
+      // 1. Invitado / sin sesión
+      window.state.cloudUser = null;
+      app.supabaseClient = mockMainSupabaseWithRole('superadmin');
+      expect(await app.checkAdminRoleStatus()).toBe(false);
+      ids.forEach((id) => expect(document.getElementById(id).hidden).toBe(true));
+
+      // 2. Usuario normal (sin fila en admin_users)
+      window.state.cloudUser = { id: 'user-norm', email: 'pepe@sabory.food' };
+      app.supabaseClient = mockMainSupabaseWithRole(null);
+      expect(await app.checkAdminRoleStatus()).toBe(false);
+      ids.forEach((id) => expect(document.getElementById(id).hidden).toBe(true));
+
+      // 3. Usuario con rol 'admin' (no 'superadmin')
+      window.state.cloudUser = { id: 'user-staff', email: 'soporte@sabory.food' };
+      app.supabaseClient = mockMainSupabaseWithRole('admin');
+      expect(await app.checkAdminRoleStatus()).toBe(false);
+      ids.forEach((id) => expect(document.getElementById(id).hidden).toBe(true));
+
+      // 4. Cuenta superadmin autorizada
+      window.state.cloudUser = { id: 'user-super', email: 'fjcerrudo@gmail.com' };
+      app.supabaseClient = mockMainSupabaseWithRole('superadmin');
+      expect(await app.checkAdminRoleStatus()).toBe(true);
+      ids.forEach((id) => expect(document.getElementById(id).hidden).toBe(false));
+
+      // 5. Al limpiar sesión / workspace vuelven a ocultarse de inmediato
+      app.resetAccountLocalWorkspace();
+      expect(window.state.isSuperAdmin).toBe(false);
+      ids.forEach((id) => expect(document.getElementById(id).hidden).toBe(true));
+    });
+  });
 });
