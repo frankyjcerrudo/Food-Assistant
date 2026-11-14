@@ -1,11 +1,11 @@
-const CACHE_NAME = 'food-assistant-v2.05';
+const CACHE_NAME = 'food-assistant-v2.06';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './styles.css?v=2.05',
-  './config.js?v=2.05',
-  './i18n.js?v=2.05',
-  './app.js?v=2.05',
+  './styles.css?v=2.06',
+  './config.js?v=2.06',
+  './i18n.js?v=2.06',
+  './app.js?v=2.06',
   './manifest.json',
   './icon.svg',
   './icon-192.png',

@@ -17,6 +17,7 @@ const tag = `v${arg}`;
 
 const edit = (file, fn) => {
   const full = path.join(root, file);
+  if (!fs.existsSync(full)) return;
   const before = fs.readFileSync(full, 'utf-8');
   const after = fn(before);
   if (after !== before) fs.writeFileSync(full, after);
@@ -30,6 +31,8 @@ edit('sw.js', s => s.replace(/(food-assistant-)v[\d.]+(')/, `$1${tag}$2`).replac
 edit('index.html', s => s.replace(/\?v=[\d.]+/g, `?v=${arg}`)
   .replace(/(id="settings-app-version-text"[^>]*>)v[\d.]+(<)/, `$1${tag}$2`)
   .replace(/(id="app-version-badge">)v[\d.]+(<)/, `$1${tag}$2`));
+edit('admin.html', s => s.replace(/\?v=[\d.]+/g, `?v=${arg}`)
+  .replace(/(id="admin-version-badge">)v[\d.]+(<)/, `$1${tag}$2`));
 edit('tests/modals.test.js', s => s.replace(/(APP_VERSION\)\.toBe\(')v[\d.]+('\))/, `$1${tag}$2`)
   .replace(/(appVersion\)\.toBe\(')v[\d.]+('\))/, `$1${tag}$2`)
   .replace(/(badge\.textContent\)\.toBe\(')v[\d.]+('\))/, `$1${tag}$2`)
