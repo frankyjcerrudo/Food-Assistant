@@ -4,7 +4,8 @@
 insert into public.admin_users (user_id, email, role)
 select id, email, 'superadmin'
 from auth.users
-where email = 'FRANKY@EMAIL.COM'
+where lower(email) = lower('FRANKY@EMAIL.COM')
 on conflict (user_id) do update set
   email = excluded.email,
-  role = 'superadmin';
+  role = 'superadmin'
+returning *;
