@@ -1068,15 +1068,28 @@
 
         <!-- Quick prompt chips -->
         <div class="gemini-quick-chips" id="gemini-invoke-chips">
+          <button type="button" class="gemini-chip" data-chip-action="autoplan">
+            <span class="material-symbols-outlined icon-sm">auto_awesome</span> <span data-i18n="ai.chipPlanWeek">Planificar esta semana</span>
+          </button>
           <button type="button" class="gemini-chip"
-            data-prompt="Apunta medio kilo de tomates, 6 huevos y pechuga de pollo a la compra">
+            data-prompt="Añade a la lista de la compra los ingredientes de mi plan semanal actual">
+            <span class="material-symbols-outlined icon-sm">playlist_add_check</span> <span data-i18n="ai.chipPlanToShopping">Compra de mi menú</span>
+          </button>
+          <button type="button" class="gemini-chip"
+            data-prefill="Apunta a la compra: " data-prefill-en="Add to shopping list: ">
             <span class="material-symbols-outlined icon-sm">add_shopping_cart</span> <span data-i18n="ai.chipShopping">Apuntar a la compra</span>
+          </button>
+          <button type="button" class="gemini-chip" data-prompt="Planifica las comidas de hoy equilibradas">
+            <span class="material-symbols-outlined icon-sm">today</span> <span data-i18n="ai.chipPlanToday">Planificar hoy</span>
           </button>
           <button type="button" class="gemini-chip" data-prompt="Planifica las comidas del fin de semana">
             <span class="material-symbols-outlined icon-sm">calendar_month</span> <span data-i18n="ai.chipWeekend">Menú fin de semana</span>
           </button>
           <button type="button" class="gemini-chip" data-prompt="¿Qué puedo cenar hoy rápido, sano y rico en proteínas?">
             <span class="material-symbols-outlined icon-sm">restaurant</span> <span data-i18n="ai.chipDinner">Sugerencia de cena</span>
+          </button>
+          <button type="button" class="gemini-chip" data-prompt="Sugiéreme una receta rápida, saludable y rica en proteínas que se prepare en menos de 15 minutos">
+            <span class="material-symbols-outlined icon-sm">timer</span> <span data-i18n="ai.chipQuickRecipe">Receta en 15 min</span>
           </button>
         </div>
 

@@ -368,4 +368,35 @@ describe('US-80: Centro de IA Sous Chef (Vista Propia + Historial + Acciones/Cá
       globalThis.fetch = origFetch;
     }
   });
+
+  it('6. Chips rápidos ofrecen Planificar esta semana, Compra de mi menú, prefill seguro sin items inventados y recetas rápidas', () => {
+    window.state.aiPlan = {
+      plan: 'free',
+      quotas: { weekly_plan: { used: 0, limit: 1 }, import_ai: { used: 0, limit: 3 }, guided_query: { used: 0, limit: 3 } }
+    };
+    app.switchView('view-ai');
+
+    const chips = Array.from(document.querySelectorAll('#gemini-invoke-chips .gemini-chip'));
+    expect(chips.length).toBe(7);
+
+    // El chip "Apuntar a la compra" pre-rellena el input SIN auto-enviar ni ensuciar la lista de la compra
+    const prefillChip = document.querySelector('#gemini-invoke-chips .gemini-chip[data-prefill]');
+    expect(prefillChip).not.toBeNull();
+    const initialShoppingLen = window.state.shoppingList.length;
+    const submitSpy = vi.spyOn(app, 'handleGeminiInvokeSubmit');
+    prefillChip.click();
+
+    const input = document.getElementById('gemini-invoke-input');
+    expect(input.value).toBe('Apunta a la compra: ');
+    expect(submitSpy).not.toHaveBeenCalled();
+    expect(window.state.shoppingList.length).toBe(initialShoppingLen);
+    expect(app.aiComposerFeatureOverride).toBe('guided_query');
+
+    // El chip "Planificar esta semana" lanza triggerGeminiAutoPlan() directamente
+    const autoplanChip = document.querySelector('#gemini-invoke-chips .gemini-chip[data-chip-action="autoplan"]');
+    expect(autoplanChip).not.toBeNull();
+    const autoPlanSpy = vi.spyOn(app, 'triggerGeminiAutoPlan').mockResolvedValue();
+    autoplanChip.click();
+    expect(autoPlanSpy).toHaveBeenCalledTimes(1);
+  });
 });

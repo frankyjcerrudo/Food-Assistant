@@ -8669,8 +8669,29 @@ class FoodAssistantApp {
     });
     document.querySelectorAll('#gemini-invoke-chips .gemini-chip').forEach(chip => {
       chip.addEventListener('click', () => {
+        if (chip.dataset.chipAction === 'autoplan') {
+          this.triggerGeminiAutoPlan();
+          return;
+        }
         const input = document.getElementById('gemini-invoke-input');
-        if (input && chip.dataset.prompt) {
+        if (!input) return;
+        if (chip.dataset.prefill) {
+          if (!this.ensureAiAccess('guided_query')) return;
+          this.aiComposerMode = null;
+          this.aiComposerFeatureOverride = 'guided_query';
+          const lang = document.documentElement.lang === 'en' ? 'en' : 'es';
+          input.value = lang === 'en' && chip.dataset.prefillEn ? chip.dataset.prefillEn : chip.dataset.prefill;
+          this.renderAiQuotaHints?.();
+          input.focus();
+          const status = document.getElementById('gemini-invoke-transcription');
+          if (status) {
+            status.textContent = window.I18n
+              ? window.I18n.t('ai.chipShoppingPrefillHint')
+              : 'Escribe o dicta lo que quieres apuntar y pulsa Enviar';
+          }
+          return;
+        }
+        if (chip.dataset.prompt) {
           this.aiComposerMode = null;
           this.aiComposerFeatureOverride = null;
           input.value = chip.dataset.prompt;
