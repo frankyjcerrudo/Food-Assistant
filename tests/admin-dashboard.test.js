@@ -329,7 +329,8 @@ describe('US-87b: Sabory Admin Portal (/admin.html), Auth Guard y Dashboard KPIs
 
     it('index.html declara los accesos directos ocultos por defecto con hidden y enlace a admin.html', () => {
       document.body.innerHTML = extractBodyHtml(indexHtmlRaw);
-      ['btn-header-admin', 'btn-settings-open-admin', 'btn-auth-open-admin'].forEach((id) => {
+      expect(document.getElementById('btn-header-admin')).toBeNull();
+      ['btn-settings-open-admin', 'btn-auth-open-admin'].forEach((id) => {
         const el = document.getElementById(id);
         expect(el).not.toBeNull();
         expect(el.hidden).toBe(true);
@@ -341,7 +342,7 @@ describe('US-87b: Sabory Admin Portal (/admin.html), Auth Guard y Dashboard KPIs
       document.body.innerHTML = extractBodyHtml(indexHtmlRaw);
       new Function(appCode)();
       const app = new window.FoodAssistantApp();
-      const ids = ['btn-header-admin', 'btn-settings-open-admin', 'btn-auth-open-admin'];
+      const ids = ['btn-settings-open-admin', 'btn-auth-open-admin'];
 
       // 1. Invitado / sin sesión
       window.state.cloudUser = null;

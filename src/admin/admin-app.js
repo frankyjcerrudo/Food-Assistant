@@ -4,7 +4,12 @@
  * navegación de vistas administrativas y Dashboard ejecutivo de KPIs.
  */
 
-import { computeRevenueMetrics, summarizeAiUsage } from './admin-core.js';
+import {
+  computeRevenueMetrics,
+  summarizeAiUsage,
+  validateEntitlementChange,
+  formatAuditSummary
+} from './admin-core.js';
 
 const PLAN_BREAKDOWN_SPEC = Object.freeze([
   { key: 'free', labelKey: 'admin.planFree', tone: 'terracotta' },
@@ -46,6 +51,19 @@ export class SaboryAdminApp {
     this.stats = null;
     this.statsDays = 30;
     this.lastUpdatedAt = null;
+    this.usersSearch = '';
+    this.usersPlanFilter = 'all';
+    this.usersSourceFilter = 'all';
+    this.usersStatusFilter = 'all';
+    this.usersPageLimit = 25;
+    this.usersOffset = 0;
+    this.usersTotal = 0;
+    this.usersItems = [];
+    this.usersLoaded = false;
+    this.selectedUserId = null;
+    this.selectedUserDetail = null;
+    this._usersSearchTimer = null;
+    this._confirmResolver = null;
     this._eventsBound = false;
     this._authListenerBound = false;
     this.els = {};
@@ -132,7 +150,51 @@ export class SaboryAdminApp {
 
       planBreakdown: byId('admin-plan-breakdown'),
       topDomains: byId('admin-top-domains'),
-      toastContainer: byId('admin-toast-container')
+      toastContainer: byId('admin-toast-container'),
+
+      usersSearchInput: byId('admin-users-search'),
+      filterPlanSelect: byId('admin-filter-plan'),
+      filterSourceSelect: byId('admin-filter-source'),
+      filterStatusSelect: byId('admin-filter-status'),
+      usersCountBadge: byId('admin-users-count'),
+      usersList: byId('admin-users-list'),
+      usersPrevBtn: byId('btn-users-prev'),
+      usersNextBtn: byId('btn-users-next'),
+
+      userModal: byId('modal-admin-user'),
+      userModalEmail: byId('admin-user-modal-email'),
+      userModalCloseBtn: byId('btn-admin-user-close'),
+      userUuidEl: byId('admin-user-uuid'),
+      copyUuidBtn: byId('btn-admin-copy-uuid'),
+      userCreatedEl: byId('admin-user-created'),
+      userLastSignInEl: byId('admin-user-last-signin'),
+      userProviderEl: byId('admin-user-provider'),
+      userServingsEl: byId('admin-user-servings'),
+      userDietaryEl: byId('admin-user-dietary'),
+      userGoalsEl: byId('admin-user-goals'),
+      userHouseholdEl: byId('admin-user-household'),
+      userActivityBadgesEl: byId('admin-user-activity-badges'),
+      userPlanBadgeEl: byId('admin-user-plan-badge'),
+      userPlanMetaEl: byId('admin-user-plan-meta'),
+      userPlayNoticeEl: byId('admin-user-play-notice'),
+      gift14dBtn: byId('btn-admin-gift-14d'),
+      gift30dBtn: byId('btn-admin-gift-30d'),
+      gift90dBtn: byId('btn-admin-gift-90d'),
+      gift365dBtn: byId('btn-admin-gift-365d'),
+      grantPermanentBtn: byId('btn-admin-grant-permanent'),
+      revokeProBtn: byId('btn-admin-revoke-pro'),
+      entitlementForm: byId('admin-entitlement-form'),
+      giftDaysInput: byId('input-admin-gift-days'),
+      entitlementNotesInput: byId('input-admin-entitlement-notes'),
+      wipeUserDataBtn: byId('btn-admin-wipe-user-data'),
+      deleteUserBtn: byId('btn-admin-delete-user'),
+      userAuditListEl: byId('admin-user-audit-list'),
+
+      confirmModal: byId('modal-admin-confirm'),
+      confirmTitleEl: byId('admin-confirm-title'),
+      confirmMsgEl: byId('admin-confirm-msg'),
+      confirmCancelBtn: byId('btn-admin-confirm-cancel'),
+      confirmOkBtn: byId('btn-admin-confirm-ok')
     };
   }
 
@@ -187,7 +249,11 @@ export class SaboryAdminApp {
     });
 
     this.els.refreshBtn?.addEventListener('click', () => {
-      this.loadDashboardStats();
+      if (this.activeView === 'users') {
+        this.loadUsers({ resetOffset: false });
+      } else {
+        this.loadDashboardStats();
+      }
     });
 
     this.els.periodSelect?.addEventListener('change', () => {
@@ -207,6 +273,98 @@ export class SaboryAdminApp {
         const view = btn.getAttribute('data-admin-view');
         if (view) this.switchAdminView(view);
       });
+    });
+
+    this.els.usersSearchInput?.addEventListener('input', (e) => {
+      this.usersSearch = String(e.target?.value || '').trim();
+      const timerApi = this.win || globalThis;
+      if (this._usersSearchTimer) {
+        timerApi.clearTimeout(this._usersSearchTimer);
+      }
+      this._usersSearchTimer = timerApi.setTimeout(() => {
+        this.loadUsers({ resetOffset: true });
+      }, 250);
+    });
+
+    this.els.filterPlanSelect?.addEventListener('change', (e) => {
+      this.usersPlanFilter = String(e.target?.value || 'all');
+      this.loadUsers({ resetOffset: true });
+    });
+
+    this.els.filterSourceSelect?.addEventListener('change', (e) => {
+      this.usersSourceFilter = String(e.target?.value || 'all');
+      this.loadUsers({ resetOffset: true });
+    });
+
+    this.els.filterStatusSelect?.addEventListener('change', (e) => {
+      this.usersStatusFilter = String(e.target?.value || 'all');
+      this.loadUsers({ resetOffset: true });
+    });
+
+    this.els.usersPrevBtn?.addEventListener('click', () => {
+      if (this.usersOffset <= 0) return;
+      this.usersOffset = Math.max(0, this.usersOffset - this.usersPageLimit);
+      this.loadUsers({ resetOffset: false });
+    });
+
+    this.els.usersNextBtn?.addEventListener('click', () => {
+      if (this.usersOffset + this.usersPageLimit >= this.usersTotal) return;
+      this.usersOffset += this.usersPageLimit;
+      this.loadUsers({ resetOffset: false });
+    });
+
+    this.els.usersList?.addEventListener('click', (e) => {
+      const btn = e.target?.closest?.('[data-open-user-id]');
+      if (!btn) return;
+      const userId = btn.getAttribute('data-open-user-id');
+      if (userId) this.openUserDetailModal(userId);
+    });
+
+    this.els.userModalCloseBtn?.addEventListener('click', () => {
+      this.closeDialog(this.els.userModal);
+    });
+
+    this.els.copyUuidBtn?.addEventListener('click', () => {
+      this.copySelectedUuid();
+    });
+
+    const quickGifts = [
+      [this.els.gift14dBtn, { plan: 'pro', source: 'gift', status: 'active', days: 14 }],
+      [this.els.gift30dBtn, { plan: 'pro', source: 'gift', status: 'active', days: 30 }],
+      [this.els.gift90dBtn, { plan: 'pro', source: 'gift', status: 'active', days: 90 }],
+      [this.els.gift365dBtn, { plan: 'pro', source: 'gift', status: 'active', days: 365 }],
+      [this.els.grantPermanentBtn, { plan: 'pro', source: 'admin', status: 'active', days: null }],
+      [this.els.revokeProBtn, { plan: 'free', source: 'none', status: 'active', days: null }]
+    ];
+    quickGifts.forEach(([btn, spec]) => {
+      btn?.addEventListener('click', () => this.applyEntitlementChange(spec));
+    });
+
+    this.els.entitlementForm?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const rawDays = Number(this.els.giftDaysInput?.value);
+      this.applyEntitlementChange({
+        plan: 'pro',
+        source: 'gift',
+        status: 'active',
+        days: Number.isFinite(rawDays) && rawDays > 0 ? Math.floor(rawDays) : null
+      });
+    });
+
+    this.els.wipeUserDataBtn?.addEventListener('click', () => {
+      this.handleDeleteUserData('wipe_data');
+    });
+
+    this.els.deleteUserBtn?.addEventListener('click', () => {
+      this.handleDeleteUserData('delete_account');
+    });
+
+    this.els.confirmCancelBtn?.addEventListener('click', () => {
+      this.resolveConfirm(false);
+    });
+
+    this.els.confirmOkBtn?.addEventListener('click', () => {
+      this.resolveConfirm(true);
     });
   }
 
@@ -375,6 +533,10 @@ export class SaboryAdminApp {
       panel.hidden = !isActive;
       panel.classList.toggle('active', isActive);
     });
+
+    if (viewName === 'users' && !this.usersLoaded) {
+      this.loadUsers({ resetOffset: true });
+    }
   }
 
   async loadDashboardStats() {
@@ -584,6 +746,12 @@ export class SaboryAdminApp {
     if (this.stats) {
       this.renderDashboard(this.stats, this.statsDays);
     }
+    if (this.usersLoaded) {
+      this.renderUsersList();
+    }
+    if (this.selectedUserDetail) {
+      this.renderUserDetailModal(this.selectedUserDetail);
+    }
   }
 
   syncLanguageUI() {
@@ -599,6 +767,349 @@ export class SaboryAdminApp {
         const story = el.getAttribute('data-admin-upcoming') || '';
         el.textContent = this.t('admin.upcomingSectionNotice', { story });
       });
+    }
+  }
+
+  formatDateTime(isoValue) {
+    if (!isoValue) return this.t('admin.never');
+    const date = new Date(isoValue);
+    if (Number.isNaN(date.getTime())) return this.t('admin.never');
+    return date.toLocaleString(this.getLocale(), {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  openDialog(dlg) {
+    if (!dlg) return;
+    if (typeof dlg.showModal === 'function') {
+      if (!dlg.open) dlg.showModal();
+    } else {
+      dlg.setAttribute('open', '');
+    }
+  }
+
+  closeDialog(dlg) {
+    if (!dlg) return;
+    if (typeof dlg.close === 'function') {
+      if (dlg.open) dlg.close();
+    } else {
+      dlg.removeAttribute('open');
+    }
+  }
+
+  getPlanBadgeMeta(item = {}) {
+    const effectivePlan = item.effective_plan || item.plan || 'free';
+    const source = item.source || item.raw_source || 'none';
+    if (effectivePlan !== 'pro') {
+      return { label: this.t('admin.badgeFree'), cssClass: 'is-free' };
+    }
+    if (item.via_household || source === 'household') {
+      return { label: this.t('admin.badgeProHousehold'), cssClass: 'is-household' };
+    }
+    if (source === 'play') {
+      return { label: this.t('admin.badgeProPlay'), cssClass: 'is-play' };
+    }
+    if (source === 'gift') {
+      return { label: this.t('admin.badgeProGift'), cssClass: 'is-gift' };
+    }
+    return { label: this.t('admin.badgeProAdmin'), cssClass: 'is-admin' };
+  }
+
+  async loadUsers({ resetOffset = false } = {}) {
+    if (!this.supabaseClient?.rpc) return null;
+    if (resetOffset) this.usersOffset = 0;
+
+    try {
+      const { data, error } = await this.supabaseClient.rpc('admin_list_users', {
+        p_search: this.usersSearch || null,
+        p_plan: this.usersPlanFilter || 'all',
+        p_source: this.usersSourceFilter || 'all',
+        p_status: this.usersStatusFilter || 'all',
+        p_limit: this.usersPageLimit,
+        p_offset: this.usersOffset
+      });
+      if (error || !data) {
+        throw error || new Error(this.t('admin.errorLoadingUsers'));
+      }
+      this.usersTotal = toSafeCount(data.total);
+      this.usersItems = Array.isArray(data.items) ? data.items : [];
+      this.usersLoaded = true;
+      this.renderUsersList();
+      return data;
+    } catch (err) {
+      this.showToast(err?.message || this.t('admin.errorLoadingUsers'), 'error');
+      return null;
+    }
+  }
+
+  renderUsersList() {
+    if (this.els.usersCountBadge) {
+      const shown = this.usersItems.length;
+      this.els.usersCountBadge.textContent = this.t('admin.usersCountSummary', {
+        shown: this.formatInt(shown),
+        total: this.formatInt(this.usersTotal)
+      });
+    }
+
+    if (this.els.usersPrevBtn) {
+      this.els.usersPrevBtn.disabled = this.usersOffset <= 0;
+    }
+    if (this.els.usersNextBtn) {
+      this.els.usersNextBtn.disabled = this.usersOffset + this.usersPageLimit >= this.usersTotal;
+    }
+
+    if (!this.els.usersList) return;
+    if (this.usersItems.length === 0) {
+      this.els.usersList.innerHTML = `<p class="admin-empty-text">${escapeHtml(this.t('admin.usersEmpty'))}</p>`;
+      return;
+    }
+
+    this.els.usersList.innerHTML = this.usersItems.map((item) => {
+      const badge = this.getPlanBadgeMeta(item);
+      const displayName = item.display_name || item.email || item.id;
+      const expiresText = item.effective_plan === 'pro'
+        ? (item.period_end ? this.formatDateTime(item.period_end) : this.t('admin.permanent'))
+        : '-';
+      const lastSignInText = this.formatDateTime(item.last_sign_in_at);
+
+      return `
+        <article class="admin-user-card" data-user-id="${escapeHtml(item.id)}">
+          <div class="admin-user-card-main">
+            <div class="admin-user-card-title">
+              <span>${escapeHtml(displayName)}</span>
+              <span class="admin-plan-pill ${escapeHtml(badge.cssClass)}">${escapeHtml(badge.label)}</span>
+            </div>
+            <div class="admin-user-card-email">${escapeHtml(item.email || '-')}</div>
+            <div class="admin-user-card-meta">
+              <span>${escapeHtml(this.t('admin.colExpires'))}: ${escapeHtml(expiresText)}</span>
+              <span>${escapeHtml(this.t('admin.colLastSignIn'))}: ${escapeHtml(lastSignInText)}</span>
+              <span>${escapeHtml(this.formatInt(item.recipes_count))} ${escapeHtml(this.t('admin.recipesShort'))}</span>
+              <span>${escapeHtml(this.formatInt(item.ai_calls_30d))} ${escapeHtml(this.t('admin.aiCallsShort'))}</span>
+            </div>
+          </div>
+          <button type="button" class="btn-outline" data-open-user-id="${escapeHtml(item.id)}">
+            ${escapeHtml(this.t('admin.openUserBtn'))}
+          </button>
+        </article>
+      `;
+    }).join('');
+  }
+
+  async openUserDetailModal(userId) {
+    if (!this.supabaseClient?.rpc || !userId) return null;
+    try {
+      const { data, error } = await this.supabaseClient.rpc('admin_get_user_detail', {
+        p_user_id: userId
+      });
+      if (error || !data) {
+        throw error || new Error(this.t('admin.errorLoadingUserDetail'));
+      }
+      this.selectedUserId = userId;
+      this.selectedUserDetail = data;
+      this.renderUserDetailModal(data);
+      this.openDialog(this.els.userModal);
+      return data;
+    } catch (err) {
+      this.showToast(err?.message || this.t('admin.errorLoadingUserDetail'), 'error');
+      return null;
+    }
+  }
+
+  renderUserDetailModal(detail = {}) {
+    const user = detail.user || {};
+    const ent = detail.entitlement || {};
+    const settings = detail.settings || {};
+    const activity = detail.activity || {};
+    const household = detail.household || null;
+    const auditLog = Array.isArray(detail.audit_log) ? detail.audit_log : [];
+
+    if (this.els.userModalEmail) this.els.userModalEmail.textContent = user.email || '-';
+    if (this.els.userUuidEl) this.els.userUuidEl.textContent = user.id || '-';
+    if (this.els.userCreatedEl) this.els.userCreatedEl.textContent = this.formatDateTime(user.created_at);
+    if (this.els.userLastSignInEl) this.els.userLastSignInEl.textContent = this.formatDateTime(user.last_sign_in_at);
+    if (this.els.userProviderEl) this.els.userProviderEl.textContent = user.provider || '-';
+
+    if (this.els.userServingsEl) {
+      this.els.userServingsEl.textContent = settings.default_servings ? this.formatInt(settings.default_servings) : '-';
+    }
+    if (this.els.userDietaryEl) {
+      const prefs = Array.isArray(settings.dietary_preferences) && settings.dietary_preferences.length > 0
+        ? settings.dietary_preferences.join(', ')
+        : '-';
+      this.els.userDietaryEl.textContent = prefs;
+    }
+    if (this.els.userGoalsEl) {
+      const goals = settings.nutrition_goals && Object.keys(settings.nutrition_goals).length > 0
+        ? JSON.stringify(settings.nutrition_goals)
+        : '-';
+      this.els.userGoalsEl.textContent = goals;
+    }
+    if (this.els.userHouseholdEl) {
+      this.els.userHouseholdEl.textContent = household
+        ? `${household.name || household.id} (${household.role || '-'})`
+        : this.t('admin.noHousehold');
+    }
+
+    if (this.els.userActivityBadgesEl) {
+      const totalTokens = toSafeCount(activity.prompt_tokens_30d) + toSafeCount(activity.output_tokens_30d);
+      const chips = [
+        `${this.formatInt(activity.recipes_count)} ${this.t('admin.recipesShort')}`,
+        `${this.formatInt(activity.meal_plans_count)} ${this.t('admin.mealPlansShort')}`,
+        `${this.formatInt(activity.shopping_items_count)} ${this.t('admin.shoppingItemsShort')}`,
+        `${this.formatInt(activity.ai_calls_30d)} ${this.t('admin.aiCallsShort')}`,
+        `${this.formatInt(totalTokens)} ${this.t('admin.tokens30d')}`
+      ];
+      this.els.userActivityBadgesEl.innerHTML = chips
+        .map((txt) => `<span class="admin-badge admin-badge-neutral">${escapeHtml(txt)}</span>`)
+        .join('');
+    }
+
+    const badge = this.getPlanBadgeMeta(ent);
+    if (this.els.userPlanBadgeEl) {
+      this.els.userPlanBadgeEl.className = `admin-plan-pill ${badge.cssClass}`;
+      this.els.userPlanBadgeEl.textContent = badge.label;
+    }
+    if (this.els.userPlanMetaEl) {
+      const expires = ent.effective_plan === 'pro'
+        ? (ent.period_end ? this.formatDateTime(ent.period_end) : this.t('admin.permanent'))
+        : '-';
+      const trialPart = ent.is_trial ? ` · ${this.t('admin.trialBadge')}` : '';
+      this.els.userPlanMetaEl.textContent = `${this.t('admin.colExpires')}: ${expires}${trialPart}`;
+    }
+    if (this.els.userPlayNoticeEl) {
+      this.els.userPlayNoticeEl.hidden = ent.source !== 'play';
+    }
+
+    if (this.els.userAuditListEl) {
+      if (auditLog.length === 0) {
+        this.els.userAuditListEl.innerHTML = `<li class="admin-empty-text">${escapeHtml(this.t('admin.auditEmpty'))}</li>`;
+      } else {
+        this.els.userAuditListEl.innerHTML = auditLog.map((entry) => `
+          <li class="admin-audit-item">
+            <span>${escapeHtml(formatAuditSummary(entry))}</span>
+            <span class="admin-audit-meta">${escapeHtml(entry.admin_email || '-')} · ${escapeHtml(this.formatDateTime(entry.created_at))}</span>
+          </li>
+        `).join('');
+      }
+    }
+  }
+
+  async applyEntitlementChange({ plan, source, status = 'active', days = null }) {
+    if (!this.supabaseClient?.rpc || !this.selectedUserId) return null;
+
+    const check = validateEntitlementChange({ plan, source, status, days });
+    if (!check.ok) {
+      this.showToast(check.error || this.t('admin.errorUpdatingEntitlement'), 'error');
+      return null;
+    }
+
+    const currentSource = this.selectedUserDetail?.entitlement?.source;
+    if (plan === 'free' && currentSource === 'play') {
+      const confirmed = await this.confirmAdminAction({
+        title: this.t('admin.revokePlayConfirmTitle'),
+        message: this.t('admin.revokePlayConfirmMsg')
+      });
+      if (!confirmed) return null;
+    }
+
+    const notes = String(this.els.entitlementNotesInput?.value || '').trim() || null;
+
+    try {
+      const { data, error } = await this.supabaseClient.rpc('admin_set_user_entitlement', {
+        p_user_id: this.selectedUserId,
+        p_plan: plan,
+        p_source: source,
+        p_status: status,
+        p_days: days,
+        p_notes: notes
+      });
+      if (error || !data?.ok) {
+        throw error || new Error(this.t('admin.errorUpdatingEntitlement'));
+      }
+
+      if (this.els.giftDaysInput) this.els.giftDaysInput.value = '';
+      if (this.els.entitlementNotesInput) this.els.entitlementNotesInput.value = '';
+      this.showToast(this.t('admin.entitlementUpdated'), 'success');
+      await this.openUserDetailModal(this.selectedUserId);
+      await this.loadUsers({ resetOffset: false });
+      return data;
+    } catch (err) {
+      this.showToast(err?.message || this.t('admin.errorUpdatingEntitlement'), 'error');
+      return null;
+    }
+  }
+
+  confirmAdminAction({ title, message }) {
+    if (!this.els.confirmModal) return Promise.resolve(false);
+    if (this.els.confirmTitleEl) this.els.confirmTitleEl.textContent = title || '';
+    if (this.els.confirmMsgEl) this.els.confirmMsgEl.textContent = message || '';
+    this.openDialog(this.els.confirmModal);
+
+    return new Promise((resolve) => {
+      this._confirmResolver = resolve;
+    });
+  }
+
+  resolveConfirm(result) {
+    this.closeDialog(this.els.confirmModal);
+    if (typeof this._confirmResolver === 'function') {
+      const fn = this._confirmResolver;
+      this._confirmResolver = null;
+      fn(Boolean(result));
+    }
+  }
+
+  async handleDeleteUserData(mode) {
+    if (!this.supabaseClient?.rpc || !this.selectedUserId) return null;
+    const isDeleteAccount = mode === 'delete_account';
+    const confirmed = await this.confirmAdminAction({
+      title: this.t(isDeleteAccount ? 'admin.deleteAccountConfirmTitle' : 'admin.wipeDataConfirmTitle'),
+      message: this.t(isDeleteAccount ? 'admin.deleteAccountConfirmMsg' : 'admin.wipeDataConfirmMsg')
+    });
+    if (!confirmed) return null;
+
+    const notes = String(this.els.entitlementNotesInput?.value || '').trim() || null;
+
+    try {
+      const { data, error } = await this.supabaseClient.rpc('admin_delete_user_data', {
+        p_user_id: this.selectedUserId,
+        p_mode: mode,
+        p_notes: notes
+      });
+      if (error || !data?.ok) {
+        throw error || new Error(this.t('admin.errorUpdatingEntitlement'));
+      }
+
+      this.showToast(this.t('admin.userDataDeleted'), 'success');
+      if (isDeleteAccount) {
+        this.closeDialog(this.els.userModal);
+        this.selectedUserId = null;
+        this.selectedUserDetail = null;
+      } else {
+        await this.openUserDetailModal(this.selectedUserId);
+      }
+      await this.loadUsers({ resetOffset: false });
+      return data;
+    } catch (err) {
+      this.showToast(err?.message || this.t('admin.errorUpdatingEntitlement'), 'error');
+      return null;
+    }
+  }
+
+  async copySelectedUuid() {
+    const uuid = this.selectedUserId || this.els.userUuidEl?.textContent || '';
+    if (!uuid || uuid === '-') return;
+    try {
+      if (this.win?.navigator?.clipboard?.writeText) {
+        await this.win.navigator.clipboard.writeText(uuid);
+      }
+      this.showToast(this.t('admin.uuidCopied'), 'info');
+    } catch (_) {
+      // ignore clipboard restrictions
     }
   }
 

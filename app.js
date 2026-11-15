@@ -4908,7 +4908,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.07';
+  window.APP_VERSION = 'v2.08';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4955,7 +4955,7 @@ if (typeof window !== 'undefined') {
 class FoodAssistantApp {
   constructor() {
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.07';
+    this.appVersion = window.APP_VERSION || 'v2.08';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -6148,7 +6148,7 @@ class FoodAssistantApp {
 
   updateAdminAccessUI() {
     const isSuper = Boolean(state.cloudUser?.id && !state.cloudUser?.isDemo && state.isSuperAdmin);
-    ['btn-header-admin', 'btn-settings-open-admin', 'btn-auth-open-admin'].forEach((id) => {
+    ['btn-settings-open-admin', 'btn-auth-open-admin'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.hidden = !isSuper;
     });
