@@ -11316,23 +11316,56 @@ dialog.admin-confirm-modal::backdrop {
 }
 
 .ai-hub-header {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 0;
   padding-bottom: 8px;
-  gap: 6px;
+  gap: 8px;
   border-bottom: 1px solid var(--m3-outline-variant, rgba(0, 0, 0, 0.08));
 }
 
 .ai-hub-header .gemini-invoke-header-top {
-  gap: 10px;
+  width: auto;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
-.ai-hub-header .gemini-avatar {
-  width: 36px;
-  height: 36px;
+.ai-hub-header .gemini-avatar-glow {
+  width: 34px;
+  height: 34px;
 }
 
-.ai-hub-header .gemini-subtitle {
+.ai-hub-header .chef-toque-sheet-svg {
+  width: 18px;
+  height: 18px;
+}
+
+.ai-hub-header #gemini-invoke-title {
+  font-size: 15.5px;
+  white-space: nowrap;
+}
+
+.ai-hub-header .gemini-subtitle,
+.ai-hub-header .gemini-invoke-close-btn {
   display: none;
+}
+
+.ai-hub-header .gemini-invoke-header-actions {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ai-hub-header .ai-hub-toggle-btn,
+.ai-hub-header .btn-new-chat,
+.ai-hub-header .btn-stop-tts {
+  white-space: nowrap;
+  font-size: 11px;
+  padding: 4px 9px;
 }
 
 .ai-hub-shell .gemini-status-container {
