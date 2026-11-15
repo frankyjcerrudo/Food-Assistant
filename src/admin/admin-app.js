@@ -7,6 +7,7 @@
 import {
   computeRevenueMetrics,
   summarizeAiUsage,
+  derivePlanBreakdownFromUsers,
   validateEntitlementChange,
   formatAuditSummary
 } from './admin-core.js';
@@ -553,6 +554,35 @@ export class SaboryAdminApp {
       if (error || !data) {
         throw error || new Error(this.t('admin.errorLoadingStats'));
       }
+
+      // Auto-reconciliación si admin_get_dashboard_stats antiguo omitió usuarios sin fila en entitlements
+      const totalUsers = toSafeCount(data.users?.total);
+      const revCheck = computeRevenueMetrics(data.plans, totalUsers);
+      const accounted = toSafeCount(data.plans?.free) + revCheck.proTotal;
+      if (totalUsers > 0 && accounted < totalUsers) {
+        try {
+          const listRes = await this.supabaseClient.rpc('admin_list_users', {
+            p_search: null,
+            p_plan: 'all',
+            p_source: 'all',
+            p_status: 'all',
+            p_limit: 100,
+            p_offset: 0
+          });
+          if (listRes?.data?.items?.length) {
+            data.plans = derivePlanBreakdownFromUsers(listRes.data.items, data.plans);
+            if (!this.usersLoaded) {
+              this.usersTotal = toSafeCount(listRes.data.total ?? listRes.data.items.length);
+              this.usersItems = listRes.data.items.slice(0, this.usersPageLimit);
+              this.usersLoaded = true;
+              this.renderUsersList();
+            }
+          }
+        } catch (_) {
+          // Respaldo silencioso si no hay respuesta del listado
+        }
+      }
+
       this.stats = data;
       this.lastUpdatedAt = new Date();
       this.renderDashboard(data, days);
@@ -846,11 +876,49 @@ export class SaboryAdminApp {
     }
   }
 
+  getUserInitials(displayName = '', email = '') {
+    const raw = String(displayName || '').trim();
+    if (raw) {
+      const words = raw.split(/\s+/).filter(Boolean);
+      if (words.length >= 2) {
+        return `${words[0][0]}${words[1][0]}`.toUpperCase();
+      }
+      return words[0].slice(0, 2).toUpperCase();
+    }
+    const mailPrefix = String(email || '').split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
+    return (mailPrefix.slice(0, 2) || 'U').toUpperCase();
+  }
+
+  formatNutritionGoals(goals) {
+    if (!goals || typeof goals !== 'object' || Object.keys(goals).length === 0) {
+      return '-';
+    }
+    const parts = [];
+    const kcal = goals.calories ?? goals.kcal;
+    if (kcal !== undefined && kcal !== null && kcal !== '') {
+      parts.push(`${this.formatInt(kcal)} kcal`);
+    }
+    if (goals.protein !== undefined && goals.protein !== null && goals.protein !== '') {
+      parts.push(`${this.formatInt(goals.protein)}g P`);
+    }
+    if (goals.carbs !== undefined && goals.carbs !== null && goals.carbs !== '') {
+      parts.push(`${this.formatInt(goals.carbs)}g C`);
+    }
+    if (goals.fat !== undefined && goals.fat !== null && goals.fat !== '') {
+      parts.push(`${this.formatInt(goals.fat)}g G`);
+    }
+    if (parts.length === 0) return '-';
+    return `${parts.join(' · ')}${goals.enabled === false ? ' (off)' : ''}`;
+  }
+
   renderUsersList() {
+    const shown = this.usersItems.length;
     if (this.els.usersCountBadge) {
-      const shown = this.usersItems.length;
+      const from = shown > 0 ? this.usersOffset + 1 : 0;
+      const to = shown > 0 ? this.usersOffset + shown : 0;
       this.els.usersCountBadge.textContent = this.t('admin.usersCountSummary', {
-        shown: this.formatInt(shown),
+        from: this.formatInt(from),
+        to: this.formatInt(to),
         total: this.formatInt(this.usersTotal)
       });
     }
@@ -863,7 +931,7 @@ export class SaboryAdminApp {
     }
 
     if (!this.els.usersList) return;
-    if (this.usersItems.length === 0) {
+    if (shown === 0) {
       this.els.usersList.innerHTML = `<p class="admin-empty-text">${escapeHtml(this.t('admin.usersEmpty'))}</p>`;
       return;
     }
@@ -871,28 +939,39 @@ export class SaboryAdminApp {
     this.els.usersList.innerHTML = this.usersItems.map((item) => {
       const badge = this.getPlanBadgeMeta(item);
       const displayName = item.display_name || item.email || item.id;
+      const initials = this.getUserInitials(item.display_name, item.email);
       const expiresText = item.effective_plan === 'pro'
         ? (item.period_end ? this.formatDateTime(item.period_end) : this.t('admin.permanent'))
         : '-';
       const lastSignInText = this.formatDateTime(item.last_sign_in_at);
+      const recipesChip = this.t('admin.recipesShort', { count: this.formatInt(item.recipes_count) });
+      const aiChip = this.t('admin.aiCallsShort', { count: this.formatInt(item.ai_calls_30d) });
 
       return `
         <article class="admin-user-card" data-user-id="${escapeHtml(item.id)}">
+          <div class="admin-user-avatar" aria-hidden="true">${escapeHtml(initials)}</div>
           <div class="admin-user-card-main">
             <div class="admin-user-card-title">
-              <span>${escapeHtml(displayName)}</span>
+              <span class="admin-user-name">${escapeHtml(displayName)}</span>
               <span class="admin-plan-pill ${escapeHtml(badge.cssClass)}">${escapeHtml(badge.label)}</span>
             </div>
             <div class="admin-user-card-email">${escapeHtml(item.email || '-')}</div>
             <div class="admin-user-card-meta">
-              <span>${escapeHtml(this.t('admin.colExpires'))}: ${escapeHtml(expiresText)}</span>
-              <span>${escapeHtml(this.t('admin.colLastSignIn'))}: ${escapeHtml(lastSignInText)}</span>
-              <span>${escapeHtml(this.formatInt(item.recipes_count))} ${escapeHtml(this.t('admin.recipesShort'))}</span>
-              <span>${escapeHtml(this.formatInt(item.ai_calls_30d))} ${escapeHtml(this.t('admin.aiCallsShort'))}</span>
+              <span class="admin-user-meta-item">
+                <span class="material-symbols-outlined" aria-hidden="true">event</span>
+                <span>${escapeHtml(this.t('admin.colExpires'))}: ${escapeHtml(expiresText)}</span>
+              </span>
+              <span class="admin-user-meta-item">
+                <span class="material-symbols-outlined" aria-hidden="true">schedule</span>
+                <span>${escapeHtml(this.t('admin.colLastSignIn'))}: ${escapeHtml(lastSignInText)}</span>
+              </span>
+              <span class="admin-user-meta-chip">${escapeHtml(recipesChip)}</span>
+              <span class="admin-user-meta-chip">${escapeHtml(aiChip)}</span>
             </div>
           </div>
-          <button type="button" class="btn-outline" data-open-user-id="${escapeHtml(item.id)}">
-            ${escapeHtml(this.t('admin.openUserBtn'))}
+          <button type="button" class="btn btn-secondary btn-sm admin-open-user-btn" data-open-user-id="${escapeHtml(item.id)}">
+            <span class="material-symbols-outlined icon-sm" aria-hidden="true">person_search</span>
+            <span>${escapeHtml(this.t('admin.openUserBtn'))}</span>
           </button>
         </article>
       `;
@@ -943,10 +1022,7 @@ export class SaboryAdminApp {
       this.els.userDietaryEl.textContent = prefs;
     }
     if (this.els.userGoalsEl) {
-      const goals = settings.nutrition_goals && Object.keys(settings.nutrition_goals).length > 0
-        ? JSON.stringify(settings.nutrition_goals)
-        : '-';
-      this.els.userGoalsEl.textContent = goals;
+      this.els.userGoalsEl.textContent = this.formatNutritionGoals(settings.nutrition_goals);
     }
     if (this.els.userHouseholdEl) {
       this.els.userHouseholdEl.textContent = household
@@ -957,11 +1033,11 @@ export class SaboryAdminApp {
     if (this.els.userActivityBadgesEl) {
       const totalTokens = toSafeCount(activity.prompt_tokens_30d) + toSafeCount(activity.output_tokens_30d);
       const chips = [
-        `${this.formatInt(activity.recipes_count)} ${this.t('admin.recipesShort')}`,
-        `${this.formatInt(activity.meal_plans_count)} ${this.t('admin.mealPlansShort')}`,
-        `${this.formatInt(activity.shopping_items_count)} ${this.t('admin.shoppingItemsShort')}`,
-        `${this.formatInt(activity.ai_calls_30d)} ${this.t('admin.aiCallsShort')}`,
-        `${this.formatInt(totalTokens)} ${this.t('admin.tokens30d')}`
+        this.t('admin.recipesShort', { count: this.formatInt(activity.recipes_count) }),
+        this.t('admin.mealPlansShort', { count: this.formatInt(activity.meal_plans_count) }),
+        this.t('admin.shoppingItemsShort', { count: this.formatInt(activity.shopping_items_count) }),
+        this.t('admin.aiCallsShort', { count: this.formatInt(activity.ai_calls_30d) }),
+        this.t('admin.tokens30d', { tokens: this.formatInt(totalTokens) })
       ];
       this.els.userActivityBadgesEl.innerHTML = chips
         .map((txt) => `<span class="admin-badge admin-badge-neutral">${escapeHtml(txt)}</span>`)
@@ -981,7 +1057,13 @@ export class SaboryAdminApp {
       this.els.userPlanMetaEl.textContent = `${this.t('admin.colExpires')}: ${expires}${trialPart}`;
     }
     if (this.els.userPlayNoticeEl) {
-      this.els.userPlayNoticeEl.hidden = ent.source !== 'play';
+      const isPlay = ent.source === 'play';
+      this.els.userPlayNoticeEl.hidden = !isPlay;
+      if (isPlay) {
+        this.els.userPlayNoticeEl.textContent = this.t('admin.playManagedNotice', {
+          product: ent.play_product_id || 'Google Play'
+        });
+      }
     }
 
     if (this.els.userAuditListEl) {
@@ -1066,9 +1148,13 @@ export class SaboryAdminApp {
   async handleDeleteUserData(mode) {
     if (!this.supabaseClient?.rpc || !this.selectedUserId) return null;
     const isDeleteAccount = mode === 'delete_account';
+    const targetEmail = this.selectedUserDetail?.user?.email || this.selectedUserId || '';
     const confirmed = await this.confirmAdminAction({
       title: this.t(isDeleteAccount ? 'admin.deleteAccountConfirmTitle' : 'admin.wipeDataConfirmTitle'),
-      message: this.t(isDeleteAccount ? 'admin.deleteAccountConfirmMsg' : 'admin.wipeDataConfirmMsg')
+      message: this.t(
+        isDeleteAccount ? 'admin.deleteAccountConfirmMsg' : 'admin.wipeDataConfirmMsg',
+        { email: targetEmail }
+      )
     });
     if (!confirmed) return null;
 

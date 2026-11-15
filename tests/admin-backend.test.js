@@ -7,6 +7,7 @@ import {
   estimateAiRowCostUsd,
   summarizeAiUsage,
   computeRevenueMetrics,
+  derivePlanBreakdownFromUsers,
   validateEntitlementChange,
   validateQuotaResetRequest,
   formatAuditSummary
@@ -178,6 +179,17 @@ describe('US-87a: Backend Admin Seguro, SQL §12 y admin-core.js', () => {
       expect(empty.mrrEur).toBe(0);
       expect(empty.arrEur).toBe(0);
       expect(empty.conversionRatePct).toBe(0);
+    });
+
+    it('derivePlanBreakdownFromUsers reconstruye free, household_pro y admin desde admin_list_users sin depender de filas en entitlements', () => {
+      const breakdown = derivePlanBreakdownFromUsers([
+        { id: 'u1', effective_plan: 'free', own_pro: false, via_household: false, source: 'none', raw_source: 'none', status: 'active' },
+        { id: 'u2', effective_plan: 'pro', own_pro: false, via_household: true, source: 'household', raw_source: 'none', status: 'active' },
+        { id: 'u3', effective_plan: 'pro', own_pro: true, via_household: false, source: 'admin', raw_source: 'admin', status: 'active' }
+      ]);
+      expect(breakdown.free).toBe(1);
+      expect(breakdown.household_pro).toBe(1);
+      expect(breakdown.admin).toBe(1);
     });
   });
 

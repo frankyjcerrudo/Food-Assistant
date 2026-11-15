@@ -672,25 +672,12 @@ begin
   with user_plans as (
     select
       u.id as user_id,
-      e.source as raw_source,
-      e.status as raw_status,
+      coalesce(e.source, 'none') as raw_source,
+      coalesce(e.status, 'active') as raw_status,
       coalesce(e.is_trial, false) as is_trial,
       e.play_product_id,
-      (
-        e.plan = 'pro'
-        and e.status in ('active','grace','canceled')
-        and (e.period_end is null or e.period_end > now())
-      ) as own_pro,
-      exists (
-        select 1
-        from public.household_members hm
-        join public.households h on h.id = hm.household_id
-        join public.entitlements oe on oe.user_id = h.owner_id
-        where hm.user_id = u.id
-          and oe.plan = 'pro'
-          and oe.status in ('active','grace','canceled')
-          and (oe.period_end is null or oe.period_end > now())
-      ) as hh_pro
+      coalesce(public.has_own_pro(u.id), false) as own_pro,
+      (public.effective_plan(u.id) = 'pro' and not coalesce(public.has_own_pro(u.id), false)) as hh_pro
     from auth.users u
     left join public.entitlements e on e.user_id = u.id
   )

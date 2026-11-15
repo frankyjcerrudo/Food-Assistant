@@ -201,6 +201,68 @@ export function computeRevenueMetrics(plans = {}, totalUsers = 0, prices = DEFAU
 }
 
 /**
+ * Reconstruye el desglose de planes a partir de la lista de usuarios (`admin_list_users`)
+ * cuando `admin_get_dashboard_stats.plans` infravalora usuarios sin fila en `entitlements`.
+ * @param {Array<object>} items
+ * @param {object} [basePlans]
+ */
+export function derivePlanBreakdownFromUsers(items = [], basePlans = {}) {
+  const list = Array.isArray(items) ? items : [];
+  const counts = {
+    free: 0,
+    play_monthly: 0,
+    play_annual: 0,
+    trial: 0,
+    gift: 0,
+    admin: 0,
+    household_pro: 0,
+    on_hold: 0,
+    canceled_active: 0
+  };
+
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue;
+    const effectivePlan = item.effective_plan || 'free';
+    const rawSource = item.raw_source || item.source || 'none';
+    const status = item.status || 'active';
+    const isTrial = Boolean(item.is_trial);
+    const playProductId = item.play_product_id || '';
+    const ownPro = Boolean(
+      item.own_pro ?? (effectivePlan === 'pro' && !item.via_household && item.source !== 'household')
+    );
+
+    if (status === 'on_hold') counts.on_hold += 1;
+    if (ownPro && status === 'canceled') counts.canceled_active += 1;
+
+    if (effectivePlan !== 'pro') {
+      counts.free += 1;
+      continue;
+    }
+
+    if (!ownPro || item.via_household || item.source === 'household') {
+      counts.household_pro += 1;
+    } else if (rawSource === 'play') {
+      if (isTrial) {
+        counts.trial += 1;
+      } else if (playProductId === 'sabory_pro_annual') {
+        counts.play_annual += 1;
+      } else {
+        counts.play_monthly += 1;
+      }
+    } else if (rawSource === 'gift') {
+      counts.gift += 1;
+    } else if (rawSource === 'admin' || !item.via_household) {
+      counts.admin += 1;
+    }
+  }
+
+  return {
+    ...(basePlans && typeof basePlans === 'object' ? basePlans : {}),
+    ...counts
+  };
+}
+
+/**
  * Valida los parámetros antes de invocar `admin_set_user_entitlement`.
  * @param {object} input
  */

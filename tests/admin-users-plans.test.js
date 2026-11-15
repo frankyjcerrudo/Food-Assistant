@@ -219,11 +219,19 @@ describe('US-87c — Directorio de Usuarios, Ficha 360º y Regalos Pro', () => {
       expect(document.querySelectorAll('.admin-user-card').length).toBe(4);
     });
 
+    const countText = document.getElementById('admin-users-count').textContent;
+    expect(countText).toContain('40');
+    expect(countText).not.toContain('{from}');
+    expect(countText).not.toContain('{to}');
+
     const listText = document.getElementById('admin-users-list').textContent;
     expect(listText).toContain('Pro · Regalo');
     expect(listText).toContain('Pro · Play');
     expect(listText).toContain('Pro · Hogar');
     expect(listText).toContain('Free');
+    expect(listText).toContain('12 recetas');
+    expect(listText).toContain('8 IA (30d)');
+    expect(listText).not.toContain('{count}');
 
     // Paginación siguiente
     const nextBtn = document.getElementById('btn-users-next');
@@ -275,9 +283,19 @@ describe('US-87c — Directorio de Usuarios, Ficha 360º y Regalos Pro', () => {
     expect(document.getElementById('admin-user-modal-email').textContent).toBe('gift@sabory.app');
     expect(document.getElementById('admin-user-servings').textContent).toBe('4');
     expect(document.getElementById('admin-user-dietary').textContent).toContain('vegetarian');
+    expect(document.getElementById('admin-user-goals').textContent).toMatch(/2[.,]?100\s*kcal/);
+    expect(document.getElementById('admin-user-goals').textContent).not.toContain('{');
     expect(document.getElementById('admin-user-household').textContent).toContain('Casa Sabory');
     expect(document.getElementById('admin-user-play-notice').hidden).toBe(true);
     expect(document.getElementById('admin-user-audit-list').textContent).toContain('grant_pro');
+
+    const badgesText = document.getElementById('admin-user-activity-badges').textContent;
+    expect(badgesText).toContain('12 recetas');
+    expect(badgesText).toContain('5 planes');
+    expect(badgesText).toContain('18 compra');
+    expect(badgesText).toContain('8 IA (30d)');
+    expect(badgesText).not.toContain('{count}');
+    expect(badgesText).not.toContain('{tokens}');
   });
 
   it('3. Regalo 90 días, Pro permanente y formulario personalizado llaman a admin_set_user_entitlement', async () => {
@@ -374,5 +392,56 @@ describe('US-87c — Directorio de Usuarios, Ficha 360º y Regalos Pro', () => {
       });
     });
     expect(document.getElementById('modal-admin-user').hasAttribute('open')).toBe(false);
+  });
+
+  it('6. Reconcilia automáticamente la distribución de planes vía admin_list_users si el RPC de estadísticas infravalora Free/Hogar', async () => {
+    const { rpcMock } = await setupAdminApp({
+      rpcHandler: async (fnName) => {
+        if (fnName === 'is_admin') return { data: true, error: null };
+        if (fnName === 'admin_get_dashboard_stats') {
+          return {
+            data: {
+              users: { total: 3, dau: 1, wau: 2, mau: 3, new_7d: 1, new_30d: 3 },
+              plans: {
+                free: 0,
+                play_monthly: 0,
+                play_annual: 0,
+                trial: 0,
+                gift: 0,
+                admin: 1,
+                household_pro: 0,
+                on_hold: 0,
+                canceled_active: 0
+              },
+              catalog: {},
+              ai: {}
+            },
+            error: null
+          };
+        }
+        if (fnName === 'admin_list_users') {
+          return {
+            data: {
+              total: 3,
+              limit: 100,
+              offset: 0,
+              items: [
+                { id: 'u1', email: 'sabory@test.com', effective_plan: 'free', own_pro: false, via_household: false, source: 'none', raw_source: 'none', status: 'active' },
+                { id: 'u2', email: 'aroa@test.com', effective_plan: 'pro', own_pro: false, via_household: true, source: 'household', raw_source: 'none', status: 'active' },
+                { id: 'u3', email: 'franky@test.com', effective_plan: 'pro', own_pro: true, via_household: false, source: 'admin', raw_source: 'admin', status: 'active' }
+              ]
+            },
+            error: null
+          };
+        }
+        return { data: null, error: null };
+      }
+    });
+
+    expect(rpcMock).toHaveBeenCalledWith('admin_list_users', expect.objectContaining({ p_limit: 100 }));
+    expect(document.getElementById('kpi-pro-users').textContent).toBe('2');
+    expect(document.querySelector('[data-plan-key="free"] .admin-bar-count').textContent).toBe('1');
+    expect(document.querySelector('[data-plan-key="household_pro"] .admin-bar-count').textContent).toBe('1');
+    expect(document.querySelector('[data-plan-key="admin"] .admin-bar-count').textContent).toBe('1');
   });
 });
