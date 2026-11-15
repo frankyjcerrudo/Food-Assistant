@@ -213,21 +213,23 @@ describe('Camino B (US-17 & BUG-26): Asistente de Voz Integrado, Plurales y Fin 
       expect(label.textContent).toBe('Sous Chef');
     });
 
-    it('el modal de invocación rápida #modal-gemini-invoke contiene los controles necesarios', () => {
-      const modal = document.getElementById('modal-gemini-invoke');
-      expect(modal).not.toBeNull();
+    it('la vista dedicada #view-ai del Sous Chef contiene los controles necesarios', () => {
+      const viewAi = document.getElementById('view-ai');
+      expect(viewAi).not.toBeNull();
       expect(document.getElementById('gemini-invoke-input')).not.toBeNull();
+      expect(document.getElementById('btn-gemini-invoke-camera')).not.toBeNull();
       expect(document.getElementById('btn-gemini-invoke-mic')).not.toBeNull();
       expect(document.getElementById('btn-gemini-invoke-send')).not.toBeNull();
-      expect(document.getElementById('gemini-invoke-result')).not.toBeNull();
+      expect(document.getElementById('chat-history-container')).not.toBeNull();
     });
 
-    it('openGeminiInvokeModal abre el modal y prepara el campo de entrada', () => {
+    it('openGeminiInvokeModal abre la vista #view-ai sin auto-activar micro y closeGeminiInvokeModal vuelve atrás', () => {
       app.openGeminiInvokeModal(false);
-      const modal = document.getElementById('modal-gemini-invoke');
-      expect(modal.classList.contains('active')).toBe(true);
+      const viewAi = document.getElementById('view-ai');
+      expect(viewAi.classList.contains('active')).toBe(true);
+      expect(app.isListeningVoice).toBe(false);
       app.closeGeminiInvokeModal();
-      expect(modal.classList.contains('active')).toBe(false);
+      expect(viewAi.classList.contains('active')).toBe(false);
     });
 
     it('handleGeminiInvokeSubmit ejecuta acción de añadir a la lista de compra y muestra resultado completo', async () => {
@@ -248,9 +250,8 @@ describe('Camino B (US-17 & BUG-26): Asistente de Voz Integrado, Plurales y Fin 
         await app.handleGeminiInvokeSubmit(false);
 
         expect(state.shoppingList.length).toBeGreaterThan(initialCount);
-        const resultCard = document.getElementById('gemini-invoke-result');
-        expect(resultCard.style.display).toBe('flex');
-        expect(resultCard.textContent.toLowerCase()).toContain('arroz');
+        const chatStream = document.getElementById('chat-history-container');
+        expect(chatStream.textContent.toLowerCase()).toContain('arroz');
       } finally {
         globalThis.fetch = origFetch;
       }
@@ -369,9 +370,10 @@ describe('Camino B (US-17 & BUG-26): Asistente de Voz Integrado, Plurales y Fin 
         expect(app.aiChatHistory.length).toBeGreaterThanOrEqual(2);
         expect(app.aiChatHistory[app.aiChatHistory.length - 2].text).toBe('¿Qué me sugieres para cenar?');
         
-        // El modal muestra el resultado
-        const resultCard = document.getElementById('gemini-invoke-result');
-        expect(resultCard.style.display).toBe('flex');
+        // El hilo persistente muestra la conversación multi-turno
+        const chatStream = document.getElementById('chat-history-container');
+        expect(chatStream.querySelectorAll('.ai-user-bubble').length).toBeGreaterThanOrEqual(1);
+        expect(chatStream.querySelectorAll('.ai-assistant-bubble').length).toBeGreaterThanOrEqual(1);
       } finally {
         globalThis.fetch = origFetch;
       }

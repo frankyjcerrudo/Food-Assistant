@@ -163,8 +163,9 @@ describe('US-73: Auditoría Integral de UX, Arquitectura de Información e Ident
     expect(firstChip).not.toBeNull();
     expect(firstChip.id).toBe('btn-toggle-fridge-panel');
 
-    // No existe la vista huérfana #view-ai en index.html
-    expect(document.getElementById('view-ai')).toBeNull();
+    // Existe la vista dedicada #view-ai (Hub del Sous Chef) en index.html y no el pop-up antiguo #modal-gemini-invoke
+    expect(document.getElementById('view-ai')).not.toBeNull();
+    expect(document.getElementById('modal-gemini-invoke')).toBeNull();
 
     // Ajustes divididos en Nivel 1 (Preferencias Culinarias) y Nivel 2 (#settings-advanced-accordion)
     const advancedAccordion = document.getElementById('settings-advanced-accordion');

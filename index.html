@@ -142,7 +142,7 @@
           <span class="material-symbols-outlined icon-sm">shopping_cart</span>
           <span data-i18n="nav.shopping">Compra</span>
         </button>
-        <button type="button" class="header-nav-btn header-nav-btn-chef" id="btn-desktop-gemini-invoke" title="Hablar con el Sous Chef" data-i18n-title="nav.aiTitle">
+        <button type="button" class="header-nav-btn header-nav-btn-chef" id="btn-desktop-gemini-invoke" data-view="view-ai" title="Hablar con el Sous Chef" data-i18n-title="nav.aiTitle">
           <span class="material-symbols-outlined icon-sm">auto_awesome</span>
           <span data-i18n="nav.ai">Sous Chef</span>
         </button>
@@ -355,6 +355,12 @@
           <p class="section-subtitle" data-i18n="planner.subtitle">Organiza tus menús de Lunes a Domingo.</p>
         </div>
         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <button type="button" class="btn btn-tonal btn-sm planner-ai-auto-btn" id="btn-planner-ai-auto"
+            title="Autoplanificar semana con IA" data-i18n-title="planner.aiAutoPlanBtn">
+            <span class="material-symbols-outlined icon-sm">auto_awesome</span>
+            <span data-i18n="planner.aiAutoPlanBtn">Autoplanificar semana con IA</span>
+            <span class="planner-autoplan-quota-badge" id="planner-autoplan-quota-badge" style="display: none;"></span>
+          </button>
           <button type="button" class="btn btn-secondary btn-sm" id="btn-open-copy-week" data-action="openCopyWeekModal"
             title="Copiar plan de la semana anterior o de cualquier otra semana">
             <span class="material-symbols-outlined icon-sm">content_copy</span>
@@ -396,6 +402,21 @@
             <span id="btn-toggle-all-planner-days-label" data-i18n="planner.expandWeek">Expandir semana</span>
           </button>
         </div>
+      </div>
+
+      <!-- US-80: Subtle Proactive Banner when active week has 0 planned meals -->
+      <div class="planner-empty-ai-banner" id="planner-empty-ai-banner" style="display: none;" role="region" aria-label="Autoplanificar semana con IA">
+        <div class="planner-empty-ai-banner-text">
+          <span class="material-symbols-outlined icon-md planner-empty-ai-icon">auto_awesome</span>
+          <div>
+            <strong data-i18n="planner.emptyWeekBannerTitle">Semana vacía · Planifícala en segundos</strong>
+            <p data-i18n="planner.emptyWeekBannerDesc">Dejaré al Sous Chef crear un menú adaptado a tus metas y gustos.</p>
+          </div>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" id="btn-planner-banner-ai-auto">
+          <span class="material-symbols-outlined icon-sm">wand_stars</span>
+          <span data-i18n="planner.emptyWeekBannerAction">Autoplanificar semana</span>
+        </button>
       </div>
 
       <div id="planner-days-container">
@@ -960,6 +981,181 @@
       </details>
     </section>
 
+    <!-- VIEW 6: SOUS CHEF AI HUB (US-80) -->
+    <section class="view-panel ai-hub-view" id="view-ai" aria-labelledby="gemini-invoke-title">
+      <div class="ai-hub-shell">
+        <div class="gemini-invoke-header ai-hub-header">
+          <div class="gemini-invoke-header-top">
+            <div class="gemini-avatar-glow">
+              <svg class="gemini-sparkle-svg chef-toque-sheet-svg" viewBox="0 0 28 28" fill="none"
+                xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path
+                  d="M14 4C11.5 4 9.45 5.45 8.65 7.55C8.28 7.45 7.9 7.4 7.5 7.4C5.01 7.4 3 9.41 3 11.9C3 13.97 4.4 15.71 6.3 16.24V20.2C6.3 21.2 7.1 22 8.1 22H19.9C20.9 22 21.7 21.2 21.7 20.2V16.24C23.6 15.71 25 13.97 25 11.9C25 9.41 22.99 7.4 20.5 7.4C20.1 7.4 19.72 7.45 19.35 7.55C18.55 5.45 16.5 4 14 4Z"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                  fill="rgba(255, 255, 255, 0.16)" />
+                <path d="M6.4 18.2H21.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                <path d="M11 14.5V18M14 13.5V18M17 14.5V18" stroke="currentColor" stroke-width="1.5"
+                  stroke-linecap="round" />
+              </svg>
+            </div>
+            <div class="gemini-invoke-title-box">
+              <h2 id="gemini-invoke-title" data-i18n="ai.title">Sous Chef</h2>
+              <p id="gemini-invoke-subtitle" class="gemini-subtitle" data-i18n="ai.subtitle">Tu mano derecha en la cocina: pregúntame dudas, pídeme recetas o planifiquemos juntos</p>
+            </div>
+            <button type="button" class="btn btn-ghost btn-icon gemini-invoke-close-btn" id="btn-close-gemini-invoke"
+              aria-label="Cerrar Sous Chef" data-i18n-aria="common.close">
+              <span class="material-symbols-outlined">arrow_back</span>
+            </button>
+          </div>
+          <div class="gemini-invoke-header-actions" id="gemini-invoke-header-actions">
+            <button type="button" class="btn btn-ghost btn-sm ai-hub-toggle-btn" id="btn-toggle-ai-hub"
+              aria-expanded="true" title="Mostrar u ocultar acciones rápidas">
+              <span class="material-symbols-outlined icon-sm">apps</span>
+              <span data-i18n="ai.hubToggleHide">Ocultar acciones</span>
+            </button>
+            <button type="button" class="btn btn-stop-tts" id="btn-header-stop-tts" style="display: none;"
+              title="Detener locución de voz">
+              <span class="material-symbols-outlined" style="font-size: 16px;">stop_circle</span> <span data-i18n="ai.stopVoice">Parar voz</span>
+            </button>
+            <button type="button" class="btn btn-new-chat" id="btn-gemini-invoke-new-chat" style="display: none;"
+              title="Comenzar nueva consulta">
+              <span class="material-symbols-outlined" style="font-size: 14px;">restart_alt</span>
+              <span data-i18n="ai.newTopic">Nuevo tema</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Quota banner (Free plan) -->
+        <div class="gemini-invoke-quota" id="gemini-invoke-quota" style="display: none;"></div>
+
+        <!-- Collapsible Quick Action Hub Panel -->
+        <div class="ai-hub-actions-panel" id="ai-hub-actions-panel">
+          <div class="ai-hub-section-label">
+            <span class="material-symbols-outlined icon-sm">bolt</span>
+            <span data-i18n="ai.hubTitle">Acciones rápidas de IA</span>
+          </div>
+          <div class="ai-hub-actions-grid">
+            <button type="button" class="ai-hub-action-card" id="btn-ai-hub-autoplan">
+              <span class="ai-hub-action-icon ai-hub-icon-plan"><span class="material-symbols-outlined">auto_awesome</span></span>
+              <div class="ai-hub-action-text">
+                <strong data-i18n="ai.hubAutoPlanTitle">Autoplanificar semana</strong>
+                <span data-i18n="ai.hubAutoPlanDesc">Menú L-D según tus macros y gustos</span>
+              </div>
+            </button>
+            <button type="button" class="ai-hub-action-card" id="btn-ai-hub-photo">
+              <span class="ai-hub-action-icon ai-hub-icon-photo"><span class="material-symbols-outlined">photo_camera</span></span>
+              <div class="ai-hub-action-text">
+                <strong data-i18n="ai.hubImportPhotoTitle">Importar desde foto</strong>
+                <span data-i18n="ai.hubImportPhotoDesc">Captura o sube un plato o receta</span>
+              </div>
+            </button>
+            <button type="button" class="ai-hub-action-card" id="btn-ai-hub-text">
+              <span class="ai-hub-action-icon ai-hub-icon-text"><span class="material-symbols-outlined">link</span></span>
+              <div class="ai-hub-action-text">
+                <strong data-i18n="ai.hubImportTextTitle">Importar texto o enlace</strong>
+                <span data-i18n="ai.hubImportTextDesc">Pega notas, URL, TikTok o IG</span>
+              </div>
+            </button>
+            <button type="button" class="ai-hub-action-card" id="btn-ai-hub-fridge">
+              <span class="ai-hub-action-icon ai-hub-icon-fridge"><span class="material-symbols-outlined">kitchen</span></span>
+              <div class="ai-hub-action-text">
+                <strong data-i18n="ai.hubFridgeTitle">Cocinar desde nevera</strong>
+                <span data-i18n="ai.hubFridgeDesc">Receta con lo que tienes en casa</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick prompt chips -->
+        <div class="gemini-quick-chips" id="gemini-invoke-chips">
+          <button type="button" class="gemini-chip"
+            data-prompt="Apunta medio kilo de tomates, 6 huevos y pechuga de pollo a la compra">
+            <span class="material-symbols-outlined icon-sm">add_shopping_cart</span> <span data-i18n="ai.chipShopping">Apuntar a la compra</span>
+          </button>
+          <button type="button" class="gemini-chip" data-prompt="Planifica las comidas del fin de semana">
+            <span class="material-symbols-outlined icon-sm">calendar_month</span> <span data-i18n="ai.chipWeekend">Menú fin de semana</span>
+          </button>
+          <button type="button" class="gemini-chip" data-prompt="¿Qué puedo cenar hoy rápido, sano y rico en proteínas?">
+            <span class="material-symbols-outlined icon-sm">restaurant</span> <span data-i18n="ai.chipDinner">Sugerencia de cena</span>
+          </button>
+        </div>
+
+        <!-- Persistent Conversation Stream -->
+        <div class="ai-chat-stream" id="chat-history-container" aria-live="polite">
+          <div class="ai-chat-empty-state" id="ai-chat-empty-state">
+            <span class="material-symbols-outlined icon-lg ai-empty-icon">forum</span>
+            <strong data-i18n="ai.emptyStateTitle">Tu centro de cocina inteligente</strong>
+            <p data-i18n="ai.emptyStateDesc">Chatea conmigo, adjunta la foto de una receta o usa un acceso rápido. Recordaré nuestra conversación aquí.</p>
+          </div>
+        </div>
+
+        <!-- Legacy/Live response & TTS compatibility block -->
+        <div class="gemini-result-card ai-hub-live-result" id="gemini-invoke-result"
+          style="display: none; flex-direction: column; gap: 8px;">
+          <div class="gemini-tts-bar" id="gemini-invoke-tts-bar"
+            style="display: none; align-items: center; justify-content: space-between; background: rgba(59, 130, 246, 0.08); border-radius: 8px; padding: 6px 12px;">
+            <span
+              style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-brand); font-weight: 500;">
+              <span class="material-symbols-outlined icon-sm" style="animation: pulse 1.5s infinite;">volume_up</span>
+              <span data-i18n="ai.speaking">Sous Chef hablando...</span>
+            </span>
+            <button type="button" class="btn btn-sm" id="btn-result-stop-tts"
+              style="color: var(--m3-error); background: transparent; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 11px; padding: 2px 8px; font-weight: 600; border-radius: 9999px;">
+              ⏹️ Detener
+            </button>
+          </div>
+          <div class="gemini-invoke-thread" id="gemini-invoke-thread" style="display: none;"></div>
+          <div class="gemini-response-body" id="gemini-invoke-result-text"
+            style="font-size: 13px; line-height: 1.5; color: var(--m3-on-surface);"
+            title="Pulsa para detener voz si está hablando"></div>
+          <div class="gemini-result-actions" id="gemini-invoke-result-actions"></div>
+        </div>
+
+        <!-- Live transcription / Status badge -->
+        <div class="gemini-status-container" id="gemini-invoke-status-box">
+          <div class="gemini-pulse-indicator" id="gemini-invoke-pulse" style="display: none;">
+            <span class="pulse-ring"></span>
+            <span class="pulse-dot"></span>
+            <span id="gemini-invoke-listening-text" data-i18n="ai.listening">Escuchando...</span>
+          </div>
+          <div class="gemini-transcription-preview" id="gemini-invoke-transcription">
+            <em data-i18n="ai.initialPrompt">Pulsa el micro o escribe tu petición</em>
+          </div>
+        </div>
+
+        <!-- Composer Footer (Attachment preview + Camera + Input + Mic + Send) -->
+        <div class="ai-chat-composer">
+          <div class="ai-chat-attachment-preview" id="ai-chat-attachment-preview" style="display: none;">
+            <img id="ai-chat-attachment-thumb" alt="Foto adjunta para extraer receta" src="">
+            <div class="ai-chat-attachment-meta">
+              <strong data-i18n="ai.attachmentReady">Foto lista para extraer o preguntar</strong>
+              <span id="ai-chat-attachment-name"></span>
+            </div>
+            <button type="button" class="btn btn-ghost btn-icon btn-sm" id="btn-clear-chat-attachment"
+              title="Quitar foto" data-i18n-title="ai.removeAttachment" aria-label="Quitar foto">
+              <span class="material-symbols-outlined icon-sm">close</span>
+            </button>
+          </div>
+          <div class="gemini-input-row">
+            <input type="file" id="ai-chat-photo-input" accept="image/*" style="display: none;">
+            <button type="button" class="btn btn-icon btn-gemini-camera" id="btn-gemini-invoke-camera"
+              title="Adjuntar foto o abrir cámara" data-i18n-title="ai.attachPhoto" aria-label="Adjuntar foto o abrir cámara">
+              <span class="material-symbols-outlined">photo_camera</span>
+            </button>
+            <input type="text" id="gemini-invoke-input" class="form-input gemini-input" aria-label="Pregunta al Sous Chef o escribe tu consulta"
+              placeholder="Pregunta algo o pulsa el micro..." data-i18n-placeholder="ai.inputPlaceholder" autocomplete="off">
+            <button type="button" class="btn btn-icon btn-gemini-mic" id="btn-gemini-invoke-mic"
+              title="Hablar con el Sous Chef" data-i18n-title="ai.talkToAssistant">
+              <span class="material-symbols-outlined">mic</span>
+            </button>
+            <button type="button" class="btn btn-icon btn-gemini-send" id="btn-gemini-invoke-send" title="Enviar petición" data-i18n-title="ai.sendRequest">
+              <span class="material-symbols-outlined">arrow_upward</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Floating Capsule Navigation Dock with Central Chef Assistant Button -->
     <nav class="bottom-nav">
       <button class="nav-item active" data-view="view-today">
@@ -974,7 +1170,7 @@
         </div>
         <span data-i18n="nav.recipes">Recetas</span>
       </button>
-      <button class="nav-item nav-item-gemini" id="btn-central-gemini-invoke" aria-label="Hablar con el Sous Chef"
+      <button class="nav-item nav-item-gemini" id="btn-central-gemini-invoke" data-view="view-ai" aria-label="Hablar con el Sous Chef"
         title="Hablar con el Sous Chef">
         <div class="nav-gemini-fab">
           <svg class="chef-toque-icon gemini-sparkle-icon" viewBox="0 0 28 28" fill="none"
@@ -1005,116 +1201,6 @@
     </nav>
 
   </div>
-
-  <!-- MODAL: DIRECT VOICE & ASSISTANT ACTIONS INVOCATION -->
-  <dialog class="modal-overlay gemini-sheet-overlay" id="modal-gemini-invoke" closedby="any"
-    aria-labelledby="gemini-invoke-title">
-    <div class="modal-content gemini-invoke-card">
-      <div class="gemini-invoke-header">
-        <div class="gemini-invoke-header-top">
-          <div class="gemini-avatar-glow">
-            <svg class="gemini-sparkle-svg chef-toque-sheet-svg" viewBox="0 0 28 28" fill="none"
-              xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path
-                d="M14 4C11.5 4 9.45 5.45 8.65 7.55C8.28 7.45 7.9 7.4 7.5 7.4C5.01 7.4 3 9.41 3 11.9C3 13.97 4.4 15.71 6.3 16.24V20.2C6.3 21.2 7.1 22 8.1 22H19.9C20.9 22 21.7 21.2 21.7 20.2V16.24C23.6 15.71 25 13.97 25 11.9C25 9.41 22.99 7.4 20.5 7.4C20.1 7.4 19.72 7.45 19.35 7.55C18.55 5.45 16.5 4 14 4Z"
-                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                fill="rgba(255, 255, 255, 0.16)" />
-              <path d="M6.4 18.2H21.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-              <path d="M11 14.5V18M14 13.5V18M17 14.5V18" stroke="currentColor" stroke-width="1.5"
-                stroke-linecap="round" />
-            </svg>
-          </div>
-          <div class="gemini-invoke-title-box">
-            <h3 id="gemini-invoke-title" data-i18n="ai.title">Sous Chef</h3>
-            <p id="gemini-invoke-subtitle" class="gemini-subtitle" data-i18n="ai.subtitle">Tu mano derecha en la cocina: pregúntame dudas, pídeme recetas o planifiquemos juntos</p>
-          </div>
-          <button class="btn btn-ghost btn-icon gemini-invoke-close-btn" id="btn-close-gemini-invoke"
-            aria-label="Cerrar Sous Chef" data-i18n-aria="common.close">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-        <div class="gemini-invoke-header-actions" id="gemini-invoke-header-actions">
-          <button type="button" class="btn btn-stop-tts" id="btn-header-stop-tts" style="display: none;"
-            title="Detener locución de voz">
-            <span class="material-symbols-outlined" style="font-size: 16px;">stop_circle</span> <span data-i18n="ai.stopVoice">Parar voz</span>
-          </button>
-          <button type="button" class="btn btn-new-chat" id="btn-gemini-invoke-new-chat" style="display: none;"
-            title="Comenzar nueva consulta">
-            <span class="material-symbols-outlined" style="font-size: 14px;">restart_alt</span>
-            <span data-i18n="ai.newTopic">Nuevo tema</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Live transcription / Status badge -->
-      <div class="gemini-status-container" id="gemini-invoke-status-box">
-        <div class="gemini-pulse-indicator" id="gemini-invoke-pulse" style="display: none;">
-          <span class="pulse-ring"></span>
-          <span class="pulse-dot"></span>
-          <span id="gemini-invoke-listening-text" data-i18n="ai.listening">Escuchando...</span>
-        </div>
-        <div class="gemini-transcription-preview" id="gemini-invoke-transcription">
-          <em data-i18n="ai.initialPrompt">Pulsa el micro o escribe tu petición</em>
-        </div>
-      </div>
-
-      <!-- Quick action prompt chips -->
-      <div class="gemini-invoke-quota" id="gemini-invoke-quota" style="display: none;"></div>
-      <div class="gemini-quick-chips" id="gemini-invoke-chips">
-        <button type="button" class="gemini-chip"
-          data-prompt="Apunta medio kilo de tomates, 6 huevos y pechuga de pollo a la compra">
-          <span class="material-symbols-outlined icon-sm">add_shopping_cart</span> <span data-i18n="ai.chipShopping">Apuntar a la compra</span>
-        </button>
-        <button type="button" class="gemini-chip" data-prompt="Planifica las comidas del fin de semana">
-          <span class="material-symbols-outlined icon-sm">calendar_month</span> <span data-i18n="ai.chipWeekend">Menú fin de semana</span>
-        </button>
-        <button type="button" class="gemini-chip" data-prompt="¿Qué puedo cenar hoy rápido, sano y rico en proteínas?">
-          <span class="material-symbols-outlined icon-sm">restaurant</span> <span data-i18n="ai.chipDinner">Sugerencia de cena</span>
-        </button>
-      </div>
-
-      <!-- Input bar -->
-      <div class="gemini-input-row">
-        <input type="text" id="gemini-invoke-input" class="form-input gemini-input" aria-label="Pregunta al Sous Chef o escribe tu consulta"
-          placeholder="Pregunta algo o pulsa el micro..." data-i18n-placeholder="ai.inputPlaceholder" autocomplete="off">
-        <button type="button" class="btn btn-icon btn-gemini-mic" id="btn-gemini-invoke-mic" autofocus
-          title="Hablar con el Sous Chef" data-i18n-title="ai.talkToAssistant">
-          <span class="material-symbols-outlined">mic</span>
-        </button>
-        <button type="button" class="btn btn-icon btn-gemini-send" id="btn-gemini-invoke-send" title="Enviar petición" data-i18n-title="ai.sendRequest">
-          <span class="material-symbols-outlined">arrow_upward</span>
-        </button>
-      </div>
-
-      <!-- Result / Conversational Response card -->
-      <div class="gemini-result-card" id="gemini-invoke-result"
-        style="display: none; flex-direction: column; gap: 8px;">
-        <div class="gemini-tts-bar" id="gemini-invoke-tts-bar"
-          style="display: none; align-items: center; justify-content: space-between; background: rgba(59, 130, 246, 0.08); border-radius: 8px; padding: 6px 12px;">
-          <span
-            style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-brand); font-weight: 500;">
-            <span class="material-symbols-outlined icon-sm" style="animation: pulse 1.5s infinite;">volume_up</span>
-            <span data-i18n="ai.speaking">Sous Chef hablando...</span>
-          </span>
-          <button type="button" class="btn btn-sm" id="btn-result-stop-tts"
-            style="color: var(--m3-error); background: transparent; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 11px; padding: 2px 8px; font-weight: 600; border-radius: 9999px;">
-            ⏹️ Detener
-          </button>
-        </div>
-        <div class="gemini-invoke-thread" id="gemini-invoke-thread"
-          style="display: none; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; padding-right: 4px; border-bottom: 1px solid var(--m3-outline-variant, rgba(0,0,0,0.08)); padding-bottom: 8px;">
-        </div>
-        <div class="gemini-response-body" id="gemini-invoke-result-text"
-          style="font-size: 13px; line-height: 1.5; color: var(--m3-on-surface);"
-          title="Pulsa para detener voz si está hablando">
-          <!-- Conversational text from Assistant -->
-        </div>
-        <div class="gemini-result-actions" id="gemini-invoke-result-actions">
-          <!-- Action buttons injected dynamically -->
-        </div>
-      </div>
-    </div>
-  </dialog>
 
   <!-- MODAL: PAYWALL SABORY PRO (US-79d) -->
   <dialog class="modal-overlay" id="modal-paywall" closedby="any" aria-labelledby="paywall-title">

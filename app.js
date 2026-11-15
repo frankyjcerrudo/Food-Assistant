@@ -5059,9 +5059,14 @@ class FoodAssistantApp {
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
+    this.previousNonAiView = 'view-today';
     this.todayNutritionExpanded = false; // US-73: Collapsible 1-line nutrition pill bar
     this.plannerExpandedDays = null; // US-73: Set of expanded dateKeys in weekly planner accordion
-    this.aiChatHistory = [];
+    this.aiHubActionsCollapsed = false;
+    this.pendingChatAttachment = null;
+    this.aiComposerMode = null; // null | 'import_text'
+    this.aiComposerFeatureOverride = null; // null | 'guided_query'
+    this.aiChatHistory = this.loadAiChatHistory();
     this.activeRecipe = null;
     this.activeServings = 2;
     this.pickerTarget = null;
@@ -5451,7 +5456,7 @@ class FoodAssistantApp {
     this.selectedCookbookId = 'all';
     this.editorSelectedCookbooks = new Set();
     this.editorShowAllTags = false;
-    this.modalGeminiInvoke = document.getElementById('modal-gemini-invoke');
+    this.modalGeminiInvoke = document.getElementById('modal-gemini-invoke') || document.getElementById('view-ai');
     this.modalPlanRecipe = document.getElementById('modal-plan-recipe');
     this.modalOnboarding = document.getElementById('modal-onboarding');
     this.cookModeOverlay = document.getElementById('cook-mode-overlay');
@@ -6538,6 +6543,9 @@ class FoodAssistantApp {
       localStorage.removeItem('fa_mealplan');
       localStorage.removeItem('fa_shopping');
       localStorage.removeItem('fa_deleted_records');
+      localStorage.removeItem('fa_ai_chat_history');
+      this.clearAiChatHistory();
+      this.renderAiChatView?.();
       localStorage.removeItem('fa_cloud_user');
       localStorage.removeItem('fa_household');
       localStorage.removeItem('fa_personal_backup');
@@ -8225,18 +8233,18 @@ class FoodAssistantApp {
       });
     });
 
-    // Central Floating Gemini Invocation Button (✦) & Desktop Header Assistant Button
+    // Central Floating Gemini Invocation Button (✦) & Desktop Header Assistant Button (US-80: abre Hub sin activar micro automáticamente)
     document.getElementById('btn-central-gemini-invoke')?.addEventListener('click', () => {
-      this.openGeminiInvokeModal(true);
+      this.openGeminiInvokeModal(false);
     });
     document.getElementById('btn-desktop-gemini-invoke')?.addEventListener('click', () => {
-      this.openGeminiInvokeModal(true);
+      this.openGeminiInvokeModal(false);
     });
 
     // Quick links
     document.getElementById('btn-goto-planner')?.addEventListener('click', () => this.switchView('view-planner'));
     document.getElementById('btn-quick-shopping')?.addEventListener('click', () => this.switchView('view-shopping'));
-    document.getElementById('btn-quick-ai-plan')?.addEventListener('click', () => this.openGeminiInvokeModal(true));
+    document.getElementById('btn-quick-ai-plan')?.addEventListener('click', () => this.openGeminiInvokeModal(false));
     document.getElementById('btn-header-settings')?.addEventListener('click', () => this.switchView('view-settings'));
 
     // Theme controls
@@ -8520,8 +8528,9 @@ class FoodAssistantApp {
     document.getElementById('btn-copy-shopping')?.addEventListener('click', () => this.copyShoppingList());
     document.getElementById('btn-send-plan-to-shopping')?.addEventListener('click', () => this.generateShoppingFromPlan());
 
-    // Planner AI
+    // Planner AI (US-80)
     document.getElementById('btn-planner-ai-auto')?.addEventListener('click', () => this.triggerGeminiAutoPlan());
+    document.getElementById('btn-planner-banner-ai-auto')?.addEventListener('click', () => this.triggerGeminiAutoPlan());
 
     // Settings
     document.getElementById('btn-save-nutrition-goals')?.addEventListener('click', () => this.saveNutritionGoalsFromSettings());
@@ -8604,11 +8613,26 @@ class FoodAssistantApp {
       if (e.key === 'Enter') this.handleAiChatSubmit();
     });
 
-    // Gemini Quick Invoke Sheet Events
+    // Gemini Quick Invoke / Dedicated Sous Chef AI Hub Events (US-80)
     document.getElementById('btn-close-gemini-invoke')?.addEventListener('click', () => this.closeGeminiInvokeModal());
+    document.getElementById('btn-toggle-ai-hub')?.addEventListener('click', () => this.toggleAiHubActions());
+    document.getElementById('btn-ai-hub-autoplan')?.addEventListener('click', () => this.triggerGeminiAutoPlan());
+    document.getElementById('btn-ai-hub-photo')?.addEventListener('click', () => this.triggerAiHubPhotoImport());
+    document.getElementById('btn-ai-hub-text')?.addEventListener('click', () => this.triggerAiHubTextImport());
+    document.getElementById('btn-ai-hub-fridge')?.addEventListener('click', () => this.triggerAiHubFridgeQuery());
+    document.getElementById('btn-gemini-invoke-camera')?.addEventListener('click', () => this.triggerAiHubPhotoImport());
+    document.getElementById('ai-chat-photo-input')?.addEventListener('change', (e) => {
+      const file = e.target?.files?.[0];
+      if (file) this.handleAiChatPhotoSelected(file);
+    });
+    document.getElementById('btn-clear-chat-attachment')?.addEventListener('click', () => this.clearAiChatAttachment());
+    document.getElementById('chat-history-container')?.addEventListener('click', (e) => this.handleAiChatStreamClick(e));
+    document.getElementById('chat-history-container')?.addEventListener('change', (e) => this.handleAiChatStreamChange(e));
+
     document.getElementById('btn-gemini-invoke-new-chat')?.addEventListener('click', () => {
       this.stopSpeech();
-      this.aiChatHistory = [];
+      this.clearAiChatHistory();
+      this.aiComposerFeatureOverride = null;
       const threadBox = document.getElementById('gemini-invoke-thread');
       if (threadBox) {
         threadBox.style.display = 'none';
@@ -8619,12 +8643,15 @@ class FoodAssistantApp {
       const input = document.getElementById('gemini-invoke-input');
       if (input) {
         input.value = '';
-        input.focus();
+        input.focus?.();
       }
       const transcription = document.getElementById('gemini-invoke-transcription');
-      if (transcription) transcription.innerHTML = '<em>Nueva consulta iniciada. Pregunta algo o pulsa el micro...</em>';
+      const newChatMsg = window.I18n ? window.I18n.t('ai.newChatConfirm') : 'Nueva conversación iniciada. Escribe, dicta o adjunta una foto...';
+      if (transcription) transcription.innerHTML = `<em>${escapeHtml(newChatMsg)}</em>`;
       const newChatBtn = document.getElementById('btn-gemini-invoke-new-chat');
       if (newChatBtn) newChatBtn.style.display = 'none';
+      this.renderAiChatView();
+      this.renderAiQuotaHints?.();
     });
     document.getElementById('btn-header-stop-tts')?.addEventListener('click', () => this.stopSpeech());
     document.getElementById('btn-result-stop-tts')?.addEventListener('click', () => this.stopSpeech());
@@ -8635,10 +8662,17 @@ class FoodAssistantApp {
     document.getElementById('gemini-invoke-input')?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.handleGeminiInvokeSubmit();
     });
+    document.getElementById('gemini-invoke-input')?.addEventListener('input', (e) => {
+      if (!e.target.value.trim()) {
+        if (this.aiComposerMode && this.aiComposerMode !== 'import_text') this.aiComposerMode = null;
+      }
+    });
     document.querySelectorAll('#gemini-invoke-chips .gemini-chip').forEach(chip => {
       chip.addEventListener('click', () => {
         const input = document.getElementById('gemini-invoke-input');
         if (input && chip.dataset.prompt) {
+          this.aiComposerMode = null;
+          this.aiComposerFeatureOverride = null;
           input.value = chip.dataset.prompt;
           this.handleGeminiInvokeSubmit(false, { feature: 'guided_query' });
         }
@@ -8662,6 +8696,9 @@ class FoodAssistantApp {
     ['gemini-invoke-input', 'ai-chat-input'].forEach(id => {
       document.getElementById(id)?.addEventListener('click', (e) => {
         if (state.cloudUser?.id && state.aiPlan?.plan === 'free') {
+          if (this.pendingChatAttachment || this.aiComposerMode === 'import_text' || this.aiComposerFeatureOverride === 'guided_query') {
+            return;
+          }
           e.preventDefault();
           e.target.blur?.();
           this.openPaywall('chat');
@@ -8707,6 +8744,9 @@ class FoodAssistantApp {
     if (this.isRecipeSelectMode && viewId !== 'view-recipes') {
       this.toggleRecipeSelectMode(false);
     }
+    if (this.activeView && this.activeView !== 'view-ai' && viewId === 'view-ai') {
+      this.previousNonAiView = this.activeView;
+    }
     const updateDOM = () => {
       this.activeView = viewId;
       this.viewPanels.forEach(panel => {
@@ -8750,6 +8790,10 @@ class FoodAssistantApp {
         break;
       case 'view-settings':
         this.renderSettings();
+        break;
+      case 'view-ai':
+        this.renderAiQuotaHints?.();
+        this.renderAiChatView?.();
         break;
       default:
         this.render();
@@ -10750,16 +10794,14 @@ class FoodAssistantApp {
     }
     const ingredientsList = this.fridgeIngredients.join(', ');
     const promptText = `Tengo en la nevera: ${ingredientsList}. Inventa y crea una receta deliciosa, equilibrada y saludable aprovechando estos ingredientes y guárdala en mi recetario.`;
-    const legacyAiPanel = document.getElementById('view-ai');
+    const invokeInput = document.getElementById('gemini-invoke-input');
     const legacyInput = document.getElementById('ai-chat-input');
-    if (legacyAiPanel && legacyInput) {
-      this.switchView('view-ai');
+    this.switchView('view-ai');
+    if (legacyInput && !invokeInput) {
       legacyInput.value = promptText;
       this.handleAiChatSubmit(false, { feature: 'guided_query' });
       return;
     }
-    this.openGeminiInvokeModal(false);
-    const invokeInput = document.getElementById('gemini-invoke-input');
     if (invokeInput) {
       invokeInput.value = promptText;
       this.handleGeminiInvokeSubmit(false, { feature: 'guided_query' });
@@ -12680,6 +12722,19 @@ class FoodAssistantApp {
     const isEn = typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() === 'en';
     const weekDays = this.getPlannerWeekDates();
     this.updatePlannerWeekLabel(weekDays);
+
+    // US-80: Banner sutil proactivo cuando la semana visible está vacía
+    const emptyBanner = document.getElementById('planner-empty-ai-banner');
+    if (emptyBanner) {
+      const weekHasMeals = weekDays.some(wDay => {
+        const day = state.mealPlan[wDay.dateKey];
+        if (!day) return false;
+        const hasStd = ['breakfast', 'lunch', 'snack', 'dinner'].some(k => Boolean(day[k]));
+        const hasCustom = Array.isArray(day.customSlots) && day.customSlots.some(cs => Boolean(cs && cs.recipeId));
+        return hasStd || hasCustom;
+      });
+      emptyBanner.style.display = weekHasMeals ? 'none' : 'flex';
+    }
 
     if (!(this.plannerExpandedDays instanceof Set)) {
       this.plannerExpandedDays = this.getDefaultExpandedPlannerDays(weekDays);
@@ -16232,7 +16287,21 @@ ${isEn
       }
     }
 
-    const locked = isFree;
+    const plannerQuotaBadge = document.getElementById('planner-autoplan-quota-badge');
+    if (plannerQuotaBadge) {
+      const qPlan = plan.quotas?.weekly_plan;
+      if (isFree) {
+        const limit = qPlan?.limit ?? 1;
+        const remaining = this.getAiQuotaRemaining('weekly_plan');
+        const remVal = remaining === null ? limit : remaining;
+        plannerQuotaBadge.textContent = `${remVal}/${limit}`;
+        plannerQuotaBadge.style.display = '';
+      } else {
+        plannerQuotaBadge.style.display = 'none';
+      }
+    }
+
+    const locked = isFree && !this.pendingChatAttachment && this.aiComposerMode !== 'import_text' && this.aiComposerFeatureOverride !== 'guided_query';
     const lockedText = this.tr('paywall.chatLocked', undefined, 'El chat libre es Pro ✨');
     ['gemini-invoke-input', 'ai-chat-input'].forEach(id => {
       const input = document.getElementById(id);
@@ -16491,38 +16560,55 @@ ${isEn
     const hasTagCI = (recipe, tag) =>
       Array.isArray(recipe?.tags) && recipe.tags.some(t => String(t).toLowerCase() === tag.toLowerCase());
 
-    const filterByTag = (tag, allowNonBreakfastFallback = false) => {
+    const goals = state.settings?.nutritionGoals;
+    const targetMealKcal = (goals?.enabled && Number(goals.calories) > 0) ? (Number(goals.calories) / 4) : 0;
+    const prioritizeList = (list, slotTag = '') => {
+      if (!Array.isArray(list) || list.length <= 1) return list;
+      const slotFactor = slotTag === 'lunch' ? 1.3 : (slotTag === 'dinner' ? 1.05 : (slotTag === 'breakfast' ? 0.9 : 0.7));
+      const idealKcal = targetMealKcal * slotFactor;
+      return [...list].sort((a, b) => {
+        const favScoreA = a.isFavorite ? 40 : 0;
+        const favScoreB = b.isFavorite ? 40 : 0;
+        const nutA = getRecipeNutrition(a);
+        const nutB = getRecipeNutrition(b);
+        const kcalFitA = idealKcal > 0 ? Math.max(0, 25 - Math.abs((nutA.calories || 0) - idealKcal) / 25) : 0;
+        const kcalFitB = idealKcal > 0 ? Math.max(0, 25 - Math.abs((nutB.calories || 0) - idealKcal) / 25) : 0;
+        return (favScoreB + kcalFitB) - (favScoreA + kcalFitA);
+      });
+    };
+
+    const filterByTag = (tag, allowNonBreakfastFallback = false, slotKey = '') => {
       const strictMatch = pool.filter(r => hasTagCI(r, tag));
-      if (strictMatch.length > 0) return strictMatch;
+      if (strictMatch.length > 0) return prioritizeList(strictMatch, slotKey);
 
       // Si no hay p.ej. ningún Desayuno o Merienda con etiqueta "Alta en Proteínas",
       // usar los Desayunos / Meriendas del catálogo que respetan las alergias estrictas, ordenados por proteína
       const safeTagMatch = safePool.filter(r => hasTagCI(r, tag));
       if (safeTagMatch.length > 0) {
-        return [...safeTagMatch].sort((a, b) => (getRecipeNutrition(b).protein || 0) - (getRecipeNutrition(a).protein || 0));
+        return [...safeTagMatch].sort((a, b) => ((b.isFavorite ? 20 : 0) + (getRecipeNutrition(b).protein || 0)) - ((a.isFavorite ? 20 : 0) + (getRecipeNutrition(a).protein || 0)));
       }
 
       if (tag.toLowerCase() === 'merienda') {
         const snackOrBreakfast = safePool.filter(r => hasTagCI(r, 'Desayuno') || /batido|yogur|hummus|tosta|fruta|avena|snack/i.test(r.title || ''));
-        if (snackOrBreakfast.length > 0) return snackOrBreakfast;
+        if (snackOrBreakfast.length > 0) return prioritizeList(snackOrBreakfast, 'snack');
       }
 
       if (tag.toLowerCase() === 'desayuno') {
         const breakfastCandidates = safePool.filter(r => hasTagCI(r, 'Desayuno') || /pancake|torta|avena|tosta|huevo|tortilla|yogur|chia|cha|smoothie|batido|fruta|porridge|bowl/i.test(r.title || ''));
-        if (breakfastCandidates.length > 0) return breakfastCandidates;
+        if (breakfastCandidates.length > 0) return prioritizeList(breakfastCandidates, 'breakfast');
       }
 
       if (allowNonBreakfastFallback) {
         const nonBreakfast = pool.filter(r => !hasTagCI(r, 'Desayuno') && !hasTagCI(r, 'Merienda'));
-        if (nonBreakfast.length > 0) return nonBreakfast;
+        if (nonBreakfast.length > 0) return prioritizeList(nonBreakfast, slotKey);
       }
-      return pool;
+      return prioritizeList(pool, slotKey);
     };
 
-    const breakfastList = filterByTag('Desayuno', false);
-    const lunchList = filterByTag('Almuerzo', true);
-    const snackList = filterByTag('Merienda', false);
-    const dinnerList = filterByTag('Cena', true);
+    const breakfastList = filterByTag('Desayuno', false, 'breakfast');
+    const lunchList = filterByTag('Almuerzo', true, 'lunch');
+    const snackList = filterByTag('Merienda', false, 'snack');
+    const dinnerList = filterByTag('Cena', true, 'dinner');
 
     const weekDays = this.getPlannerWeekDates();
     let prevDinnerId = null;
@@ -17221,49 +17307,51 @@ ${isEn
       }
 
       // Paso 2: Validación y rotación balanceada de proteínas (Anti-Pollo y Anti-Monotonía)
-      let lastDinnerProtein = null;
-      let totalChickenCount = 0;
-      const maxAllowedChicken = daysInput.length <= 2 ? 1 : Math.min(3, Math.ceil(daysInput.length * 0.35));
+      if (!args.fromPreviewCard) {
+        let lastDinnerProtein = null;
+        let totalChickenCount = 0;
+        const maxAllowedChicken = daysInput.length <= 2 ? 1 : Math.min(3, Math.ceil(daysInput.length * 0.35));
 
-      daysInput.forEach((d) => {
-        const lunchRec = d.lunch ? (state.recipes || []).find(r => r.id === d.lunch || r.id === this.resolveRecipeIdForAgent(d.lunch)) : null;
-        let lunchProt = getPrimaryProteinCategory(lunchRec);
+        daysInput.forEach((d) => {
+          const lunchRec = d.lunch ? (state.recipes || []).find(r => r.id === d.lunch || r.id === this.resolveRecipeIdForAgent(d.lunch)) : null;
+          let lunchProt = getPrimaryProteinCategory(lunchRec);
 
-        if (lunchProt === 'pollo' && totalChickenCount >= maxAllowedChicken) {
-          const altLunch = (state.recipes || []).find(r =>
-            r.id !== d.lunch &&
-            getPrimaryProteinCategory(r) !== 'pollo' &&
-            (r.tags || []).some(t => /almuerzo|comida|cena/i.test(t))
-          );
-          if (altLunch) {
-            d.lunch = altLunch.id;
-            lunchProt = getPrimaryProteinCategory(altLunch);
+          if (lunchProt === 'pollo' && totalChickenCount >= maxAllowedChicken) {
+            const altLunch = (state.recipes || []).find(r =>
+              r.id !== d.lunch &&
+              getPrimaryProteinCategory(r) !== 'pollo' &&
+              (r.tags || []).some(t => /almuerzo|comida|cena/i.test(t))
+            );
+            if (altLunch) {
+              d.lunch = altLunch.id;
+              lunchProt = getPrimaryProteinCategory(altLunch);
+            }
           }
-        }
-        if (lunchProt === 'pollo') totalChickenCount++;
+          if (lunchProt === 'pollo') totalChickenCount++;
 
-        const dinnerRec = d.dinner ? (state.recipes || []).find(r => r.id === d.dinner || r.id === this.resolveRecipeIdForAgent(d.dinner)) : null;
-        let dinnerProt = getPrimaryProteinCategory(dinnerRec);
+          const dinnerRec = d.dinner ? (state.recipes || []).find(r => r.id === d.dinner || r.id === this.resolveRecipeIdForAgent(d.dinner)) : null;
+          let dinnerProt = getPrimaryProteinCategory(dinnerRec);
 
-        const isSameAsLunch = dinnerProt !== 'otro' && dinnerProt === lunchProt;
-        const isExcessChicken = dinnerProt === 'pollo' && (totalChickenCount >= maxAllowedChicken || lunchProt === 'pollo' || lastDinnerProtein === 'pollo');
+          const isSameAsLunch = dinnerProt !== 'otro' && dinnerProt === lunchProt;
+          const isExcessChicken = dinnerProt === 'pollo' && (totalChickenCount >= maxAllowedChicken || lunchProt === 'pollo' || lastDinnerProtein === 'pollo');
 
-        if (isSameAsLunch || isExcessChicken) {
-          const altDinner = (state.recipes || []).find(r =>
-            r.id !== d.lunch &&
-            r.id !== d.dinner &&
-            getPrimaryProteinCategory(r) !== lunchProt &&
-            getPrimaryProteinCategory(r) !== 'pollo' &&
-            (r.tags || []).some(t => /cena|almuerzo|comida/i.test(t))
-          );
-          if (altDinner) {
-            d.dinner = altDinner.id;
-            dinnerProt = getPrimaryProteinCategory(altDinner);
+          if (isSameAsLunch || isExcessChicken) {
+            const altDinner = (state.recipes || []).find(r =>
+              r.id !== d.lunch &&
+              r.id !== d.dinner &&
+              getPrimaryProteinCategory(r) !== lunchProt &&
+              getPrimaryProteinCategory(r) !== 'pollo' &&
+              (r.tags || []).some(t => /cena|almuerzo|comida/i.test(t))
+            );
+            if (altDinner) {
+              d.dinner = altDinner.id;
+              dinnerProt = getPrimaryProteinCategory(altDinner);
+            }
           }
-        }
-        if (dinnerProt === 'pollo') totalChickenCount++;
-        lastDinnerProtein = dinnerProt;
-      });
+          if (dinnerProt === 'pollo') totalChickenCount++;
+          lastDinnerProtein = dinnerProt;
+        });
+      }
 
       daysInput.forEach((dayEntry, idx) => {
         if (!dayEntry) return;
@@ -17458,13 +17546,18 @@ ${isEn
 
   async handleAiChatSubmit(fromVoice = false, options = {}) {
     this.stopSpeech();
-    const input = document.getElementById('ai-chat-input');
+    const input = document.getElementById('ai-chat-input') || document.getElementById('gemini-invoke-input');
     const text = input?.value.trim() || '';
     if (!text) return;
     if (!this.ensureAiAccess(options?.feature || (fromVoice ? 'voice' : 'chat'))) return;
 
     const history = document.getElementById('chat-history-container');
     if (!history) return;
+
+    const emptyState = document.getElementById('ai-chat-empty-state');
+    if (emptyState) emptyState.style.display = 'none';
+    const newChatBtn = document.getElementById('btn-gemini-invoke-new-chat');
+    if (newChatBtn) newChatBtn.style.display = 'inline-flex';
 
     const userBubble = document.createElement('div');
     userBubble.className = 'ai-user-bubble';
@@ -17475,10 +17568,8 @@ ${isEn
 
     const aiBubble = document.createElement('div');
     aiBubble.className = 'ai-assistant-bubble';
-    const isFullCatalog = false;
-    const waitNotice = isFullCatalog ? `<div class="ai-wait-notice">Analizando recetario completo (${state.recipes.length} recetas)... unos segundos.</div>` : '';
     const consultingText = window.I18n ? window.I18n.t('ai.consultingAssistant') : 'Consultando al Sous Chef...';
-    aiBubble.innerHTML = `<em>${consultingText}</em>${waitNotice}`;
+    aiBubble.innerHTML = `<em>${consultingText}</em>`;
     history.appendChild(aiBubble);
     history.scrollTop = history.scrollHeight;
 
@@ -17575,7 +17666,6 @@ ${isEn
             tc.args = { ...(tc.args || {}), completeWeek: true };
           }
         });
-        // Red de seguridad: si el modelo devolvió el menú en texto sin emitir functionCall, extraerlo y aplicarlo
         if (!rawToolCalls.some(tc => tc.name === 'set_weekly_plan')) {
           const extractedArgs = this.extractWeeklyPlanFromAiText(agentResult.text);
           rawToolCalls.push({
@@ -17585,7 +17675,6 @@ ${isEn
         }
       }
 
-      // Proteger lista de la compra si el usuario solo pidió añadir artículos sueltos
       const isExplicitPlanShopRequest = /ingredientes\s+del\s+plan|men[uú]\s+semanal|toda\s+la\s+semana|plan\s+a\s+la\s+compra|vuelca.*compra/i.test(text);
       if (!isExplicitPlanShopRequest) {
         rawToolCalls.forEach(tc => {
@@ -17619,7 +17708,6 @@ ${isEn
         displayMessage = summaries.join('\n\n');
       }
 
-      // Eliminar IDs internos tipo (*rec-...*) o rec-... del mensaje visible
       displayMessage = this.stripRecipeIdsFromText(displayMessage);
 
       if (slotGaps.length > 0 && !/crear|inventar|nuevas recetas/i.test(displayMessage || '')) {
@@ -17628,11 +17716,32 @@ ${isEn
         displayMessage = `${displayMessage}\n\n💡 **Nota**: En tu recetario tienes pocas o ninguna opción de **${gapLabels}** que cumplan con **${prefList}**, así que he completado la semana apoyándome en tus mejores opciones actuales. ¿Quieres que cree nuevas recetas a medida para esos huecos y las asigne al plan?`;
       }
 
-      if (!Array.isArray(this.aiChatHistory)) this.aiChatHistory = [];
-      this.aiChatHistory.push({ role: 'user', text });
-      this.aiChatHistory.push({ role: 'model', text: displayMessage || 'Acción completada.' });
+      const savedActions = [];
+      executedResults.forEach(res => {
+        if (res.tool === 'set_weekly_plan' || res.tool === 'set_day_plan') {
+          savedActions.push({ type: 'view', target: 'view-planner', label: 'Ver en Planificador', icon: 'calendar_month', primary: true });
+          if (slotGaps.length > 0) {
+            const gapLabelText = slotGaps.map(g => g.label).join(' y ');
+            savedActions.push({ type: 'create_missing', gaps: slotGaps, label: `Crear ${gapLabelText} a medida`, icon: 'auto_awesome' });
+          }
+        } else if (res.tool === 'create_and_save_recipe') {
+          savedActions.push({ type: 'recipe', recipeId: res.recipeId, label: 'Abrir Receta', icon: 'restaurant_menu' });
+        } else if (res.tool === 'manage_shopping_list') {
+          savedActions.push({ type: 'view', target: 'view-shopping', label: 'Ver Lista de la Compra', icon: 'shopping_cart' });
+        }
+      });
 
-      // US-37: Saneamiento estricto antes de aplicar formato Markdown ligero
+      if (!Array.isArray(this.aiChatHistory)) this.aiChatHistory = [];
+      this.aiChatHistory.push({ id: generateId('msg-'), role: 'user', text, createdAt: new Date().toISOString() });
+      this.aiChatHistory.push({
+        id: generateId('msg-'),
+        role: 'model',
+        text: displayMessage || 'Acción completada.',
+        actions: savedActions,
+        createdAt: new Date().toISOString()
+      });
+      this.saveAiChatHistory();
+
       aiBubble.innerHTML = formatSafeAiMarkdown(displayMessage || 'Acción completada.');
 
       if (executedResults.length > 0) {
@@ -17653,7 +17762,7 @@ ${isEn
               createMissingBtn.type = 'button';
               createMissingBtn.className = 'btn btn-tonal btn-sm';
               const gapLabelText = slotGaps.map(g => g.label).join(' y ');
-              createMissingBtn.innerHTML = `<span class="material-symbols-outlined icon-sm">auto_awesome</span> Crear ${gapLabelText} a medida`;
+              createMissingBtn.innerHTML = `<span class="material-symbols-outlined icon-sm">auto_awesome</span> Crear ${escapeHtml(gapLabelText)} a medida`;
               createMissingBtn.onclick = () => this.triggerCreateMissingSlotRecipes(slotGaps);
               actionsContainer.appendChild(createMissingBtn);
             }
@@ -17680,12 +17789,10 @@ ${isEn
         aiBubble.appendChild(actionsContainer);
       }
 
-      // Camino B (US-17): Si la orden se dictó por voz, responder también con voz natural hablada
       if (fromVoice && displayMessage) {
         this.speakAiResponse(displayMessage);
       }
     } catch (err) {
-      // US-37: Mostrar mensajes de error con textContent para impedir XSS
       aiBubble.innerHTML = '';
       const errSpan = document.createElement('span');
       errSpan.style.color = 'var(--m3-error)';
@@ -17753,8 +17860,11 @@ ${isEn
         this.recognition.onend = () => {
           this.isListeningVoice = false;
           this.updateVoiceUI(false);
+          const viewAi = document.getElementById('view-ai');
           const invokeModal = document.getElementById('modal-gemini-invoke');
-          if (invokeModal && (invokeModal.classList.contains('active') || invokeModal.open)) {
+          const isViewAiActive = viewAi && viewAi.classList.contains('active');
+          const isModalActive = invokeModal && (invokeModal.classList.contains('active') || invokeModal.open);
+          if (isViewAiActive || isModalActive || document.getElementById('gemini-invoke-input')?.value?.trim()) {
             const invokeInput = document.getElementById('gemini-invoke-input');
             const text = invokeInput?.value?.trim();
             if (text) {
@@ -17847,12 +17957,84 @@ ${isEn
     }
   }
 
+  loadAiChatHistory() {
+    try {
+      const stored = typeof state !== 'undefined' && typeof state.load === 'function'
+        ? state.load('fa_ai_chat_history', [])
+        : [];
+      if (Array.isArray(stored)) {
+        return stored.filter(m => m && (m.role === 'user' || m.role === 'model')).slice(-40);
+      }
+    } catch (e) { /* ignore storage errors */ }
+    return [];
+  }
+
+  saveAiChatHistory() {
+    if (!Array.isArray(this.aiChatHistory)) this.aiChatHistory = [];
+    if (this.aiChatHistory.length > 40) {
+      this.aiChatHistory = this.aiChatHistory.slice(-40);
+    }
+    try {
+      const len = this.aiChatHistory.length;
+      const sanitized = this.aiChatHistory.map((m, idx) => {
+        if (!m || typeof m !== 'object') return m;
+        const copy = { ...m };
+        if (copy.attachment && typeof copy.attachment === 'object') {
+          const keepFull = idx >= len - 6;
+          copy.attachment = {
+            name: copy.attachment.name || 'Foto',
+            dataUrl: keepFull ? (copy.attachment.dataUrl || '') : ''
+          };
+        }
+        return copy;
+      });
+      if (typeof state !== 'undefined' && typeof state.save === 'function') {
+        state.save('fa_ai_chat_history', sanitized);
+      }
+    } catch (e) { /* ignore storage quota errors */ }
+  }
+
+  clearAiChatHistory() {
+    this.aiChatHistory = [];
+    this.pendingChatAttachment = null;
+    this.aiComposerMode = null;
+    this.updateChatAttachmentPreview?.();
+    try {
+      if (typeof state !== 'undefined' && typeof state.save === 'function') {
+        state.save('fa_ai_chat_history', []);
+      }
+    } catch (e) { /* ignore */ }
+  }
+
   openGeminiInvokeModal(startVoice = false) {
     this.stopSpeech();
-    const modal = document.getElementById('modal-gemini-invoke');
-    if (!modal) return;
+    const viewAi = document.getElementById('view-ai');
+    const legacyModal = document.getElementById('modal-gemini-invoke');
+    if (viewAi) {
+      if (this.activeView && this.activeView !== 'view-ai') {
+        this.previousNonAiView = this.activeView;
+      }
+      this.switchView('view-ai');
+      this.renderAiQuotaHints?.();
+      this.renderAiChatView();
+
+      const input = document.getElementById('gemini-invoke-input');
+      const transcription = document.getElementById('gemini-invoke-transcription');
+      if (transcription && !this.isListeningVoice) {
+        const promptText = window.I18n ? window.I18n.t('ai.initialPrompt') : 'Pulsa el micro o escribe tu petición';
+        transcription.innerHTML = `<em>${escapeHtml(promptText)}</em>`;
+      }
+      if (startVoice && this.speechRecognitionSupported) {
+        this.toggleVoiceRecognition(true);
+      } else if (input && typeof input.focus === 'function') {
+        setTimeout(() => input.focus(), 100);
+      }
+      return;
+    }
+
+    if (!legacyModal) return;
     this.renderAiQuotaHints?.();
-    this.openDialogModal(modal);
+    this.openDialogModal(legacyModal);
 
     const input = document.getElementById('gemini-invoke-input');
     const resultBox = document.getElementById('gemini-invoke-result');
@@ -17876,31 +18058,46 @@ ${isEn
 
   closeGeminiInvokeModal() {
     this.stopSpeech();
-    const modal = document.getElementById('modal-gemini-invoke');
     if (this.isListeningVoice) {
       try { this.recognition.stop(); } catch (e) { }
       this.isListeningVoice = false;
       this.updateVoiceUI(false);
     }
-    // Franky: limpiar memoria conversacional al cerrar la ventana para comenzar limpio en la siguiente apertura
-    this.aiChatHistory = [];
-    const threadBox = document.getElementById('gemini-invoke-thread');
-    if (threadBox) {
-      threadBox.style.display = 'none';
-      threadBox.innerHTML = '';
+    const legacyModal = document.getElementById('modal-gemini-invoke');
+    if (legacyModal) {
+      // Compatibilidad con tests que montan #modal-gemini-invoke explícitamente
+      this.closeDialogModal(legacyModal);
+      return;
     }
-    const newChatBtn = document.getElementById('btn-gemini-invoke-new-chat');
-    if (newChatBtn) newChatBtn.style.display = 'none';
-    if (modal) this.closeDialogModal(modal);
+    if (this.activeView === 'view-ai') {
+      const targetView = (this.previousNonAiView && this.previousNonAiView !== 'view-ai')
+        ? this.previousNonAiView
+        : 'view-today';
+      this.switchView(targetView);
+    }
   }
 
   async handleGeminiInvokeSubmit(isVoice = false, options = {}) {
     this.stopSpeech();
     const input = document.getElementById('gemini-invoke-input');
-    const prompt = input?.value?.trim();
-    if (!prompt) return;
-    if (!this.ensureAiAccess(options?.feature || (isVoice ? 'voice' : 'chat'))) return;
+    const rawPrompt = input?.value?.trim() || '';
+    const attachment = this.pendingChatAttachment;
+    if (!rawPrompt && !attachment) return;
+
+    const importPrefix = window.I18n ? window.I18n.t('ai.textImportPromptPrefix') : 'Importa y extrae esta receta en mi catálogo: ';
+    const isTextImportIntent = this.aiComposerMode === 'import_text' || /^Importa y extrae esta receta en mi cat[aá]logo:/i.test(rawPrompt);
+    const feature = attachment
+      ? 'import_ai'
+      : (isTextImportIntent ? 'import_ai' : (options?.feature || this.aiComposerFeatureOverride || (isVoice ? 'voice' : 'chat')));
+
+    if (!this.ensureAiAccess(feature)) return;
+
     if (input) input.value = '';
+    this.pendingChatAttachment = null;
+    this.aiComposerMode = null;
+    this.aiComposerFeatureOverride = null;
+    this.updateChatAttachmentPreview();
+    this.renderAiQuotaHints?.();
 
     if (this.isListeningVoice) {
       try { this.recognition.stop(); } catch (e) { }
@@ -17913,36 +18110,128 @@ ${isEn
     const resultText = document.getElementById('gemini-invoke-result-text');
     const resultActions = document.getElementById('gemini-invoke-result-actions');
     const sendBtn = document.getElementById('btn-gemini-invoke-send');
+    const hasChatStream = Boolean(document.getElementById('chat-history-container'));
 
-    const isFullCatalog = false;
-    const noticeHtml = isFullCatalog
-      ? `<div class="ai-wait-notice">Analizando tu recetario completo (${state.recipes.length} recetas)... Esto puede tardar unos segundos.</div>`
-      : '';
     if (transcription) {
       const thinkingText = window.I18n ? window.I18n.t('ai.assistantThinking') : 'El Sous Chef está pensando...';
       transcription.innerHTML = `<span class="ai-status-loading">
         <span class="material-symbols-outlined icon-sm icon-spin">sync</span>
-        ${thinkingText}
-      </span>${noticeHtml}`;
+        ${escapeHtml(thinkingText)}
+      </span>`;
     }
     if (sendBtn) sendBtn.disabled = true;
 
+    const userVisiblePrompt = rawPrompt || (attachment
+      ? (window.I18n ? window.I18n.t('ai.hubImportPhotoTitle') : 'Importar receta desde foto')
+      : '');
+
     try {
-      const feature = options?.feature || (isVoice ? 'voice' : 'chat');
+      // FLUJO 1: Extracción de receta desde foto adjunta o modo importación texto/enlace
+      if (attachment || isTextImportIntent) {
+        if (!Array.isArray(this.aiChatHistory)) this.aiChatHistory = [];
+        this.aiChatHistory.push({
+          id: generateId('msg-'),
+          role: 'user',
+          text: userVisiblePrompt,
+          attachment: attachment ? { name: attachment.fileName || 'Foto', dataUrl: attachment.dataUrl || '' } : null,
+          createdAt: new Date().toISOString()
+        });
+        this.saveAiChatHistory();
+        if (hasChatStream) this.renderAiChatView();
+
+        let extractedRecipe = null;
+        if (attachment) {
+          extractedRecipe = await this.extractRecipeWithGemini({
+            text: rawPrompt,
+            imageBase64: attachment.base64Data,
+            mimeType: attachment.mimeType || 'image/jpeg'
+          });
+        } else {
+          const cleanImportText = rawPrompt.replace(/^Importa y extrae esta receta en mi cat[aá]logo:\s*/i, '').trim();
+          const urlMatch = cleanImportText.match(/https?:\/\/[^\s<>"']+/i);
+          extractedRecipe = (!urlMatch && typeof RecipeParser !== 'undefined' && RecipeParser.parseRecipeText)
+            ? RecipeParser.parseRecipeText(cleanImportText)
+            : null;
+          if (!extractedRecipe || !extractedRecipe.ingredients || extractedRecipe.ingredients.length === 0) {
+            extractedRecipe = await this.extractRecipeWithGemini({
+              text: cleanImportText,
+              sourceUrl: urlMatch ? urlMatch[0] : ''
+            });
+          }
+        }
+
+        const recipeTitle = extractedRecipe?.title || 'Receta extraída';
+        const replyText = extractedRecipe?._isHighDemandFallback
+          ? `⚠️ He preparado un borrador con tu adjunto para **${recipeTitle}** mientras Gemini recupera capacidad. Puedes revisarlo o guardarlo directamente.`
+          : `He extraído la receta **${recipeTitle}** (${(extractedRecipe?.ingredients || []).length} ingredientes). Revísala o guárdala en tu catálogo con 1 clic:`;
+
+        if (transcription) transcription.textContent = `"${userVisiblePrompt}"`;
+        this.aiChatHistory.push({
+          id: generateId('msg-'),
+          role: 'model',
+          text: replyText,
+          card: {
+            type: 'imported_recipe_preview',
+            data: {
+              recipe: extractedRecipe,
+              savedRecipeId: null,
+              isDraftFallback: !!extractedRecipe?._isHighDemandFallback
+            }
+          },
+          createdAt: new Date().toISOString()
+        });
+        this.saveAiChatHistory();
+        if (hasChatStream) {
+          if (resultBox) resultBox.style.display = 'none';
+          this.renderAiChatView();
+        } else if (resultBox && resultText) {
+          resultBox.style.display = 'flex';
+          resultText.innerHTML = formatSafeAiMarkdown(replyText);
+        }
+        if (isVoice) this.speakAiResponse(replyText);
+        this.showToast('✓ Receta analizada en el chat.', 'success');
+        return;
+      }
+
+      // FLUJO 2: Consulta conversacional estándar / guiada / voz
+      const prompt = rawPrompt;
+      if (hasChatStream) {
+        if (!Array.isArray(this.aiChatHistory)) this.aiChatHistory = [];
+        this.aiChatHistory.push({
+          id: generateId('msg-'),
+          role: 'user',
+          text: prompt,
+          createdAt: new Date().toISOString()
+        });
+        this.saveAiChatHistory();
+        this.renderAiChatView();
+      }
+
       const systemPrompt = this.buildAiSystemInstruction(prompt);
       const response = await this.callGeminiAgent(prompt, systemPrompt, true, { feature });
       if (response?.requiresLogin) {
+        const loginMsg = response.text || (window.I18n ? window.I18n.t('ai.loginRequired') : 'Inicia sesión para usar el Sous Chef');
         if (transcription) transcription.textContent = `"${prompt}"`;
-        if (resultBox && resultText) {
+        if (hasChatStream) {
+          this.aiChatHistory.push({
+            id: generateId('msg-'),
+            role: 'model',
+            text: loginMsg,
+            createdAt: new Date().toISOString()
+          });
+          this.saveAiChatHistory();
+          this.renderAiChatView();
+        } else if (resultBox && resultText) {
           resultBox.style.display = 'flex';
-          resultText.textContent = response.text || (window.I18n ? window.I18n.t('ai.loginRequired') : 'Inicia sesión para usar el Sous Chef');
+          resultText.textContent = loginMsg;
         }
         if (resultActions) resultActions.innerHTML = '';
         this.openAuthModal?.();
         return;
       }
+
       let executedToolsCount = 0;
-      let primaryActionTarget = null; // 'view-shopping' | 'view-planner' | 'view-recipes'
+      let primaryActionTarget = null;
       const createdRecipes = [];
 
       if (Array.isArray(response.toolCalls) && response.toolCalls.length > 0) {
@@ -17962,47 +18251,75 @@ ${isEn
 
       this.render();
 
-      const cleanText = response.text || 'Acción completada con éxito.';
+      const cleanText = this.stripRecipeIdsFromText(response.text || 'Acción completada con éxito.');
       if (transcription) {
         transcription.textContent = `"${prompt}"`;
       }
 
-      // Mantener memoria multi-turno en el Asistente para permitir diálogos continuos ("recomiéndame..." -> "guárdalas")
-      if (!Array.isArray(this.aiChatHistory)) this.aiChatHistory = [];
-      this.aiChatHistory.push({ role: 'user', text: prompt });
-      this.aiChatHistory.push({ role: 'model', text: cleanText });
+      const savedActions = [];
+      if (createdRecipes.length > 0) {
+        createdRecipes.forEach(cr => {
+          savedActions.push({ type: 'recipe', recipeId: cr.recipeId, label: `Ver "${cr.title}"`, icon: 'restaurant_menu', primary: true });
+        });
+      } else if (primaryActionTarget) {
+        const label = primaryActionTarget === 'view-shopping'
+          ? 'Ver Lista de la Compra'
+          : (primaryActionTarget === 'view-planner' ? 'Ver Planificador' : 'Ver Recetas');
+        savedActions.push({ type: 'view', target: primaryActionTarget, label, icon: primaryActionTarget === 'view-shopping' ? 'shopping_cart' : (primaryActionTarget === 'view-planner' ? 'calendar_month' : 'restaurant_menu'), primary: true });
+      }
 
-      // Botón "Nuevo tema" visible si hay conversación activa
+      const fallbackNotice = (response && response.isSimulatedFallback)
+        ? (response.originalError || 'tiempo de espera agotado')
+        : null;
+
+      if (!Array.isArray(this.aiChatHistory)) this.aiChatHistory = [];
+      if (!hasChatStream) {
+        this.aiChatHistory.push({ id: generateId('msg-'), role: 'user', text: prompt, createdAt: new Date().toISOString() });
+      }
+      this.aiChatHistory.push({
+        id: generateId('msg-'),
+        role: 'model',
+        text: cleanText,
+        fallbackNotice,
+        actions: savedActions,
+        createdAt: new Date().toISOString()
+      });
+      this.saveAiChatHistory();
+
       const newChatBtn = document.getElementById('btn-gemini-invoke-new-chat');
       if (newChatBtn) newChatBtn.style.display = 'inline-flex';
 
-      // Mostrar hilo anterior mientras la ventana está abierta para memoria conversacional visual
-      const threadBox = document.getElementById('gemini-invoke-thread');
-      if (threadBox) {
-        const previousTurns = this.aiChatHistory.slice(0, -2);
-        if (previousTurns.length > 0) {
-          threadBox.style.display = 'flex';
-          threadBox.innerHTML = previousTurns.map(t => {
-            const isU = t.role === 'user';
-            const escaped = typeof escapeHtml === 'function' ? escapeHtml(t.text) : String(t.text).replace(/</g, '&lt;');
-            const authorText = isU
-              ? (window.I18n ? window.I18n.t('household.you').replace(/[()]/g, '') : 'Tú')
-              : 'Sous Chef';
-            return `<div class="ai-history-bubble ${isU ? 'is-user' : ''}">
-              <strong class="${isU ? 'ai-history-author-user' : 'ai-history-author-assistant'}">${authorText}:</strong> ${escaped.slice(0, 160)}${escaped.length > 160 ? '...' : ''}
-            </div>`;
-          }).join('');
-        } else {
-          threadBox.style.display = 'none';
-          threadBox.innerHTML = '';
+      if (hasChatStream) {
+        if (resultBox) resultBox.style.display = 'none';
+        this.renderAiChatView();
+      } else {
+        const threadBox = document.getElementById('gemini-invoke-thread');
+        if (threadBox) {
+          const previousTurns = this.aiChatHistory.slice(0, -2);
+          if (previousTurns.length > 0) {
+            threadBox.style.display = 'flex';
+            threadBox.innerHTML = previousTurns.map(t => {
+              const isU = t.role === 'user';
+              const escaped = typeof escapeHtml === 'function' ? escapeHtml(t.text) : String(t.text).replace(/</g, '&lt;');
+              const authorText = isU
+                ? (window.I18n ? window.I18n.t('household.you').replace(/[()]/g, '') : 'Tú')
+                : 'Sous Chef';
+              return `<div class="ai-history-bubble ${isU ? 'is-user' : ''}">
+                <strong class="${isU ? 'ai-history-author-user' : 'ai-history-author-assistant'}">${authorText}:</strong> ${escaped.slice(0, 160)}${escaped.length > 160 ? '...' : ''}
+              </div>`;
+            }).join('');
+          } else {
+            threadBox.style.display = 'none';
+            threadBox.innerHTML = '';
+          }
         }
       }
 
       if (resultBox && resultText) {
-        resultBox.style.display = 'flex';
+        resultBox.style.display = hasChatStream ? 'none' : 'flex';
         let fallbackBanner = '';
-        if (response && response.isSimulatedFallback) {
-          const safeErrorMsg = escapeHtml(response.originalError || 'tiempo de espera agotado');
+        if (fallbackNotice) {
+          const safeErrorMsg = escapeHtml(fallbackNotice);
           fallbackBanner = `<div class="ai-fallback-banner">
             <span class="material-symbols-outlined icon-18 u-shrink-0">cloud_off</span>
             <span><strong>Aviso de conexión:</strong> No se pudo contactar con Gemini en la nube (${safeErrorMsg}). Se ha activado la simulación local provisional de emergencia.</span>
@@ -18013,15 +18330,13 @@ ${isEn
         if (resultActions) {
           resultActions.innerHTML = '';
 
-          // Si se crearon recetas nuevas, añadir botón directo para abrir cada una
           if (createdRecipes.length > 0) {
             createdRecipes.forEach(cr => {
               const btnRecipe = document.createElement('button');
               btnRecipe.type = 'button';
               btnRecipe.className = 'btn btn-primary btn-sm';
-              btnRecipe.innerHTML = `<span class="material-symbols-outlined icon-sm">restaurant_menu</span> Ver "${cr.title}"`;
+              btnRecipe.innerHTML = `<span class="material-symbols-outlined icon-sm">restaurant_menu</span> Ver "${escapeHtml(cr.title)}"`;
               btnRecipe.addEventListener('click', () => {
-                this.closeGeminiInvokeModal();
                 this.switchView('view-recipes');
                 this.openRecipeDetail(cr.recipeId);
               });
@@ -18035,34 +18350,31 @@ ${isEn
               ? 'Ver Lista de la Compra'
               : (primaryActionTarget === 'view-planner' ? 'Ver Planificador' : 'Ver Recetas');
             btnTarget.addEventListener('click', () => {
-              this.closeGeminiInvokeModal();
               this.switchView(primaryActionTarget);
             });
             resultActions.appendChild(btnTarget);
           } else if (/\b(Lunes|Martes|Miércoles|Miercoles|Jueves|Viernes|Sábado|Sabado|Domingo)\b.*?[:\-]/i.test(cleanText)) {
-            // Si el Asistente propuso un menú semanal en texto, ofrecer botón directo para aplicarlo al planificador
             const btnApplyPlan = document.createElement('button');
             btnApplyPlan.type = 'button';
             btnApplyPlan.className = 'btn btn-primary btn-sm';
             btnApplyPlan.innerHTML = `<span class="material-symbols-outlined icon-sm">calendar_month</span> Aplicar al Planificador`;
             btnApplyPlan.addEventListener('click', () => {
-              const input = document.getElementById('gemini-invoke-input');
-              if (input) {
-                input.value = 'Aplica este menú semanal en mi Planificador con los IDs de mi catálogo';
+              const inp = document.getElementById('gemini-invoke-input');
+              if (inp) {
+                inp.value = 'Aplica este menú semanal en mi Planificador con los IDs de mi catálogo';
                 this.handleGeminiInvokeSubmit(isVoice);
               }
             });
             resultActions.appendChild(btnApplyPlan);
           } else if (/receta|plato|ingrediente|1\.|2\./i.test(cleanText)) {
-            // Si el Asistente propuso recetas sueltas en texto que no existen, ofrecer guardarlas
             const btnSaveRecipes = document.createElement('button');
             btnSaveRecipes.type = 'button';
             btnSaveRecipes.className = 'btn btn-tonal btn-sm';
             btnSaveRecipes.innerHTML = `<span class="material-symbols-outlined icon-sm">bookmark_add</span> Guardar en mis recetas`;
             btnSaveRecipes.addEventListener('click', () => {
-              const input = document.getElementById('gemini-invoke-input');
-              if (input) {
-                input.value = 'Guarda las recetas recomendadas en mi catálogo';
+              const inp = document.getElementById('gemini-invoke-input');
+              if (inp) {
+                inp.value = 'Guarda las recetas recomendadas en mi catálogo';
                 this.handleGeminiInvokeSubmit(isVoice);
               }
             });
@@ -18075,6 +18387,8 @@ ${isEn
           btnClose.addEventListener('click', () => this.closeGeminiInvokeModal());
           resultActions.appendChild(btnClose);
         }
+      } else if (createdRecipes.length > 0) {
+        this.showToast(`✓ ${createdRecipes.length === 1 ? `Receta "${createdRecipes[0].title}" guardada en tu catálogo.` : `${createdRecipes.length} recetas guardadas en tu catálogo.`}`, 'success');
       }
 
       if (isVoice) {
@@ -18083,9 +18397,20 @@ ${isEn
       this.showToast('✓ Tu Sous Chef respondió.', 'success');
     } catch (err) {
       if (transcription) {
-        transcription.innerHTML = `<span class="u-text-error-medium">Error: ${err.message}</span>`;
+        transcription.innerHTML = `<span class="u-text-error-medium">Error: ${escapeHtml(err?.message || 'Error desconocido')}</span>`;
       }
-      this.showToast(`Error del Sous Chef: ${err.message}`, 'error');
+      if (hasChatStream) {
+        if (!Array.isArray(this.aiChatHistory)) this.aiChatHistory = [];
+        this.aiChatHistory.push({
+          id: generateId('msg-'),
+          role: 'model',
+          text: `Error: ${err?.message || 'Error desconocido'}`,
+          createdAt: new Date().toISOString()
+        });
+        this.saveAiChatHistory();
+        this.renderAiChatView();
+      }
+      this.showToast(`Error del Sous Chef: ${err?.message || 'Error'}`, 'error');
     } finally {
       if (sendBtn) sendBtn.disabled = false;
     }
@@ -18165,6 +18490,704 @@ ${isEn
     }
   }
 
+  // ==========================================================================
+  // US-80: SOUS CHEF AI HUB (HISTORIAL PERSISTENTE + CÁMARA + AUTOPLANIFICADOR)
+  // ==========================================================================
+  toggleAiHubActions(forceState = null) {
+    this.aiHubActionsCollapsed = forceState !== null ? Boolean(forceState) : !this.aiHubActionsCollapsed;
+    const panel = document.getElementById('ai-hub-actions-panel');
+    const toggleBtn = document.getElementById('btn-toggle-ai-hub');
+    if (panel) {
+      panel.classList.toggle('is-collapsed', this.aiHubActionsCollapsed);
+    }
+    if (toggleBtn) {
+      toggleBtn.setAttribute('aria-expanded', String(!this.aiHubActionsCollapsed));
+      const labelEl = toggleBtn.querySelector('[data-i18n]');
+      if (labelEl) {
+        const key = this.aiHubActionsCollapsed ? 'ai.hubToggleShow' : 'ai.hubToggleHide';
+        labelEl.setAttribute('data-i18n', key);
+        labelEl.textContent = window.I18n ? window.I18n.t(key) : (this.aiHubActionsCollapsed ? 'Ver acciones' : 'Ocultar acciones');
+      }
+    }
+  }
+
+  triggerAiHubPhotoImport() {
+    if (!this.ensureAiAccess('import_ai')) return;
+    const photoInput = document.getElementById('ai-chat-photo-input');
+    if (photoInput) {
+      photoInput.value = '';
+      photoInput.click();
+    }
+  }
+
+  triggerAiHubTextImport() {
+    if (!this.ensureAiAccess('import_ai')) return;
+    const input = document.getElementById('gemini-invoke-input');
+    this.aiComposerMode = 'import_text';
+    this.renderAiQuotaHints?.();
+    if (input) {
+      const currentVal = input.value.trim();
+      if (currentVal && (currentVal.length > 20 || /https?:\/\//i.test(currentVal))) {
+        this.handleGeminiInvokeSubmit(false, { feature: 'import_ai' });
+        return;
+      }
+      const isEn = window.I18n && window.I18n.getLanguage() === 'en';
+      input.setAttribute('placeholder', isEn ? 'Paste recipe text, website URL, Instagram or TikTok link and send...' : 'Pega texto de receta, web, Instagram o TikTok y envía...');
+      input.focus?.();
+    }
+    const transcription = document.getElementById('gemini-invoke-transcription');
+    if (transcription) {
+      const isEn = window.I18n && window.I18n.getLanguage() === 'en';
+      transcription.innerHTML = `<em>${escapeHtml(isEn ? 'Paste recipe text or social/web link below and press Send' : 'Pega el texto o enlace de receta abajo y pulsa Enviar')}</em>`;
+    }
+  }
+
+  triggerAiHubFridgeQuery() {
+    if (Array.isArray(this.fridgeIngredients) && this.fridgeIngredients.length > 0) {
+      this.generateRecipeFromFridgeWithAi();
+      return;
+    }
+    if (!this.ensureAiAccess('guided_query')) return;
+    this.aiComposerFeatureOverride = 'guided_query';
+    this.renderAiQuotaHints?.();
+    const input = document.getElementById('gemini-invoke-input');
+    const isEn = window.I18n && window.I18n.getLanguage() === 'en';
+    if (input) {
+      input.value = isEn ? 'In my fridge I have: ' : 'Tengo en la nevera: ';
+      input.focus?.();
+    }
+    const transcription = document.getElementById('gemini-invoke-transcription');
+    if (transcription) {
+      transcription.innerHTML = `<em>${escapeHtml(isEn ? 'List your available ingredients and press Send' : 'Indica qué ingredientes tienes y pulsa Enviar')}</em>`;
+    }
+  }
+
+  async handleAiChatPhotoSelected(file) {
+    if (!file) return;
+    const compressed = await this.compressImageToBase64(file, 1024, 1024, 0.8);
+    if (!compressed || !compressed.base64Data) {
+      this.showToast('No se pudo procesar la foto seleccionada.', 'error');
+      return;
+    }
+    this.pendingChatAttachment = {
+      dataUrl: compressed.dataUrl,
+      base64Data: compressed.base64Data,
+      mimeType: compressed.mimeType || 'image/jpeg',
+      fileName: file.name || 'Foto'
+    };
+    this.updateChatAttachmentPreview();
+    this.renderAiQuotaHints?.();
+    const input = document.getElementById('gemini-invoke-input');
+    if (input && typeof input.focus === 'function') {
+      input.focus();
+    }
+  }
+
+  updateChatAttachmentPreview() {
+    const box = document.getElementById('ai-chat-attachment-preview');
+    const thumb = document.getElementById('ai-chat-attachment-thumb');
+    const nameEl = document.getElementById('ai-chat-attachment-name');
+    if (!box) return;
+    if (this.pendingChatAttachment) {
+      box.style.display = 'flex';
+      if (thumb) thumb.src = this.pendingChatAttachment.dataUrl || '';
+      if (nameEl) nameEl.textContent = this.pendingChatAttachment.fileName || 'Foto';
+    } else {
+      box.style.display = 'none';
+      if (thumb) thumb.removeAttribute('src');
+      if (nameEl) nameEl.textContent = '';
+    }
+  }
+
+  clearAiChatAttachment() {
+    this.pendingChatAttachment = null;
+    const photoInput = document.getElementById('ai-chat-photo-input');
+    if (photoInput) photoInput.value = '';
+    this.updateChatAttachmentPreview();
+    this.renderAiQuotaHints?.();
+  }
+
+  computeAutoPlanDayMacros(slots = {}) {
+    let calories = 0;
+    let protein = 0;
+    let carbs = 0;
+    let fat = 0;
+    ['breakfast', 'lunch', 'snack', 'dinner'].forEach(slotKey => {
+      const recId = slots?.[slotKey];
+      if (!recId) return;
+      const rec = (state.recipes || []).find(r => r.id === recId);
+      if (!rec) return;
+      const nut = getRecipeNutrition(rec);
+      calories += Number(nut.calories) || 0;
+      protein += Number(nut.protein) || 0;
+      carbs += Number(nut.carbs) || 0;
+      fat += Number(nut.fat) || 0;
+    });
+    return {
+      calories: Math.round(calories),
+      protein: Math.round(protein),
+      carbs: Math.round(carbs),
+      fat: Math.round(fat)
+    };
+  }
+
+  buildSmartAutoPlanProposal(aiDaysOverride = null, prompt = '', modeOverride = null) {
+    const weekDays = this.getPlannerWeekDates();
+    const activePrefs = Array.isArray(state.dietaryPreferences) ? state.dietaryPreferences : [];
+    const goals = state.settings?.nutritionGoals || {};
+    const goalsEnabled = Boolean(goals.enabled);
+    const goalsCalories = Number(goals.calories) || 2000;
+    const fallbackArgs = this.buildSimulatedWeeklyPlanArgs('replace', false, prompt);
+
+    const existingPlannedCount = weekDays.reduce((acc, wDay) => {
+      const day = state.mealPlan[wDay.dateKey];
+      if (!day) return acc;
+      return acc + ['breakfast', 'lunch', 'snack', 'dinner'].filter(k => Boolean(day[k])).length;
+    }, 0);
+    const defaultMode = modeOverride || (existingPlannedCount > 0 ? 'merge' : 'replace');
+
+    const findFallbackSlotRecipe = (slotKey, dayIdx) => {
+      const fbDay = fallbackArgs.days[dayIdx] || fallbackArgs.days[0] || {};
+      return fbDay[slotKey] || null;
+    };
+
+    const ensureCompliantSlotId = (rawVal, slotKey, dayIdx) => {
+      const resolvedId = rawVal ? this.resolveRecipeIdForAgent(String(rawVal)) : null;
+      const rec = resolvedId ? (state.recipes || []).find(r => r.id === resolvedId) : null;
+      if (rec && (activePrefs.length === 0 || checkDietaryCompliance(rec, activePrefs).compliant)) {
+        return rec.id;
+      }
+      return findFallbackSlotRecipe(slotKey, dayIdx);
+    };
+
+    const days = weekDays.map((wDay, idx) => {
+      const aiEntry = Array.isArray(aiDaysOverride)
+        ? (aiDaysOverride.find(d => d && (d.dateKey === wDay.dateKey || normalizeIngredientText(d.dayName || '') === normalizeIngredientText(wDay.dayName))) || aiDaysOverride[idx])
+        : null;
+
+      const slots = {
+        breakfast: ensureCompliantSlotId(aiEntry?.breakfast, 'breakfast', idx),
+        lunch: ensureCompliantSlotId(aiEntry?.lunch, 'lunch', idx),
+        snack: ensureCompliantSlotId(aiEntry?.snack, 'snack', idx),
+        dinner: ensureCompliantSlotId(aiEntry?.dinner, 'dinner', idx)
+      };
+
+      return {
+        dateKey: wDay.dateKey,
+        dayName: wDay.dayName,
+        slots
+      };
+    });
+
+    const favoritesCount = days.reduce((acc, d) => {
+      return acc + ['breakfast', 'lunch', 'snack', 'dinner'].filter(k => {
+        const rec = d.slots[k] ? (state.recipes || []).find(r => r.id === d.slots[k]) : null;
+        return Boolean(rec && rec.isFavorite);
+      }).length;
+    }, 0);
+
+    const firstDay = weekDays[0]?.date;
+    const lastDay = weekDays[weekDays.length - 1]?.date;
+    const isEn = typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() === 'en';
+    const months = isEn ? MONTHS_SHORT_EN : MONTHS_SHORT_ES;
+    const weekLabel = (firstDay && lastDay)
+      ? `${firstDay.getDate()} ${months[firstDay.getMonth()]} - ${lastDay.getDate()} ${months[lastDay.getMonth()]}`
+      : '';
+
+    return {
+      weekLabel,
+      mode: defaultMode,
+      applyToShopping: false,
+      applied: false,
+      favoritesCount,
+      prefsUsed: [...activePrefs],
+      goalsEnabled,
+      goalsCalories,
+      days
+    };
+  }
+
+  renderAutoPlanCardHtml(cardData, messageId) {
+    if (!cardData || !Array.isArray(cardData.days)) return '';
+    const isEn = typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() === 'en';
+    const servings = Math.max(1, Number(state.settings?.defaultServings || state.defaultServings || 2) || 2);
+    const title = window.I18n ? window.I18n.t('ai.autoPlanCardTitle') : 'Propuesta de menú semanal';
+    const replaceLabel = window.I18n ? window.I18n.t('ai.autoPlanReplaceMode') : 'Reemplazar semana';
+    const mergeLabel = window.I18n ? window.I18n.t('ai.autoPlanMergeMode') : 'Solo huecos vacíos';
+    const swapLabel = window.I18n ? window.I18n.t('ai.autoPlanSwapSlot') : 'Cambiar plato';
+    const dumpLabel = window.I18n
+      ? window.I18n.t('ai.autoPlanDumpShopping', { servings })
+      : `Enviar ingredientes a la compra (${servings} rac.)`;
+    const applyLabel = window.I18n ? window.I18n.t('ai.autoPlanApplyBtn') : 'Aplicar al Planificador';
+    const regenLabel = window.I18n ? window.I18n.t('ai.autoPlanRegenerateBtn') : 'Regenerar';
+    const appliedLabel = window.I18n ? window.I18n.t('ai.autoPlanAppliedBadge') : 'Aplicado al planificador';
+    const viewPlannerLabel = isEn ? 'View Planner' : 'Ver Planificador';
+
+    const badgesHtml = [];
+    if (cardData.favoritesCount > 0) {
+      const favTxt = window.I18n ? window.I18n.t('ai.autoPlanFavoritesUsed', { count: cardData.favoritesCount }) : `${cardData.favoritesCount} favoritas priorizadas`;
+      badgesHtml.push(`<span class="ai-autoplan-badge ai-badge-fav"><span class="material-symbols-outlined icon-13">favorite</span> ${escapeHtml(favTxt)}</span>`);
+    }
+    if (Array.isArray(cardData.prefsUsed) && cardData.prefsUsed.length > 0) {
+      const prefsTxt = cardData.prefsUsed.map(p => window.I18n ? window.I18n.getTagLabel(p) : p).join(', ');
+      const label = window.I18n ? window.I18n.t('ai.autoPlanDietaryBadge', { prefs: prefsTxt }) : `Filtro: ${prefsTxt}`;
+      badgesHtml.push(`<span class="ai-autoplan-badge ai-badge-diet"><span class="material-symbols-outlined icon-13">verified_user</span> ${escapeHtml(label)}</span>`);
+    }
+    if (cardData.goalsEnabled && cardData.goalsCalories) {
+      const goalTxt = window.I18n ? window.I18n.t('ai.autoPlanGoalsBadge', { kcal: cardData.goalsCalories }) : `Meta ~${cardData.goalsCalories} kcal/día`;
+      badgesHtml.push(`<span class="ai-autoplan-badge ai-badge-goal"><span class="material-symbols-outlined icon-13">track_changes</span> ${escapeHtml(goalTxt)}</span>`);
+    }
+
+    const slotDefs = [
+      { key: 'breakfast', icon: 'free_breakfast', label: window.I18n ? window.I18n.getSlotLabel('breakfast', 'Desayuno') : 'Desayuno' },
+      { key: 'lunch', icon: 'lunch_dining', label: window.I18n ? window.I18n.getSlotLabel('lunch', 'Almuerzo') : 'Almuerzo' },
+      { key: 'snack', icon: 'bakery_dining', label: window.I18n ? window.I18n.getSlotLabel('snack', 'Merienda') : 'Merienda' },
+      { key: 'dinner', icon: 'dinner_dining', label: window.I18n ? window.I18n.getSlotLabel('dinner', 'Cena') : 'Cena' }
+    ];
+
+    const daysHtml = cardData.days.map(day => {
+      const existingDay = state.mealPlan[day.dateKey] || null;
+      const effectiveSlots = {};
+      slotDefs.forEach(s => {
+        if (cardData.mode === 'merge' && existingDay && existingDay[s.key]) {
+          effectiveSlots[s.key] = existingDay[s.key];
+        } else {
+          effectiveSlots[s.key] = day.slots?.[s.key] || null;
+        }
+      });
+      const macros = this.computeAutoPlanDayMacros(effectiveSlots);
+      const slotsRows = slotDefs.map(s => {
+        const isKeptExisting = cardData.mode === 'merge' && existingDay && existingDay[s.key];
+        const recId = isKeptExisting ? existingDay[s.key] : day.slots?.[s.key];
+        const rec = recId ? (state.recipes || []).find(r => r.id === recId) : null;
+        const dishTitle = rec ? rec.title : (isEn ? 'Unassigned' : 'Sin asignar');
+        const favIcon = rec?.isFavorite ? `<span class="material-symbols-outlined icon-13 ai-slot-fav-icon" title="Favorita">favorite</span>` : '';
+        const keptTag = isKeptExisting ? `<span class="ai-slot-kept-pill">${isEn ? 'Kept' : 'Actual'}</span>` : '';
+        return `
+          <div class="ai-autoplan-slot-row ${isKeptExisting ? 'is-kept' : ''}">
+            <span class="ai-autoplan-slot-label">
+              <span class="material-symbols-outlined icon-14">${s.icon}</span>
+              ${escapeHtml(s.label)}
+            </span>
+            <span class="ai-autoplan-slot-dish" title="${escapeHtml(dishTitle)}">${escapeHtml(dishTitle)} ${favIcon} ${keptTag}</span>
+            <button type="button" class="btn-icon ai-slot-swap-btn"
+              data-ai-action="swap-slot"
+              data-msg-id="${escapeHtml(messageId)}"
+              data-date-key="${escapeHtml(day.dateKey)}"
+              data-slot-key="${s.key}"
+              title="${escapeHtml(swapLabel)}"
+              aria-label="${escapeHtml(swapLabel)} (${escapeHtml(day.dayName)} - ${escapeHtml(s.label)})"
+              ${isKeptExisting ? 'disabled' : ''}>
+              <span class="material-symbols-outlined icon-15">sync</span>
+            </button>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="ai-autoplan-day-item">
+          <div class="ai-autoplan-day-head">
+            <strong>${escapeHtml(day.dayName)}</strong>
+            <span class="ai-autoplan-day-kcal">${macros.calories} kcal · P:${macros.protein}g</span>
+          </div>
+          <div class="ai-autoplan-slots-list">${slotsRows}</div>
+        </div>
+      `;
+    }).join('');
+
+    const safeMsgId = escapeHtml(messageId);
+    const applyBtnHtml = cardData.applied
+      ? `<span class="ai-autoplan-applied-pill"><span class="material-symbols-outlined icon-sm">check_circle</span> ${escapeHtml(appliedLabel)}</span>
+         <button type="button" class="btn btn-primary btn-sm" data-ai-action="open-planner">${escapeHtml(viewPlannerLabel)}</button>`
+      : `<button type="button" class="btn btn-primary btn-sm" data-ai-action="apply-autoplan" data-msg-id="${safeMsgId}">
+           <span class="material-symbols-outlined icon-sm">check</span> ${escapeHtml(applyLabel)}
+         </button>`;
+
+    return `
+      <div class="ai-autoplan-card" data-msg-id="${safeMsgId}">
+        <div class="ai-autoplan-card-header">
+          <div class="ai-autoplan-title-wrap">
+            <span class="material-symbols-outlined icon-sm ai-card-spark-icon">auto_awesome</span>
+            <div>
+              <strong>${escapeHtml(title)}</strong>
+              ${cardData.weekLabel ? `<span class="ai-autoplan-week-range">${escapeHtml(cardData.weekLabel)}</span>` : ''}
+            </div>
+          </div>
+        </div>
+        ${badgesHtml.length > 0 ? `<div class="ai-autoplan-badges">${badgesHtml.join('')}</div>` : ''}
+        <div class="ai-autoplan-mode-switch" role="group" aria-label="Modo de aplicación">
+          <button type="button" class="ai-mode-pill ${cardData.mode === 'replace' ? 'active' : ''}" data-ai-action="set-plan-mode" data-mode="replace" data-msg-id="${safeMsgId}">${escapeHtml(replaceLabel)}</button>
+          <button type="button" class="ai-mode-pill ${cardData.mode === 'merge' ? 'active' : ''}" data-ai-action="set-plan-mode" data-mode="merge" data-msg-id="${safeMsgId}">${escapeHtml(mergeLabel)}</button>
+        </div>
+        <div class="ai-autoplan-days-list">${daysHtml}</div>
+        <label class="ai-autoplan-shopping-opt">
+          <input type="checkbox" data-ai-action="toggle-plan-shopping" data-msg-id="${safeMsgId}" ${cardData.applyToShopping ? 'checked' : ''}>
+          <span>${escapeHtml(dumpLabel)}</span>
+        </label>
+        <div class="ai-autoplan-footer">
+          <div class="ai-autoplan-footer-main">${applyBtnHtml}</div>
+          <button type="button" class="btn btn-ghost btn-sm" data-ai-action="regen-autoplan" data-msg-id="${safeMsgId}">
+            <span class="material-symbols-outlined icon-sm">refresh</span> ${escapeHtml(regenLabel)}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  renderImportedRecipeCardHtml(cardData, messageId) {
+    const rec = cardData?.recipe;
+    if (!rec) return '';
+    const safeMsgId = escapeHtml(messageId);
+    const isSaved = Boolean(cardData.savedRecipeId && (state.recipes || []).some(r => r.id === cardData.savedRecipeId));
+    const totalTime = (Number(rec.prepTimeMinutes) || 0) + (Number(rec.cookTimeMinutes) || 0);
+    const nut = getRecipeNutrition(rec);
+    const reviewLabel = window.I18n ? window.I18n.t('ai.recipeCardReviewBtn') : 'Revisar borrador';
+    const saveLabel = window.I18n ? window.I18n.t('ai.recipeCardSaveBtn') : 'Guardar en mis recetas';
+    const savedBadge = window.I18n ? window.I18n.t('ai.recipeCardSavedBadge') : 'Guardada en tu recetario';
+    const openLabel = window.I18n ? window.I18n.t('ai.recipeCardOpenBtn') : 'Ver receta';
+    const thumbHtml = (rec.imageUrl || rec.image)
+      ? `<img class="ai-chat-recipe-thumb" src="${escapeHtml(rec.imageUrl || rec.image)}" alt="${escapeHtml(rec.title)}">`
+      : `<div class="ai-chat-recipe-thumb-placeholder"><span class="material-symbols-outlined">restaurant_menu</span></div>`;
+
+    const actionsHtml = isSaved
+      ? `<span class="ai-autoplan-applied-pill"><span class="material-symbols-outlined icon-sm">check_circle</span> ${escapeHtml(savedBadge)}</span>
+         <button type="button" class="btn btn-primary btn-sm" data-ai-action="open-saved-recipe" data-recipe-id="${escapeHtml(cardData.savedRecipeId)}">
+           <span class="material-symbols-outlined icon-sm">restaurant_menu</span> ${escapeHtml(openLabel)}
+         </button>`
+      : `<button type="button" class="btn btn-tonal btn-sm" data-ai-action="review-chat-recipe" data-msg-id="${safeMsgId}">
+           <span class="material-symbols-outlined icon-sm">edit_note</span> ${escapeHtml(reviewLabel)}
+         </button>
+         <button type="button" class="btn btn-primary btn-sm" data-ai-action="save-chat-recipe" data-msg-id="${safeMsgId}">
+           <span class="material-symbols-outlined icon-sm">bookmark_add</span> ${escapeHtml(saveLabel)}
+         </button>`;
+
+    return `
+      <div class="ai-chat-recipe-card" data-msg-id="${safeMsgId}">
+        <div class="ai-chat-recipe-main">
+          ${thumbHtml}
+          <div class="ai-chat-recipe-info">
+            <strong>${escapeHtml(rec.title || 'Receta extraída')}</strong>
+            <div class="ai-chat-recipe-meta">
+              <span>${totalTime || 20} min</span> ·
+              <span>${(rec.ingredients || []).length} ing.</span> ·
+              <span>${Math.round(nut.calories || 0)} kcal</span>
+            </div>
+          </div>
+        </div>
+        <div class="ai-chat-recipe-actions">${actionsHtml}</div>
+      </div>
+    `;
+  }
+
+  renderAiChatView() {
+    const historyContainer = document.getElementById('chat-history-container');
+    if (!historyContainer) return;
+
+    const panel = document.getElementById('ai-hub-actions-panel');
+    if (panel) panel.classList.toggle('is-collapsed', !!this.aiHubActionsCollapsed);
+
+    const newChatBtn = document.getElementById('btn-gemini-invoke-new-chat');
+    const turns = Array.isArray(this.aiChatHistory) ? this.aiChatHistory : [];
+    if (newChatBtn) {
+      newChatBtn.style.display = turns.length > 0 ? 'inline-flex' : 'none';
+    }
+
+    const emptyStateEl = document.getElementById('ai-chat-empty-state');
+    if (turns.length === 0) {
+      historyContainer.querySelectorAll('.ai-user-bubble, .ai-assistant-bubble').forEach(el => el.remove());
+      if (emptyStateEl) {
+        emptyStateEl.style.display = 'flex';
+      } else {
+        const emptyTitle = window.I18n ? window.I18n.t('ai.emptyStateTitle') : 'Tu centro de cocina inteligente';
+        const emptyDesc = window.I18n ? window.I18n.t('ai.emptyStateDesc') : 'Chatea conmigo, adjunta la foto de una receta o usa un acceso rápido. Recordaré nuestra conversación aquí.';
+        historyContainer.innerHTML = `<div class="ai-chat-empty-state" id="ai-chat-empty-state">
+          <span class="material-symbols-outlined icon-lg ai-empty-icon">forum</span>
+          <strong data-i18n="ai.emptyStateTitle">${escapeHtml(emptyTitle)}</strong>
+          <p data-i18n="ai.emptyStateDesc">${escapeHtml(emptyDesc)}</p>
+        </div>`;
+      }
+      return;
+    }
+
+    if (emptyStateEl) {
+      emptyStateEl.style.display = 'none';
+    }
+    historyContainer.querySelectorAll('.ai-user-bubble, .ai-assistant-bubble').forEach(el => el.remove());
+
+    turns.forEach((msg, idx) => {
+      const msgId = msg.id || `msg-${idx}`;
+      if (!msg.id) msg.id = msgId;
+      const bubble = document.createElement('div');
+      bubble.className = msg.role === 'user' ? 'ai-user-bubble' : 'ai-assistant-bubble';
+
+      if (msg.role === 'user') {
+        if (msg.attachment?.dataUrl) {
+          const img = document.createElement('img');
+          img.className = 'ai-user-attachment-thumb';
+          img.src = msg.attachment.dataUrl;
+          img.alt = msg.attachment.name || 'Foto adjunta';
+          bubble.appendChild(img);
+        } else if (msg.attachment?.name) {
+          const tag = document.createElement('span');
+          tag.className = 'ai-user-attachment-pill';
+          tag.textContent = `📷 ${msg.attachment.name}`;
+          bubble.appendChild(tag);
+        }
+        const txtDiv = document.createElement('div');
+        txtDiv.textContent = msg.text || '';
+        bubble.appendChild(txtDiv);
+      } else {
+        let html = '';
+        if (msg.fallbackNotice) {
+          html += `<div class="ai-fallback-banner">
+            <span class="material-symbols-outlined icon-18 u-shrink-0">cloud_off</span>
+            <span><strong>Aviso de conexión:</strong> No se pudo contactar con Gemini en la nube (${escapeHtml(msg.fallbackNotice)}). Se ha activado la simulación local provisional de emergencia.</span>
+          </div>`;
+        }
+        html += formatSafeAiMarkdown(msg.text || '');
+
+        if (msg.card?.type === 'weekly_plan_preview') {
+          html += this.renderAutoPlanCardHtml(msg.card.data, msgId);
+        } else if (msg.card?.type === 'imported_recipe_preview') {
+          html += this.renderImportedRecipeCardHtml(msg.card.data, msgId);
+        }
+        bubble.innerHTML = html;
+
+        if (Array.isArray(msg.actions) && msg.actions.length > 0) {
+          const actionsRow = document.createElement('div');
+          actionsRow.className = 'ai-actions-row';
+          msg.actions.forEach(act => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = act.primary ? 'btn btn-primary btn-sm' : 'btn btn-tonal btn-sm';
+            const iconHtml = act.icon ? `<span class="material-symbols-outlined icon-sm">${escapeHtml(act.icon)}</span> ` : '';
+            btn.innerHTML = `${iconHtml}${escapeHtml(act.label || 'Abrir')}`;
+            btn.addEventListener('click', () => {
+              if (act.type === 'view' && act.target) {
+                this.switchView(act.target);
+              } else if (act.type === 'recipe' && act.recipeId) {
+                this.switchView('view-recipes');
+                this.openRecipeDetail(act.recipeId);
+              } else if (act.type === 'create_missing') {
+                this.triggerCreateMissingSlotRecipes(act.gaps);
+              }
+            });
+            actionsRow.appendChild(btn);
+          });
+          bubble.appendChild(actionsRow);
+        }
+      }
+
+      historyContainer.appendChild(bubble);
+    });
+
+    historyContainer.scrollTop = historyContainer.scrollHeight;
+  }
+
+  handleAiChatStreamClick(e) {
+    const btn = e.target.closest('[data-ai-action]');
+    if (!btn || btn.disabled) return;
+    const action = btn.dataset.aiAction;
+    const msgId = btn.dataset.msgId;
+
+    if (action === 'swap-slot') {
+      this.swapAutoPlanCardSlot(msgId, btn.dataset.dateKey, btn.dataset.slotKey);
+    } else if (action === 'set-plan-mode') {
+      this.setAutoPlanCardMode(msgId, btn.dataset.mode);
+    } else if (action === 'apply-autoplan') {
+      this.applyAutoPlanFromChatCard(msgId);
+    } else if (action === 'regen-autoplan') {
+      this.regenerateAutoPlanFromChatCard(msgId);
+    } else if (action === 'open-planner') {
+      this.switchView('view-planner');
+    } else if (action === 'review-chat-recipe') {
+      this.reviewChatExtractedRecipe(msgId);
+    } else if (action === 'save-chat-recipe') {
+      this.saveChatExtractedRecipe(msgId);
+    } else if (action === 'open-saved-recipe' && btn.dataset.recipeId) {
+      this.switchView('view-recipes');
+      this.openRecipeDetail(btn.dataset.recipeId);
+    }
+  }
+
+  handleAiChatStreamChange(e) {
+    const target = e.target;
+    if (target?.dataset?.aiAction === 'toggle-plan-shopping') {
+      this.toggleAutoPlanCardShopping(target.dataset.msgId, target.checked);
+    }
+  }
+
+  findAiCardMessage(messageId) {
+    if (!Array.isArray(this.aiChatHistory)) return null;
+    return this.aiChatHistory.find(m => m && m.id === messageId) || null;
+  }
+
+  reviewChatExtractedRecipe(messageId) {
+    const msg = this.findAiCardMessage(messageId);
+    const recipe = msg?.card?.data?.recipe;
+    if (!recipe) return;
+    this.openImportReview(recipe);
+  }
+
+  saveChatExtractedRecipe(messageId) {
+    const msg = this.findAiCardMessage(messageId);
+    const cardData = msg?.card?.data;
+    if (!cardData?.recipe) return;
+    const res = this.executeAiToolCall({
+      name: 'create_and_save_recipe',
+      args: cardData.recipe
+    });
+    if (res && res.recipeId) {
+      cardData.savedRecipeId = res.recipeId;
+      this.saveAiChatHistory();
+      this.renderAiChatView();
+      this.showToast(`✓ Receta "${res.title}" guardada en tu recetario.`, 'success');
+    }
+  }
+
+  swapAutoPlanCardSlot(messageId, dateKey, slotKey) {
+    const msg = this.findAiCardMessage(messageId);
+    const cardData = msg?.card?.data;
+    if (!cardData || !Array.isArray(cardData.days)) return;
+    const dayObj = cardData.days.find(d => d.dateKey === dateKey);
+    if (!dayObj || !dayObj.slots) return;
+
+    const currentId = dayObj.slots[slotKey];
+    const activePrefs = Array.isArray(state.dietaryPreferences) ? state.dietaryPreferences : [];
+    const slotTagMap = { breakfast: 'Desayuno', lunch: 'Almuerzo', snack: 'Merienda', dinner: 'Cena' };
+    const targetTag = slotTagMap[slotKey] || 'Almuerzo';
+    const hasTagCI = (r, tag) => Array.isArray(r?.tags) && r.tags.some(t => String(t).toLowerCase() === tag.toLowerCase());
+
+    const compliantPool = (state.recipes || []).filter(r =>
+      activePrefs.length === 0 || checkDietaryCompliance(r, activePrefs).compliant
+    );
+    const basePool = compliantPool.length > 0 ? compliantPool : (state.recipes || []);
+    const tagCandidates = basePool.filter(r => hasTagCI(r, targetTag));
+    const candidates = (tagCandidates.length > 1 ? tagCandidates : basePool).filter(r => r.id !== currentId);
+
+    if (candidates.length === 0) {
+      this.showToast('No hay otras recetas compatibles disponibles para cambiar este plato.', 'info');
+      return;
+    }
+
+    const usedInDay = new Set(Object.values(dayObj.slots).filter(Boolean));
+    candidates.sort((a, b) => {
+      const aUnused = usedInDay.has(a.id) ? 0 : 25;
+      const bUnused = usedInDay.has(b.id) ? 0 : 25;
+      const aFav = a.isFavorite ? 15 : 0;
+      const bFav = b.isFavorite ? 15 : 0;
+      return (bUnused + bFav) - (aUnused + aFav);
+    });
+
+    dayObj.slots[slotKey] = candidates[0].id;
+    cardData.applied = false;
+    cardData.favoritesCount = cardData.days.reduce((acc, d) => (
+      acc + ['breakfast', 'lunch', 'snack', 'dinner'].filter(k => {
+        const rec = d.slots[k] ? (state.recipes || []).find(r => r.id === d.slots[k]) : null;
+        return Boolean(rec && rec.isFavorite);
+      }).length
+    ), 0);
+
+    this.saveAiChatHistory();
+    this.renderAiChatView();
+  }
+
+  setAutoPlanCardMode(messageId, mode) {
+    const msg = this.findAiCardMessage(messageId);
+    if (!msg?.card?.data) return;
+    msg.card.data.mode = mode === 'merge' ? 'merge' : 'replace';
+    msg.card.data.applied = false;
+    this.saveAiChatHistory();
+    this.renderAiChatView();
+  }
+
+  toggleAutoPlanCardShopping(messageId, checked) {
+    const msg = this.findAiCardMessage(messageId);
+    if (!msg?.card?.data) return;
+    msg.card.data.applyToShopping = Boolean(checked);
+    this.saveAiChatHistory();
+  }
+
+  addWeekPlanIngredientsToShopping(daysList = []) {
+    const servings = Math.max(1, Number(state.settings?.defaultServings || state.defaultServings || 2) || 2);
+    let addedCount = 0;
+    const targetDays = Array.isArray(daysList) && daysList.length > 0 ? daysList : this.getPlannerWeekDates();
+    targetDays.forEach(wDay => {
+      const dayPlan = state.getDayPlan(wDay.dateKey, wDay.dayName);
+      ['breakfast', 'lunch', 'snack', 'dinner'].forEach(slotKey => {
+        const recId = dayPlan?.[slotKey];
+        const rec = recId ? (state.recipes || []).find(r => r.id === recId) : null;
+        if (!rec || !Array.isArray(rec.ingredients)) return;
+        const baseServings = Math.max(1, Number(rec.servings) || 2);
+        const ratio = servings / baseServings;
+        rec.ingredients.forEach(ing => {
+          if (!ing || !ing.name) return;
+          const rawAmt = Number(ing.amount);
+          const scaledAmt = rawAmt > 0 ? Math.round(rawAmt * ratio * 10) / 10 : 1;
+          mergeOrAddShoppingItem(state.shoppingList, {
+            id: generateId('shop-'),
+            name: ing.name,
+            amount: scaledAmt,
+            unit: RecipeParser.normalizeUnit(ing.unit || 'ud'),
+            aisle: ing.aisle || categorizeIngredientAisle(ing.name),
+            isChecked: false,
+            recipeOrigin: rec.title,
+            updatedAt: new Date().toISOString()
+          });
+          addedCount++;
+        });
+      });
+    });
+    if (addedCount > 0) {
+      state.save('fa_shopping', state.shoppingList);
+      this.scheduleSyncWithCloud();
+    }
+    return addedCount;
+  }
+
+  applyAutoPlanFromChatCard(messageId) {
+    const msg = this.findAiCardMessage(messageId);
+    const cardData = msg?.card?.data;
+    if (!cardData || !Array.isArray(cardData.days)) return;
+
+    const mode = cardData.mode === 'merge' ? 'merge' : 'replace';
+    const mappedDays = cardData.days.map(d => ({
+      dateKey: d.dateKey,
+      dayName: d.dayName,
+      breakfast: d.slots?.breakfast || null,
+      lunch: d.slots?.lunch || null,
+      snack: d.slots?.snack || null,
+      dinner: d.slots?.dinner || null
+    }));
+
+    this.executeAiToolCall({
+      name: 'set_weekly_plan',
+      args: {
+        mode,
+        days: mappedDays,
+        fromPreviewCard: true
+      }
+    });
+
+    let addedShopCount = 0;
+    if (cardData.applyToShopping) {
+      addedShopCount = this.addWeekPlanIngredientsToShopping(mappedDays);
+    }
+
+    cardData.applied = true;
+    this.saveAiChatHistory();
+    this.render();
+    this.renderAiChatView();
+    const msgToast = addedShopCount > 0
+      ? `✓ Plan aplicado y ${addedShopCount} ingredientes añadidos a tu compra.`
+      : '✓ Menú semanal aplicado al Planificador.';
+    this.showToast(msgToast, 'success');
+  }
+
+  regenerateAutoPlanFromChatCard() {
+    this.triggerGeminiAutoPlan();
+  }
+
   applySampleAiPlan(planOverride = null) {
     const targetPlan = planOverride || this.lastAiProposedPlan || this.buildSimulatedWeeklyPlanArgs('replace', false, typeof prompt !== 'undefined' ? prompt : '');
     this.executeAiToolCall({
@@ -18175,12 +19198,108 @@ ${isEn
     this.switchView('view-planner');
   }
 
-  triggerGeminiAutoPlan() {
+  async triggerGeminiAutoPlan() {
+    if (!this.ensureAiAccess('weekly_plan')) return;
     this.switchView('view-ai');
-    const input = document.getElementById('ai-chat-input');
-    if (input) {
-      input.value = "Planifica mi menú semanal equilibrado de lunes a domingo con mis recetas guardadas.";
-      this.handleAiChatSubmit(false, { feature: 'weekly_plan' });
+
+    const promptText = 'Autoplanifica mi menú semanal equilibrado de lunes a domingo con mis recetas guardadas, respetando preferencias dietéticas, favoritas y objetivos nutricionales.';
+    const hasChatStream = Boolean(document.getElementById('chat-history-container'));
+    const userMsgId = generateId('msg-');
+    const loadingMsgId = generateId('msg-');
+
+    if (!Array.isArray(this.aiChatHistory)) this.aiChatHistory = [];
+    this.aiChatHistory.push({
+      id: userMsgId,
+      role: 'user',
+      text: window.I18n ? window.I18n.t('ai.hubAutoPlanTitle') : 'Autoplanificar semana',
+      createdAt: new Date().toISOString()
+    });
+    this.aiChatHistory.push({
+      id: loadingMsgId,
+      role: 'model',
+      text: window.I18n ? window.I18n.t('ai.consultingAssistant') : 'Consultando al Sous Chef...',
+      createdAt: new Date().toISOString()
+    });
+    this.saveAiChatHistory();
+    if (hasChatStream) this.renderAiChatView();
+
+    const transcription = document.getElementById('gemini-invoke-transcription');
+    if (transcription) {
+      const thinkingText = window.I18n ? window.I18n.t('ai.assistantThinking') : 'El Sous Chef está pensando...';
+      transcription.innerHTML = `<span class="ai-status-loading"><span class="material-symbols-outlined icon-sm icon-spin">sync</span> ${escapeHtml(thinkingText)}</span>`;
+    }
+
+    try {
+      const systemPrompt = this.buildAiSystemInstruction(promptText);
+      const response = await this.callGeminiAgent(promptText, systemPrompt, true, { feature: 'weekly_plan' });
+
+      if (response?.requiresLogin) {
+        const idx = this.aiChatHistory.findIndex(m => m.id === loadingMsgId);
+        if (idx >= 0) {
+          this.aiChatHistory[idx].text = response.text || (window.I18n ? window.I18n.t('ai.loginRequired') : 'Inicia sesión para usar el Sous Chef');
+        }
+        this.saveAiChatHistory();
+        if (hasChatStream) this.renderAiChatView();
+        this.openAuthModal?.();
+        return;
+      }
+
+      if (response?.quotaExceeded) {
+        const idx = this.aiChatHistory.findIndex(m => m.id === loadingMsgId);
+        if (idx >= 0) {
+          this.aiChatHistory[idx].text = response.text || (window.I18n ? window.I18n.t('ai.quotaExceeded') : 'Has alcanzado tu límite de IA');
+        }
+        this.saveAiChatHistory();
+        if (hasChatStream) this.renderAiChatView();
+        return;
+      }
+
+      const planCall = Array.isArray(response.toolCalls)
+        ? response.toolCalls.find(tc => tc.name === 'set_weekly_plan')
+        : null;
+      const aiDays = Array.isArray(planCall?.args?.days) ? planCall.args.days : null;
+      const proposal = this.buildSmartAutoPlanProposal(aiDays, promptText);
+      this.lastAiProposedPlan = {
+        mode: proposal.mode,
+        days: proposal.days.map(d => ({
+          dateKey: d.dateKey,
+          dayName: d.dayName,
+          breakfast: d.slots.breakfast,
+          lunch: d.slots.lunch,
+          snack: d.slots.snack,
+          dinner: d.slots.dinner
+        }))
+      };
+
+      const cleanText = this.stripRecipeIdsFromText(response.text || '') ||
+        'Aquí tienes tu propuesta personalizada de lunes a domingo. Puedes cambiar cualquier plato con 🔄, elegir modo y aplicarla en 1 clic:';
+
+      const idx = this.aiChatHistory.findIndex(m => m.id === loadingMsgId);
+      const modelEntry = {
+        id: loadingMsgId,
+        role: 'model',
+        text: cleanText,
+        fallbackNotice: response?.isSimulatedFallback ? (response.originalError || 'tiempo de espera agotado') : null,
+        card: {
+          type: 'weekly_plan_preview',
+          data: proposal
+        },
+        createdAt: new Date().toISOString()
+      };
+      if (idx >= 0) this.aiChatHistory[idx] = modelEntry;
+      else this.aiChatHistory.push(modelEntry);
+
+      this.saveAiChatHistory();
+      if (transcription) transcription.textContent = '"Autoplanificar semana"';
+      if (hasChatStream) this.renderAiChatView();
+      this.renderAiQuotaHints?.();
+    } catch (err) {
+      const idx = this.aiChatHistory.findIndex(m => m.id === loadingMsgId);
+      if (idx >= 0) {
+        this.aiChatHistory[idx].text = `Error: ${err?.message || 'Error al autoplanificar'}`;
+      }
+      this.saveAiChatHistory();
+      if (hasChatStream) this.renderAiChatView();
     }
   }
 
@@ -18189,9 +19308,14 @@ ${isEn
     const gapTags = activeGaps.length > 0 ? activeGaps.map(g => g.tag).join(' y ') : 'Desayuno y Merienda';
     const prefs = (state.dietaryPreferences || []).join(', ') || 'saludables';
     this.switchView('view-ai');
-    const input = document.getElementById('ai-chat-input');
-    if (input) {
-      input.value = `Crea recetas nuevas de ${gapTags} que cumplan con ${prefs} y asígnalas en mi Plan semanal.`;
+    const promptText = `Crea recetas nuevas de ${gapTags} que cumplan con ${prefs} y asígnalas en mi Plan semanal.`;
+    const invokeInput = document.getElementById('gemini-invoke-input');
+    const legacyInput = document.getElementById('ai-chat-input');
+    if (invokeInput) {
+      invokeInput.value = promptText;
+      this.handleGeminiInvokeSubmit(false, { feature: 'guided_query' });
+    } else if (legacyInput) {
+      legacyInput.value = promptText;
       this.handleAiChatSubmit(false, { feature: 'guided_query' });
     }
   }
@@ -20846,6 +21970,9 @@ REGLAS CRÍTICAS:
       localStorage.removeItem('fa_mealplan');
       localStorage.removeItem('fa_shopping');
       localStorage.removeItem('fa_deleted_records');
+      localStorage.removeItem('fa_ai_chat_history');
+      this.clearAiChatHistory();
+      this.renderAiChatView?.();
       state.deletedRecords = { recipes: [], mealPlans: [], shoppingItems: [] };
       state.recipes = typeof structuredClone === 'function' ? structuredClone(SEED_RECIPES) : JSON.parse(JSON.stringify(SEED_RECIPES));
       state.mealPlan = state.generateInitialMealPlan();
