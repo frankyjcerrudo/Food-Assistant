@@ -5,10 +5,12 @@
  */
 
 import {
+  DEFAULT_EUR_PER_USD,
   computeRevenueMetrics,
   summarizeAiUsage,
   derivePlanBreakdownFromUsers,
   validateEntitlementChange,
+  validateQuotaResetRequest,
   formatAuditSummary
 } from './admin-core.js';
 
@@ -64,6 +66,20 @@ export class SaboryAdminApp {
     this.selectedUserId = null;
     this.selectedUserDetail = null;
     this._usersSearchTimer = null;
+    this.householdsSearch = '';
+    this.householdsPageLimit = 25;
+    this.householdsOffset = 0;
+    this.householdsTotal = 0;
+    this.householdsItems = [];
+    this.householdsLoaded = false;
+    this.selectedHouseholdId = null;
+    this.selectedHousehold = null;
+    this._householdsSearchTimer = null;
+    this.auditPageLimit = 50;
+    this.auditOffset = 0;
+    this.auditTotal = 0;
+    this.auditItems = [];
+    this.auditLoaded = false;
     this._confirmResolver = null;
     this._eventsBound = false;
     this._authListenerBound = false;
@@ -189,7 +205,43 @@ export class SaboryAdminApp {
       entitlementNotesInput: byId('input-admin-entitlement-notes'),
       wipeUserDataBtn: byId('btn-admin-wipe-user-data'),
       deleteUserBtn: byId('btn-admin-delete-user'),
+      userQuotasSummaryEl: byId('admin-user-quotas-summary'),
+      quotaFeatureSelect: byId('select-admin-quota-feature'),
+      resetQuotaBtn: byId('btn-admin-reset-quota'),
       userAuditListEl: byId('admin-user-audit-list'),
+
+      aiRangeSelect: byId('admin-ai-range'),
+      aiKpiCost: byId('ai-kpi-cost'),
+      aiKpiCostMeta: byId('ai-kpi-cost-meta'),
+      aiKpiTokens: byId('ai-kpi-tokens'),
+      aiKpiTokensMeta: byId('ai-kpi-tokens-meta'),
+      aiKpiCalls: byId('ai-kpi-calls'),
+      aiKpiCallsMeta: byId('ai-kpi-calls-meta'),
+      aiKpiMargin: byId('ai-kpi-margin'),
+      aiKpiMarginMeta: byId('ai-kpi-margin-meta'),
+      aiByFeature: byId('admin-ai-by-feature'),
+      aiByModel: byId('admin-ai-by-model'),
+      aiHeavyUsersList: byId('admin-ai-heavy-users'),
+      aiFreeCappedList: byId('admin-ai-free-capped'),
+
+      householdsCountBadge: byId('admin-households-count'),
+      householdsSearchInput: byId('admin-households-search'),
+      householdsList: byId('admin-households-list'),
+      householdsPrevBtn: byId('btn-households-prev'),
+      householdsNextBtn: byId('btn-households-next'),
+      householdModal: byId('modal-admin-household'),
+      householdModalTitleEl: byId('admin-household-modal-title'),
+      householdModalMetaEl: byId('admin-household-modal-meta'),
+      householdModalCloseBtn: byId('btn-admin-household-close'),
+      householdStatusBadgeEl: byId('admin-household-status-badge'),
+      householdInviteCodeEl: byId('admin-household-invite-code'),
+      householdRegenCodeBtn: byId('btn-admin-regen-code'),
+      householdMembersListEl: byId('admin-household-members-list'),
+
+      auditCountBadge: byId('admin-audit-count'),
+      auditList: byId('admin-audit-list'),
+      auditPrevBtn: byId('btn-audit-prev'),
+      auditNextBtn: byId('btn-audit-next'),
 
       confirmModal: byId('modal-admin-confirm'),
       confirmTitleEl: byId('admin-confirm-title'),
@@ -252,13 +304,29 @@ export class SaboryAdminApp {
     this.els.refreshBtn?.addEventListener('click', () => {
       if (this.activeView === 'users') {
         this.loadUsers({ resetOffset: false });
+      } else if (this.activeView === 'households') {
+        this.loadHouseholds({ resetOffset: false });
+      } else if (this.activeView === 'audit') {
+        this.loadAuditLog({ resetOffset: false });
       } else {
         this.loadDashboardStats();
       }
     });
 
     this.els.periodSelect?.addEventListener('change', () => {
-      this.loadDashboardStats();
+      const days = Number(this.els.periodSelect?.value) || 30;
+      if (this.els.aiRangeSelect) {
+        this.els.aiRangeSelect.value = String(days);
+      }
+      this.loadDashboardStats(days);
+    });
+
+    this.els.aiRangeSelect?.addEventListener('change', () => {
+      const days = Number(this.els.aiRangeSelect?.value) || 30;
+      if (this.els.periodSelect && ['7', '30', '90'].includes(String(days))) {
+        this.els.periodSelect.value = String(days);
+      }
+      this.loadDashboardStats(days);
     });
 
     this.els.themeBtn?.addEventListener('click', () => {
@@ -366,6 +434,105 @@ export class SaboryAdminApp {
 
     this.els.confirmOkBtn?.addEventListener('click', () => {
       this.resolveConfirm(true);
+    });
+
+    this.els.resetQuotaBtn?.addEventListener('click', () => {
+      if (!this.selectedUserId) return;
+      const feature = String(this.els.quotaFeatureSelect?.value || 'all');
+      this.handleResetUserQuota(this.selectedUserId, feature);
+    });
+
+    const bindAiActionList = (listEl) => {
+      listEl?.addEventListener('click', (e) => {
+        const resetBtn = e.target?.closest?.('[data-reset-quota-user]');
+        if (resetBtn) {
+          const userId = resetBtn.getAttribute('data-reset-quota-user');
+          if (!userId) return;
+          const row = resetBtn.closest('[data-user-id]');
+          const sel = row?.querySelector?.('[data-quota-feature-select]');
+          const feature = String(sel?.value || resetBtn.getAttribute('data-reset-feature') || 'all');
+          this.handleResetUserQuota(userId, feature);
+          return;
+        }
+        const openBtn = e.target?.closest?.('[data-open-user-id]');
+        if (openBtn) {
+          const userId = openBtn.getAttribute('data-open-user-id');
+          if (userId) this.openUserDetailModal(userId);
+        }
+      });
+    };
+    bindAiActionList(this.els.aiHeavyUsersList);
+    bindAiActionList(this.els.aiFreeCappedList);
+
+    this.els.householdsSearchInput?.addEventListener('input', (e) => {
+      this.householdsSearch = String(e.target?.value || '').trim();
+      const timerApi = this.win || globalThis;
+      if (this._householdsSearchTimer) {
+        timerApi.clearTimeout(this._householdsSearchTimer);
+      }
+      this._householdsSearchTimer = timerApi.setTimeout(() => {
+        this.loadHouseholds({ resetOffset: true });
+      }, 250);
+    });
+
+    this.els.householdsPrevBtn?.addEventListener('click', () => {
+      if (this.householdsOffset <= 0) return;
+      this.householdsOffset = Math.max(0, this.householdsOffset - this.householdsPageLimit);
+      this.loadHouseholds({ resetOffset: false });
+    });
+
+    this.els.householdsNextBtn?.addEventListener('click', () => {
+      if (this.householdsOffset + this.householdsPageLimit >= this.householdsTotal) return;
+      this.householdsOffset += this.householdsPageLimit;
+      this.loadHouseholds({ resetOffset: false });
+    });
+
+    this.els.householdsList?.addEventListener('click', (e) => {
+      const btn = e.target?.closest?.('[data-manage-household-id]');
+      if (!btn) return;
+      const householdId = btn.getAttribute('data-manage-household-id');
+      if (householdId) this.openHouseholdModal(householdId);
+    });
+
+    this.els.householdModalCloseBtn?.addEventListener('click', () => {
+      this.closeDialog(this.els.householdModal);
+      this.selectedHouseholdId = null;
+      this.selectedHousehold = null;
+    });
+
+    this.els.householdRegenCodeBtn?.addEventListener('click', () => {
+      if (this.selectedHouseholdId) {
+        this.handleManageHousehold(this.selectedHouseholdId, 'regenerate_code');
+      }
+    });
+
+    this.els.householdMembersListEl?.addEventListener('click', (e) => {
+      const btn = e.target?.closest?.('[data-household-action][data-target-user-id]');
+      if (!btn || !this.selectedHouseholdId) return;
+      const action = btn.getAttribute('data-household-action');
+      const targetUserId = btn.getAttribute('data-target-user-id');
+      if (action && targetUserId) {
+        this.handleManageHousehold(this.selectedHouseholdId, action, targetUserId);
+      }
+    });
+
+    this.els.auditPrevBtn?.addEventListener('click', () => {
+      if (this.auditOffset <= 0) return;
+      this.auditOffset = Math.max(0, this.auditOffset - this.auditPageLimit);
+      this.loadAuditLog({ resetOffset: false });
+    });
+
+    this.els.auditNextBtn?.addEventListener('click', () => {
+      if (this.auditOffset + this.auditPageLimit >= this.auditTotal) return;
+      this.auditOffset += this.auditPageLimit;
+      this.loadAuditLog({ resetOffset: false });
+    });
+
+    this.els.auditList?.addEventListener('click', (e) => {
+      const btn = e.target?.closest?.('[data-open-user-id]');
+      if (!btn) return;
+      const userId = btn.getAttribute('data-open-user-id');
+      if (userId) this.openUserDetailModal(userId);
     });
   }
 
@@ -537,13 +704,29 @@ export class SaboryAdminApp {
 
     if (viewName === 'users' && !this.usersLoaded) {
       this.loadUsers({ resetOffset: true });
+    } else if (viewName === 'households' && !this.householdsLoaded) {
+      this.loadHouseholds({ resetOffset: true });
+    } else if (viewName === 'audit' && !this.auditLoaded) {
+      this.loadAuditLog({ resetOffset: true });
+    } else if ((viewName === 'ai' || viewName === 'dashboard') && !this.stats) {
+      this.loadDashboardStats();
     }
   }
 
-  async loadDashboardStats() {
+  async loadDashboardStats(overrideDays = null) {
     if (!this.supabaseClient?.rpc) return null;
-    const days = Number(this.els.periodSelect?.value) || this.statsDays || 30;
+    const activeDefaultDays = this.activeView === 'ai'
+      ? (this.els.aiRangeSelect?.value || this.statsDays)
+      : (this.els.periodSelect?.value || this.statsDays);
+    const days = Number(overrideDays || activeDefaultDays) || 30;
     this.statsDays = days;
+    if (this.els.aiRangeSelect) {
+      const hasAiOpt = Array.from(this.els.aiRangeSelect.options || []).some((opt) => String(opt.value) === String(days));
+      if (hasAiOpt) this.els.aiRangeSelect.value = String(days);
+    }
+    if (this.els.periodSelect && ['7', '30', '90'].includes(String(days))) {
+      this.els.periodSelect.value = String(days);
+    }
 
     if (this.els.refreshBtn) this.els.refreshBtn.disabled = true;
 
@@ -695,6 +878,15 @@ export class SaboryAdminApp {
 
     this.renderPlanBreakdown(plans, Math.max(toSafeCount(users.total), rev.freeTotal + rev.proTotal, 1));
     this.renderTopDomains(stats.top_domains);
+    this.renderAiMonitor(stats, days, {
+      rev,
+      aiSummary,
+      totalCalls,
+      callsOk,
+      callsError,
+      callsReset,
+      totalTokens
+    });
   }
 
   renderPlanBreakdown(plans = {}, baseTotal = 1) {
@@ -781,6 +973,15 @@ export class SaboryAdminApp {
     }
     if (this.selectedUserDetail) {
       this.renderUserDetailModal(this.selectedUserDetail);
+    }
+    if (this.householdsLoaded) {
+      this.renderHouseholdsList();
+    }
+    if (this.selectedHousehold) {
+      this.renderHouseholdModal(this.selectedHousehold);
+    }
+    if (this.auditLoaded) {
+      this.renderAuditLog();
     }
   }
 
@@ -1066,6 +1267,17 @@ export class SaboryAdminApp {
       }
     }
 
+    if (this.els.userQuotasSummaryEl) {
+      const q = detail.quotas || {};
+      this.els.userQuotasSummaryEl.textContent = this.t('admin.quotaSummaryToday', {
+        weekly: this.formatInt(q.weekly_plan),
+        guided: this.formatInt(q.guided_query),
+        importAi: this.formatInt(q.import_ai),
+        chat: this.formatInt(q.chat),
+        voice: this.formatInt(q.voice)
+      });
+    }
+
     if (this.els.userAuditListEl) {
       if (auditLog.length === 0) {
         this.els.userAuditListEl.innerHTML = `<li class="admin-empty-text">${escapeHtml(this.t('admin.auditEmpty'))}</li>`;
@@ -1197,6 +1409,497 @@ export class SaboryAdminApp {
     } catch (_) {
       // ignore clipboard restrictions
     }
+  }
+
+  updatePaginationUI(countEl, prevBtn, nextBtn, labelKey, shownCount, offset, limit, total) {
+    if (countEl) {
+      const from = shownCount > 0 ? offset + 1 : 0;
+      const to = shownCount > 0 ? offset + shownCount : 0;
+      countEl.textContent = this.t(labelKey, {
+        from: this.formatInt(from),
+        to: this.formatInt(to),
+        total: this.formatInt(total)
+      });
+    }
+    if (prevBtn) prevBtn.disabled = offset <= 0;
+    if (nextBtn) nextBtn.disabled = offset + limit >= total;
+  }
+
+  buildQuotaFeatureSelectHtml() {
+    const features = [
+      ['all', 'admin.aiFeatureAll'],
+      ['weekly_plan', 'admin.aiFeatureWeeklyPlan'],
+      ['guided_query', 'admin.aiFeatureGuidedQuery'],
+      ['import_ai', 'admin.aiFeatureImportAi'],
+      ['chat', 'admin.aiFeatureChat'],
+      ['voice', 'admin.aiFeatureVoice']
+    ];
+    return features
+      .map(([value, key]) => `<option value="${escapeHtml(value)}">${escapeHtml(this.t(key))}</option>`)
+      .join('');
+  }
+
+  renderAiBreakdownBars(container, bucketMap = {}) {
+    if (!container) return;
+    const entries = Object.entries(bucketMap || {}).sort(
+      (a, b) => (b[1].costEur - a[1].costEur) || (b[1].calls - a[1].calls)
+    );
+    if (entries.length === 0) {
+      container.innerHTML = `<p class="admin-empty-text">${escapeHtml(this.t('admin.aiEmptyBreakdown'))}</p>`;
+      return;
+    }
+
+    const maxCalls = Math.max(...entries.map(([, b]) => toSafeCount(b.calls)), 1);
+    container.innerHTML = entries.map(([name, bucket]) => {
+      const calls = toSafeCount(bucket.calls);
+      const pct = Math.max(4, Math.min(100, Math.round((calls / maxCalls) * 100)));
+      const summary = `${this.formatInt(calls)} · ${this.formatInt(bucket.totalTokens)} tok · ${this.formatEur(bucket.costEur)}`;
+      return `
+        <div class="admin-bar-row" data-ai-bucket="${escapeHtml(name)}">
+          <div class="admin-bar-head">
+            <span class="admin-bar-label">${escapeHtml(name)}</span>
+            <span class="admin-bar-count">${escapeHtml(summary)}</span>
+          </div>
+          <div class="admin-bar-track">
+            <span class="admin-bar-fill is-sage" style="width: ${pct}%"></span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  renderAiMonitor(stats = {}, _days = 30, precomputed = null) {
+    const users = stats.users || {};
+    const plans = stats.plans || {};
+    const ai = stats.ai || {};
+    const rev = precomputed?.rev || computeRevenueMetrics(plans, users.total);
+    const aiSummary = precomputed?.aiSummary || summarizeAiUsage(Array.isArray(ai.by_feature_model) ? ai.by_feature_model : []);
+
+    const totalCalls = precomputed?.totalCalls ?? (aiSummary.callsTotal > 0 ? aiSummary.callsTotal : toSafeCount(ai.calls_total));
+    const callsOk = precomputed?.callsOk ?? (aiSummary.callsTotal > 0 ? aiSummary.callsOk : toSafeCount(ai.calls_ok));
+    const callsError = precomputed?.callsError ?? (aiSummary.callsTotal > 0 ? aiSummary.callsError : toSafeCount(ai.calls_error));
+    const callsReset = precomputed?.callsReset ?? (aiSummary.callsTotal > 0 ? aiSummary.callsReset : toSafeCount(ai.calls_reset));
+    const promptTokens = aiSummary.totalTokens > 0 ? aiSummary.promptTokens : toSafeCount(ai.prompt_tokens);
+    const outputTokens = aiSummary.totalTokens > 0 ? aiSummary.outputTokens : toSafeCount(ai.output_tokens);
+    const totalTokens = precomputed?.totalTokens ?? (aiSummary.totalTokens > 0 ? aiSummary.totalTokens : promptTokens + outputTokens);
+    const grossMarginEur = Math.round((rev.mrrEur - aiSummary.costEur) * 100) / 100;
+
+    if (this.els.aiKpiCost) this.els.aiKpiCost.textContent = this.formatEur(aiSummary.costEur);
+    if (this.els.aiKpiCostMeta) {
+      this.els.aiKpiCostMeta.textContent = this.t('admin.aiKpiCostMeta', {
+        usd: this.formatDecimal(aiSummary.costUsd, 2),
+        rate: this.formatDecimal(DEFAULT_EUR_PER_USD, 2)
+      });
+    }
+    if (this.els.aiKpiTokens) this.els.aiKpiTokens.textContent = this.formatInt(totalTokens);
+    if (this.els.aiKpiTokensMeta) {
+      this.els.aiKpiTokensMeta.textContent = this.t('admin.aiKpiTokensMeta', {
+        prompt: this.formatInt(promptTokens),
+        output: this.formatInt(outputTokens)
+      });
+    }
+    if (this.els.aiKpiCalls) this.els.aiKpiCalls.textContent = this.formatInt(totalCalls);
+    if (this.els.aiKpiCallsMeta) {
+      this.els.aiKpiCallsMeta.textContent = this.t('admin.aiKpiCallsMeta', {
+        ok: this.formatInt(callsOk),
+        error: this.formatInt(callsError),
+        reset: this.formatInt(callsReset)
+      });
+    }
+    if (this.els.aiKpiMargin) this.els.aiKpiMargin.textContent = this.formatEur(grossMarginEur);
+    if (this.els.aiKpiMarginMeta) {
+      this.els.aiKpiMarginMeta.textContent = this.t('admin.aiKpiMarginMeta', {
+        mrr: this.formatEur(rev.mrrEur),
+        cost: this.formatEur(aiSummary.costEur)
+      });
+    }
+
+    this.renderAiBreakdownBars(this.els.aiByFeature, aiSummary.byFeature);
+    this.renderAiBreakdownBars(this.els.aiByModel, aiSummary.byModel);
+
+    if (this.els.aiHeavyUsersList) {
+      const heavy = Array.isArray(stats.ai_heavy_users) ? stats.ai_heavy_users : [];
+      if (heavy.length === 0) {
+        this.els.aiHeavyUsersList.innerHTML = `<li class="admin-empty-text">${escapeHtml(this.t('admin.aiHeavyUsersEmpty'))}</li>`;
+      } else {
+        const optionsHtml = this.buildQuotaFeatureSelectHtml();
+        this.els.aiHeavyUsersList.innerHTML = heavy.map((u) => {
+          const callsToday = toSafeCount(u.calls_today);
+          const isNearCap = callsToday >= 150;
+          const label = u.display_name || u.email || u.user_id;
+          const badge = this.getPlanBadgeMeta({ plan: u.plan, effective_plan: u.plan });
+          const meta7d = this.t('admin.aiCalls7dMeta', {
+            calls: this.formatInt(u.calls_7d),
+            tokens: this.formatInt(u.tokens_7d)
+          });
+          return `
+            <li class="admin-action-row" data-user-id="${escapeHtml(u.user_id)}">
+              <div class="admin-action-main">
+                <div class="admin-action-header">
+                  <strong>${escapeHtml(label)}</strong>
+                  <div class="admin-action-controls">
+                    <span class="admin-plan-pill ${escapeHtml(badge.cssClass)}">${escapeHtml(badge.label)}</span>
+                    <span class="admin-badge ${isNearCap ? 'admin-badge-warn' : 'admin-badge-neutral'}">${escapeHtml(this.t('admin.aiCallsTodayBadge', { count: this.formatInt(callsToday) }))}</span>
+                    ${isNearCap ? `<span class="admin-badge admin-badge-warn">${escapeHtml(this.t('admin.aiHeavyBadge'))}</span>` : ''}
+                  </div>
+                </div>
+                <div class="admin-action-meta">${escapeHtml(u.email || '-')} · ${escapeHtml(meta7d)}</div>
+              </div>
+              <div class="admin-action-controls">
+                <select class="form-select admin-filter-select" data-quota-feature-select="${escapeHtml(u.user_id)}" aria-label="${escapeHtml(this.t('admin.aiFeatureCol'))}">
+                  ${optionsHtml}
+                </select>
+                <button type="button" class="btn btn-secondary btn-sm" data-reset-quota-user="${escapeHtml(u.user_id)}">
+                  <span class="material-symbols-outlined icon-sm" aria-hidden="true">restart_alt</span>
+                  <span>${escapeHtml(this.t('admin.resetQuotaBtn'))}</span>
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" data-open-user-id="${escapeHtml(u.user_id)}">
+                  <span>${escapeHtml(this.t('admin.openUserBtn'))}</span>
+                </button>
+              </div>
+            </li>
+          `;
+        }).join('');
+      }
+    }
+
+    if (this.els.aiFreeCappedList) {
+      const capped = Array.isArray(stats.ai_free_capped_users) ? stats.ai_free_capped_users : [];
+      if (capped.length === 0) {
+        this.els.aiFreeCappedList.innerHTML = `<li class="admin-empty-text">${escapeHtml(this.t('admin.aiFreeCappedEmpty'))}</li>`;
+      } else {
+        this.els.aiFreeCappedList.innerHTML = capped.map((u) => {
+          const label = u.display_name || u.email || u.user_id;
+          const usageMeta = this.t('admin.aiFreeCappedUsageMeta', {
+            weekly: this.formatInt(u.weekly_plan_used),
+            guided: this.formatInt(u.guided_query_used),
+            importAi: this.formatInt(u.import_ai_used)
+          });
+          return `
+            <li class="admin-action-row" data-user-id="${escapeHtml(u.user_id)}">
+              <div class="admin-action-main">
+                <div class="admin-action-header">
+                  <strong>${escapeHtml(label)}</strong>
+                  <span class="admin-plan-pill is-free">${escapeHtml(this.t('admin.badgeFree'))}</span>
+                </div>
+                <div class="admin-action-meta">${escapeHtml(u.email || '-')} · ${escapeHtml(usageMeta)}</div>
+              </div>
+              <div class="admin-action-controls">
+                <button type="button" class="btn btn-secondary btn-sm" data-reset-quota-user="${escapeHtml(u.user_id)}" data-reset-feature="all">
+                  <span class="material-symbols-outlined icon-sm" aria-hidden="true">restart_alt</span>
+                  <span>${escapeHtml(this.t('admin.resetQuotaAllBtn'))}</span>
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" data-open-user-id="${escapeHtml(u.user_id)}">
+                  <span>${escapeHtml(this.t('admin.openUserBtn'))}</span>
+                </button>
+              </div>
+            </li>
+          `;
+        }).join('');
+      }
+    }
+  }
+
+  async handleResetUserQuota(userId, feature = 'all') {
+    if (!this.supabaseClient?.rpc) return null;
+    const cleanUserId = String(userId || '').trim();
+    const cleanFeature = String(feature || 'all').trim() || 'all';
+    const check = validateQuotaResetRequest({ userId: cleanUserId, feature: cleanFeature });
+    if (!check.ok) {
+      this.showToast(check.error || this.t('admin.errorResettingQuota'), 'error');
+      return null;
+    }
+
+    const notes = this.selectedUserId === cleanUserId
+      ? String(this.els.entitlementNotesInput?.value || '').trim()
+      : '';
+
+    try {
+      const { data, error } = await this.supabaseClient.rpc('admin_reset_user_ai_quota', {
+        p_user_id: cleanUserId,
+        p_feature: cleanFeature,
+        p_notes: notes
+      });
+      if (error || !data?.ok) {
+        throw error || new Error(this.t('admin.errorResettingQuota'));
+      }
+
+      this.showToast(
+        this.t('admin.resetQuotaSuccess', {
+          feature: cleanFeature,
+          rows: this.formatInt(data.rows_reset)
+        }),
+        'success'
+      );
+
+      await this.loadDashboardStats(this.statsDays);
+      if (this.selectedUserId === cleanUserId) {
+        await this.openUserDetailModal(cleanUserId);
+      }
+      return data;
+    } catch (err) {
+      this.showToast(err?.message || this.t('admin.errorResettingQuota'), 'error');
+      return null;
+    }
+  }
+
+  async loadHouseholds({ resetOffset = false } = {}) {
+    if (!this.supabaseClient?.rpc) return null;
+    if (resetOffset) this.householdsOffset = 0;
+
+    try {
+      const { data, error } = await this.supabaseClient.rpc('admin_list_households', {
+        p_search: this.householdsSearch || '',
+        p_limit: this.householdsPageLimit,
+        p_offset: this.householdsOffset
+      });
+      if (error || !data) {
+        throw error || new Error(this.t('admin.errorLoadingHouseholds'));
+      }
+      this.householdsTotal = toSafeCount(data.total);
+      this.householdsItems = Array.isArray(data.items) ? data.items : [];
+      this.householdsLoaded = true;
+      this.renderHouseholdsList();
+
+      if (this.selectedHouseholdId) {
+        const updated = this.householdsItems.find((h) => h.id === this.selectedHouseholdId) || null;
+        if (updated) {
+          this.selectedHousehold = updated;
+          this.renderHouseholdModal(updated);
+        }
+      }
+      return data;
+    } catch (err) {
+      this.showToast(err?.message || this.t('admin.errorLoadingHouseholds'), 'error');
+      return null;
+    }
+  }
+
+  renderHouseholdsList() {
+    this.updatePaginationUI(
+      this.els.householdsCountBadge,
+      this.els.householdsPrevBtn,
+      this.els.householdsNextBtn,
+      'admin.householdsPaginationShowing',
+      this.householdsItems.length,
+      this.householdsOffset,
+      this.householdsPageLimit,
+      this.householdsTotal
+    );
+
+    if (!this.els.householdsList) return;
+    if (this.householdsItems.length === 0) {
+      this.els.householdsList.innerHTML = `<p class="admin-empty-text">${escapeHtml(this.t('admin.householdsEmpty'))}</p>`;
+      return;
+    }
+
+    this.els.householdsList.innerHTML = this.householdsItems.map((h) => {
+      const isActive = Boolean(h.owner_has_pro) && !h.is_paused;
+      const statusClass = isActive ? 'admin-badge-pro' : 'admin-badge-paused';
+      const statusLabel = this.t(isActive ? 'admin.householdStatusActive' : 'admin.householdStatusPaused');
+      const meta = this.t('admin.householdMeta', {
+        members: this.formatInt(h.members_count),
+        recipes: this.formatInt(h.recipes_count),
+        owner: h.owner_email || '-'
+      });
+      return `
+        <article class="admin-household-card" data-household-id="${escapeHtml(h.id)}">
+          <div class="admin-household-card-header">
+            <div>
+              <strong>${escapeHtml(h.name || h.id)}</strong>
+              <div class="admin-household-meta">${escapeHtml(meta)}</div>
+            </div>
+            <span class="admin-badge ${statusClass}">${escapeHtml(statusLabel)}</span>
+          </div>
+          <div class="admin-action-header">
+            <div class="admin-action-controls">
+              <span class="admin-meta-label">${escapeHtml(this.t('admin.householdInviteLabel'))}</span>
+              <code class="admin-uuid-code">${escapeHtml(h.invite_code || '-')}</code>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" data-manage-household-id="${escapeHtml(h.id)}">
+              <span class="material-symbols-outlined icon-sm" aria-hidden="true">home_and_garden</span>
+              <span>${escapeHtml(this.t('admin.manageHouseholdBtn'))}</span>
+            </button>
+          </div>
+        </article>
+      `;
+    }).join('');
+  }
+
+  async openHouseholdModal(householdId) {
+    if (!householdId) return null;
+    if (!this.householdsLoaded) {
+      await this.loadHouseholds({ resetOffset: false });
+    }
+    const household = this.householdsItems.find((h) => h.id === householdId) || null;
+    if (!household) return null;
+    this.selectedHouseholdId = household.id;
+    this.selectedHousehold = household;
+    this.renderHouseholdModal(household);
+    this.openDialog(this.els.householdModal);
+    return household;
+  }
+
+  renderHouseholdModal(household = {}) {
+    if (this.els.householdModalTitleEl) {
+      this.els.householdModalTitleEl.textContent = household.name || this.t('admin.householdModalTitle');
+    }
+    if (this.els.householdModalMetaEl) {
+      this.els.householdModalMetaEl.textContent = this.t('admin.householdMeta', {
+        members: this.formatInt(household.members_count),
+        recipes: this.formatInt(household.recipes_count),
+        owner: household.owner_email || '-'
+      });
+    }
+    if (this.els.householdStatusBadgeEl) {
+      const isActive = Boolean(household.owner_has_pro) && !household.is_paused;
+      this.els.householdStatusBadgeEl.className = `admin-badge ${isActive ? 'admin-badge-pro' : 'admin-badge-paused'}`;
+      this.els.householdStatusBadgeEl.textContent = this.t(
+        isActive ? 'admin.householdStatusActive' : 'admin.householdStatusPaused'
+      );
+    }
+    if (this.els.householdInviteCodeEl) {
+      this.els.householdInviteCodeEl.textContent = household.invite_code || '-';
+    }
+
+    if (this.els.householdMembersListEl) {
+      const members = Array.isArray(household.members) ? household.members : [];
+      this.els.householdMembersListEl.innerHTML = members.map((m) => {
+        const isOwner = m.user_id === household.owner_id || m.role === 'owner';
+        const roleLabel = this.t(isOwner ? 'admin.householdRoleOwner' : 'admin.householdRoleMember');
+        const nameText = m.display_name || m.email || m.user_id;
+        return `
+          <li class="admin-household-member-row" data-member-id="${escapeHtml(m.user_id)}">
+            <div class="admin-household-member-info">
+              <div class="admin-action-controls">
+                <strong>${escapeHtml(nameText)}</strong>
+                <span class="admin-badge ${isOwner ? 'admin-badge-pro' : 'admin-badge-neutral'}">${escapeHtml(roleLabel)}</span>
+              </div>
+              <span class="admin-action-meta">${escapeHtml(m.email || '-')}</span>
+            </div>
+            ${isOwner ? '' : `
+              <div class="admin-household-member-actions">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  data-household-action="transfer_owner"
+                  data-target-user-id="${escapeHtml(m.user_id)}"
+                >${escapeHtml(this.t('admin.householdTransferOwnerBtn'))}</button>
+                <button
+                  type="button"
+                  class="btn btn-danger-outline btn-sm"
+                  data-household-action="remove_member"
+                  data-target-user-id="${escapeHtml(m.user_id)}"
+                >${escapeHtml(this.t('admin.householdRemoveMemberBtn'))}</button>
+              </div>
+            `}
+          </li>
+        `;
+      }).join('');
+    }
+  }
+
+  async handleManageHousehold(householdId, action, targetUserId = null) {
+    if (!this.supabaseClient?.rpc || !householdId || !action) return null;
+
+    if (action === 'remove_member') {
+      const member = this.selectedHousehold?.members?.find((m) => m.user_id === targetUserId);
+      const confirmed = await this.confirmAdminAction({
+        title: this.t('admin.confirmRemoveMemberTitle'),
+        message: this.t('admin.confirmRemoveMemberBody', {
+          email: member?.email || targetUserId || '',
+          name: this.selectedHousehold?.name || householdId
+        })
+      });
+      if (!confirmed) return null;
+    }
+
+    try {
+      const { data, error } = await this.supabaseClient.rpc('admin_manage_household', {
+        p_household_id: householdId,
+        p_action: action,
+        p_target_user_id: targetUserId
+      });
+      if (error || !data?.ok) {
+        throw error || new Error(this.t('admin.errorManagingHousehold'));
+      }
+
+      if (action === 'transfer_owner') {
+        this.showToast(this.t('admin.householdTransferSuccess'), 'success');
+      } else if (action === 'remove_member') {
+        this.showToast(this.t('admin.householdRemoveSuccess'), 'success');
+      } else if (action === 'regenerate_code') {
+        this.showToast(
+          this.t('admin.householdCodeRegenerated', { code: data.invite_code || '-' }),
+          'success'
+        );
+      }
+
+      await this.loadHouseholds({ resetOffset: false });
+      return data;
+    } catch (err) {
+      this.showToast(err?.message || this.t('admin.errorManagingHousehold'), 'error');
+      return null;
+    }
+  }
+
+  async loadAuditLog({ resetOffset = false } = {}) {
+    if (!this.supabaseClient?.rpc) return null;
+    if (resetOffset) this.auditOffset = 0;
+
+    try {
+      const { data, error } = await this.supabaseClient.rpc('admin_list_audit_log', {
+        p_limit: this.auditPageLimit,
+        p_offset: this.auditOffset
+      });
+      if (error || !data) {
+        throw error || new Error(this.t('admin.errorLoadingAudit'));
+      }
+      this.auditTotal = toSafeCount(data.total);
+      this.auditItems = Array.isArray(data.items) ? data.items : [];
+      this.auditLoaded = true;
+      this.renderAuditLog();
+      return data;
+    } catch (err) {
+      this.showToast(err?.message || this.t('admin.errorLoadingAudit'), 'error');
+      return null;
+    }
+  }
+
+  renderAuditLog() {
+    this.updatePaginationUI(
+      this.els.auditCountBadge,
+      this.els.auditPrevBtn,
+      this.els.auditNextBtn,
+      'admin.auditPaginationShowing',
+      this.auditItems.length,
+      this.auditOffset,
+      this.auditPageLimit,
+      this.auditTotal
+    );
+
+    if (!this.els.auditList) return;
+    if (this.auditItems.length === 0) {
+      this.els.auditList.innerHTML = `<li class="admin-empty-text">${escapeHtml(this.t('admin.auditEmpty'))}</li>`;
+      return;
+    }
+
+    this.els.auditList.innerHTML = this.auditItems.map((entry) => {
+      const targetPart = entry.target_email ? ` · ${entry.target_email}` : '';
+      return `
+        <li class="admin-audit-item" data-audit-id="${escapeHtml(entry.id)}">
+          <div class="admin-audit-row-top">
+            <span>${escapeHtml(formatAuditSummary(entry))}</span>
+            ${entry.target_user_id ? `
+              <button type="button" class="btn btn-secondary btn-sm admin-audit-target-btn" data-open-user-id="${escapeHtml(entry.target_user_id)}">
+                <span>${escapeHtml(this.t('admin.auditViewUserBtn'))}</span>
+              </button>
+            ` : ''}
+          </div>
+          <span class="admin-audit-meta">${escapeHtml(entry.admin_email || '-')}${escapeHtml(targetPart)} · ${escapeHtml(this.formatDateTime(entry.created_at))}</span>
+        </li>
+      `;
+    }).join('');
   }
 
   showToast(message, type = 'info') {

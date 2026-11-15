@@ -10884,6 +10884,7 @@ body.is-mobile-device .app-container {
 
 /* Top-layer <dialog> Modals para Sabory Admin */
 dialog.admin-user-modal,
+dialog.admin-household-modal,
 dialog.admin-confirm-modal {
   width: min(740px, calc(100vw - 24px));
   max-width: 740px;
@@ -10899,23 +10900,31 @@ dialog.admin-confirm-modal {
   z-index: 120;
 }
 
+dialog.admin-household-modal {
+  width: min(640px, calc(100vw - 24px));
+  max-width: 640px;
+}
+
 dialog.admin-confirm-modal {
   width: min(440px, calc(100vw - 28px));
   max-width: 440px;
 }
 
 dialog.admin-user-modal:not([open]),
+dialog.admin-household-modal:not([open]),
 dialog.admin-confirm-modal:not([open]) {
   display: none;
 }
 
 dialog.admin-user-modal[open],
+dialog.admin-household-modal[open],
 dialog.admin-confirm-modal[open] {
   display: flex;
   flex-direction: column;
 }
 
 dialog.admin-user-modal::backdrop,
+dialog.admin-household-modal::backdrop,
 dialog.admin-confirm-modal::backdrop {
   background: rgba(24, 18, 14, 0.56);
   backdrop-filter: blur(6px);
@@ -11150,6 +11159,107 @@ dialog.admin-confirm-modal::backdrop {
   background-color: var(--m3-surface-container-low);
 }
 
+/* US-87d: AI Monitor, Quota Reset, Households Console & Global Audit Log */
+.admin-ai-range-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.admin-action-list,
+.admin-households-list,
+.admin-household-members-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-action-row,
+.admin-household-card,
+.admin-household-member-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background-color: var(--m3-surface-container-low);
+  border: var(--border-subtle);
+}
+
+.admin-action-main,
+.admin-household-member-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-action-header,
+.admin-household-card-header,
+.admin-audit-row-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-action-meta,
+.admin-household-meta {
+  font-size: var(--text-xs);
+  color: var(--m3-on-surface-variant);
+  word-break: break-word;
+}
+
+.admin-action-controls,
+.admin-household-member-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-quota-reset-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.admin-household-code-row,
+.admin-household-code-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background-color: var(--m3-surface-container-low);
+  border: var(--border-subtle);
+}
+
+.admin-household-code-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-badge-paused {
+  background-color: var(--m3-error-container);
+  color: var(--m3-on-error-container);
+}
+
+.admin-badge-warn {
+  background-color: var(--m3-tertiary-container, rgba(217, 119, 6, 0.16));
+  color: var(--m3-on-tertiary-container, #9a4a00);
+}
+
+.admin-audit-target-btn {
+  align-self: flex-start;
+}
+
 @media (min-width: 900px) {
   .admin-users-toolbar {
     flex-direction: row;
@@ -11162,5 +11272,18 @@ dialog.admin-confirm-modal::backdrop {
 
   .admin-users-filters {
     flex: 1 1 420px;
+  }
+
+  .admin-action-row,
+  .admin-household-member-row,
+  .admin-household-code-bar,
+  .admin-quota-reset-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .admin-quota-reset-row .form-select {
+    flex: 1 1 auto;
   }
 }

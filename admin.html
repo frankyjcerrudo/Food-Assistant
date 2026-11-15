@@ -368,28 +368,148 @@
           </div>
         </section>
 
-        <!-- Vistas preparadas para US-87d -->
+        <!-- US-87d: Vista Monitor de Consumo y Costes IA -->
         <section id="admin-view-ai" class="admin-view" hidden>
-          <div class="admin-panel-card admin-placeholder-card">
-            <span class="material-symbols-outlined admin-placeholder-icon" aria-hidden="true">neurology</span>
-            <h2 class="admin-panel-title" data-i18n="admin.navAi">Consumo IA</h2>
-            <p class="admin-card-subtitle" data-admin-upcoming="US-87d"></p>
+          <div class="admin-view-topbar">
+            <div>
+              <h2 class="admin-section-heading" data-i18n="admin.aiMonitorTitle">Monitor de Consumo y Costes IA</h2>
+              <p class="admin-card-subtitle" data-i18n="admin.aiMonitorSubtitle">
+                Costes estimados de Gemini API, desglose por función y modelo, heavy users y oportunidades de conversión.
+              </p>
+            </div>
+            <label class="admin-ai-range-wrap" for="admin-ai-range">
+              <select id="admin-ai-range" class="form-select admin-period-select" aria-label="Rango IA">
+                <option value="1" data-i18n="admin.aiRangeToday">Hoy (24h)</option>
+                <option value="7" data-i18n="admin.aiRange7d">Últimos 7 días</option>
+                <option value="30" selected data-i18n="admin.aiRange30d">Últimos 30 días</option>
+                <option value="90" data-i18n="admin.aiRange90d">Últimos 90 días</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="admin-kpi-grid">
+            <article class="admin-kpi-card">
+              <div class="admin-kpi-label" data-i18n="admin.aiKpiCostTitle">Coste IA del periodo</div>
+              <div class="admin-kpi-value" id="ai-kpi-cost">0,00 €</div>
+              <div class="admin-kpi-meta" id="ai-kpi-cost-meta">—</div>
+            </article>
+
+            <article class="admin-kpi-card">
+              <div class="admin-kpi-label" data-i18n="admin.aiKpiTokensTitle">Tokens totales</div>
+              <div class="admin-kpi-value" id="ai-kpi-tokens">0</div>
+              <div class="admin-kpi-meta" id="ai-kpi-tokens-meta">—</div>
+            </article>
+
+            <article class="admin-kpi-card">
+              <div class="admin-kpi-label" data-i18n="admin.aiKpiCallsTitle">Llamadas registradas</div>
+              <div class="admin-kpi-value" id="ai-kpi-calls">0</div>
+              <div class="admin-kpi-meta" id="ai-kpi-calls-meta">—</div>
+            </article>
+
+            <article class="admin-kpi-card admin-kpi-accent">
+              <div class="admin-kpi-label" data-i18n="admin.aiKpiMarginTitle">Margen bruto est.</div>
+              <div class="admin-kpi-value" id="ai-kpi-margin">0,00 €</div>
+              <div class="admin-kpi-meta" id="ai-kpi-margin-meta">—</div>
+            </article>
+          </div>
+
+          <div class="admin-panels-grid">
+            <section class="admin-panel-card">
+              <h3 class="admin-panel-title" data-i18n="admin.aiByFeatureTitle">Desglose por función</h3>
+              <div id="admin-ai-by-feature" class="admin-breakdown-list" aria-live="polite"></div>
+            </section>
+
+            <section class="admin-panel-card">
+              <h3 class="admin-panel-title" data-i18n="admin.aiByModelTitle">Desglose por modelo</h3>
+              <div id="admin-ai-by-model" class="admin-breakdown-list" aria-live="polite"></div>
+            </section>
+          </div>
+
+          <div class="admin-panels-grid">
+            <section class="admin-panel-card">
+              <h3 class="admin-panel-title" data-i18n="admin.aiHeavyUsersTitle">Heavy Users (últimos 7d)</h3>
+              <p class="admin-card-subtitle" data-i18n="admin.aiHeavyUsersSubtitle">
+                Usuarios con mayor volumen de llamadas o consumo cercano a cuotas diarias.
+              </p>
+              <ul id="admin-ai-heavy-users" class="admin-action-list" aria-live="polite"></ul>
+            </section>
+
+            <section class="admin-panel-card">
+              <h3 class="admin-panel-title" data-i18n="admin.aiFreeCappedTitle">Usuarios Free al límite</h3>
+              <p class="admin-card-subtitle" data-i18n="admin.aiFreeCappedSubtitle">
+                Oportunidades de conversión que han agotado su cuota diaria o semanal.
+              </p>
+              <ul id="admin-ai-free-capped" class="admin-action-list" aria-live="polite"></ul>
+            </section>
           </div>
         </section>
 
+        <!-- US-87d: Vista Consola de Hogares -->
         <section id="admin-view-households" class="admin-view" hidden>
-          <div class="admin-panel-card admin-placeholder-card">
-            <span class="material-symbols-outlined admin-placeholder-icon" aria-hidden="true">home_and_garden</span>
-            <h2 class="admin-panel-title" data-i18n="admin.navHouseholds">Hogares</h2>
-            <p class="admin-card-subtitle" data-admin-upcoming="US-87d"></p>
+          <div class="admin-panel-card">
+            <div class="admin-panel-header">
+              <div>
+                <h2 class="admin-panel-title" data-i18n="admin.householdsTitle">Consola de Hogares</h2>
+                <p class="admin-card-subtitle" data-i18n="admin.householdsSubtitle">
+                  Hogares familiares compartidos, código de invitación, estado del titular Pro y gestión de miembros.
+                </p>
+              </div>
+              <span id="admin-households-count" class="admin-pagination-info"></span>
+            </div>
+
+            <div class="admin-users-toolbar">
+              <label class="admin-search-wrap" for="admin-households-search">
+                <span class="material-symbols-outlined" aria-hidden="true">search</span>
+                <input
+                  id="admin-households-search"
+                  type="search"
+                  class="form-input admin-search-input"
+                  placeholder="Buscar por nombre o invite_code..."
+                  data-i18n-placeholder="admin.householdsSearchPlaceholder"
+                />
+              </label>
+            </div>
+
+            <div id="admin-households-list" class="admin-households-list" aria-live="polite"></div>
+
+            <div class="admin-pagination">
+              <button type="button" id="btn-households-prev" class="btn btn-secondary btn-sm" disabled>
+                <span class="material-symbols-outlined icon-sm" aria-hidden="true">chevron_left</span>
+                <span data-i18n="admin.prevPage">Anterior</span>
+              </button>
+              <button type="button" id="btn-households-next" class="btn btn-secondary btn-sm" disabled>
+                <span data-i18n="admin.nextPage">Siguiente</span>
+                <span class="material-symbols-outlined icon-sm" aria-hidden="true">chevron_right</span>
+              </button>
+            </div>
           </div>
         </section>
 
+        <!-- US-87d: Vista Auditoría Global -->
         <section id="admin-view-audit" class="admin-view" hidden>
-          <div class="admin-panel-card admin-placeholder-card">
-            <span class="material-symbols-outlined admin-placeholder-icon" aria-hidden="true">history</span>
-            <h2 class="admin-panel-title" data-i18n="admin.navAudit">Auditoría</h2>
-            <p class="admin-card-subtitle" data-admin-upcoming="US-87d"></p>
+          <div class="admin-panel-card">
+            <div class="admin-panel-header">
+              <div>
+                <h2 class="admin-panel-title" data-i18n="admin.auditTitle">Auditoría global de administración</h2>
+                <p class="admin-card-subtitle" data-i18n="admin.auditSubtitle">
+                  Registro inmutable de todas las acciones ejecutadas desde Sabory Admin.
+                </p>
+              </div>
+              <span id="admin-audit-count" class="admin-pagination-info"></span>
+            </div>
+
+            <ul id="admin-audit-list" class="admin-audit-list admin-global-audit-list" aria-live="polite"></ul>
+
+            <div class="admin-pagination">
+              <button type="button" id="btn-audit-prev" class="btn btn-secondary btn-sm" disabled>
+                <span class="material-symbols-outlined icon-sm" aria-hidden="true">chevron_left</span>
+                <span data-i18n="admin.prevPage">Anterior</span>
+              </button>
+              <button type="button" id="btn-audit-next" class="btn btn-secondary btn-sm" disabled>
+                <span data-i18n="admin.nextPage">Siguiente</span>
+                <span class="material-symbols-outlined icon-sm" aria-hidden="true">chevron_right</span>
+              </button>
+            </div>
           </div>
         </section>
       </main>
@@ -506,6 +626,25 @@
         </form>
       </section>
 
+      <section class="admin-modal-section">
+        <h3 class="admin-modal-section-title" data-i18n="admin.sectionUserQuotas">Cuotas y uso de IA</h3>
+        <p id="admin-user-quotas-summary" class="admin-card-subtitle">-</p>
+        <div class="admin-quota-reset-row">
+          <select id="select-admin-quota-feature" class="form-select admin-filter-select" aria-label="Feature IA">
+            <option value="all" data-i18n="admin.aiFeatureAll">Todas las funciones (all)</option>
+            <option value="weekly_plan" data-i18n="admin.aiFeatureWeeklyPlan">Planificador semanal (weekly_plan)</option>
+            <option value="guided_query" data-i18n="admin.aiFeatureGuidedQuery">Chef IA / Consulta (guided_query)</option>
+            <option value="import_ai" data-i18n="admin.aiFeatureImportAi">Importador IA (import_ai)</option>
+            <option value="chat" data-i18n="admin.aiFeatureChat">Chat IA (chat)</option>
+            <option value="voice" data-i18n="admin.aiFeatureVoice">Voz IA (voice)</option>
+          </select>
+          <button type="button" id="btn-admin-reset-quota" class="btn btn-secondary btn-sm">
+            <span class="material-symbols-outlined icon-sm" aria-hidden="true">restart_alt</span>
+            <span data-i18n="admin.resetQuotaBtn">Resetear cuota IA</span>
+          </button>
+        </div>
+      </section>
+
       <section class="admin-modal-section admin-danger-zone">
         <h3 class="admin-modal-section-title" data-i18n="admin.sectionSupportGdpr">Soporte y RGPD</h3>
         <div class="admin-danger-actions">
@@ -521,6 +660,38 @@
       <section class="admin-modal-section">
         <h3 class="admin-modal-section-title" data-i18n="admin.sectionUserAudit">Historial de auditoría</h3>
         <ul id="admin-user-audit-list" class="admin-audit-list"></ul>
+      </section>
+    </div>
+  </dialog>
+
+  <!-- US-87d: Modal Gestión de Hogar -->
+  <dialog id="modal-admin-household" class="modal-dialog admin-household-modal" aria-labelledby="admin-household-modal-title">
+    <div class="modal-header admin-modal-header">
+      <div>
+        <h2 id="admin-household-modal-title" class="admin-modal-title" data-i18n="admin.householdModalTitle">Gestión de hogar</h2>
+        <p id="admin-household-modal-meta" class="admin-card-subtitle"></p>
+      </div>
+      <button type="button" id="btn-admin-household-close" class="btn-icon btn-ghost admin-modal-close" aria-label="Cerrar">
+        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+      </button>
+    </div>
+
+    <div class="modal-body admin-user-modal-body">
+      <div class="admin-household-code-bar">
+        <div class="admin-household-code-info">
+          <span id="admin-household-status-badge" class="admin-badge"></span>
+          <span class="admin-meta-label" data-i18n="admin.householdInviteLabel">Código:</span>
+          <code id="admin-household-invite-code" class="admin-uuid-code">-</code>
+        </div>
+        <button type="button" id="btn-admin-regen-code" class="btn btn-secondary btn-sm">
+          <span class="material-symbols-outlined icon-sm" aria-hidden="true">autorenew</span>
+          <span data-i18n="admin.householdRegenerateCodeBtn">Regenerar código</span>
+        </button>
+      </div>
+
+      <section class="admin-modal-section">
+        <h3 class="admin-modal-section-title" data-i18n="admin.householdMembersTitle">Miembros del hogar</h3>
+        <ul id="admin-household-members-list" class="admin-household-members-list"></ul>
       </section>
     </div>
   </dialog>
