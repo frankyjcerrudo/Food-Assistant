@@ -399,4 +399,47 @@ describe('US-80: Centro de IA Sous Chef (Vista Propia + Historial + Acciones/Cá
     autoplanChip.click();
     expect(autoPlanSpy).toHaveBeenCalledTimes(1);
   });
+
+  it('7. Tarjeta de autoplanificador permite cambiar de semana (Próx. semana / flechas) directamente en el chat y aplicarla a esa semana', async () => {
+    window.state.aiPlan = {
+      plan: 'pro',
+      quotas: { weekly_plan: { used: 0, limit: 10 }, import_ai: { used: 0, limit: 10 }, guided_query: { used: 0, limit: 10 } }
+    };
+    app.getAiAuthToken = vi.fn().mockResolvedValue('tok');
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ok: true,
+        data: {
+          candidates: [{ content: { parts: [{ text: 'Menú listo.' }] } }]
+        }
+      })
+    });
+
+    try {
+      app.plannerWeekOffset = 0;
+      await app.triggerGeminiAutoPlan();
+
+      const planMsg = app.aiChatHistory.find(m => m.card?.type === 'weekly_plan_preview');
+      expect(planMsg).toBeDefined();
+      expect(planMsg.card.data.weekOffset).toBe(0);
+
+      const nextWeekDays = app.getPlannerWeekDates(1);
+      const nextWeekBtn = document.querySelector('[data-ai-action="set-plan-week"][data-week-offset="1"]');
+      expect(nextWeekBtn).not.toBeNull();
+      nextWeekBtn.click();
+
+      expect(planMsg.card.data.weekOffset).toBe(1);
+      expect(planMsg.card.data.days[0].dateKey).toBe(nextWeekDays[0].dateKey);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1); // No consume llamada extra de IA al cambiar semana
+
+      app.applyAutoPlanFromChatCard(planMsg.id);
+      expect(app.plannerWeekOffset).toBe(1);
+      expect(window.state.mealPlan[nextWeekDays[0].dateKey]?.lunch).toBe(planMsg.card.data.days[0].slots.lunch);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
 });

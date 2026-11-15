@@ -11677,6 +11677,60 @@ body.is-mobile-device .ai-chat-composer {
   color: var(--m3-on-surface-variant);
 }
 
+.ai-autoplan-week-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--radius-full);
+  background: var(--m3-surface-container);
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+.ai-week-nav-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: transparent;
+  color: var(--m3-on-surface-variant);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease;
+}
+
+.ai-week-nav-btn:hover:not(:disabled) {
+  background: var(--m3-surface-container-high);
+  color: var(--m3-on-surface);
+}
+
+.ai-week-nav-btn:disabled,
+.ai-week-pill:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ai-week-pill {
+  border: none;
+  background: transparent;
+  color: var(--m3-on-surface-variant);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease;
+}
+
+.ai-week-pill.active {
+  background: var(--m3-surface);
+  color: var(--m3-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
 .ai-autoplan-badges {
   display: flex;
   flex-wrap: wrap;

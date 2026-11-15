@@ -12601,9 +12601,10 @@ class FoodAssistantApp {
   }
 
   // PLANNER - US-05, US-22, BUG-07, BUG-08, BUG-17
-  getPlannerWeekDates() {
+  getPlannerWeekDates(weekOffsetOverride = null) {
     const now = new Date();
-    const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (this.plannerWeekOffset * 7));
+    const offset = typeof weekOffsetOverride === 'number' ? weekOffsetOverride : this.plannerWeekOffset;
+    const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (offset * 7));
     return getWeekDates(targetDate);
   }
 
@@ -18652,8 +18653,9 @@ ${isEn
     };
   }
 
-  buildSmartAutoPlanProposal(aiDaysOverride = null, prompt = '', modeOverride = null) {
-    const weekDays = this.getPlannerWeekDates();
+  buildSmartAutoPlanProposal(aiDaysOverride = null, prompt = '', modeOverride = null, weekOffsetOverride = null) {
+    const targetOffset = typeof weekOffsetOverride === 'number' ? weekOffsetOverride : this.plannerWeekOffset;
+    const weekDays = this.getPlannerWeekDates(targetOffset);
     const activePrefs = Array.isArray(state.dietaryPreferences) ? state.dietaryPreferences : [];
     const goals = state.settings?.nutritionGoals || {};
     const goalsEnabled = Boolean(goals.enabled);
@@ -18716,6 +18718,7 @@ ${isEn
       : '';
 
     return {
+      weekOffset: targetOffset,
       weekLabel,
       mode: defaultMode,
       applyToShopping: false,
@@ -18817,9 +18820,12 @@ ${isEn
     }).join('');
 
     const safeMsgId = escapeHtml(messageId);
+    const currentOffset = typeof cardData.weekOffset === 'number' ? cardData.weekOffset : (this.plannerWeekOffset || 0);
+    const thisWeekLabel = window.I18n ? window.I18n.t('ai.autoPlanThisWeek') : 'Esta semana';
+    const nextWeekLabel = window.I18n ? window.I18n.t('ai.autoPlanNextWeek') : 'Próx. semana';
     const applyBtnHtml = cardData.applied
       ? `<span class="ai-autoplan-applied-pill"><span class="material-symbols-outlined icon-sm">check_circle</span> ${escapeHtml(appliedLabel)}</span>
-         <button type="button" class="btn btn-primary btn-sm" data-ai-action="open-planner">${escapeHtml(viewPlannerLabel)}</button>`
+         <button type="button" class="btn btn-primary btn-sm" data-ai-action="open-planner" data-msg-id="${safeMsgId}">${escapeHtml(viewPlannerLabel)}</button>`
       : `<button type="button" class="btn btn-primary btn-sm" data-ai-action="apply-autoplan" data-msg-id="${safeMsgId}">
            <span class="material-symbols-outlined icon-sm">check</span> ${escapeHtml(applyLabel)}
          </button>`;
@@ -18834,6 +18840,16 @@ ${isEn
               ${cardData.weekLabel ? `<span class="ai-autoplan-week-range">${escapeHtml(cardData.weekLabel)}</span>` : ''}
             </div>
           </div>
+        </div>
+        <div class="ai-autoplan-week-bar" role="group" aria-label="${isEn ? 'Select week' : 'Seleccionar semana'}">
+          <button type="button" class="ai-week-nav-btn" data-ai-action="set-plan-week" data-msg-id="${safeMsgId}" data-week-offset="${currentOffset - 1}" ${cardData.applied ? 'disabled' : ''} aria-label="${isEn ? 'Previous week' : 'Semana anterior'}">
+            <span class="material-symbols-outlined icon-15">chevron_left</span>
+          </button>
+          <button type="button" class="ai-week-pill ${currentOffset === 0 ? 'active' : ''}" data-ai-action="set-plan-week" data-msg-id="${safeMsgId}" data-week-offset="0" ${cardData.applied ? 'disabled' : ''}>${escapeHtml(thisWeekLabel)}</button>
+          <button type="button" class="ai-week-pill ${currentOffset === 1 ? 'active' : ''}" data-ai-action="set-plan-week" data-msg-id="${safeMsgId}" data-week-offset="1" ${cardData.applied ? 'disabled' : ''}>${escapeHtml(nextWeekLabel)}</button>
+          <button type="button" class="ai-week-nav-btn" data-ai-action="set-plan-week" data-msg-id="${safeMsgId}" data-week-offset="${currentOffset + 1}" ${cardData.applied ? 'disabled' : ''} aria-label="${isEn ? 'Next week' : 'Semana siguiente'}">
+            <span class="material-symbols-outlined icon-15">chevron_right</span>
+          </button>
         </div>
         ${badgesHtml.length > 0 ? `<div class="ai-autoplan-badges">${badgesHtml.join('')}</div>` : ''}
         <div class="ai-autoplan-mode-switch" role="group" aria-label="Modo de aplicación">
@@ -19015,11 +19031,17 @@ ${isEn
       this.swapAutoPlanCardSlot(msgId, btn.dataset.dateKey, btn.dataset.slotKey);
     } else if (action === 'set-plan-mode') {
       this.setAutoPlanCardMode(msgId, btn.dataset.mode);
+    } else if (action === 'set-plan-week') {
+      this.shiftAutoPlanCardWeek(msgId, btn.dataset.weekOffset);
     } else if (action === 'apply-autoplan') {
       this.applyAutoPlanFromChatCard(msgId);
     } else if (action === 'regen-autoplan') {
       this.regenerateAutoPlanFromChatCard(msgId);
     } else if (action === 'open-planner') {
+      const msg = msgId ? this.findAiCardMessage(msgId) : null;
+      if (typeof msg?.card?.data?.weekOffset === 'number') {
+        this.plannerWeekOffset = msg.card.data.weekOffset;
+      }
       this.switchView('view-planner');
     } else if (action === 'review-chat-recipe') {
       this.reviewChatExtractedRecipe(msgId);
@@ -19166,10 +19188,44 @@ ${isEn
     return addedCount;
   }
 
+  shiftAutoPlanCardWeek(messageId, nextOffset) {
+    const msg = this.findAiCardMessage(messageId);
+    const cardData = msg?.card?.data;
+    if (!cardData || !Array.isArray(cardData.days) || cardData.applied) return;
+    const targetOffset = Number.isFinite(Number(nextOffset)) ? Number(nextOffset) : 0;
+    const weekDays = this.getPlannerWeekDates(targetOffset);
+    if (!Array.isArray(weekDays) || weekDays.length === 0) return;
+
+    cardData.weekOffset = targetOffset;
+    cardData.days = cardData.days.map((d, idx) => {
+      const wDay = weekDays[idx] || weekDays[0];
+      return {
+        ...d,
+        dateKey: wDay.dateKey,
+        dayName: wDay.dayName
+      };
+    });
+
+    const firstDay = weekDays[0]?.date;
+    const lastDay = weekDays[weekDays.length - 1]?.date;
+    const isEn = typeof window !== 'undefined' && window.I18n && window.I18n.getLanguage() === 'en';
+    const months = isEn ? MONTHS_SHORT_EN : MONTHS_SHORT_ES;
+    cardData.weekLabel = (firstDay && lastDay)
+      ? `${firstDay.getDate()} ${months[firstDay.getMonth()]} - ${lastDay.getDate()} ${months[lastDay.getMonth()]}`
+      : '';
+
+    this.saveAiChatHistory();
+    this.renderAiChatView();
+  }
+
   applyAutoPlanFromChatCard(messageId) {
     const msg = this.findAiCardMessage(messageId);
     const cardData = msg?.card?.data;
     if (!cardData || !Array.isArray(cardData.days)) return;
+
+    if (typeof cardData.weekOffset === 'number') {
+      this.plannerWeekOffset = cardData.weekOffset;
+    }
 
     const mode = cardData.mode === 'merge' ? 'merge' : 'replace';
     const mappedDays = cardData.days.map(d => ({
