@@ -1611,6 +1611,13 @@ function mergeOrAddShoppingItem(shoppingList, newItem) {
     existing.updatedAt = (newItem.updatedAt && new Date(newItem.updatedAt).getTime() > new Date(existing.updatedAt || 0).getTime())
       ? newItem.updatedAt
       : (existing.updatedAt || nowIso);
+    if (!existing.householdId && newItem.householdId) {
+      existing.householdId = newItem.householdId;
+    }
+    if (!existing.ownerUserId && newItem.ownerUserId) {
+      existing.ownerUserId = newItem.ownerUserId;
+    }
+    existing._syncedWithCloud = Boolean(existing._syncedWithCloud && newItem._syncedWithCloud && (!newItem.id || newItem.id === existing.id));
     return existing;
   }
 
@@ -1627,6 +1634,9 @@ function mergeOrAddShoppingItem(shoppingList, newItem) {
     recipeBreakdown: incomingBreakdown,
     updatedAt: newItem.updatedAt || nowIso
   };
+  if (newItem.householdId) created.householdId = newItem.householdId;
+  if (newItem.ownerUserId) created.ownerUserId = newItem.ownerUserId;
+  if (newItem._syncedWithCloud) created._syncedWithCloud = true;
   recalculateShoppingItemQuantities(created);
   shoppingList.push(created);
   return created;
@@ -2751,6 +2761,69 @@ class StateStore {
       return false;
     }
     return true;
+  }
+
+  getRecentTombstoneIds(entityType, maxCount = 200) {
+    if (!entityType) return [];
+    if (!this.tombstones) {
+      this.tombstones = this.load('fa_tombstones', {});
+    }
+    const bucket = this.tombstones[entityType] || {};
+    const now = Date.now();
+    let expiredRemoved = false;
+    const validEntries = [];
+
+    Object.entries(bucket).forEach(([id, ts]) => {
+      if (!id) return;
+      if (!ts || (now - ts > 1209600000)) {
+        delete bucket[id];
+        expiredRemoved = true;
+      } else {
+        validEntries.push([id, ts]);
+      }
+    });
+
+    if (expiredRemoved) {
+      this.save('fa_tombstones', this.tombstones);
+    }
+
+    validEntries.sort((a, b) => b[1] - a[1]);
+    const result = [];
+    const seen = new Set();
+
+    validEntries.forEach(([id]) => {
+      if (!seen.has(id)) {
+        seen.add(id);
+        result.push(id);
+      }
+    });
+
+    const pendingDeleted = Array.isArray(this.deletedRecords?.[entityType]) ? this.deletedRecords[entityType] : [];
+    pendingDeleted.forEach(id => {
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        result.push(id);
+      }
+    });
+
+    return maxCount > 0 ? result.slice(0, maxCount) : result;
+  }
+
+  getLatestTombstoneIso(entityType) {
+    if (!entityType) return null;
+    if (!this.tombstones) {
+      this.tombstones = this.load('fa_tombstones', {});
+    }
+    const bucket = this.tombstones[entityType];
+    if (!bucket) return null;
+    const now = Date.now();
+    let maxTs = 0;
+    Object.values(bucket).forEach(ts => {
+      if (typeof ts === 'number' && !isNaN(ts) && (now - ts <= 1209600000) && ts > maxTs) {
+        maxTs = ts;
+      }
+    });
+    return maxTs > 0 ? new Date(maxTs).toISOString() : null;
   }
 
   clearDeletedRecords(entityType, ids) {
@@ -4934,7 +5007,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.10';
+  window.APP_VERSION = 'v2.11';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4982,7 +5055,7 @@ class FoodAssistantApp {
   constructor() {
     if (typeof window !== 'undefined') window.app = this;
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.10';
+    this.appVersion = window.APP_VERSION || 'v2.11';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -6788,6 +6861,7 @@ class FoodAssistantApp {
 
       // 2. Fusión de Meal Plans (con desduplicación por fecha en Modo Familia US-77)
       let remoteHouseholdPrefsRow = null;
+      const remoteDeletedShoppingIds = new Set();
       const hasLocalDayMeals = (d) => !!(d && (d.breakfast || d.lunch || d.snack || d.dinner || (Array.isArray(d.customSlots) && d.customSlots.some(cs => cs && cs.recipeId && cs.type !== 'plan_explicit_clear'))));
       const hasRemoteRowMeals = (r) => !!(r && (r.breakfast_recipe_id || r.lunch_recipe_id || r.snack_recipe_id || r.dinner_recipe_id || (Array.isArray(r.custom_slots) && r.custom_slots.some(cs => cs && cs.recipeId && cs.type !== 'plan_explicit_clear'))));
 
@@ -6804,6 +6878,20 @@ class FoodAssistantApp {
           const dKey = row?.plan_date || row?.id;
           if (!dKey) return;
           if (dKey === '__household_prefs__' || dKey === '__user_prefs__') {
+            if (Array.isArray(row.custom_slots)) {
+              row.custom_slots.forEach(slot => {
+                if (slot && slot.type === 'deleted_shopping_items' && Array.isArray(slot.deletedIds)) {
+                  slot.deletedIds.forEach(delId => {
+                    if (delId) {
+                      remoteDeletedShoppingIds.add(delId);
+                      if (typeof state.addTombstone === 'function') {
+                        state.addTombstone('shoppingItems', delId);
+                      }
+                    }
+                  });
+                }
+              });
+            }
             if (!remoteHouseholdPrefsRow || new Date(row.updated_at || 0).getTime() >= new Date(remoteHouseholdPrefsRow.updated_at || 0).getTime()) {
               remoteHouseholdPrefsRow = row;
             }
@@ -6887,10 +6975,18 @@ class FoodAssistantApp {
       }
 
       // 3. Fusión de Shopping Items (con desduplicación colaborativa en Modo Familia US-77)
+      if (remoteDeletedShoppingIds.size > 0 && typeof state.clearDeletedRecords === 'function') {
+        state.clearDeletedRecords('shoppingItems', Array.from(remoteDeletedShoppingIds));
+      }
       if (Array.isArray(shopRes.data)) {
         const dedupedShopMap = new Map();
         shopRes.data.forEach(row => {
           if (!row || !row.id) return;
+          if (remoteDeletedShoppingIds.has(row.id) ||
+            state.deletedRecords.shoppingItems?.includes(row.id) ||
+            (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', row.id))) {
+            return;
+          }
           const prev = dedupedShopMap.get(row.id);
           if (!prev || new Date(row.updated_at || 0).getTime() >= new Date(prev.updated_at || 0).getTime()) {
             dedupedShopMap.set(row.id, row);
@@ -6898,23 +6994,53 @@ class FoodAssistantApp {
         });
         const remoteShopList = Array.from(dedupedShopMap.values());
         const remoteShopIds = new Set(remoteShopList.map(i => i.id));
-        if (state.lastSyncedAt) {
-          const lastSyncTime = new Date(state.lastSyncedAt).getTime();
-          const initialShopLen = state.shoppingList.length;
-          state.shoppingList = state.shoppingList.filter(item => {
-            if (remoteShopIds.has(item.id)) return true;
+        const lastSyncTime = state.lastSyncedAt ? new Date(state.lastSyncedAt).getTime() : 0;
+        const initialShopLen = state.shoppingList.length;
+        state.shoppingList = state.shoppingList.filter(item => {
+          if (!item || !item.id) return false;
+          if (remoteDeletedShoppingIds.has(item.id) ||
+            state.deletedRecords.shoppingItems?.includes(item.id) ||
+            (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', item.id))) {
+            return false;
+          }
+          if (remoteShopIds.has(item.id)) return true;
+
+          // Si el artículo ya estaba sincronizado con la nube o pertenecía a otro miembro del hogar
+          // y ya no viene en remoteShopIds, fue borrado en otro dispositivo/miembro.
+          if (item._syncedWithCloud) {
+            if (typeof state.addTombstone === 'function') state.addTombstone('shoppingItems', item.id);
+            return false;
+          }
+          if (item.ownerUserId && item.ownerUserId !== state.cloudUser.id) {
+            if (typeof state.addTombstone === 'function') state.addTombstone('shoppingItems', item.id);
+            return false;
+          }
+
+          // Si el artículo está marcado como comprado (y no acaba de marcarse localmente hace <10s)
+          // y ya no existe en la nube, fue limpiado/borrado remotamente.
+          const isRecentlyCheckedLocally = this._recentShoppingCheckTimestamps &&
+            (Date.now() - (this._recentShoppingCheckTimestamps.get(item.id) || 0) < 10000);
+          if ((item.isChecked || item.checked) && !isRecentlyCheckedLocally) {
+            if (typeof state.addTombstone === 'function') state.addTombstone('shoppingItems', item.id);
+            return false;
+          }
+
+          if (state.lastSyncedAt) {
             if (item.updatedAt && new Date(item.updatedAt).getTime() > lastSyncTime) {
               return true;
             }
+            if (typeof state.addTombstone === 'function') state.addTombstone('shoppingItems', item.id);
             return false;
-          });
-          if (state.shoppingList.length !== initialShopLen) {
-            stateChanged = true;
           }
+          return true;
+        });
+        if (state.shoppingList.length !== initialShopLen) {
+          stateChanged = true;
         }
 
         remoteShopList.forEach(remoteRow => {
-          if (state.deletedRecords.shoppingItems?.includes(remoteRow.id) ||
+          if (remoteDeletedShoppingIds.has(remoteRow.id) ||
+            state.deletedRecords.shoppingItems?.includes(remoteRow.id) ||
             (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', remoteRow.id))) {
             return;
           }
@@ -6954,7 +7080,8 @@ class FoodAssistantApp {
             isChecked: !!remoteRow.is_checked,
             recipeOrigin: remoteRow.recipe_origin || '',
             recipeBreakdown: breakdown,
-            updatedAt: remoteRow.updated_at
+            updatedAt: remoteRow.updated_at,
+            _syncedWithCloud: true
           };
           if (remoteRow.household_id) remoteItem.householdId = remoteRow.household_id;
           if (remoteRow.user_id) remoteItem.ownerUserId = remoteRow.user_id;
@@ -6972,7 +7099,8 @@ class FoodAssistantApp {
               state.shoppingList[localIdx] = {
                 ...local,
                 ...remoteItem,
-                isChecked: finalChecked
+                isChecked: finalChecked,
+                _syncedWithCloud: true
               };
               stateChanged = true;
             } else if (remoteDate === localDate) {
@@ -6981,6 +7109,19 @@ class FoodAssistantApp {
                 local.isChecked = finalChecked;
                 stateChanged = true;
               }
+              if (!local._syncedWithCloud) {
+                local._syncedWithCloud = true;
+                stateChanged = true;
+              }
+              if (!local.householdId && remoteItem.householdId) local.householdId = remoteItem.householdId;
+              if (!local.ownerUserId && remoteItem.ownerUserId) local.ownerUserId = remoteItem.ownerUserId;
+            } else {
+              if (!local._syncedWithCloud) {
+                local._syncedWithCloud = true;
+                stateChanged = true;
+              }
+              if (!local.householdId && remoteItem.householdId) local.householdId = remoteItem.householdId;
+              if (!local.ownerUserId && remoteItem.ownerUserId) local.ownerUserId = remoteItem.ownerUserId;
             }
             // Si remoteDate < localDate, la versión local es estrictamente más reciente
             // (por broadcast en vivo o pulsación local); nunca sobreescribir con datos obsoletos de la nube.
@@ -7609,6 +7750,18 @@ class FoodAssistantApp {
         return rowPayload;
       });
 
+      const deletedShoppingIds = typeof state.getRecentTombstoneIds === 'function'
+        ? state.getRecentTombstoneIds('shoppingItems', 200)
+        : [];
+      const deletedShoppingUpdatedAt = typeof state.getLatestTombstoneIso === 'function'
+        ? state.getLatestTombstoneIso('shoppingItems')
+        : null;
+      const deletedShoppingSlotPayload = {
+        type: 'deleted_shopping_items',
+        deletedIds: deletedShoppingIds,
+        updatedAt: deletedShoppingUpdatedAt || new Date().toISOString()
+      };
+
       if (activeHouseholdId) {
         const hhDietaryUpdatedAt = state.dietaryUpdatedAt || state.household?.dietaryUpdatedAt || new Date().toISOString();
         const hhPrefSlotPayload = {
@@ -7621,9 +7774,12 @@ class FoodAssistantApp {
           cookbooks: Array.isArray(state.cookbooks) ? state.cookbooks : [],
           updatedAt: state.cookbooksUpdatedAt || new Date().toISOString()
         };
-        const hhRowUpdatedAt = state.cookbooksUpdatedAt && (!hhDietaryUpdatedAt || new Date(state.cookbooksUpdatedAt).getTime() > new Date(hhDietaryUpdatedAt).getTime())
-          ? state.cookbooksUpdatedAt
-          : hhDietaryUpdatedAt;
+        const candidatePrefTimestamps = [hhDietaryUpdatedAt, state.cookbooksUpdatedAt, deletedShoppingUpdatedAt]
+          .filter(Boolean)
+          .map(ts => ({ iso: ts, ms: new Date(ts).getTime() }))
+          .filter(entry => !isNaN(entry.ms))
+          .sort((a, b) => b.ms - a.ms);
+        const hhRowUpdatedAt = candidatePrefTimestamps.length > 0 ? candidatePrefTimestamps[0].iso : hhDietaryUpdatedAt;
 
         mealPlansPayload.push({
           id: '__household_prefs__',
@@ -7634,7 +7790,7 @@ class FoodAssistantApp {
           lunch_recipe_id: null,
           snack_recipe_id: null,
           dinner_recipe_id: null,
-          custom_slots: [hhPrefSlotPayload, hhCookbooksSlotPayload],
+          custom_slots: [hhPrefSlotPayload, hhCookbooksSlotPayload, deletedShoppingSlotPayload],
           household_id: activeHouseholdId,
           updated_at: hhRowUpdatedAt
         });
@@ -7661,6 +7817,13 @@ class FoodAssistantApp {
           customTags: Array.isArray(state.customTags) ? [...state.customTags] : [],
           updatedAt: state.dietaryUpdatedAt || new Date().toISOString()
         };
+        const candidateUserTimestamps = [userCookbooksUpdatedAt, deletedShoppingUpdatedAt]
+          .filter(Boolean)
+          .map(ts => ({ iso: ts, ms: new Date(ts).getTime() }))
+          .filter(entry => !isNaN(entry.ms))
+          .sort((a, b) => b.ms - a.ms);
+        const userPrefsRowUpdatedAt = candidateUserTimestamps.length > 0 ? candidateUserTimestamps[0].iso : userCookbooksUpdatedAt;
+
         mealPlansPayload.push({
           id: '__user_prefs__',
           user_id: state.cloudUser.id,
@@ -7670,8 +7833,8 @@ class FoodAssistantApp {
           lunch_recipe_id: null,
           snack_recipe_id: null,
           dinner_recipe_id: null,
-          custom_slots: [userPrefSlotPayload, userCookbooksSlotPayload],
-          updated_at: userCookbooksUpdatedAt
+          custom_slots: [userPrefSlotPayload, userCookbooksSlotPayload, deletedShoppingSlotPayload],
+          updated_at: userPrefsRowUpdatedAt
         });
       }
 
@@ -7681,8 +7844,18 @@ class FoodAssistantApp {
       }
 
       // 4. Batch Upsert Shopping Items (US-45, BUG-23, BUG-24 & US-77 Modo Familia)
-      if (Array.isArray(state.shoppingList) && state.shoppingList.length > 0) {
-        const shoppingPayload = state.shoppingList.map(item => {
+      const activeShoppingToPush = Array.isArray(state.shoppingList)
+        ? state.shoppingList.filter(item => {
+          if (!item) return false;
+          if (item.id && (state.deletedRecords.shoppingItems?.includes(item.id) ||
+            (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', item.id)))) {
+            return false;
+          }
+          return true;
+        })
+        : [];
+      if (activeShoppingToPush.length > 0) {
+        const shoppingPayload = activeShoppingToPush.map(item => {
           if (!item.id) item.id = generateId('shop-');
           const rowPayload = {
             id: item.id,
@@ -7704,6 +7877,25 @@ class FoodAssistantApp {
 
         const sRes = await this.upsertWithSchemaFallback('shopping_items', shoppingPayload);
         if (!sRes.success) throw sRes.error;
+
+        let markedSynced = false;
+        activeShoppingToPush.forEach(item => {
+          if (!item._syncedWithCloud) {
+            item._syncedWithCloud = true;
+            markedSynced = true;
+          }
+          if (activeHouseholdId && !item.householdId) {
+            item.householdId = activeHouseholdId;
+            markedSynced = true;
+          }
+          if (!item.ownerUserId && state.cloudUser?.id) {
+            item.ownerUserId = state.cloudUser.id;
+            markedSynced = true;
+          }
+        });
+        if (markedSynced) {
+          state.save('fa_shopping', state.shoppingList);
+        }
       }
 
       // 5. Preferencias Dietéticas, Tags Personalizados, Libros y Objetivos (Sincronización multi-dispositivo)
@@ -14709,13 +14901,52 @@ class FoodAssistantApp {
           aisle: item.aisle,
           isChecked: !!item.isChecked,
           recipeOrigin: item.recipeOrigin || '',
+          householdId: activeHouseholdId || item.householdId || null,
+          ownerUserId: rowPayload.user_id,
           updatedAt: rowPayload.updated_at
         }
       });
-      await this.upsertWithSchemaFallback('shopping_items', [rowPayload]);
+      const upRes = await this.upsertWithSchemaFallback('shopping_items', [rowPayload]);
+      if (upRes?.success && !item._syncedWithCloud) {
+        item._syncedWithCloud = true;
+        state.save('fa_shopping', state.shoppingList);
+      }
     } catch (e) {
       console.warn('[Sync] Fallo en syncShoppingItemInstant, delegando en scheduleSyncWithCloud:', e);
       this.scheduleSyncWithCloud();
+    }
+  }
+
+  async deleteShoppingItemsInstant(ids) {
+    if (!this.supabaseClient || !state.cloudUser?.id || !Array.isArray(ids) || ids.length === 0) return;
+    const cleanIds = ids.filter(Boolean);
+    if (cleanIds.length === 0) return;
+    try {
+      const activeHouseholdId = state.household?.id || null;
+      const deleteScopeCol = activeHouseholdId ? 'household_id' : 'user_id';
+      const deleteScopeVal = activeHouseholdId || state.cloudUser.id;
+      const CHUNK_SIZE = 50;
+      const successfullyDeleted = [];
+      for (let i = 0; i < cleanIds.length; i += CHUNK_SIZE) {
+        const chunk = cleanIds.slice(i, i + CHUNK_SIZE);
+        let delQuery = this.supabaseClient.from('shopping_items').delete().in('id', chunk);
+        if (activeHouseholdId && typeof delQuery?.or === 'function') {
+          delQuery = delQuery.or(`household_id.eq.${activeHouseholdId},user_id.eq.${state.cloudUser.id}`);
+        } else if (delQuery && typeof delQuery.eq === 'function') {
+          delQuery = delQuery.eq(deleteScopeCol, deleteScopeVal);
+        }
+        const delRes = (await delQuery) || {};
+        if (!delRes.error) {
+          successfullyDeleted.push(...chunk);
+        } else {
+          console.warn('[Sync] Error en deleteShoppingItemsInstant:', delRes.error);
+        }
+      }
+      if (successfullyDeleted.length > 0) {
+        state.clearDeletedRecords('shoppingItems', successfullyDeleted);
+      }
+    } catch (e) {
+      console.warn('[Sync] Fallo en deleteShoppingItemsInstant, delegando en scheduleSyncWithCloud:', e);
     }
   }
 
@@ -14734,6 +14965,8 @@ class FoodAssistantApp {
     const item = state.shoppingList[index];
     if (item && item.id) {
       state.trackDeletion('shoppingItems', item.id);
+      if (this._recentShoppingCheckTimestamps) this._recentShoppingCheckTimestamps.delete(item.id);
+      if (this._pendingShoppingToggles) this._pendingShoppingToggles.delete(item.id);
       this.broadcastRealtimeChange('shopping_change', {
         action: 'delete',
         itemId: item.id
@@ -14741,6 +14974,9 @@ class FoodAssistantApp {
     }
     state.shoppingList.splice(index, 1);
     state.save('fa_shopping', state.shoppingList);
+    if (item && item.id && this.supabaseClient && state.cloudUser?.id) {
+      this.deleteShoppingItemsInstant([item.id]);
+    }
     this.scheduleSyncWithCloud();
     this.flushSync();
     this.render();
@@ -14777,6 +15013,7 @@ class FoodAssistantApp {
               state.trackDeletion('shoppingItems', id);
               deletedIds.push(id);
               if (this._pendingShoppingToggles) this._pendingShoppingToggles.delete(id);
+              if (this._recentShoppingCheckTimestamps) this._recentShoppingCheckTimestamps.delete(id);
             });
             state.shoppingList = [];
             state.save('fa_shopping', state.shoppingList);
@@ -14784,6 +15021,9 @@ class FoodAssistantApp {
               action: 'clear_completed',
               deletedIds
             });
+            if (this.supabaseClient && state.cloudUser?.id && deletedIds.length > 0) {
+              await this.deleteShoppingItemsInstant(deletedIds);
+            }
             this.scheduleSyncWithCloud();
             await this.flushSync();
             this.render();
@@ -14806,6 +15046,7 @@ class FoodAssistantApp {
               state.trackDeletion('shoppingItems', id);
               deletedIds.push(id);
               if (this._pendingShoppingToggles) this._pendingShoppingToggles.delete(id);
+              if (this._recentShoppingCheckTimestamps) this._recentShoppingCheckTimestamps.delete(id);
             });
             state.shoppingList = state.shoppingList.filter(i => !i.isChecked && !i.checked);
             state.save('fa_shopping', state.shoppingList);
@@ -14813,6 +15054,9 @@ class FoodAssistantApp {
               action: 'clear_completed',
               deletedIds
             });
+            if (this.supabaseClient && state.cloudUser?.id && deletedIds.length > 0) {
+              await this.deleteShoppingItemsInstant(deletedIds);
+            }
             this.scheduleSyncWithCloud();
             await this.flushSync();
             this.render();
@@ -14837,6 +15081,7 @@ class FoodAssistantApp {
             state.trackDeletion('shoppingItems', id);
             deletedIds.push(id);
             if (this._pendingShoppingToggles) this._pendingShoppingToggles.delete(id);
+            if (this._recentShoppingCheckTimestamps) this._recentShoppingCheckTimestamps.delete(id);
           });
           state.shoppingList = [];
           state.save('fa_shopping', state.shoppingList);
@@ -14844,6 +15089,9 @@ class FoodAssistantApp {
             action: 'clear_completed',
             deletedIds
           });
+          if (this.supabaseClient && state.cloudUser?.id && deletedIds.length > 0) {
+            await this.deleteShoppingItemsInstant(deletedIds);
+          }
           this.scheduleSyncWithCloud();
           await this.flushSync();
           this.render();
@@ -14894,13 +15142,15 @@ class FoodAssistantApp {
       recipeOrigin: "Añadido manualmente",
       updatedAt: new Date().toISOString()
     };
+    if (state.household?.id) newItem.householdId = state.household.id;
+    if (state.cloudUser?.id) newItem.ownerUserId = state.cloudUser.id;
 
-    mergeOrAddShoppingItem(state.shoppingList, newItem);
+    const mergedItem = mergeOrAddShoppingItem(state.shoppingList, newItem) || newItem;
 
     state.save('fa_shopping', state.shoppingList);
     this.broadcastRealtimeChange('shopping_change', {
       action: 'add',
-      item: newItem
+      item: mergedItem
     });
     this.scheduleSyncWithCloud();
     this.flushSync();
@@ -15250,15 +15500,29 @@ class FoodAssistantApp {
 
     const clearFirst = document.getElementById('shopping-preview-clear-first')?.checked;
     if (clearFirst) {
+      const deletedIds = [];
       state.shoppingList.forEach(item => {
-        if (item.id) state.trackDeletion('shoppingItems', item.id);
+        if (item.id) {
+          state.trackDeletion('shoppingItems', item.id);
+          deletedIds.push(item.id);
+          if (this._recentShoppingCheckTimestamps) this._recentShoppingCheckTimestamps.delete(item.id);
+        }
       });
       state.shoppingList = [];
+      if (deletedIds.length > 0) {
+        this.broadcastRealtimeChange('shopping_change', {
+          action: 'clear_completed',
+          deletedIds
+        });
+        if (this.supabaseClient && state.cloudUser?.id) {
+          this.deleteShoppingItemsInstant(deletedIds);
+        }
+      }
     }
 
     let addedCount = 0;
     selectedItems.forEach(item => {
-      mergeOrAddShoppingItem(state.shoppingList, {
+      const toAdd = {
         id: item.id || generateId('shop-'),
         name: item.name,
         amount: item.amount,
@@ -15267,7 +15531,10 @@ class FoodAssistantApp {
         isChecked: false,
         recipeOrigin: item.recipeOrigin || '',
         updatedAt: new Date().toISOString()
-      });
+      };
+      if (state.household?.id) toAdd.householdId = state.household.id;
+      if (state.cloudUser?.id) toAdd.ownerUserId = state.cloudUser.id;
+      mergeOrAddShoppingItem(state.shoppingList, toAdd);
       addedCount++;
     });
 
@@ -19758,12 +20025,15 @@ REGLAS CRÍTICAS:
           if (item.amount !== undefined) local.amount = item.amount;
           if (item.unit !== undefined) local.unit = item.unit;
           if (item.aisle) local.aisle = item.aisle;
+          if (item.householdId) local.householdId = item.householdId;
+          if (item.ownerUserId) local.ownerUserId = item.ownerUserId;
+          local._syncedWithCloud = true;
           modified = true;
           if (!this._recentShoppingCheckTimestamps) this._recentShoppingCheckTimestamps = new Map();
           this._recentShoppingCheckTimestamps.set(item.id, Date.now());
         }
       } else {
-        state.shoppingList.push({
+        const newItem = {
           id: item.id,
           name: item.name,
           amount: item.amount !== undefined ? item.amount : null,
@@ -19771,8 +20041,12 @@ REGLAS CRÍTICAS:
           aisle: item.aisle || 'other',
           isChecked: !!item.isChecked,
           recipeOrigin: item.recipeOrigin || '',
-          updatedAt: item.updatedAt || new Date().toISOString()
-        });
+          updatedAt: item.updatedAt || new Date().toISOString(),
+          _syncedWithCloud: true
+        };
+        if (item.householdId || state.household?.id) newItem.householdId = item.householdId || state.household.id;
+        if (item.ownerUserId || payload.senderId) newItem.ownerUserId = item.ownerUserId || payload.senderId;
+        state.shoppingList.push(newItem);
         modified = true;
         if (!this._recentShoppingCheckTimestamps) this._recentShoppingCheckTimestamps = new Map();
         this._recentShoppingCheckTimestamps.set(item.id, Date.now());
@@ -19781,6 +20055,7 @@ REGLAS CRÍTICAS:
       if (payload.itemId) {
         state.trackDeletion('shoppingItems', payload.itemId);
         if (this._pendingShoppingToggles) this._pendingShoppingToggles.delete(payload.itemId);
+        if (this._recentShoppingCheckTimestamps) this._recentShoppingCheckTimestamps.delete(payload.itemId);
         const prevLen = state.shoppingList.length;
         state.shoppingList = state.shoppingList.filter(i => i.id !== payload.itemId);
         if (state.shoppingList.length !== prevLen) modified = true;
@@ -19791,6 +20066,7 @@ REGLAS CRÍTICAS:
         payload.deletedIds.forEach(id => {
           state.trackDeletion('shoppingItems', id);
           if (this._pendingShoppingToggles) this._pendingShoppingToggles.delete(id);
+          if (this._recentShoppingCheckTimestamps) this._recentShoppingCheckTimestamps.delete(id);
         });
         state.shoppingList = state.shoppingList.filter(i => !payload.deletedIds.includes(i.id));
       } else {
@@ -19798,6 +20074,7 @@ REGLAS CRÍTICAS:
           if (Boolean(i.isChecked || i.checked) && i.id) {
             state.trackDeletion('shoppingItems', i.id);
             if (this._pendingShoppingToggles) this._pendingShoppingToggles.delete(i.id);
+            if (this._recentShoppingCheckTimestamps) this._recentShoppingCheckTimestamps.delete(i.id);
           }
         });
         state.shoppingList = state.shoppingList.filter(i => !i.isChecked && !i.checked);
@@ -19811,7 +20088,13 @@ REGLAS CRÍTICAS:
         }
         const exists = state.shoppingList.some(i => i.id === payload.item.id);
         if (!exists) {
-          state.shoppingList.push(payload.item);
+          const addedItem = {
+            ...payload.item,
+            _syncedWithCloud: true
+          };
+          if (payload.item.householdId || state.household?.id) addedItem.householdId = payload.item.householdId || state.household.id;
+          if (payload.item.ownerUserId || payload.senderId) addedItem.ownerUserId = payload.item.ownerUserId || payload.senderId;
+          state.shoppingList.push(addedItem);
           modified = true;
         }
       }
@@ -19907,6 +20190,9 @@ REGLAS CRÍTICAS:
               if (remoteRow.amount !== undefined) local.amount = (remoteRow.amount !== null && !isNaN(remoteRow.amount)) ? Number(remoteRow.amount) : null;
               if (remoteRow.unit !== undefined) local.unit = remoteRow.unit || '';
               if (remoteRow.aisle) local.aisle = remoteRow.aisle;
+              if (remoteRow.household_id) local.householdId = remoteRow.household_id;
+              if (remoteRow.user_id) local.ownerUserId = remoteRow.user_id;
+              local._syncedWithCloud = true;
               state.save('fa_shopping', state.shoppingList);
               this.renderShoppingList();
             }
@@ -19926,7 +20212,8 @@ REGLAS CRÍTICAS:
               isChecked: !!remoteRow.is_checked,
               recipeOrigin: remoteRow.recipe_origin || '',
               recipeBreakdown: breakdown,
-              updatedAt: remoteRow.updated_at
+              updatedAt: remoteRow.updated_at,
+              _syncedWithCloud: true
             };
             if (remoteRow.household_id) remoteItem.householdId = remoteRow.household_id;
             if (remoteRow.user_id) remoteItem.ownerUserId = remoteRow.user_id;
@@ -19957,7 +20244,8 @@ REGLAS CRÍTICAS:
               isChecked: !!remoteRow.is_checked,
               recipeOrigin: remoteRow.recipe_origin || '',
               recipeBreakdown: breakdown,
-              updatedAt: remoteRow.updated_at
+              updatedAt: remoteRow.updated_at,
+              _syncedWithCloud: true
             };
             if (remoteRow.household_id) remoteItem.householdId = remoteRow.household_id;
             if (remoteRow.user_id) remoteItem.ownerUserId = remoteRow.user_id;
@@ -19969,6 +20257,7 @@ REGLAS CRÍTICAS:
           const delId = payload.old.id;
           state.trackDeletion('shoppingItems', delId);
           if (this._pendingShoppingToggles) this._pendingShoppingToggles.delete(delId);
+          if (this._recentShoppingCheckTimestamps) this._recentShoppingCheckTimestamps.delete(delId);
           const prevLen = state.shoppingList.length;
           state.shoppingList = state.shoppingList.filter(i => i.id !== delId);
           if (state.shoppingList.length !== prevLen) {

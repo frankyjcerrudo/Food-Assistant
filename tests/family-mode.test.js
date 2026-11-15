@@ -1156,5 +1156,342 @@ describe('US-77: Modo Familia / Espacio Colaborativo del Hogar (Family Mode)', (
       expect(localStorage.getItem('fa_household')).toBeNull();
       expect(upsertedSettings.some(s => s.user_id === 'user-free-999' && s.active_household_id === null)).toBe(true);
     });
+
+    it('19. Sincronización de borrado individual con botón X (deleteGroceryItem) entre miembros del hogar sin resurrección remota', async () => {
+      state.tombstones = {};
+      state.deletedRecords = { recipes: [], mealPlans: [], shoppingItems: [], cookbooks: [] };
+      state.saveHousehold({
+        id: 'hh-family-999',
+        name: 'Casa Aroa y Fran',
+        ownerId: 'user-franky-111',
+        role: 'member'
+      });
+      state.cloudUser = { id: 'user-aroa-222', email: 'aroa@sabory.food', name: 'Aroa' };
+
+      const dbShopping = [
+        {
+          id: 'shop-tomates',
+          user_id: 'user-franky-111',
+          household_id: 'hh-family-999',
+          name: 'Tomates',
+          amount: 1,
+          unit: 'kg',
+          aisle: 'produce',
+          is_checked: false,
+          updated_at: '2026-11-15T18:00:00.000Z'
+        },
+        {
+          id: 'shop-leche',
+          user_id: 'user-franky-111',
+          household_id: 'hh-family-999',
+          name: 'Leche',
+          amount: 2,
+          unit: 'L',
+          aisle: 'dairy',
+          is_checked: false,
+          updated_at: '2026-11-15T18:00:00.000Z'
+        }
+      ];
+      let dbMealPlans = [];
+      const deleteCalls = [];
+      const pushedShoppingUpserts = [];
+
+      const createTableMock = (table) => {
+        const makeDeleteChain = () => {
+          const chain = {
+            _ids: [],
+            in: vi.fn((col, ids) => {
+              if (col === 'id') chain._ids = [...ids];
+              return chain;
+            }),
+            or: vi.fn(async () => {
+              deleteCalls.push({ table, ids: [...chain._ids] });
+              if (table === 'shopping_items') {
+                for (let i = dbShopping.length - 1; i >= 0; i--) {
+                  if (chain._ids.includes(dbShopping[i].id)) dbShopping.splice(i, 1);
+                }
+              }
+              return { error: null };
+            }),
+            eq: vi.fn(async () => {
+              deleteCalls.push({ table, ids: [...chain._ids] });
+              if (table === 'shopping_items') {
+                for (let i = dbShopping.length - 1; i >= 0; i--) {
+                  if (chain._ids.includes(dbShopping[i].id)) dbShopping.splice(i, 1);
+                }
+              }
+              return { error: null };
+            })
+          };
+          return chain;
+        };
+
+        return {
+          select: vi.fn().mockReturnValue({
+            or: vi.fn().mockReturnValue({
+              limit: vi.fn().mockImplementation(async () => {
+                if (table === 'shopping_items') return { data: [...dbShopping], error: null };
+                if (table === 'meal_plans') return { data: [...dbMealPlans], error: null };
+                return { data: [], error: null };
+              })
+            }),
+            eq: vi.fn().mockImplementation(async () => {
+              if (table === 'households') {
+                return { data: [{ id: 'hh-family-999', name: 'Casa Aroa y Fran', owner_id: 'user-franky-111', invite_code: 'SAB-9K2M' }], error: null };
+              }
+              if (table === 'household_members') {
+                return { data: [{ household_id: 'hh-family-999', user_id: 'user-franky-111' }, { household_id: 'hh-family-999', user_id: 'user-aroa-222' }], error: null };
+              }
+              if (table === 'shopping_items') return { data: [...dbShopping], error: null };
+              return { data: [], error: null };
+            })
+          }),
+          upsert: vi.fn().mockImplementation(async (payload) => {
+            const rows = Array.isArray(payload) ? payload : [payload];
+            if (table === 'shopping_items') {
+              pushedShoppingUpserts.push(rows);
+              rows.forEach(r => {
+                const idx = dbShopping.findIndex(x => x.id === r.id);
+                if (idx >= 0) dbShopping[idx] = { ...dbShopping[idx], ...r };
+                else dbShopping.push(r);
+              });
+            } else if (table === 'meal_plans') {
+              dbMealPlans = rows.filter(r => r.id === '__household_prefs__');
+            }
+            return { data: rows, error: null };
+          }),
+          update: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: [], error: null })
+          }),
+          delete: vi.fn(makeDeleteChain)
+        };
+      };
+
+      appInstance.supabaseClient = {
+        from: vi.fn(createTableMock),
+        auth: {
+          updateUser: vi.fn().mockResolvedValue({ data: {}, error: null }),
+          getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-aroa-222', user_metadata: {} } }, error: null })
+        }
+      };
+
+      const broadcastSpy = vi.spyOn(appInstance, 'broadcastRealtimeChange');
+
+      // 1. Aroa borra 'Tomates' con la X en su móvil
+      state.shoppingList = [
+        { id: 'shop-tomates', name: 'Tomates', amount: 1, unit: 'kg', aisle: 'produce', isChecked: false, updatedAt: '2026-11-15T18:00:00.000Z', householdId: 'hh-family-999', ownerUserId: 'user-franky-111', _syncedWithCloud: true },
+        { id: 'shop-leche', name: 'Leche', amount: 2, unit: 'L', aisle: 'dairy', isChecked: false, updatedAt: '2026-11-15T18:00:00.000Z', householdId: 'hh-family-999', ownerUserId: 'user-franky-111', _syncedWithCloud: true }
+      ];
+
+      appInstance.deleteGroceryItem('shop-tomates');
+      // Esperar promesas asíncronas de deleteShoppingItemsInstant + flushSync
+      await new Promise(r => setTimeout(r, 50));
+      while (appInstance.isPushingToCloud) {
+        await new Promise(r => setTimeout(r, 10));
+      }
+
+      expect(broadcastSpy).toHaveBeenCalledWith('shopping_change', {
+        action: 'delete',
+        itemId: 'shop-tomates'
+      });
+      expect(deleteCalls.some(c => c.table === 'shopping_items' && c.ids.includes('shop-tomates'))).toBe(true);
+      expect(dbShopping.some(i => i.id === 'shop-tomates')).toBe(false);
+
+      // 2. Ahora simulamos el móvil de Franky que NO recibió el broadcast y tiene lastSyncedAt antiguo
+      // (antes del último añadido de 'Tomates'), aunque ya tenía 'Tomates' tras una descarga/check previo.
+      state.cloudUser = { id: 'user-franky-111', email: 'franky@sabory.food', name: 'Franky' };
+      state.tombstones = {};
+      state.deletedRecords = { recipes: [], mealPlans: [], shoppingItems: [], cookbooks: [] };
+      state.lastSyncedAt = '2026-11-15T17:00:00.000Z';
+      state.shoppingList = [
+        { id: 'shop-tomates', name: 'Tomates', amount: 1, unit: 'kg', aisle: 'produce', isChecked: false, updatedAt: '2026-11-15T18:00:00.000Z', householdId: 'hh-family-999', ownerUserId: 'user-franky-111', _syncedWithCloud: true },
+        { id: 'shop-leche', name: 'Leche', amount: 2, unit: 'L', aisle: 'dairy', isChecked: false, updatedAt: '2026-11-15T18:00:00.000Z', householdId: 'hh-family-999', ownerUserId: 'user-franky-111', _syncedWithCloud: true }
+      ];
+      pushedShoppingUpserts.length = 0;
+
+      await appInstance.syncDataWithCloud(true);
+
+      // 'Tomates' debe desaparecer de la lista de Franky y NO resucitar en Supabase
+      expect(state.shoppingList.some(i => i.id === 'shop-tomates')).toBe(false);
+      expect(state.shoppingList.map(i => i.id)).toEqual(['shop-leche']);
+      expect(dbShopping.some(i => i.id === 'shop-tomates')).toBe(false);
+      const resurrected = pushedShoppingUpserts.flat().some(r => r.id === 'shop-tomates');
+      expect(resurrected).toBe(false);
+    });
+
+    it('20. Sincronización de Limpiar comprados (clearCompletedGroceries) tras hacer check entre miembros del hogar sin resurrección', async () => {
+      state.tombstones = {};
+      state.deletedRecords = { recipes: [], mealPlans: [], shoppingItems: [], cookbooks: [] };
+      state.saveHousehold({
+        id: 'hh-family-999',
+        name: 'Casa Aroa y Fran',
+        ownerId: 'user-franky-111',
+        role: 'member'
+      });
+      state.cloudUser = { id: 'user-aroa-222', email: 'aroa@sabory.food', name: 'Aroa' };
+
+      const dbShopping = [
+        {
+          id: 'shop-huevos',
+          user_id: 'user-franky-111',
+          household_id: 'hh-family-999',
+          name: 'Huevos',
+          amount: 12,
+          unit: 'ud',
+          aisle: 'dairy',
+          is_checked: true,
+          updated_at: '2026-11-15T18:30:00.000Z'
+        },
+        {
+          id: 'shop-pan',
+          user_id: 'user-aroa-222',
+          household_id: 'hh-family-999',
+          name: 'Pan integral',
+          amount: 1,
+          unit: 'ud',
+          aisle: 'bakery',
+          is_checked: true,
+          updated_at: '2026-11-15T18:31:00.000Z'
+        },
+        {
+          id: 'shop-arroz',
+          user_id: 'user-franky-111',
+          household_id: 'hh-family-999',
+          name: 'Arroz',
+          amount: 1,
+          unit: 'kg',
+          aisle: 'pantry',
+          is_checked: false,
+          updated_at: '2026-11-15T16:00:00.000Z'
+        }
+      ];
+      let dbMealPlans = [];
+      const deleteCalls = [];
+      const pushedShoppingUpserts = [];
+
+      const createTableMock = (table) => {
+        const makeDeleteChain = () => {
+          const chain = {
+            _ids: [],
+            in: vi.fn((col, ids) => {
+              if (col === 'id') chain._ids = [...ids];
+              return chain;
+            }),
+            or: vi.fn(async () => {
+              deleteCalls.push({ table, ids: [...chain._ids] });
+              if (table === 'shopping_items') {
+                for (let i = dbShopping.length - 1; i >= 0; i--) {
+                  if (chain._ids.includes(dbShopping[i].id)) dbShopping.splice(i, 1);
+                }
+              }
+              return { error: null };
+            }),
+            eq: vi.fn(async () => {
+              deleteCalls.push({ table, ids: [...chain._ids] });
+              if (table === 'shopping_items') {
+                for (let i = dbShopping.length - 1; i >= 0; i--) {
+                  if (chain._ids.includes(dbShopping[i].id)) dbShopping.splice(i, 1);
+                }
+              }
+              return { error: null };
+            })
+          };
+          return chain;
+        };
+
+        return {
+          select: vi.fn().mockReturnValue({
+            or: vi.fn().mockReturnValue({
+              limit: vi.fn().mockImplementation(async () => {
+                if (table === 'shopping_items') return { data: [...dbShopping], error: null };
+                if (table === 'meal_plans') return { data: [...dbMealPlans], error: null };
+                return { data: [], error: null };
+              })
+            }),
+            eq: vi.fn().mockImplementation(async () => {
+              if (table === 'households') {
+                return { data: [{ id: 'hh-family-999', name: 'Casa Aroa y Fran', owner_id: 'user-franky-111', invite_code: 'SAB-9K2M' }], error: null };
+              }
+              if (table === 'household_members') {
+                return { data: [{ household_id: 'hh-family-999', user_id: 'user-franky-111' }, { household_id: 'hh-family-999', user_id: 'user-aroa-222' }], error: null };
+              }
+              if (table === 'shopping_items') return { data: [...dbShopping], error: null };
+              return { data: [], error: null };
+            })
+          }),
+          upsert: vi.fn().mockImplementation(async (payload) => {
+            const rows = Array.isArray(payload) ? payload : [payload];
+            if (table === 'shopping_items') {
+              pushedShoppingUpserts.push(rows);
+              rows.forEach(r => {
+                const idx = dbShopping.findIndex(x => x.id === r.id);
+                if (idx >= 0) dbShopping[idx] = { ...dbShopping[idx], ...r };
+                else dbShopping.push(r);
+              });
+            } else if (table === 'meal_plans') {
+              dbMealPlans = rows.filter(r => r.id === '__household_prefs__');
+            }
+            return { data: rows, error: null };
+          }),
+          update: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: [], error: null })
+          }),
+          delete: vi.fn(makeDeleteChain)
+        };
+      };
+
+      appInstance.supabaseClient = {
+        from: vi.fn(createTableMock),
+        auth: {
+          updateUser: vi.fn().mockResolvedValue({ data: {}, error: null }),
+          getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-aroa-222', user_metadata: {} } }, error: null })
+        }
+      };
+
+      const broadcastSpy = vi.spyOn(appInstance, 'broadcastRealtimeChange');
+
+      // 1. Aroa limpia la lista de completados en su dispositivo
+      state.shoppingList = [
+        { id: 'shop-huevos', name: 'Huevos', amount: 12, unit: 'ud', aisle: 'dairy', isChecked: true, updatedAt: '2026-11-15T18:30:00.000Z', householdId: 'hh-family-999', ownerUserId: 'user-franky-111', _syncedWithCloud: true },
+        { id: 'shop-pan', name: 'Pan integral', amount: 1, unit: 'ud', aisle: 'bakery', isChecked: true, updatedAt: '2026-11-15T18:31:00.000Z', householdId: 'hh-family-999', ownerUserId: 'user-aroa-222', _syncedWithCloud: true },
+        { id: 'shop-arroz', name: 'Arroz', amount: 1, unit: 'kg', aisle: 'pantry', isChecked: false, updatedAt: '2026-11-15T16:00:00.000Z', householdId: 'hh-family-999', ownerUserId: 'user-franky-111', _syncedWithCloud: true }
+      ];
+
+      const cleared = await appInstance.clearCompletedGroceries(true);
+      expect(cleared).toBe(true);
+      while (appInstance.isPushingToCloud) {
+        await new Promise(r => setTimeout(r, 10));
+      }
+
+      expect(broadcastSpy).toHaveBeenCalledWith('shopping_change', {
+        action: 'clear_completed',
+        deletedIds: ['shop-huevos', 'shop-pan']
+      });
+      expect(deleteCalls.some(c => c.table === 'shopping_items' && c.ids.includes('shop-huevos') && c.ids.includes('shop-pan'))).toBe(true);
+      expect(dbShopping.map(i => i.id)).toEqual(['shop-arroz']);
+
+      // 2. Móvil de Franky: tenía ambos ítems marcados tras hacer toggleGroceryCheck (updatedAt > lastSyncedAt)
+      // sin haber ejecutado pushToCloud todavía, e incluso sin __household_prefs__ sincronizado en local
+      state.cloudUser = { id: 'user-franky-111', email: 'franky@sabory.food', name: 'Franky' };
+      state.tombstones = {};
+      state.deletedRecords = { recipes: [], mealPlans: [], shoppingItems: [], cookbooks: [] };
+      state.lastSyncedAt = '2026-11-15T17:00:00.000Z';
+      appInstance._recentShoppingCheckTimestamps = new Map();
+      state.shoppingList = [
+        { id: 'shop-huevos', name: 'Huevos', amount: 12, unit: 'ud', aisle: 'dairy', isChecked: true, updatedAt: '2026-11-15T18:30:00.000Z', householdId: 'hh-family-999', ownerUserId: 'user-franky-111' },
+        { id: 'shop-pan', name: 'Pan integral', amount: 1, unit: 'ud', aisle: 'bakery', isChecked: true, updatedAt: '2026-11-15T18:31:00.000Z', householdId: 'hh-family-999', ownerUserId: 'user-aroa-222' },
+        { id: 'shop-arroz', name: 'Arroz', amount: 1, unit: 'kg', aisle: 'pantry', isChecked: false, updatedAt: '2026-11-15T16:00:00.000Z', householdId: 'hh-family-999', ownerUserId: 'user-franky-111', _syncedWithCloud: true }
+      ];
+      pushedShoppingUpserts.length = 0;
+
+      await appInstance.syncDataWithCloud(true);
+
+      // Franky solo conserva 'Arroz' y nunca resucita ni Huevos ni Pan en Supabase
+      expect(state.shoppingList.map(i => i.id)).toEqual(['shop-arroz']);
+      expect(dbShopping.map(i => i.id)).toEqual(['shop-arroz']);
+      const resurrectedIds = pushedShoppingUpserts.flat().map(r => r.id);
+      expect(resurrectedIds).not.toContain('shop-huevos');
+      expect(resurrectedIds).not.toContain('shop-pan');
+    });
   });
 });
