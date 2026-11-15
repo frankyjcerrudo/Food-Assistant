@@ -148,6 +148,20 @@ describe('US-78: Selección Múltiple, Borrado en Lote y Filtros de Auditoría d
       appInstance.deselectAllRecipes();
       expect(appInstance.selectedRecipeIds.size).toBe(0);
     });
+
+    it('v2.10: hacer clic real en una tarjeta del DOM en modo selección marca al 1er clic y desmarca al 2º clic (sin doble disparo)', () => {
+      appInstance.toggleRecipeSelectMode(true);
+      const card = document.querySelector('.recipe-card[data-recipe-id="rec-completa-1"]');
+      expect(card).not.toBeNull();
+
+      card.click();
+      expect(appInstance.selectedRecipeIds.has('rec-completa-1')).toBe(true);
+      expect(card.classList.contains('is-selected')).toBe(true);
+
+      card.click();
+      expect(appInstance.selectedRecipeIds.has('rec-completa-1')).toBe(false);
+      expect(card.classList.contains('is-selected')).toBe(false);
+    });
   });
 
   describe('4. Borrado en Lote (Bulk Delete)', () => {

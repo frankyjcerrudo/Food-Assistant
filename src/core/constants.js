@@ -354,12 +354,27 @@ function estimateRecipeNutrition(recipe) {
   };
 }
 
+function setRecipeNutritionCache(recipe, nutrition, cacheKey = null) {
+  if (!recipe || typeof recipe !== 'object') return;
+  try {
+    Object.defineProperty(recipe, '_cachedNutrition', {
+      value: nutrition,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+    Object.defineProperty(recipe, '_cachedNutritionKey', {
+      value: cacheKey,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  } catch (e) { }
+}
+
 function getRecipeNutrition(recipe) {
   if (!recipe) {
     return { calories: 0, protein: 0, carbs: 0, fat: 0 };
-  }
-  if (recipe._cachedNutrition) {
-    return recipe._cachedNutrition;
   }
   const raw = recipe.nutrition || recipe.nutritionSummary;
   if (raw && typeof raw === 'object') {
@@ -382,12 +397,16 @@ function getRecipeNutrition(recipe) {
         carbs: Math.round(carbs * 10) / 10,
         fat: Math.round(fat * 10) / 10
       };
-      recipe._cachedNutrition = res;
+      setRecipeNutritionCache(recipe, res, null);
       return res;
     }
   }
+  const cacheKey = `${recipe.servings || 2}:${Array.isArray(recipe.ingredients) ? recipe.ingredients.length : 0}`;
+  if (recipe._cachedNutrition && recipe._cachedNutritionKey === cacheKey) {
+    return recipe._cachedNutrition;
+  }
   const estimated = estimateRecipeNutrition(recipe);
-  recipe._cachedNutrition = estimated;
+  setRecipeNutritionCache(recipe, estimated, cacheKey);
   return estimated;
 }
 

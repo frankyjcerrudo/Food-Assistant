@@ -375,12 +375,27 @@ function estimateRecipeNutrition(recipe) {
   };
 }
 
+function setRecipeNutritionCache(recipe, nutrition, cacheKey = null) {
+  if (!recipe || typeof recipe !== 'object') return;
+  try {
+    Object.defineProperty(recipe, '_cachedNutrition', {
+      value: nutrition,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+    Object.defineProperty(recipe, '_cachedNutritionKey', {
+      value: cacheKey,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  } catch (e) { }
+}
+
 function getRecipeNutrition(recipe) {
   if (!recipe) {
     return { calories: 0, protein: 0, carbs: 0, fat: 0 };
-  }
-  if (recipe._cachedNutrition) {
-    return recipe._cachedNutrition;
   }
   const raw = recipe.nutrition || recipe.nutritionSummary;
   if (raw && typeof raw === 'object') {
@@ -403,12 +418,16 @@ function getRecipeNutrition(recipe) {
         carbs: Math.round(carbs * 10) / 10,
         fat: Math.round(fat * 10) / 10
       };
-      recipe._cachedNutrition = res;
+      setRecipeNutritionCache(recipe, res, null);
       return res;
     }
   }
+  const cacheKey = `${recipe.servings || 2}:${Array.isArray(recipe.ingredients) ? recipe.ingredients.length : 0}`;
+  if (recipe._cachedNutrition && recipe._cachedNutritionKey === cacheKey) {
+    return recipe._cachedNutrition;
+  }
   const estimated = estimateRecipeNutrition(recipe);
-  recipe._cachedNutrition = estimated;
+  setRecipeNutritionCache(recipe, estimated, cacheKey);
   return estimated;
 }
 
@@ -2430,6 +2449,12 @@ class StateStore {
     if (Array.isArray(savedRecipes)) {
       let tagsCleaned = false;
       savedRecipes.forEach(r => {
+        if (!r || typeof r !== 'object') return;
+        if ('_cachedNutrition' in r || '_cachedNutritionKey' in r) {
+          delete r._cachedNutrition;
+          delete r._cachedNutritionKey;
+          tagsCleaned = true;
+        }
         if (!r.createdAt && r.updatedAt) {
           r.createdAt = r.updatedAt;
         }
@@ -2447,7 +2472,8 @@ class StateStore {
             !r.isExplicitNutrition
           )) {
             r.nutrition = { calories: 0, protein: 0, carbs: 0, fat: 0 };
-            r._cachedNutrition = null;
+            delete r._cachedNutrition;
+            delete r._cachedNutritionKey;
             tagsCleaned = true;
           }
         }
@@ -4908,7 +4934,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.09';
+  window.APP_VERSION = 'v2.10';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -4954,8 +4980,9 @@ if (typeof window !== 'undefined') {
 // UI Controller
 class FoodAssistantApp {
   constructor() {
+    if (typeof window !== 'undefined') window.app = this;
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.09';
+    this.appVersion = window.APP_VERSION || 'v2.10';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -5088,6 +5115,13 @@ class FoodAssistantApp {
     let changed = false;
     state.recipes.forEach(r => {
       if (!r) return;
+      if ('_cachedNutrition' in r || '_cachedNutritionKey' in r) {
+        const hadEnumerableCache = Object.prototype.propertyIsEnumerable.call(r, '_cachedNutrition') ||
+          Object.prototype.propertyIsEnumerable.call(r, '_cachedNutritionKey');
+        delete r._cachedNutrition;
+        delete r._cachedNutritionKey;
+        if (hadEnumerableCache) changed = true;
+      }
       if (!Array.isArray(r.tags)) r.tags = [];
 
       // 1. Limpiar la etiqueta obsoleta "General" si existe
@@ -5110,7 +5144,8 @@ class FoodAssistantApp {
           !r.isExplicitNutrition
         )) {
           r.nutrition = { calories: 0, protein: 0, carbs: 0, fat: 0 };
-          r._cachedNutrition = null;
+          delete r._cachedNutrition;
+          delete r._cachedNutritionKey;
           changed = true;
         }
       }
@@ -6695,11 +6730,15 @@ class FoodAssistantApp {
                 nutrition: remoteRecipe.nutrition || local.nutrition || null,
                 cookbooks: hasExplicitRemoteCookbooks ? remoteRecipe.cookbooks : (local.cookbooks || [])
               };
+              delete state.recipes[localIdx]._cachedNutrition;
+              delete state.recipes[localIdx]._cachedNutritionKey;
               stateChanged = true;
             } else if (remoteDate === localDate) {
               let updated = false;
               if (!localHasNutrition && remoteHasNutrition) {
                 local.nutrition = remoteRecipe.nutrition;
+                delete local._cachedNutrition;
+                delete local._cachedNutritionKey;
                 updated = true;
               }
               if (tagsDiffer) {
@@ -6727,6 +6766,8 @@ class FoodAssistantApp {
               // Si local es más nuevo pero carece de nutrición y remota sí la tiene, recuperarla
               if (!localHasNutrition && remoteHasNutrition) {
                 local.nutrition = remoteRecipe.nutrition;
+                delete local._cachedNutrition;
+                delete local._cachedNutritionKey;
                 stateChanged = true;
               }
               if (remoteRecipe.ownerUserId && !local.ownerUserId) {
@@ -7788,6 +7829,7 @@ class FoodAssistantApp {
     document.addEventListener('click', (e) => {
       const target = e.target.closest('[data-action]');
       if (!target) return;
+      if (target.hasAttribute('onclick')) return;
 
       const action = target.dataset.action;
       if (!action) return;
@@ -12143,6 +12185,8 @@ class FoodAssistantApp {
       updatedAt: new Date().toISOString(),
       isExplicitTags: true
     };
+    delete finalRecipe._cachedNutrition;
+    delete finalRecipe._cachedNutritionKey;
 
     if (ingredients.length > 0 && typeof analyzeAndInferRecipeTags === 'function') {
       const inferred = analyzeAndInferRecipeTags(finalRecipe);

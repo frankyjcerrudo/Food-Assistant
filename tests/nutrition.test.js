@@ -700,5 +700,58 @@ describe('US-01: Contador de Calorías y Macronutrientes por plato y resumen dia
       expect(saved.nutrition.protein).not.toBe(99);
       expect(saved.nutrition.protein).toBeGreaterThan(20);
     });
+
+    it('v2.10: al editar porciones, recalcular macros y guardar en una receta previamente abierta, se invalida _cachedNutrition y no se serializa en localStorage', () => {
+      const existing = {
+        id: 'rec-cache-bug-test',
+        title: 'Pollo con arroz para ajustar porciones',
+        servings: 8,
+        tags: [],
+        ingredients: [
+          { id: 'ing-1', name: 'Pechuga de pollo', amount: 400, unit: 'g', aisle: 'carniceria' },
+          { id: 'ing-2', name: 'Arroz', amount: 200, unit: 'g', aisle: 'despensa' }
+        ],
+        instructions: [{ step: 1, text: 'Cocinar todo junto' }],
+        nutrition: { calories: 165, protein: 14, carbs: 20, fat: 2 }
+      };
+      state.recipes = [existing];
+
+      // 1. El usuario abre primero el detalle de la receta (puebla _cachedNutrition con 165 kcal)
+      app.openRecipeDetail('rec-cache-bug-test');
+      expect(getRecipeNutrition(existing).calories).toBe(165);
+      expect(document.getElementById('macro-detail-calories').textContent).toContain('165');
+
+      // 2. Abre el editor, corrige las porciones de 8 a 2, pulsa Recalcular y guarda
+      app.openEditRecipeModal('rec-cache-bug-test');
+      document.getElementById('edit-recipe-servings').value = '2';
+      app.recalculateEditorNutrition();
+
+      const recalculatedCal = parseFloat(document.getElementById('edit-recipe-calories').value);
+      expect(recalculatedCal).toBeGreaterThan(500);
+
+      app.saveRecipeEdit();
+
+      // 3. Al salir del editor y reabrir el detalle, getRecipeNutrition y el modal muestran los nuevos macros
+      const updated = state.recipes.find(r => r.id === 'rec-cache-bug-test');
+      expect(updated.servings).toBe(2);
+      expect(getRecipeNutrition(updated).calories).toBe(recalculatedCal);
+      expect(document.getElementById('macro-detail-calories').textContent).toContain(String(recalculatedCal));
+
+      // 4. _cachedNutrition no debe persistirse en localStorage
+      const serialized = JSON.stringify(updated);
+      expect(serialized).not.toContain('_cachedNutrition');
+      expect(localStorage.getItem('fa_recipes')).not.toContain('_cachedNutrition');
+
+      // 5. Si localStorage tenía un _cachedNutrition obsoleto de versiones anteriores, StateStore lo limpia al arrancar
+      const legacyRecipe = {
+        ...updated,
+        _cachedNutrition: { calories: 165, protein: 14, carbs: 20, fat: 2 }
+      };
+      localStorage.setItem('fa_recipes', JSON.stringify([legacyRecipe]));
+      const reloadedStore = new StateStore();
+      const reloaded = reloadedStore.recipes.find(r => r.id === 'rec-cache-bug-test');
+      expect(getRecipeNutrition(reloaded).calories).toBe(recalculatedCal);
+      expect(localStorage.getItem('fa_recipes')).not.toContain('_cachedNutrition');
+    });
   });
 });
