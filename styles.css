@@ -5798,7 +5798,16 @@ h2,
   font-size: 13px;
   line-height: 1.45;
   align-self: flex-start;
-  max-width: 88%;
+  max-width: 92%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.ai-assistant-bubble:has(.ai-autoplan-card),
+.ai-assistant-bubble:has(.ai-chat-recipe-card) {
+  width: 100%;
+  max-width: 100%;
+  padding: 10px 12px;
 }
 
 .ai-actions-row {
@@ -11302,8 +11311,8 @@ dialog.admin-confirm-modal::backdrop {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  min-height: calc(100dvh - 170px);
+  gap: 10px;
+  min-width: 0;
 }
 
 .ai-hub-header {
@@ -11416,9 +11425,8 @@ dialog.admin-confirm-modal::backdrop {
 
 .ai-chat-stream {
   flex: 1 1 auto;
-  min-height: 220px;
-  max-height: 55dvh;
-  overflow-y: auto;
+  min-height: 300px;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -11426,6 +11434,7 @@ dialog.admin-confirm-modal::backdrop {
   border-radius: var(--radius-lg);
   background: var(--m3-surface-container-low);
   border: 1px solid var(--m3-outline-variant, rgba(0, 0, 0, 0.08));
+  min-width: 0;
 }
 
 .ai-chat-empty-state {
@@ -11481,9 +11490,22 @@ dialog.admin-confirm-modal::backdrop {
   flex-direction: column;
   gap: 8px;
   position: sticky;
-  bottom: 0;
-  background: var(--m3-surface);
-  padding: 8px 0 4px 0;
+  bottom: 12px;
+  z-index: 25;
+  background: var(--m3-background, var(--m3-surface));
+  padding: 8px 0 6px 0;
+  border-top: 1px solid var(--m3-outline-variant, rgba(0, 0, 0, 0.06));
+}
+
+@media (max-width: 899px) {
+  .ai-chat-composer {
+    bottom: calc(82px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+html.is-mobile-device .ai-chat-composer,
+body.is-mobile-device .ai-chat-composer {
+  bottom: calc(82px + env(safe-area-inset-bottom, 0px));
 }
 
 .ai-chat-attachment-preview {
@@ -11594,13 +11616,17 @@ dialog.admin-confirm-modal::backdrop {
 /* Interactive Smart Weekly Autoplan Card inside chat */
 .ai-autoplan-card {
   margin-top: 10px;
-  padding: 14px;
+  padding: 12px;
   border-radius: var(--radius-lg);
   background: var(--m3-surface);
   border: 1px solid var(--m3-primary-container, rgba(16, 185, 129, 0.35));
   display: flex;
   flex-direction: column;
   gap: 10px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .ai-autoplan-card-header {
@@ -11662,11 +11688,13 @@ dialog.admin-confirm-modal::backdrop {
 .ai-autoplan-mode-switch {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 4px;
   padding: 3px;
   border-radius: var(--radius-full);
   background: var(--m3-surface-container);
   align-self: flex-start;
+  max-width: 100%;
 }
 
 .ai-mode-pill {
@@ -11688,24 +11716,27 @@ dialog.admin-confirm-modal::backdrop {
 
 .ai-autoplan-days-list {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
-  max-height: 360px;
-  overflow-y: auto;
-  padding-right: 2px;
+  min-width: 0;
+  width: 100%;
 }
 
 .ai-autoplan-day-item {
-  padding: 8px 10px;
+  padding: 10px;
   border-radius: var(--radius-md);
   background: var(--m3-surface-container-low);
   border: 1px solid var(--m3-outline-variant, rgba(0, 0, 0, 0.08));
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .ai-autoplan-day-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   margin-bottom: 6px;
   font-size: 12.5px;
 }
@@ -11714,12 +11745,14 @@ dialog.admin-confirm-modal::backdrop {
   font-size: 11px;
   font-weight: 600;
   color: var(--m3-primary);
+  flex-shrink: 0;
 }
 
 .ai-autoplan-slots-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  min-width: 0;
 }
 
 .ai-autoplan-slot-row {
@@ -11728,29 +11761,34 @@ dialog.admin-confirm-modal::backdrop {
   gap: 6px;
   font-size: 11.5px;
   min-height: 26px;
+  min-width: 0;
 }
 
 .ai-autoplan-slot-row.is-kept {
-  opacity: 0.72;
+  opacity: 0.78;
 }
 
 .ai-autoplan-slot-label {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  width: 78px;
+  width: 72px;
   flex-shrink: 0;
   color: var(--m3-on-surface-variant);
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 11px;
 }
 
 .ai-autoplan-slot-dish {
   flex: 1;
   min-width: 0;
   color: var(--m3-on-surface);
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
 }
 
 .ai-slot-fav-icon {
@@ -11872,6 +11910,22 @@ dialog.admin-confirm-modal::backdrop {
   margin: 2px 0 0 0;
   font-size: 12px;
   color: var(--m3-on-surface-variant);
+}
+
+@media (max-width: 600px) {
+  .ai-hub-action-card {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .ai-hub-action-icon {
+    width: 30px;
+    height: 30px;
+  }
+
+  .ai-chat-stream {
+    padding: 10px;
+  }
 }
 
 @media (min-width: 720px) {
