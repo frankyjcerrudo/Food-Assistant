@@ -6135,6 +6135,9 @@ class FoodAssistantApp {
   }
 
   updateUserAccountUI() {
+    if (this.modalOnboarding && (this.modalOnboarding.open || this.modalOnboarding.classList.contains('active')) && this.onboardingStep === 1) {
+      this.renderOnboardingStep();
+    }
     const user = state.cloudUser;
     const pillBtn = document.getElementById('btn-header-account');
     const pillIcon = document.getElementById('header-account-icon');
@@ -8204,7 +8207,22 @@ class FoodAssistantApp {
           this.inputOnboardingServings(e);
           break;
         case 'openAuthFromOnboarding':
-          this.openAuthFromOnboarding();
+          this.openAuthFromOnboarding(target.dataset);
+          break;
+        case 'completeOnboardingAndStartTour':
+          this.completeOnboardingAndStartTour();
+          break;
+        case 'startAppTour':
+          this.startAppTour();
+          break;
+        case 'nextAppTourStep':
+          this.nextAppTourStep();
+          break;
+        case 'prevAppTourStep':
+          this.prevAppTourStep();
+          break;
+        case 'closeAppTour':
+          this.closeAppTour();
           break;
         default:
           if (typeof this[action] === 'function') {
@@ -22241,8 +22259,12 @@ REGLAS CRÍTICAS:
     });
   }
 
-  openAuthFromOnboarding() {
+  openAuthFromOnboarding(tabOrDataset) {
+    const tab = typeof tabOrDataset === 'object' && tabOrDataset !== null ? tabOrDataset.tab : tabOrDataset;
     this.openAuthModal();
+    if ((tab === 'login' || tab === 'signup') && typeof this.switchAuthTab === 'function') {
+      this.switchAuthTab(tab);
+    }
   }
 
   renderOnboardingStep() {
@@ -22264,23 +22286,48 @@ REGLAS CRÍTICAS:
 
     const prevBtn = document.getElementById('btn-onboarding-prev');
     const nextBtn = document.getElementById('btn-onboarding-next');
+    const nextLabel = document.getElementById('btn-onboarding-next-label') || nextBtn?.querySelector('span[data-i18n]');
     const finishBtn = document.getElementById('btn-onboarding-finish');
+    const startTourBtn = document.getElementById('btn-onboarding-start-tour');
 
     if (prevBtn) prevBtn.classList.toggle('is-hidden', step === 1);
     if (nextBtn) nextBtn.classList.toggle('is-hidden', step === 5);
     if (finishBtn) finishBtn.classList.toggle('is-hidden', step !== 5);
+    if (startTourBtn) startTourBtn.classList.toggle('is-hidden', step !== 5);
+
+    if (nextLabel) {
+      if (step === 1 && !state.cloudUser?.email) {
+        nextLabel.setAttribute('data-i18n', 'onboarding.continueWithoutAccount');
+        nextLabel.textContent = window.I18n
+          ? window.I18n.t('onboarding.continueWithoutAccount')
+          : 'Continuar sin cuenta';
+      } else {
+        nextLabel.setAttribute('data-i18n', 'onboarding.nextBtn');
+        nextLabel.textContent = window.I18n
+          ? window.I18n.t('onboarding.nextBtn')
+          : 'Siguiente';
+      }
+    }
 
     if (step === 1) {
+      const accountCard = document.getElementById('onboarding-account-card');
       const statusText = document.getElementById('onboarding-account-status-text');
       const connectBtn = document.getElementById('btn-onboarding-connect-account');
-      if (state.cloudUser?.email) {
+      const signupBtn = document.getElementById('btn-onboarding-signup-account');
+      const isConnected = Boolean(state.cloudUser?.email);
+
+      if (accountCard) accountCard.classList.toggle('is-connected', isConnected);
+      if (signupBtn) signupBtn.classList.toggle('is-hidden', isConnected);
+
+      if (isConnected) {
         if (statusText) {
           statusText.textContent = window.I18n && window.I18n.getLanguage() === 'en'
             ? `Connected as ${state.cloudUser.email}`
             : `Conectado como ${state.cloudUser.email}`;
         }
         if (connectBtn) {
-          connectBtn.textContent = window.I18n && window.I18n.getLanguage() === 'en'
+          const labelSpan = connectBtn.querySelector('span[data-i18n]') || connectBtn;
+          labelSpan.textContent = window.I18n && window.I18n.getLanguage() === 'en'
             ? 'Account connected'
             : 'Cuenta conectada';
         }
@@ -22288,7 +22335,14 @@ REGLAS CRÍTICAS:
         if (statusText) {
           statusText.textContent = window.I18n
             ? window.I18n.t('onboarding.accountPromo')
-            : '¿Tienes cuenta o quieres sincronizar entre dispositivos?';
+            : 'Inicia sesión con Google o correo para guardar tus recetas, menús y listas entre dispositivos.';
+        }
+        if (connectBtn) {
+          const labelSpan = connectBtn.querySelector('span[data-i18n]');
+          if (labelSpan) {
+            labelSpan.setAttribute('data-i18n', 'onboarding.loginBtn');
+            labelSpan.textContent = window.I18n ? window.I18n.t('onboarding.loginBtn') : 'Iniciar sesión';
+          }
         }
       }
     } else if (step === 2) {
@@ -22383,6 +22437,208 @@ REGLAS CRÍTICAS:
     this.render();
     this.scheduleSyncWithCloud();
     this.showToast('¡Configuración inicial guardada! Disfruta de Sabory.', 'success');
+  }
+
+  completeOnboardingAndStartTour() {
+    this.completeOnboarding();
+    this.startAppTour();
+  }
+
+  getAppTourSteps() {
+    return [
+      {
+        view: 'view-today',
+        icon: 'today',
+        selectors: ['#today-nutrition-card', '#today-slots-container', '#view-today .today-header'],
+        titleKey: 'tour.step1Title',
+        descKey: 'tour.step1Desc',
+        titleFallback: 'Hoy: tu menú y macros al día',
+        descFallback: 'Aquí ves de un vistazo qué toca desayunar, comer y cenar hoy, junto al anillo de calorías y macronutrientes.'
+      },
+      {
+        view: 'view-recipes',
+        icon: 'menu_book',
+        selectors: ['#view-recipes .recipes-section-header', '#recipes-toolbar', '#view-recipes'],
+        titleKey: 'tour.step2Title',
+        descKey: 'tour.step2Desc',
+        titleFallback: 'Recetario y Modo Cocina',
+        descFallback: 'Guarda tus recetas, impórtalas desde webs, redes o fotos con IA y usa el Modo Cocina para cocinar paso a paso sin que se apague la pantalla.'
+      },
+      {
+        view: 'view-planner',
+        icon: 'calendar_month',
+        selectors: ['#btn-planner-ai-auto', '#planner-week-nav-bar', '#view-planner .section-header'],
+        titleKey: 'tour.step3Title',
+        descKey: 'tour.step3Desc',
+        titleFallback: 'Planificador Semanal',
+        descFallback: 'Organiza tus comidas de lunes a domingo, copia semanas anteriores o deja que la IA planifique el menú completo por ti.'
+      },
+      {
+        view: 'view-shopping',
+        icon: 'shopping_cart',
+        selectors: ['#shopping-view-toggle', '#view-shopping .shopping-section-header'],
+        titleKey: 'tour.step4Title',
+        descKey: 'tour.step4Desc',
+        titleFallback: 'Lista de la Compra Inteligente',
+        descFallback: 'Envía tu menú semanal a la lista con un toque y agrúpala por pasillos del súper o por receta mientras compras.'
+      },
+      {
+        view: 'view-ai',
+        icon: 'auto_awesome',
+        selectors: ['#view-ai .gemini-invoke-header', '#view-ai'],
+        titleKey: 'tour.step5Title',
+        descKey: 'tour.step5Desc',
+        titleFallback: 'Sous Chef con IA',
+        descFallback: 'Pídele ideas con lo que tienes en la nevera, adapta recetas a tus alergias o resuelve cualquier duda mientras cocinas.'
+      }
+    ];
+  }
+
+  startAppTour(stepIndex = 0) {
+    const overlay = document.getElementById('app-tour-overlay');
+    if (!overlay) return;
+    const steps = this.getAppTourSteps();
+    this.appTourStep = Math.max(0, Math.min(steps.length - 1, Number(stepIndex) || 0));
+    overlay.classList.remove('is-hidden');
+
+    if (!this._appTourResizeBound) {
+      this._appTourResizeBound = () => {
+        if (!document.getElementById('app-tour-overlay')?.classList.contains('is-hidden')) {
+          this.renderAppTourStep();
+        }
+      };
+      this._appTourKeydownBound = (e) => {
+        if (e.key === 'Escape' && !document.getElementById('app-tour-overlay')?.classList.contains('is-hidden')) {
+          this.closeAppTour();
+        }
+      };
+      window.addEventListener('resize', this._appTourResizeBound);
+      window.addEventListener('keydown', this._appTourKeydownBound);
+    }
+
+    this.renderAppTourStep();
+  }
+
+  renderAppTourStep() {
+    const overlay = document.getElementById('app-tour-overlay');
+    if (!overlay || overlay.classList.contains('is-hidden')) return;
+
+    const steps = this.getAppTourSteps();
+    const idx = Math.max(0, Math.min(steps.length - 1, this.appTourStep || 0));
+    const step = steps[idx];
+
+    if (step.view && typeof this.switchView === 'function') {
+      this.switchView(step.view);
+    }
+
+    const badge = document.getElementById('app-tour-step-badge');
+    const icon = document.getElementById('app-tour-icon');
+    const title = document.getElementById('app-tour-title');
+    const desc = document.getElementById('app-tour-desc');
+    const dots = document.getElementById('app-tour-dots');
+    const prevBtn = document.getElementById('btn-app-tour-prev');
+    const nextLabel = document.getElementById('app-tour-next-label');
+
+    if (badge) badge.textContent = `${idx + 1} / ${steps.length}`;
+    if (icon) icon.textContent = step.icon;
+    if (title) title.textContent = window.I18n ? window.I18n.t(step.titleKey) : step.titleFallback;
+    if (desc) desc.textContent = window.I18n ? window.I18n.t(step.descKey) : step.descFallback;
+
+    if (dots) {
+      dots.innerHTML = steps.map((_, i) => `<span class="app-tour-dot ${i === idx ? 'active' : ''}"></span>`).join('');
+    }
+    if (prevBtn) prevBtn.classList.toggle('is-hidden', idx === 0);
+    if (nextLabel) {
+      const isLast = idx === steps.length - 1;
+      const key = isLast ? 'tour.finish' : 'tour.next';
+      nextLabel.setAttribute('data-i18n', key);
+      nextLabel.textContent = window.I18n ? window.I18n.t(key) : (isLast ? '¡Entendido!' : 'Siguiente');
+    }
+
+    const targetEl = (step.selectors || [])
+      .map(sel => document.querySelector(sel))
+      .find(el => {
+        if (!el) return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      }) || document.getElementById(step.view);
+
+    this.positionAppTourElements(targetEl);
+  }
+
+  positionAppTourElements(targetEl) {
+    const spotlight = document.getElementById('app-tour-spotlight');
+    const card = document.getElementById('app-tour-card');
+    if (!spotlight || !card) return;
+
+    const vw = window.innerWidth || 375;
+    const vh = window.innerHeight || 667;
+    const pad = 8;
+
+    let rect = targetEl ? targetEl.getBoundingClientRect() : null;
+    if (!rect || rect.width === 0 || rect.height === 0) {
+      rect = { top: 80, left: 16, width: Math.max(200, vw - 32), height: 140, bottom: 220, right: vw - 16 };
+    }
+
+    const spotTop = Math.max(8, rect.top - pad);
+    const spotLeft = Math.max(8, rect.left - pad);
+    const spotWidth = Math.min(vw - spotLeft - 8, rect.width + pad * 2);
+    const spotHeight = Math.min(vh - spotTop - 8, Math.min(rect.height + pad * 2, vh * 0.48));
+
+    spotlight.style.top = `${spotTop}px`;
+    spotlight.style.left = `${spotLeft}px`;
+    spotlight.style.width = `${Math.max(40, spotWidth)}px`;
+    spotlight.style.height = `${Math.max(40, spotHeight)}px`;
+
+    const cardRect = card.getBoundingClientRect();
+    const cardW = cardRect.width || Math.min(380, vw - 24);
+    const cardH = cardRect.height || 230;
+    const spaceBelow = vh - (spotTop + spotHeight);
+    const spaceAbove = spotTop;
+
+    let cardTop;
+    if (spaceBelow >= cardH + 20) {
+      cardTop = spotTop + spotHeight + 14;
+    } else if (spaceAbove >= cardH + 20) {
+      cardTop = spotTop - cardH - 14;
+    } else {
+      cardTop = Math.max(12, vh - cardH - 16);
+    }
+
+    const cardLeft = Math.max(12, Math.min(vw - cardW - 12, spotLeft + (spotWidth - cardW) / 2));
+    card.style.top = `${cardTop}px`;
+    card.style.left = `${cardLeft}px`;
+  }
+
+  nextAppTourStep() {
+    const steps = this.getAppTourSteps();
+    if ((this.appTourStep || 0) < steps.length - 1) {
+      this.appTourStep = (this.appTourStep || 0) + 1;
+      this.renderAppTourStep();
+    } else {
+      this.closeAppTour(true);
+    }
+  }
+
+  prevAppTourStep() {
+    if ((this.appTourStep || 0) > 0) {
+      this.appTourStep = (this.appTourStep || 0) - 1;
+      this.renderAppTourStep();
+    }
+  }
+
+  closeAppTour(completed = false) {
+    const overlay = document.getElementById('app-tour-overlay');
+    if (overlay) overlay.classList.add('is-hidden');
+    if (typeof this.switchView === 'function') {
+      this.switchView('view-today');
+    }
+    if (completed) {
+      const msg = window.I18n && window.I18n.getLanguage() === 'en'
+        ? 'Tour finished! You are ready to cook with Sabory.'
+        : '¡Tour completado! Ya conoces todo lo que puedes hacer en Sabory.';
+      this.showToast(msg, 'success');
+    }
   }
 }
 

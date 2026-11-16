@@ -524,8 +524,11 @@ describe('US-68: Asistente de Bienvenida (Onboarding Wizard)', () => {
         ${[1, 2, 3, 4, 5].map(i => `<span class="onboarding-dot" data-step="${i}"></span>`).join('')}
       </div>
       ${[1, 2, 3, 4, 5].map(i => `<section id="onboarding-step-${i}" class="onboarding-step"></section>`).join('')}
-      <p id="onboarding-account-status-text"></p>
-      <button id="btn-onboarding-connect-account"></button>
+      <div id="onboarding-account-card">
+        <p id="onboarding-account-status-text"></p>
+        <button id="btn-onboarding-connect-account"><span data-i18n="onboarding.loginBtn">Iniciar sesión</span></button>
+        <button id="btn-onboarding-signup-account"><span data-i18n="onboarding.signupBtn">Crear cuenta gratis</span></button>
+      </div>
       <div id="onboarding-dietary-chips"></div>
       <input type="checkbox" id="onboarding-goals-enabled">
       <div id="onboarding-goal-presets">
@@ -545,9 +548,27 @@ describe('US-68: Asistente de Bienvenida (Onboarding Wizard)', () => {
       </div>
       <div id="onboarding-summary-box"></div>
       <button id="btn-onboarding-prev"></button>
-      <button id="btn-onboarding-next"></button>
+      <button id="btn-onboarding-next"><span id="btn-onboarding-next-label" data-i18n="onboarding.nextBtn">Siguiente</span></button>
       <button id="btn-onboarding-finish"></button>
+      <button id="btn-onboarding-start-tour"></button>
     </dialog>
+    <div id="app-tour-overlay" class="is-hidden">
+      <div id="app-tour-spotlight"></div>
+      <div id="app-tour-card">
+        <span id="app-tour-step-badge"></span>
+        <span id="app-tour-icon"></span>
+        <h3 id="app-tour-title"></h3>
+        <p id="app-tour-desc"></p>
+        <div id="app-tour-dots"></div>
+        <button id="btn-app-tour-prev"></button>
+        <button id="btn-app-tour-next"><span id="app-tour-next-label"></span></button>
+      </div>
+    </div>
+    <main id="view-today"></main>
+    <section id="view-recipes"></section>
+    <section id="view-planner"></section>
+    <section id="view-shopping"></section>
+    <section id="view-ai"></section>
   `;
 
   beforeEach(() => {
@@ -678,5 +699,55 @@ describe('US-68: Asistente de Bienvenida (Onboarding Wizard)', () => {
     expect(isModalOpen()).toBe(false);
     expect(localStorage.getItem('fa_onboarding_completed')).toBe('true');
     expect(appInstance.checkAndLaunchOnboarding()).toBe(false);
+  });
+
+  it('destaca login/registro en el paso 1 y muestra Continuar sin cuenta si no está logado', () => {
+    state.cloudUser = null;
+    appInstance.openOnboardingModal(1);
+    expect(document.getElementById('onboarding-account-card').classList.contains('is-connected')).toBe(false);
+    expect(document.getElementById('btn-onboarding-signup-account').classList.contains('is-hidden')).toBe(false);
+    expect(document.getElementById('btn-onboarding-next-label').getAttribute('data-i18n')).toBe('onboarding.continueWithoutAccount');
+
+    state.cloudUser = { email: 'franky@sabory.app' };
+    appInstance.renderOnboardingStep();
+    expect(document.getElementById('onboarding-account-card').classList.contains('is-connected')).toBe(true);
+    expect(document.getElementById('btn-onboarding-signup-account').classList.contains('is-hidden')).toBe(true);
+    expect(document.getElementById('onboarding-account-status-text').textContent).toContain('franky@sabory.app');
+    expect(document.getElementById('btn-onboarding-next-label').getAttribute('data-i18n')).toBe('onboarding.nextBtn');
+  });
+
+  it('en el paso 5 ofrece hacer tour por la app y recorre las 5 vistas reales', () => {
+    appInstance.switchView = vi.fn();
+    appInstance.openOnboardingModal(5);
+    expect(document.getElementById('btn-onboarding-start-tour').classList.contains('is-hidden')).toBe(false);
+    expect(document.getElementById('btn-onboarding-finish').classList.contains('is-hidden')).toBe(false);
+
+    appInstance.completeOnboardingAndStartTour();
+    expect(isModalOpen()).toBe(false);
+    expect(document.getElementById('app-tour-overlay').classList.contains('is-hidden')).toBe(false);
+    expect(appInstance.switchView).toHaveBeenCalledWith('view-today');
+    expect(document.getElementById('app-tour-step-badge').textContent).toBe('1 / 5');
+
+    appInstance.nextAppTourStep();
+    expect(appInstance.switchView).toHaveBeenCalledWith('view-recipes');
+    expect(document.getElementById('app-tour-step-badge').textContent).toBe('2 / 5');
+
+    appInstance.nextAppTourStep();
+    expect(appInstance.switchView).toHaveBeenCalledWith('view-planner');
+
+    appInstance.nextAppTourStep();
+    expect(appInstance.switchView).toHaveBeenCalledWith('view-shopping');
+
+    appInstance.nextAppTourStep();
+    expect(appInstance.switchView).toHaveBeenCalledWith('view-ai');
+    expect(document.getElementById('app-tour-step-badge').textContent).toBe('5 / 5');
+
+    appInstance.prevAppTourStep();
+    expect(document.getElementById('app-tour-step-badge').textContent).toBe('4 / 5');
+
+    appInstance.nextAppTourStep();
+    appInstance.nextAppTourStep(); // finish tour
+    expect(document.getElementById('app-tour-overlay').classList.contains('is-hidden')).toBe(true);
+    expect(appInstance.switchView).toHaveBeenLastCalledWith('view-today');
   });
 });

@@ -492,11 +492,18 @@
           <h2 class="section-title" data-i18n="settings.title">Ajustes</h2>
           <p class="section-subtitle" data-i18n="settings.subtitle">Mis preferencias culinarias y configuración.</p>
         </div>
-        <button type="button" class="btn btn-secondary btn-sm" id="btn-relaunch-onboarding"
-          data-action="openOnboardingModal" title="Abrir asistente de bienvenida paso a paso">
-          <span class="material-symbols-outlined icon-sm">waving_hand</span>
-          <span data-i18n="settings.onboardingBtn">Guía inicial</span>
-        </button>
+        <div class="settings-header-actions">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-launch-app-tour"
+            data-action="startAppTour" title="Hacer recorrido interactivo por las pantallas de Sabory">
+            <span class="material-symbols-outlined icon-sm">explore</span>
+            <span data-i18n="settings.appTourBtn">Tour por la app</span>
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-relaunch-onboarding"
+            data-action="openOnboardingModal" title="Abrir asistente de bienvenida paso a paso">
+            <span class="material-symbols-outlined icon-sm">waving_hand</span>
+            <span data-i18n="settings.onboardingBtn">Guía inicial</span>
+          </button>
+        </div>
       </div>
 
       <!-- TIER 1: MIS PREFERENCIAS CULINARIAS (USO FRECUENTE) -->
@@ -2616,6 +2623,30 @@
           en menos de un minuto.
         </p>
 
+        <div class="onboarding-account-card" id="onboarding-account-card">
+          <div class="onboarding-account-card-header">
+            <div class="onboarding-account-icon-badge">
+              <span class="material-symbols-outlined">cloud_sync</span>
+            </div>
+            <div class="onboarding-account-card-copy">
+              <strong data-i18n="onboarding.accountCardTitle">¿Tienes cuenta o quieres sincronizar en la nube?</strong>
+              <span id="onboarding-account-status-text" data-i18n="onboarding.accountPromo">Inicia sesión con Google o correo para guardar tus recetas, menús y listas entre dispositivos.</span>
+            </div>
+          </div>
+          <div class="onboarding-account-actions" id="onboarding-account-actions">
+            <button type="button" class="btn btn-primary btn-sm onboarding-account-btn" id="btn-onboarding-connect-account"
+              data-action="openAuthFromOnboarding" data-tab="login">
+              <span class="material-symbols-outlined icon-sm">login</span>
+              <span data-i18n="onboarding.loginBtn">Iniciar sesión</span>
+            </button>
+            <button type="button" class="btn btn-tonal btn-sm onboarding-account-btn" id="btn-onboarding-signup-account"
+              data-action="openAuthFromOnboarding" data-tab="signup">
+              <span class="material-symbols-outlined icon-sm">person_add</span>
+              <span data-i18n="onboarding.signupBtn">Crear cuenta gratis</span>
+            </button>
+          </div>
+        </div>
+
         <div class="onboarding-feature-list">
           <div class="onboarding-feature-item">
             <span class="material-symbols-outlined icon-sm icon-primary">menu_book</span>
@@ -2631,18 +2662,6 @@
               <span data-i18n="onboarding.feature2Desc">Organiza tu semana y genera la lista agrupada por pasillos o por receta.</span>
             </div>
           </div>
-        </div>
-
-        <div class="onboarding-account-promo">
-          <div class="onboarding-account-promo-text">
-            <span class="material-symbols-outlined icon-sm icon-primary">cloud_sync</span>
-            <span id="onboarding-account-status-text" data-i18n="onboarding.accountPromo">¿Tienes cuenta o quieres sincronizar entre dispositivos?</span>
-          </div>
-          <button type="button" class="btn btn-secondary btn-sm" id="btn-onboarding-connect-account"
-            data-action="openAuthFromOnboarding">
-            <span class="material-symbols-outlined icon-sm">account_circle</span>
-            <span data-i18n="onboarding.connectAccount">Conectar cuenta</span>
-          </button>
         </div>
       </div>
 
@@ -2810,17 +2829,58 @@
         </button>
         <button type="button" class="btn btn-primary onboarding-next-btn" id="btn-onboarding-next" autofocus
           data-action="nextOnboardingStep">
-          <span data-i18n="onboarding.nextBtn">Siguiente</span>
+          <span id="btn-onboarding-next-label" data-i18n="onboarding.nextBtn">Siguiente</span>
           <span class="material-symbols-outlined icon-sm">arrow_forward</span>
         </button>
-        <button type="button" class="btn btn-primary onboarding-next-btn is-hidden" id="btn-onboarding-finish"
+        <button type="button" class="btn btn-secondary onboarding-next-btn is-hidden" id="btn-onboarding-finish"
           data-action="completeOnboarding">
           <span class="material-symbols-outlined icon-sm">restaurant</span>
           <span data-i18n="onboarding.finishBtn">¡Empezar a cocinar!</span>
         </button>
+        <button type="button" class="btn btn-primary onboarding-next-btn is-hidden" id="btn-onboarding-start-tour"
+          data-action="completeOnboardingAndStartTour">
+          <span class="material-symbols-outlined icon-sm">explore</span>
+          <span data-i18n="onboarding.startTourBtn">Hacer tour por la app</span>
+        </button>
       </div>
     </div>
   </dialog>
+
+  <!-- INTERACTIVE APP TOUR OVERLAY -->
+  <div class="app-tour-overlay is-hidden" id="app-tour-overlay" role="dialog" aria-modal="true"
+    aria-labelledby="app-tour-title">
+    <div class="app-tour-backdrop" id="app-tour-backdrop"></div>
+    <div class="app-tour-spotlight" id="app-tour-spotlight"></div>
+    <div class="app-tour-card" id="app-tour-card">
+      <div class="app-tour-card-header">
+        <span class="app-tour-badge" id="app-tour-step-badge">1 / 5</span>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-app-tour-skip" data-action="closeAppTour"
+          data-i18n="tour.skip">
+          Saltar tour
+        </button>
+      </div>
+      <div class="app-tour-card-body">
+        <div class="app-tour-icon-wrap" id="app-tour-icon-wrap">
+          <span class="material-symbols-outlined" id="app-tour-icon">today</span>
+        </div>
+        <h3 class="app-tour-title" id="app-tour-title"></h3>
+        <p class="app-tour-desc" id="app-tour-desc"></p>
+      </div>
+      <div class="app-tour-card-footer">
+        <div class="app-tour-dots" id="app-tour-dots"></div>
+        <div class="app-tour-actions">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-app-tour-prev" data-action="prevAppTourStep">
+            <span class="material-symbols-outlined icon-sm">arrow_back</span>
+            <span data-i18n="tour.prev">Anterior</span>
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-app-tour-next" data-action="nextAppTourStep">
+            <span id="app-tour-next-label" data-i18n="tour.next">Siguiente</span>
+            <span class="material-symbols-outlined icon-sm">arrow_forward</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- TOAST / SNACKBAR CONTAINER (Material 3 non-blocking notifications) -->
   <div id="toast-container" class="toast-container" popover="manual" aria-live="polite" aria-atomic="true"></div>
