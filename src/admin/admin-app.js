@@ -11,7 +11,8 @@ import {
   derivePlanBreakdownFromUsers,
   validateEntitlementChange,
   validateQuotaResetRequest,
-  formatAuditSummary
+  formatAuditSummary,
+  summarizeSupabaseStorage
 } from './admin-core.js';
 
 const PLAN_BREAKDOWN_SPEC = Object.freeze([
@@ -167,6 +168,12 @@ export class SaboryAdminApp {
 
       planBreakdown: byId('admin-plan-breakdown'),
       topDomains: byId('admin-top-domains'),
+      kpiDbSize: byId('kpi-db-size'),
+      kpiDbSizeMeta: byId('kpi-db-size-meta'),
+      adminDbQuotaBar: byId('admin-db-quota-bar'),
+      kpiBase64Images: byId('kpi-base64-images'),
+      kpiBase64ImagesMeta: byId('kpi-base64-images-meta'),
+      adminStorageBreakdown: byId('admin-storage-breakdown'),
       toastContainer: byId('admin-toast-container'),
 
       usersSearchInput: byId('admin-users-search'),
@@ -878,6 +885,7 @@ export class SaboryAdminApp {
 
     this.renderPlanBreakdown(plans, Math.max(toSafeCount(users.total), rev.freeTotal + rev.proTotal, 1));
     this.renderTopDomains(stats.top_domains);
+    this.renderStorageHealth(stats.storage);
     this.renderAiMonitor(stats, days, {
       rev,
       aiSummary,
@@ -936,6 +944,54 @@ export class SaboryAdminApp {
         </div>
       `;
     }).join('');
+  }
+
+  renderStorageHealth(storage = null) {
+    const summary = summarizeSupabaseStorage(storage || {});
+    if (!summary.available) {
+      if (this.els.kpiDbSize) this.els.kpiDbSize.textContent = '—';
+      if (this.els.kpiDbSizeMeta) this.els.kpiDbSizeMeta.textContent = this.t('admin.kpiDbSizeUnavailable');
+      if (this.els.adminDbQuotaBar) this.els.adminDbQuotaBar.style.width = '0%';
+      if (this.els.kpiBase64Images) this.els.kpiBase64Images.textContent = '—';
+      if (this.els.kpiBase64ImagesMeta) this.els.kpiBase64ImagesMeta.textContent = '—';
+      if (this.els.adminStorageBreakdown) this.els.adminStorageBreakdown.textContent = '—';
+      return;
+    }
+
+    if (this.els.kpiDbSize) {
+      this.els.kpiDbSize.textContent = `${this.formatDecimal(summary.dbMb, 2)} MB`;
+    }
+    if (this.els.kpiDbSizeMeta) {
+      this.els.kpiDbSizeMeta.textContent = this.t('admin.kpiDbSizeMeta', {
+        pct: this.formatDecimal(summary.dbQuotaPct, 1),
+        limit: this.formatInt(summary.freeLimitMb)
+      });
+    }
+    if (this.els.adminDbQuotaBar) {
+      this.els.adminDbQuotaBar.style.width = `${Math.min(100, Math.max(2, summary.dbQuotaPct))}%`;
+      this.els.adminDbQuotaBar.className = summary.status === 'ok'
+        ? 'admin-bar-fill is-sage'
+        : 'admin-bar-fill';
+    }
+
+    if (this.els.kpiBase64Images) {
+      this.els.kpiBase64Images.textContent = `${this.formatDecimal(summary.base64ImagesMb, 2)} MB`;
+    }
+    if (this.els.kpiBase64ImagesMeta) {
+      this.els.kpiBase64ImagesMeta.textContent = this.t('admin.kpiBase64ImagesMeta', {
+        count: this.formatInt(summary.base64ImagesCount),
+        avg: this.formatDecimal(summary.avgImageKb, 1)
+      });
+    }
+
+    if (this.els.adminStorageBreakdown) {
+      this.els.adminStorageBreakdown.innerHTML = [
+        `recipes: <strong>${escapeHtml(this.formatDecimal(summary.recipesTableMb, 2))} MB</strong>`,
+        `meal_plans: <strong>${escapeHtml(this.formatDecimal(summary.mealPlansTableMb, 2))} MB</strong>`,
+        `shopping_items: <strong>${escapeHtml(this.formatDecimal(summary.shoppingItemsTableMb, 2))} MB</strong>`,
+        `ai_usage: <strong>${escapeHtml(this.formatDecimal(summary.aiUsageTableMb, 2))} MB</strong>`
+      ].join(' · ');
+    }
   }
 
   toggleTheme() {

@@ -304,6 +304,37 @@
               <div id="admin-top-domains" class="admin-domains-list"></div>
             </section>
           </div>
+
+          <div class="admin-section-header" style="margin-top: 24px;">
+            <h2 class="admin-section-heading" data-i18n="admin.sectionSupabaseHealth">Salud Cloud y Almacenamiento Supabase</h2>
+            <a href="https://supabase.com/dashboard/org/jrxptmnxmqesxcrhsfui/usage" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">
+              <span class="material-symbols-outlined icon-sm" aria-hidden="true">open_in_new</span>
+              <span data-i18n="admin.storageUsageLinkBtn">Ver Egress en Supabase</span>
+            </a>
+          </div>
+
+          <div class="admin-kpi-grid">
+            <article class="admin-kpi-card" id="card-kpi-db-size">
+              <div class="admin-kpi-label" data-i18n="admin.kpiDbSize">Tamaño BD Postgres</div>
+              <div class="admin-kpi-value" id="kpi-db-size">—</div>
+              <div class="admin-bar-track" style="margin: 8px 0 6px;">
+                <span class="admin-bar-fill is-sage" id="admin-db-quota-bar" style="width: 0%"></span>
+              </div>
+              <div class="admin-kpi-meta" id="kpi-db-size-meta">—</div>
+            </article>
+
+            <article class="admin-kpi-card">
+              <div class="admin-kpi-label" data-i18n="admin.kpiBase64Images">Imágenes base64 en BD</div>
+              <div class="admin-kpi-value" id="kpi-base64-images">—</div>
+              <div class="admin-kpi-meta" id="kpi-base64-images-meta">—</div>
+            </article>
+
+            <article class="admin-kpi-card">
+              <div class="admin-kpi-label" data-i18n="admin.storageBreakdownTitle">Peso por tabla en Supabase</div>
+              <div id="admin-storage-breakdown" class="admin-kpi-meta" style="margin-top: 6px; line-height: 1.6;">—</div>
+            </article>
+          </div>
+          <p class="admin-kpi-meta" style="margin-top: 8px;" data-i18n="admin.storageUsageHint">El tráfico exacto de salida (egress GB) se consulta en el panel de Supabase; aquí vigilas el crecimiento de BD e imágenes base64 en tiempo real.</p>
         </section>
 
         <!-- US-87c: Directorio de Usuarios y Planes -->

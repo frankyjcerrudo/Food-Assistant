@@ -374,4 +374,40 @@ describe('US-87b: Sabory Admin Portal (/admin.html), Auth Guard y Dashboard KPIs
       ids.forEach((id) => expect(document.getElementById(id).hidden).toBe(true));
     });
   });
+
+  describe('US-88: Monitor de Salud Cloud y Almacenamiento Supabase', () => {
+    it('renderiza tamaño de BD, porcentaje de cuota Free, imágenes base64 y desglose por tabla', async () => {
+      const mockSupabase = createMockSupabase({
+        session: { user: { id: 'admin-1', email: 'fjcerrudo@gmail.com' } },
+        isAdmin: true,
+        stats: {
+          users: { total: 2, dau: 2, wau: 2, mau: 2, new_7d: 0, new_30d: 0 },
+          plans: { free: 2 },
+          catalog: { total_recipes: 120, total_meal_plans: 15, total_shopping_items: 25, total_households: 1, paused_households: 0 },
+          top_domains: [],
+          ai: { today_calls: 0, period_days: 30, calls_total: 0, calls_ok: 0, calls_error: 0, prompt_tokens: 0, output_tokens: 0, by_feature_model: [] },
+          storage: {
+            db_bytes: 52428800, // 50 MB
+            recipes_table_bytes: 31457280, // 30 MB
+            meal_plans_table_bytes: 1048576, // 1 MB
+            shopping_items_table_bytes: 524288, // 0.5 MB
+            ai_usage_table_bytes: 262144, // 0.25 MB
+            recipes_with_base64_images: 40,
+            base64_images_bytes: 20971520 // 20 MB
+          }
+        }
+      });
+
+      const adminApp = new SaboryAdminApp({ supabaseClient: mockSupabase });
+      await adminApp.init();
+
+      expect(document.getElementById('kpi-db-size').textContent).toContain('50');
+      expect(document.getElementById('kpi-db-size-meta').textContent).toContain('500 MB');
+      expect(document.getElementById('admin-db-quota-bar').style.width).toBe('10%');
+      expect(document.getElementById('kpi-base64-images').textContent).toContain('20');
+      expect(document.getElementById('kpi-base64-images-meta').textContent).toContain('40');
+      expect(document.getElementById('admin-storage-breakdown').textContent).toContain('recipes:');
+      expect(document.getElementById('admin-storage-breakdown').textContent).toContain('meal_plans:');
+    });
+  });
 });

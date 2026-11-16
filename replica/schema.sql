@@ -654,6 +654,7 @@ declare
   v_ai jsonb;
   v_heavy_users jsonb;
   v_free_capped jsonb;
+  v_storage jsonb;
 begin
   if not public.is_admin() then
     raise exception 'FORBIDDEN' using errcode = '42501';
@@ -796,6 +797,16 @@ begin
     limit 20
   ) fc;
 
+  select jsonb_build_object(
+    'db_bytes', pg_database_size(current_database())::bigint,
+    'recipes_table_bytes', pg_total_relation_size('public.recipes')::bigint,
+    'meal_plans_table_bytes', pg_total_relation_size('public.meal_plans')::bigint,
+    'shopping_items_table_bytes', pg_total_relation_size('public.shopping_items')::bigint,
+    'ai_usage_table_bytes', pg_total_relation_size('public.ai_usage')::bigint,
+    'recipes_with_base64_images', (select count(*)::int from public.recipes where image_url like 'data:image%'),
+    'base64_images_bytes', (select coalesce(sum(octet_length(image_url)), 0)::bigint from public.recipes where image_url like 'data:image%')
+  ) into v_storage;
+
   return jsonb_build_object(
     'users', v_users,
     'plans', v_plans,
@@ -803,7 +814,8 @@ begin
     'top_domains', v_top_domains,
     'ai', v_ai,
     'ai_heavy_users', v_heavy_users,
-    'ai_free_capped_users', v_free_capped
+    'ai_free_capped_users', v_free_capped,
+    'storage', v_storage
   );
 end; $$;
 revoke execute on function public.admin_get_dashboard_stats(int) from public, anon;

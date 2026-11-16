@@ -359,3 +359,53 @@ export function formatAuditSummary(entry = {}) {
       return `Acción administrativa: ${action}`;
   }
 }
+
+/**
+ * Resume métricas de almacenamiento de Supabase Postgres e imágenes base64 (US-88).
+ * Ayuda a vigilar la cuota de BD Free (500 MB) y el riesgo de egress por imágenes incrustadas.
+ */
+export function summarizeSupabaseStorage(storage = {}, freeLimitMb = 500) {
+  const s = storage && typeof storage === 'object' ? storage : {};
+  const toBytes = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  };
+  const bytesToMb = (b) => Math.round((b / (1024 * 1024)) * 100) / 100;
+
+  const dbBytes = toBytes(s.db_bytes);
+  const recipesTableBytes = toBytes(s.recipes_table_bytes);
+  const mealPlansTableBytes = toBytes(s.meal_plans_table_bytes);
+  const shoppingItemsTableBytes = toBytes(s.shopping_items_table_bytes);
+  const aiUsageTableBytes = toBytes(s.ai_usage_table_bytes);
+  const base64ImagesBytes = toBytes(s.base64_images_bytes);
+  const base64ImagesCount = toNonNegativeInt(s.recipes_with_base64_images);
+
+  const dbMb = bytesToMb(dbBytes);
+  const limitMb = Math.max(1, Number(freeLimitMb) || 500);
+  const dbQuotaPct = Math.round(((dbMb / limitMb) * 100) * 10) / 10;
+  const base64ImagesMb = bytesToMb(base64ImagesBytes);
+  const avgImageKb = base64ImagesCount > 0
+    ? Math.round(((base64ImagesBytes / base64ImagesCount) / 1024) * 10) / 10
+    : 0;
+
+  let status = 'ok';
+  if (dbQuotaPct >= 90) status = 'danger';
+  else if (dbQuotaPct >= 70) status = 'warning';
+
+  return {
+    available: dbBytes > 0 || recipesTableBytes > 0 || base64ImagesCount > 0,
+    dbBytes,
+    dbMb,
+    freeLimitMb: limitMb,
+    dbQuotaPct,
+    status,
+    recipesTableMb: bytesToMb(recipesTableBytes),
+    mealPlansTableMb: bytesToMb(mealPlansTableBytes),
+    shoppingItemsTableMb: bytesToMb(shoppingItemsTableBytes),
+    aiUsageTableMb: bytesToMb(aiUsageTableBytes),
+    base64ImagesCount,
+    base64ImagesBytes,
+    base64ImagesMb,
+    avgImageKb
+  };
+}
