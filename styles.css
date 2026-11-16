@@ -7174,7 +7174,8 @@ body.app-tour-active .app-tour-nav-target {
   opacity: 1 !important;
   background-color: var(--m3-primary-container) !important;
   color: var(--m3-primary) !important;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-lg);
+  padding: 4px 6px;
   box-shadow: 0 0 0 2px var(--m3-primary), 0 4px 12px rgba(200, 90, 50, 0.28);
   animation: tourNavPulse 1.5s ease-in-out infinite;
 }

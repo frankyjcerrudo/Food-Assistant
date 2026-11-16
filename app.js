@@ -22450,7 +22450,7 @@ REGLAS CRÍTICAS:
       {
         view: 'view-today',
         icon: 'today',
-        selectors: ['#view-today .today-header', '#today-nutrition-card'],
+        selectors: ['#view-today .today-header-info', '#view-today .today-header'],
         titleKey: 'tour.step1Title',
         descKey: 'tour.step1Desc',
         titleFallback: 'Hoy: tu menú y macros al día',
@@ -22459,7 +22459,7 @@ REGLAS CRÍTICAS:
       {
         view: 'view-recipes',
         icon: 'menu_book',
-        selectors: ['#view-recipes .recipes-section-header', '#view-recipes'],
+        selectors: ['#view-recipes .recipes-header-title-group', '#view-recipes .recipes-section-header'],
         titleKey: 'tour.step2Title',
         descKey: 'tour.step2Desc',
         titleFallback: 'Recetario y Modo Cocina',
@@ -22468,7 +22468,7 @@ REGLAS CRÍTICAS:
       {
         view: 'view-planner',
         icon: 'calendar_month',
-        selectors: ['#view-planner .section-header', '#planner-week-nav-bar'],
+        selectors: ['#view-planner .section-header > div:first-child', '#view-planner .section-header'],
         titleKey: 'tour.step3Title',
         descKey: 'tour.step3Desc',
         titleFallback: 'Planificador Semanal',
@@ -22477,7 +22477,7 @@ REGLAS CRÍTICAS:
       {
         view: 'view-shopping',
         icon: 'shopping_cart',
-        selectors: ['#view-shopping .shopping-section-header', '#shopping-view-toggle'],
+        selectors: ['#view-shopping .shopping-section-header'],
         titleKey: 'tour.step4Title',
         descKey: 'tour.step4Desc',
         titleFallback: 'Lista de la Compra Inteligente',
@@ -22486,7 +22486,7 @@ REGLAS CRÍTICAS:
       {
         view: 'view-ai',
         icon: 'auto_awesome',
-        selectors: ['#view-ai .gemini-invoke-header', '#view-ai'],
+        selectors: ['#view-ai .gemini-invoke-header-top', '#view-ai .gemini-invoke-header'],
         titleKey: 'tour.step5Title',
         descKey: 'tour.step5Desc',
         titleFallback: 'Sous Chef con IA',
@@ -22609,10 +22609,13 @@ REGLAS CRÍTICAS:
     const vw = window.innerWidth || 375;
     const vh = window.innerHeight || 667;
     const pad = 8;
+    const appHeader = document.querySelector('.app-header');
+    const headerRect = appHeader ? appHeader.getBoundingClientRect() : null;
     const bottomNav = document.querySelector('.bottom-nav');
-    const hasBottomNav = bottomNav && bottomNav.getBoundingClientRect().height > 0;
-    const safeTop = hasBottomNav ? 12 : 76;
-    const safeBottom = hasBottomNav ? 92 : 16;
+    const bottomNavRect = bottomNav ? bottomNav.getBoundingClientRect() : null;
+    const hasBottomNav = Boolean(bottomNavRect && bottomNavRect.height > 0);
+    const safeTop = (headerRect && headerRect.height > 0) ? Math.max(12, Math.ceil(headerRect.bottom) + 8) : 12;
+    const safeBottom = hasBottomNav ? Math.max(16, Math.ceil(vh - bottomNavRect.top) + 10) : 16;
 
     const cardRect = card.getBoundingClientRect();
     const cardW = cardRect.width || Math.min(380, vw - 24);
