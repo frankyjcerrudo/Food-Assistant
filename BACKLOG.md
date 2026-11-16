@@ -197,6 +197,14 @@
 
 ---
 
+## ⚡ Épica 14: Escalabilidad, Optimización de Egress y Rendimiento Cloud
+
+| ID | Historia de Usuario / Feature | Prioridad | Estado | Criterios de Aceptación (DoD) |
+| :--- | :--- | :---: | :---: | :--- |
+| **US-88** | Optimización de Egress en Supabase, Sincronización Incremental y Escalabilidad Cloud | 🔴 Alta | `In Progress` | • **Cortar polling completo cada 5s (`app.js`)**: eliminar `pullFromCloud()` completo en el `setInterval` de 5s de `view-shopping` / `view-planner`. Ejecutar refresco ligero solo cuando exista hogar activo (`activeHouseholdId`) o fallback espaciado, consultando únicamente la tabla de la vista (`shopping_items` en compra, `meal_plans` en planificador) sin re-descargar `recipes` ni imágenes base64.<br>• **Sincronización incremental (`updated_at > lastSyncAt`)**: en `pullFromCloud()`, almacenar y utilizar el último timestamp de sincronización por tabla (`recipes`, `meal_plans`, `shopping_items`) para descargar solo filas modificadas desde el último sync, manteniendo resync completo en arranque/botón manual y propagación segura de borrados.<br>• **Realtime / Broadcast en hogares**: aprovechar el canal WebSocket de Supabase Broadcast para sincronizar cambios al instante entre miembros del hogar sin depender de polling continuo.<br>• **Desacoplamiento futuro de imágenes base64 (`recipes.image_url`)** *(Fase 2 / Pre-lanzamiento público)*: migrar fotos `data:image/jpeg` de Postgres a Object Storage (Supabase Storage / R2) con `Cache-Control` largo para proteger el límite de BD (500 MB Free / 8 GB Pro).<br>• **Tests**: ampliar `tests/sync.test.js` verificando que el refresco ligero de vista no consulta `recipes`, que la sincronización incremental filtra por `updated_at` y que el resync completo sigue preservando integridad y borrados. |
+
+---
+
 ## 🐛 Historial y Registro de Defectos (Bugs)
 
 | ID | Defecto | Severidad | Estado | Resolución |
