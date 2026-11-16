@@ -6064,9 +6064,9 @@ class FoodAssistantApp {
           this.sanitizeRecipeProteinTags();
           this.render();
           if (this.supabaseClient && state.cloudUser?.id) {
-            // US-69 & US-81: refresco reactivo al volver a la app (debounce de 2 s para multi-dispositivo y PWA)
+            // US-69 & US-88: refresco reactivo al volver a la app (debounce de 10 s para reducir egress en cambios de pestaña)
             const nowMs = Date.now();
-            if (!this._lastVisibilitySyncAt || nowMs - this._lastVisibilitySyncAt > 2000) {
+            if (!this._lastVisibilitySyncAt || nowMs - this._lastVisibilitySyncAt > 10000) {
               this._lastVisibilitySyncAt = nowMs;
               this.loadAiPlanStatus();
               this.syncDataWithCloud(true);
@@ -6075,18 +6075,18 @@ class FoodAssistantApp {
         }
       });
 
-      // US-81: Refresco activo en vivo (cada 5s) si la lista de la compra o el planificador están en pantalla
+      // US-81 & US-88: Refresco ligero de respaldo (cada 30s) solo de la tabla de la vista activa (sin re-descargar recetas/imágenes)
       setInterval(async () => {
         try {
           if (typeof document !== 'undefined' && document.visibilityState === 'visible' && !this.isPushingToCloud) {
             if (this.activeView === 'view-shopping' || this.activeView === 'view-planner') {
               if (this.supabaseClient && state.cloudUser?.id && (typeof navigator === 'undefined' || navigator.onLine)) {
-                await this.pullFromCloud();
+                await this.pullViewUpdatesFromCloud(this.activeView);
               }
             }
           }
         } catch (e) { }
-      }, 5000);
+      }, 30000);
       window.addEventListener('pagehide', () => {
         this.flushSync();
       });
@@ -6594,8 +6594,349 @@ class FoodAssistantApp {
     return Promise.resolve({ success: true });
   }
 
-  // US-35: Descarga y fusión bidireccional desde Supabase
-  async pullFromCloud() {
+  _buildScopedQuery(table, selectCols, activeHouseholdId) {
+    let base = this.supabaseClient.from(table).select(selectCols);
+    let query;
+    if (activeHouseholdId) {
+      if (typeof base.or === 'function') {
+        query = base.or(`household_id.eq.${activeHouseholdId},user_id.eq.${state.cloudUser.id}`);
+      } else {
+        query = base.eq('household_id', activeHouseholdId);
+      }
+    } else {
+      query = base.eq('user_id', state.cloudUser.id);
+    }
+    if (typeof query.limit === 'function') query = query.limit(5000);
+    return query;
+  }
+
+  _mergeRemoteMealPlans(remoteRows) {
+    let stateChanged = false;
+    let remoteHouseholdPrefsRow = null;
+    const remoteDeletedShoppingIds = new Set();
+    const hasLocalDayMeals = (d) => !!(d && (d.breakfast || d.lunch || d.snack || d.dinner || (Array.isArray(d.customSlots) && d.customSlots.some(cs => cs && cs.recipeId && cs.type !== 'plan_explicit_clear'))));
+    const hasRemoteRowMeals = (r) => !!(r && (r.breakfast_recipe_id || r.lunch_recipe_id || r.snack_recipe_id || r.dinner_recipe_id || (Array.isArray(r.custom_slots) && r.custom_slots.some(cs => cs && cs.recipeId && cs.type !== 'plan_explicit_clear'))));
+
+    if (state.mealPlan && state.mealPlan['__household_prefs__']) {
+      delete state.mealPlan['__household_prefs__'];
+    }
+    if (state.mealPlan && state.mealPlan['__user_prefs__']) {
+      delete state.mealPlan['__user_prefs__'];
+    }
+
+    if (Array.isArray(remoteRows)) {
+      const dedupedPlansMap = new Map();
+      remoteRows.forEach(row => {
+        const dKey = row?.plan_date || row?.id;
+        if (!dKey) return;
+        if (dKey === '__household_prefs__' || dKey === '__user_prefs__') {
+          if (Array.isArray(row.custom_slots)) {
+            row.custom_slots.forEach(slot => {
+              if (slot && slot.type === 'deleted_shopping_items' && Array.isArray(slot.deletedIds)) {
+                slot.deletedIds.forEach(delId => {
+                  if (delId) {
+                    remoteDeletedShoppingIds.add(delId);
+                    if (typeof state.addTombstone === 'function') {
+                      state.addTombstone('shoppingItems', delId);
+                    }
+                  }
+                });
+              }
+            });
+          }
+          if (!remoteHouseholdPrefsRow || new Date(row.updated_at || 0).getTime() >= new Date(remoteHouseholdPrefsRow.updated_at || 0).getTime()) {
+            remoteHouseholdPrefsRow = row;
+          }
+          return;
+        }
+        const prev = dedupedPlansMap.get(dKey);
+        if (!prev) {
+          dedupedPlansMap.set(dKey, row);
+          return;
+        }
+        const rowHasExplicitClear = Array.isArray(row.custom_slots) && row.custom_slots.some(c => c && c.type === 'plan_explicit_clear');
+        const prevHasExplicitClear = Array.isArray(prev.custom_slots) && prev.custom_slots.some(c => c && c.type === 'plan_explicit_clear');
+        const rowHasContent = hasRemoteRowMeals(row);
+        const prevHasContent = hasRemoteRowMeals(prev);
+
+        if (rowHasExplicitClear || prevHasExplicitClear) {
+          if (new Date(row.updated_at || 0).getTime() >= new Date(prev.updated_at || 0).getTime()) {
+            dedupedPlansMap.set(dKey, row);
+          }
+        } else if (rowHasContent && !prevHasContent) {
+          dedupedPlansMap.set(dKey, row);
+        } else if (!rowHasContent && prevHasContent) {
+          if (row.user_id && prev.user_id && row.user_id === prev.user_id && new Date(row.updated_at || 0).getTime() > new Date(prev.updated_at || 0).getTime()) {
+            dedupedPlansMap.set(dKey, row);
+          }
+        } else if (new Date(row.updated_at || 0).getTime() >= new Date(prev.updated_at || 0).getTime()) {
+          dedupedPlansMap.set(dKey, row);
+        }
+      });
+
+      const remotePlansList = Array.from(dedupedPlansMap.values());
+      const remotePlanKeys = new Set(remotePlansList.map(r => r.plan_date || r.id));
+      if (state.lastSyncedAt) {
+        const lastSyncTime = new Date(state.lastSyncedAt).getTime();
+        Object.keys(state.mealPlan).forEach(dateKey => {
+          if (!remotePlanKeys.has(dateKey)) {
+            const day = state.mealPlan[dateKey];
+            if (day && day.updatedAt && new Date(day.updatedAt).getTime() <= lastSyncTime) {
+              if (day.breakfast || day.lunch || day.snack || day.dinner || (day.customSlots && day.customSlots.length > 0)) {
+                day.breakfast = null;
+                day.lunch = null;
+                day.snack = null;
+                day.dinner = null;
+                day.customSlots = [];
+                stateChanged = true;
+              }
+            }
+          }
+        });
+      }
+
+      remotePlansList.forEach(remoteRow => {
+        const dateKey = remoteRow.plan_date || remoteRow.id;
+        if (!dateKey || dateKey === '__household_prefs__' || dateKey === '__user_prefs__' || state.deletedRecords.mealPlans?.includes(dateKey)) return;
+
+        const localPlan = state.mealPlan[dateKey];
+        const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
+        const localDate = new Date(localPlan?.updatedAt || 0).getTime();
+        const localIsUntouchedEmpty = localPlan && !hasLocalDayMeals(localPlan) && !localPlan.updatedAt;
+        const remoteHasContent = hasRemoteRowMeals(remoteRow);
+
+        if (!localPlan || localIsUntouchedEmpty || (remoteHasContent && !hasLocalDayMeals(localPlan) && !localPlan.updatedAt) || remoteDate >= localDate) {
+          const cleanCustomSlots = (Array.isArray(remoteRow.custom_slots) ? remoteRow.custom_slots : []).filter(c => !c || c.type !== 'plan_explicit_clear');
+          const mergedDay = {
+            dayName: remoteRow.day_name || localPlan?.dayName || 'Día',
+            breakfast: remoteRow.breakfast_recipe_id || null,
+            lunch: remoteRow.lunch_recipe_id || null,
+            snack: remoteRow.snack_recipe_id || null,
+            dinner: remoteRow.dinner_recipe_id || null,
+            customSlots: cleanCustomSlots,
+            updatedAt: remoteRow.updated_at
+          };
+          if (remoteRow.household_id) mergedDay.householdId = remoteRow.household_id;
+          if (remoteRow.user_id) mergedDay.ownerUserId = remoteRow.user_id;
+          state.mealPlan[dateKey] = mergedDay;
+          stateChanged = true;
+        }
+      });
+    }
+
+    return { stateChanged, remoteHouseholdPrefsRow, remoteDeletedShoppingIds };
+  }
+
+  _mergeRemoteShoppingItems(remoteRows, remoteDeletedShoppingIds = new Set()) {
+    let stateChanged = false;
+    if (remoteDeletedShoppingIds.size > 0 && typeof state.clearDeletedRecords === 'function') {
+      state.clearDeletedRecords('shoppingItems', Array.from(remoteDeletedShoppingIds));
+    }
+    if (!Array.isArray(remoteRows)) return false;
+
+    const dedupedShopMap = new Map();
+    remoteRows.forEach(row => {
+      if (!row || !row.id) return;
+      if (remoteDeletedShoppingIds.has(row.id) ||
+        state.deletedRecords.shoppingItems?.includes(row.id) ||
+        (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', row.id))) {
+        return;
+      }
+      const prev = dedupedShopMap.get(row.id);
+      if (!prev || new Date(row.updated_at || 0).getTime() >= new Date(prev.updated_at || 0).getTime()) {
+        dedupedShopMap.set(row.id, row);
+      }
+    });
+    const remoteShopList = Array.from(dedupedShopMap.values());
+    const remoteShopIds = new Set(remoteShopList.map(i => i.id));
+    const lastSyncTime = state.lastSyncedAt ? new Date(state.lastSyncedAt).getTime() : 0;
+    const initialShopLen = state.shoppingList.length;
+    state.shoppingList = state.shoppingList.filter(item => {
+      if (!item || !item.id) return false;
+      if (remoteDeletedShoppingIds.has(item.id) ||
+        state.deletedRecords.shoppingItems?.includes(item.id) ||
+        (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', item.id))) {
+        return false;
+      }
+      if (remoteShopIds.has(item.id)) return true;
+
+      if (item._syncedWithCloud) {
+        if (typeof state.addTombstone === 'function') state.addTombstone('shoppingItems', item.id);
+        return false;
+      }
+      if (item.ownerUserId && item.ownerUserId !== state.cloudUser.id) {
+        if (typeof state.addTombstone === 'function') state.addTombstone('shoppingItems', item.id);
+        return false;
+      }
+
+      const isRecentlyCheckedLocally = this._recentShoppingCheckTimestamps &&
+        (Date.now() - (this._recentShoppingCheckTimestamps.get(item.id) || 0) < 10000);
+      if ((item.isChecked || item.checked) && !isRecentlyCheckedLocally) {
+        if (typeof state.addTombstone === 'function') state.addTombstone('shoppingItems', item.id);
+        return false;
+      }
+
+      if (state.lastSyncedAt) {
+        if (item.updatedAt && new Date(item.updatedAt).getTime() > lastSyncTime) {
+          return true;
+        }
+        if (typeof state.addTombstone === 'function') state.addTombstone('shoppingItems', item.id);
+        return false;
+      }
+      return true;
+    });
+    if (state.shoppingList.length !== initialShopLen) {
+      stateChanged = true;
+    }
+
+    remoteShopList.forEach(remoteRow => {
+      if (remoteDeletedShoppingIds.has(remoteRow.id) ||
+        state.deletedRecords.shoppingItems?.includes(remoteRow.id) ||
+        (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', remoteRow.id))) {
+        return;
+      }
+
+      const localIdx = state.shoppingList.findIndex(i => i.id === remoteRow.id);
+      const local = localIdx >= 0 ? state.shoppingList[localIdx] : null;
+
+      let breakdown = null;
+      if (Array.isArray(remoteRow.recipe_breakdown)) {
+        breakdown = remoteRow.recipe_breakdown;
+      } else if (typeof remoteRow.recipe_breakdown === 'string') {
+        try { breakdown = JSON.parse(remoteRow.recipe_breakdown); } catch (e) { }
+      }
+
+      if (!breakdown && local && Array.isArray(local.recipeBreakdown) && local.recipeBreakdown.length > 0) {
+        breakdown = local.recipeBreakdown;
+      }
+
+      if (!breakdown && remoteRow.recipe_origin && remoteRow.recipe_origin.includes(',')) {
+        const parts = parseRecipeOrigins(remoteRow.recipe_origin, state.recipes || []);
+        if (parts.length > 1) {
+          breakdown = parts.map(p => ({
+            recipe: p,
+            name: remoteRow.name,
+            amount: null,
+            unit: remoteRow.unit || ''
+          }));
+        }
+      }
+
+      const remoteItem = {
+        id: remoteRow.id,
+        name: remoteRow.name,
+        amount: remoteRow.amount !== null && !isNaN(remoteRow.amount) ? Number(remoteRow.amount) : null,
+        unit: remoteRow.unit || '',
+        aisle: remoteRow.aisle || 'other',
+        isChecked: !!remoteRow.is_checked,
+        recipeOrigin: remoteRow.recipe_origin || '',
+        recipeBreakdown: breakdown,
+        updatedAt: remoteRow.updated_at,
+        _syncedWithCloud: true
+      };
+      if (remoteRow.household_id) remoteItem.householdId = remoteRow.household_id;
+      if (remoteRow.user_id) remoteItem.ownerUserId = remoteRow.user_id;
+      reconcileShoppingItemBreakdown(remoteItem, state.recipes || []);
+
+      if (localIdx >= 0) {
+        const isRecentlyCheckedLocally = this._recentShoppingCheckTimestamps &&
+          (Date.now() - (this._recentShoppingCheckTimestamps.get(local.id) || 0) < 10000);
+        const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
+        const localDate = new Date(local.updatedAt || 0).getTime();
+
+        if (remoteDate > localDate) {
+          const finalChecked = isRecentlyCheckedLocally ? local.isChecked : !!remoteRow.is_checked;
+          state.shoppingList[localIdx] = {
+            ...local,
+            ...remoteItem,
+            isChecked: finalChecked,
+            _syncedWithCloud: true
+          };
+          stateChanged = true;
+        } else if (remoteDate === localDate) {
+          const finalChecked = isRecentlyCheckedLocally ? local.isChecked : !!remoteRow.is_checked;
+          if (local.isChecked !== finalChecked) {
+            local.isChecked = finalChecked;
+            stateChanged = true;
+          }
+          if (!local._syncedWithCloud) {
+            local._syncedWithCloud = true;
+            stateChanged = true;
+          }
+          if (!local.householdId && remoteItem.householdId) local.householdId = remoteItem.householdId;
+          if (!local.ownerUserId && remoteItem.ownerUserId) local.ownerUserId = remoteItem.ownerUserId;
+        } else {
+          if (!local._syncedWithCloud) {
+            local._syncedWithCloud = true;
+            stateChanged = true;
+          }
+          if (!local.householdId && remoteItem.householdId) local.householdId = remoteItem.householdId;
+          if (!local.ownerUserId && remoteItem.ownerUserId) local.ownerUserId = remoteItem.ownerUserId;
+        }
+      } else {
+        state.shoppingList.push(remoteItem);
+        stateChanged = true;
+      }
+    });
+
+    if (Array.isArray(state.shoppingList) && state.shoppingList.length > 1) {
+      const prevLen = state.shoppingList.length;
+      state.shoppingList = consolidateShoppingList(state.shoppingList);
+      if (state.shoppingList.length !== prevLen) {
+        stateChanged = true;
+      }
+    }
+
+    return stateChanged;
+  }
+
+  // US-88: Refresco ligero de respaldo para la vista activa (solo shopping_items o meal_plans, sin descargar recipes ni imágenes)
+  async pullViewUpdatesFromCloud(viewName = this.activeView) {
+    if (!this.supabaseClient || !state.cloudUser?.id) return { success: false, reason: 'no_session' };
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return { success: false, reason: 'offline' };
+    if (viewName !== 'view-shopping' && viewName !== 'view-planner') return { success: false, reason: 'unsupported_view' };
+
+    try {
+      const activeHouseholdId = state.household?.id || null;
+      if (!this.householdRealtimeChannel && !this.userRealtimeChannel && typeof this.initHouseholdRealtimeSubscription === 'function') {
+        this.initHouseholdRealtimeSubscription();
+      }
+
+      if (viewName === 'view-shopping') {
+        const shopRes = await this._buildScopedQuery('shopping_items', '*', activeHouseholdId);
+        if (shopRes?.error) throw shopRes.error;
+        if (Array.isArray(shopRes?.data)) {
+          const changed = this._mergeRemoteShoppingItems(shopRes.data);
+          if (changed) {
+            state.save('fa_shopping', state.shoppingList);
+            this.renderShoppingList();
+          }
+        }
+        return { success: true, scope: 'shopping_items' };
+      }
+
+      if (viewName === 'view-planner') {
+        const planRes = await this._buildScopedQuery('meal_plans', '*', activeHouseholdId);
+        if (planRes?.error) throw planRes.error;
+        if (Array.isArray(planRes?.data)) {
+          const { stateChanged } = this._mergeRemoteMealPlans(planRes.data);
+          if (stateChanged) {
+            state.save('fa_mealplan', state.mealPlan);
+            this.render();
+          }
+        }
+        return { success: true, scope: 'meal_plans' };
+      }
+
+      return { success: false, reason: 'unsupported_view' };
+    } catch (err) {
+      console.warn('Error en refresco ligero de vista:', err);
+      return { success: false, error: err };
+    }
+  }
+
+  // US-35 & US-88: Descarga y fusión bidireccional desde Supabase (con sincronización incremental de recetas)
+  async pullFromCloud(options = {}) {
     if (!this.supabaseClient || !state.cloudUser?.id) return { success: false, reason: 'no_session' };
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       this.updateSyncIndicator(window.I18n ? window.I18n.t('settings.syncOffline') : 'Sin conexión (modo local)', 'warning');
@@ -6635,54 +6976,34 @@ class FoodAssistantApp {
         } catch (hhErr) { }
       }
 
-      let recBase = this.supabaseClient.from('recipes').select('*');
-      let recQuery;
-      if (activeHouseholdId) {
-        if (typeof recBase.or === 'function') {
-          recQuery = recBase.or(`household_id.eq.${activeHouseholdId},user_id.eq.${state.cloudUser.id}`);
-        } else {
-          recQuery = recBase.eq('household_id', activeHouseholdId);
-        }
-      } else {
-        recQuery = recBase.eq('user_id', state.cloudUser.id);
-      }
-      if (typeof recQuery.limit === 'function') recQuery = recQuery.limit(5000);
+      let recQuery = this._buildScopedQuery('recipes', '*', activeHouseholdId);
+      const canUseIncrementalRecipes = Boolean(
+        state.lastSyncedAt &&
+        !options.forceFull &&
+        Array.isArray(state.recipes) &&
+        state.recipes.length > 0 &&
+        typeof recQuery.gt === 'function'
+      );
 
-      let planBase = this.supabaseClient.from('meal_plans').select('*');
-      let planQuery;
-      if (activeHouseholdId) {
-        if (typeof planBase.or === 'function') {
-          planQuery = planBase.or(`household_id.eq.${activeHouseholdId},user_id.eq.${state.cloudUser.id}`);
-        } else {
-          planQuery = planBase.eq('household_id', activeHouseholdId);
-        }
-      } else {
-        planQuery = planBase.eq('user_id', state.cloudUser.id);
+      let recIdsQuery = null;
+      if (canUseIncrementalRecipes) {
+        const sinceIso = new Date(new Date(state.lastSyncedAt).getTime() - 5000).toISOString();
+        recQuery = recQuery.gt('updated_at', sinceIso);
+        recIdsQuery = this._buildScopedQuery('recipes', 'id', activeHouseholdId);
       }
-      if (typeof planQuery.limit === 'function') planQuery = planQuery.limit(5000);
 
-      let shopBase = this.supabaseClient.from('shopping_items').select('*');
-      let shopQuery;
-      if (activeHouseholdId) {
-        if (typeof shopBase.or === 'function') {
-          shopQuery = shopBase.or(`household_id.eq.${activeHouseholdId},user_id.eq.${state.cloudUser.id}`);
-        } else {
-          shopQuery = shopBase.eq('household_id', activeHouseholdId);
-        }
-      } else {
-        shopQuery = shopBase.eq('user_id', state.cloudUser.id);
-      }
-      if (typeof shopQuery.limit === 'function') shopQuery = shopQuery.limit(5000);
+      const planQuery = this._buildScopedQuery('meal_plans', '*', activeHouseholdId);
+      const shopQuery = this._buildScopedQuery('shopping_items', '*', activeHouseholdId);
 
-      const [recRes, planRes, shopRes] = await Promise.all([
-        recQuery,
-        planQuery,
-        shopQuery
-      ]);
+      const queryPromises = [recQuery, planQuery, shopQuery];
+      if (recIdsQuery) queryPromises.push(recIdsQuery);
+
+      const [recRes, planRes, shopRes, recIdsRes] = await Promise.all(queryPromises);
 
       if (recRes.error) throw recRes.error;
       if (planRes.error) throw planRes.error;
       if (shopRes.error) throw shopRes.error;
+      if (recIdsRes?.error) throw recIdsRes.error;
 
       let stateChanged = false;
 
@@ -6705,7 +7026,9 @@ class FoodAssistantApp {
           }
         });
         const remoteRecipesList = Array.from(dedupedRemoteRecipesMap.values());
-        const remoteRecipeIds = new Set(remoteRecipesList.map(r => r.id));
+        const remoteRecipeIds = Array.isArray(recIdsRes?.data)
+          ? new Set(recIdsRes.data.map(r => r && r.id).filter(Boolean))
+          : new Set(remoteRecipesList.map(r => r.id));
 
         // Propagación de borrados remotos entre dispositivos (BUG-23 / Multi-device):
         // Si el cliente ya sincronizó con la nube con anterioridad (state.lastSyncedAt no es null),
@@ -6871,285 +7194,16 @@ class FoodAssistantApp {
       }
 
       // 2. Fusión de Meal Plans (con desduplicación por fecha en Modo Familia US-77)
-      let remoteHouseholdPrefsRow = null;
-      const remoteDeletedShoppingIds = new Set();
-      const hasLocalDayMeals = (d) => !!(d && (d.breakfast || d.lunch || d.snack || d.dinner || (Array.isArray(d.customSlots) && d.customSlots.some(cs => cs && cs.recipeId && cs.type !== 'plan_explicit_clear'))));
-      const hasRemoteRowMeals = (r) => !!(r && (r.breakfast_recipe_id || r.lunch_recipe_id || r.snack_recipe_id || r.dinner_recipe_id || (Array.isArray(r.custom_slots) && r.custom_slots.some(cs => cs && cs.recipeId && cs.type !== 'plan_explicit_clear'))));
-
-      if (state.mealPlan && state.mealPlan['__household_prefs__']) {
-        delete state.mealPlan['__household_prefs__'];
-      }
-      if (state.mealPlan && state.mealPlan['__user_prefs__']) {
-        delete state.mealPlan['__user_prefs__'];
-      }
-
-      if (Array.isArray(planRes.data)) {
-        const dedupedPlansMap = new Map();
-        planRes.data.forEach(row => {
-          const dKey = row?.plan_date || row?.id;
-          if (!dKey) return;
-          if (dKey === '__household_prefs__' || dKey === '__user_prefs__') {
-            if (Array.isArray(row.custom_slots)) {
-              row.custom_slots.forEach(slot => {
-                if (slot && slot.type === 'deleted_shopping_items' && Array.isArray(slot.deletedIds)) {
-                  slot.deletedIds.forEach(delId => {
-                    if (delId) {
-                      remoteDeletedShoppingIds.add(delId);
-                      if (typeof state.addTombstone === 'function') {
-                        state.addTombstone('shoppingItems', delId);
-                      }
-                    }
-                  });
-                }
-              });
-            }
-            if (!remoteHouseholdPrefsRow || new Date(row.updated_at || 0).getTime() >= new Date(remoteHouseholdPrefsRow.updated_at || 0).getTime()) {
-              remoteHouseholdPrefsRow = row;
-            }
-            return;
-          }
-          const prev = dedupedPlansMap.get(dKey);
-          if (!prev) {
-            dedupedPlansMap.set(dKey, row);
-            return;
-          }
-          const rowHasExplicitClear = Array.isArray(row.custom_slots) && row.custom_slots.some(c => c && c.type === 'plan_explicit_clear');
-          const prevHasExplicitClear = Array.isArray(prev.custom_slots) && prev.custom_slots.some(c => c && c.type === 'plan_explicit_clear');
-          const rowHasContent = hasRemoteRowMeals(row);
-          const prevHasContent = hasRemoteRowMeals(prev);
-
-          if (rowHasExplicitClear || prevHasExplicitClear) {
-            // Si alguno de los registros tiene un vaciado explícito por un miembro al mover o borrar,
-            // prevalece la acción más reciente en el tiempo
-            if (new Date(row.updated_at || 0).getTime() >= new Date(prev.updated_at || 0).getTime()) {
-              dedupedPlansMap.set(dKey, row);
-            }
-          } else if (rowHasContent && !prevHasContent) {
-            dedupedPlansMap.set(dKey, row);
-          } else if (!rowHasContent && prevHasContent) {
-            // Un registro vacío autogenerado de otro miembro nunca pisa un día planificado del hogar
-            if (row.user_id && prev.user_id && row.user_id === prev.user_id && new Date(row.updated_at || 0).getTime() > new Date(prev.updated_at || 0).getTime()) {
-              dedupedPlansMap.set(dKey, row);
-            }
-          } else if (new Date(row.updated_at || 0).getTime() >= new Date(prev.updated_at || 0).getTime()) {
-            dedupedPlansMap.set(dKey, row);
-          }
-        });
-        const remotePlansList = Array.from(dedupedPlansMap.values());
-        const remotePlanKeys = new Set(remotePlansList.map(r => r.plan_date || r.id));
-        if (state.lastSyncedAt) {
-          const lastSyncTime = new Date(state.lastSyncedAt).getTime();
-          Object.keys(state.mealPlan).forEach(dateKey => {
-            if (!remotePlanKeys.has(dateKey)) {
-              const day = state.mealPlan[dateKey];
-              if (day && day.updatedAt && new Date(day.updatedAt).getTime() <= lastSyncTime) {
-                if (day.breakfast || day.lunch || day.snack || day.dinner || (day.customSlots && day.customSlots.length > 0)) {
-                  day.breakfast = null;
-                  day.lunch = null;
-                  day.snack = null;
-                  day.dinner = null;
-                  day.customSlots = [];
-                  stateChanged = true;
-                }
-              }
-            }
-          });
-        }
-
-        remotePlansList.forEach(remoteRow => {
-          const dateKey = remoteRow.plan_date || remoteRow.id;
-          if (!dateKey || dateKey === '__household_prefs__' || dateKey === '__user_prefs__' || state.deletedRecords.mealPlans?.includes(dateKey)) return;
-
-          const localPlan = state.mealPlan[dateKey];
-          const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
-          const localDate = new Date(localPlan?.updatedAt || 0).getTime();
-          const localIsUntouchedEmpty = localPlan && !hasLocalDayMeals(localPlan) && !localPlan.updatedAt;
-          const remoteHasContent = hasRemoteRowMeals(remoteRow);
-
-          if (!localPlan || localIsUntouchedEmpty || (remoteHasContent && !hasLocalDayMeals(localPlan) && !localPlan.updatedAt) || remoteDate >= localDate) {
-            const cleanCustomSlots = (Array.isArray(remoteRow.custom_slots) ? remoteRow.custom_slots : []).filter(c => !c || c.type !== 'plan_explicit_clear');
-            const mergedDay = {
-              dayName: remoteRow.day_name || localPlan?.dayName || 'Día',
-              breakfast: remoteRow.breakfast_recipe_id || null,
-              lunch: remoteRow.lunch_recipe_id || null,
-              snack: remoteRow.snack_recipe_id || null,
-              dinner: remoteRow.dinner_recipe_id || null,
-              customSlots: cleanCustomSlots,
-              updatedAt: remoteRow.updated_at
-            };
-            if (remoteRow.household_id) mergedDay.householdId = remoteRow.household_id;
-            if (remoteRow.user_id) mergedDay.ownerUserId = remoteRow.user_id;
-            state.mealPlan[dateKey] = mergedDay;
-            stateChanged = true;
-          }
-        });
-      }
+      const {
+        stateChanged: planChanged,
+        remoteHouseholdPrefsRow,
+        remoteDeletedShoppingIds
+      } = this._mergeRemoteMealPlans(planRes.data);
+      if (planChanged) stateChanged = true;
 
       // 3. Fusión de Shopping Items (con desduplicación colaborativa en Modo Familia US-77)
-      if (remoteDeletedShoppingIds.size > 0 && typeof state.clearDeletedRecords === 'function') {
-        state.clearDeletedRecords('shoppingItems', Array.from(remoteDeletedShoppingIds));
-      }
-      if (Array.isArray(shopRes.data)) {
-        const dedupedShopMap = new Map();
-        shopRes.data.forEach(row => {
-          if (!row || !row.id) return;
-          if (remoteDeletedShoppingIds.has(row.id) ||
-            state.deletedRecords.shoppingItems?.includes(row.id) ||
-            (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', row.id))) {
-            return;
-          }
-          const prev = dedupedShopMap.get(row.id);
-          if (!prev || new Date(row.updated_at || 0).getTime() >= new Date(prev.updated_at || 0).getTime()) {
-            dedupedShopMap.set(row.id, row);
-          }
-        });
-        const remoteShopList = Array.from(dedupedShopMap.values());
-        const remoteShopIds = new Set(remoteShopList.map(i => i.id));
-        const lastSyncTime = state.lastSyncedAt ? new Date(state.lastSyncedAt).getTime() : 0;
-        const initialShopLen = state.shoppingList.length;
-        state.shoppingList = state.shoppingList.filter(item => {
-          if (!item || !item.id) return false;
-          if (remoteDeletedShoppingIds.has(item.id) ||
-            state.deletedRecords.shoppingItems?.includes(item.id) ||
-            (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', item.id))) {
-            return false;
-          }
-          if (remoteShopIds.has(item.id)) return true;
-
-          // Si el artículo ya estaba sincronizado con la nube o pertenecía a otro miembro del hogar
-          // y ya no viene en remoteShopIds, fue borrado en otro dispositivo/miembro.
-          if (item._syncedWithCloud) {
-            if (typeof state.addTombstone === 'function') state.addTombstone('shoppingItems', item.id);
-            return false;
-          }
-          if (item.ownerUserId && item.ownerUserId !== state.cloudUser.id) {
-            if (typeof state.addTombstone === 'function') state.addTombstone('shoppingItems', item.id);
-            return false;
-          }
-
-          // Si el artículo está marcado como comprado (y no acaba de marcarse localmente hace <10s)
-          // y ya no existe en la nube, fue limpiado/borrado remotamente.
-          const isRecentlyCheckedLocally = this._recentShoppingCheckTimestamps &&
-            (Date.now() - (this._recentShoppingCheckTimestamps.get(item.id) || 0) < 10000);
-          if ((item.isChecked || item.checked) && !isRecentlyCheckedLocally) {
-            if (typeof state.addTombstone === 'function') state.addTombstone('shoppingItems', item.id);
-            return false;
-          }
-
-          if (state.lastSyncedAt) {
-            if (item.updatedAt && new Date(item.updatedAt).getTime() > lastSyncTime) {
-              return true;
-            }
-            if (typeof state.addTombstone === 'function') state.addTombstone('shoppingItems', item.id);
-            return false;
-          }
-          return true;
-        });
-        if (state.shoppingList.length !== initialShopLen) {
-          stateChanged = true;
-        }
-
-        remoteShopList.forEach(remoteRow => {
-          if (remoteDeletedShoppingIds.has(remoteRow.id) ||
-            state.deletedRecords.shoppingItems?.includes(remoteRow.id) ||
-            (typeof state.isTombstoned === 'function' && state.isTombstoned('shoppingItems', remoteRow.id))) {
-            return;
-          }
-
-          const localIdx = state.shoppingList.findIndex(i => i.id === remoteRow.id);
-          const local = localIdx >= 0 ? state.shoppingList[localIdx] : null;
-
-          let breakdown = null;
-          if (Array.isArray(remoteRow.recipe_breakdown)) {
-            breakdown = remoteRow.recipe_breakdown;
-          } else if (typeof remoteRow.recipe_breakdown === 'string') {
-            try { breakdown = JSON.parse(remoteRow.recipe_breakdown); } catch (e) { }
-          }
-
-          if (!breakdown && local && Array.isArray(local.recipeBreakdown) && local.recipeBreakdown.length > 0) {
-            breakdown = local.recipeBreakdown;
-          }
-
-          if (!breakdown && remoteRow.recipe_origin && remoteRow.recipe_origin.includes(',')) {
-            const parts = parseRecipeOrigins(remoteRow.recipe_origin, state.recipes || []);
-            if (parts.length > 1) {
-              breakdown = parts.map(p => ({
-                recipe: p,
-                name: remoteRow.name,
-                amount: null,
-                unit: remoteRow.unit || ''
-              }));
-            }
-          }
-
-          const remoteItem = {
-            id: remoteRow.id,
-            name: remoteRow.name,
-            amount: remoteRow.amount !== null && !isNaN(remoteRow.amount) ? Number(remoteRow.amount) : null,
-            unit: remoteRow.unit || '',
-            aisle: remoteRow.aisle || 'other',
-            isChecked: !!remoteRow.is_checked,
-            recipeOrigin: remoteRow.recipe_origin || '',
-            recipeBreakdown: breakdown,
-            updatedAt: remoteRow.updated_at,
-            _syncedWithCloud: true
-          };
-          if (remoteRow.household_id) remoteItem.householdId = remoteRow.household_id;
-          if (remoteRow.user_id) remoteItem.ownerUserId = remoteRow.user_id;
-          reconcileShoppingItemBreakdown(remoteItem, state.recipes || []);
-
-          if (localIdx >= 0) {
-            const isRecentlyCheckedLocally = this._recentShoppingCheckTimestamps &&
-              (Date.now() - (this._recentShoppingCheckTimestamps.get(local.id) || 0) < 10000);
-            const remoteDate = new Date(remoteRow.updated_at || 0).getTime();
-            const localDate = new Date(local.updatedAt || 0).getTime();
-
-            // US-81: Proteger contra respuestas de red obsoletas o en vuelo durante sincronización multi-dispositivo
-            if (remoteDate > localDate) {
-              const finalChecked = isRecentlyCheckedLocally ? local.isChecked : !!remoteRow.is_checked;
-              state.shoppingList[localIdx] = {
-                ...local,
-                ...remoteItem,
-                isChecked: finalChecked,
-                _syncedWithCloud: true
-              };
-              stateChanged = true;
-            } else if (remoteDate === localDate) {
-              const finalChecked = isRecentlyCheckedLocally ? local.isChecked : !!remoteRow.is_checked;
-              if (local.isChecked !== finalChecked) {
-                local.isChecked = finalChecked;
-                stateChanged = true;
-              }
-              if (!local._syncedWithCloud) {
-                local._syncedWithCloud = true;
-                stateChanged = true;
-              }
-              if (!local.householdId && remoteItem.householdId) local.householdId = remoteItem.householdId;
-              if (!local.ownerUserId && remoteItem.ownerUserId) local.ownerUserId = remoteItem.ownerUserId;
-            } else {
-              if (!local._syncedWithCloud) {
-                local._syncedWithCloud = true;
-                stateChanged = true;
-              }
-              if (!local.householdId && remoteItem.householdId) local.householdId = remoteItem.householdId;
-              if (!local.ownerUserId && remoteItem.ownerUserId) local.ownerUserId = remoteItem.ownerUserId;
-            }
-            // Si remoteDate < localDate, la versión local es estrictamente más reciente
-            // (por broadcast en vivo o pulsación local); nunca sobreescribir con datos obsoletos de la nube.
-          } else {
-            state.shoppingList.push(remoteItem);
-            stateChanged = true;
-          }
-        });
-
-        // Auto-consolidar artículos de compra equivalentes procedentes de la nube o multi-dispositivo (US-64)
-        if (Array.isArray(state.shoppingList) && state.shoppingList.length > 1) {
-          const prevLen = state.shoppingList.length;
-          state.shoppingList = consolidateShoppingList(state.shoppingList);
-          if (state.shoppingList.length !== prevLen) {
-            stateChanged = true;
-          }
-        }
+      if (this._mergeRemoteShoppingItems(shopRes.data, remoteDeletedShoppingIds)) {
+        stateChanged = true;
       }
 
       // 4. Fusión de Preferencias Dietéticas, Tags Personalizados, Objetivos Nutricionales (US-03) y Clave Gemini

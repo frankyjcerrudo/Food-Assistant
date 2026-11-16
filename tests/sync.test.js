@@ -1015,5 +1015,151 @@ describe('US-35 & Bugs Bloqueantes: Sincronización Supabase, IDs Únicos y Esqu
       expect(state.deletedRecords.recipes).toHaveLength(0);
     });
   });
+
+  describe('US-88: Optimización de Egress y Sincronización Incremental', () => {
+    it('pullViewUpdatesFromCloud("view-shopping") solo consulta shopping_items y nunca recipes ni meal_plans', async () => {
+      state.cloudUser = { id: 'user-egress-1', email: 'test@example.com' };
+      state.household = { id: 'hh-1', name: 'Casa' };
+      state.shoppingList = [
+        { id: 'us88-shop-1', name: 'Leche', isChecked: false, updatedAt: '2026-01-01T00:00:00.000Z', _syncedWithCloud: true }
+      ];
+
+      const queriedTables = [];
+      const mockSupabase = {
+        from: vi.fn().mockImplementation((table) => {
+          queriedTables.push(table);
+          const result = {
+            data: table === 'shopping_items' ? [
+              { id: 'us88-shop-1', name: 'Leche', is_checked: true, updated_at: '2026-01-01T00:05:00.000Z' },
+              { id: 'us88-shop-2', name: 'Pan', is_checked: false, updated_at: '2026-01-01T00:05:00.000Z' }
+            ] : [],
+            error: null
+          };
+          const chain = {
+            select: () => chain,
+            or: () => chain,
+            eq: () => chain,
+            limit: () => Promise.resolve(result),
+            then: (resolve) => Promise.resolve(result).then(resolve)
+          };
+          return chain;
+        })
+      };
+
+      appInstance.supabaseClient = mockSupabase;
+      appInstance.householdRealtimeChannel = { id: 'mock-ch' };
+      const res = await appInstance.pullViewUpdatesFromCloud('view-shopping');
+
+      expect(res.success).toBe(true);
+      expect(queriedTables).toEqual(['shopping_items']);
+      expect(queriedTables).not.toContain('recipes');
+      expect(queriedTables).not.toContain('meal_plans');
+      expect(queriedTables).not.toContain('user_settings');
+      expect(state.shoppingList.find(i => i.id === 'us88-shop-1').isChecked).toBe(true);
+      expect(state.shoppingList.find(i => i.id === 'us88-shop-2').name).toBe('Pan');
+    });
+
+    it('pullViewUpdatesFromCloud("view-planner") solo consulta meal_plans y nunca recipes ni shopping_items', async () => {
+      state.cloudUser = { id: 'user-egress-2', email: 'test@example.com' };
+      state.mealPlan = {};
+
+      const queriedTables = [];
+      const mockSupabase = {
+        from: vi.fn().mockImplementation((table) => {
+          queriedTables.push(table);
+          const result = {
+            data: table === 'meal_plans' ? [
+              {
+                id: '2026-11-16',
+                plan_date: '2026-11-16',
+                day_name: 'Lunes',
+                lunch_recipe_id: 'rec-abc',
+                updated_at: '2026-11-16T10:00:00.000Z'
+              }
+            ] : [],
+            error: null
+          };
+          const chain = {
+            select: () => chain,
+            or: () => chain,
+            eq: () => chain,
+            limit: () => Promise.resolve(result),
+            then: (resolve) => Promise.resolve(result).then(resolve)
+          };
+          return chain;
+        })
+      };
+
+      appInstance.supabaseClient = mockSupabase;
+      appInstance.userRealtimeChannel = { id: 'mock-ch' };
+      const res = await appInstance.pullViewUpdatesFromCloud('view-planner');
+
+      expect(res.success).toBe(true);
+      expect(queriedTables).toEqual(['meal_plans']);
+      expect(state.mealPlan['2026-11-16']?.lunch).toBe('rec-abc');
+    });
+
+    it('pullFromCloud usa consulta incremental gt(updated_at) + select(id) en recipes cuando existe lastSyncedAt', async () => {
+      state.cloudUser = { id: 'user-egress-3', email: 'test@example.com' };
+      state.lastSyncedAt = '2026-11-16T10:00:00.000Z';
+      state.recipes = [
+        { id: 'rec-keep', title: 'Tortilla', imageUrl: 'data:image/jpeg;base64,AAA', updatedAt: '2026-11-15T10:00:00.000Z' },
+        { id: 'rec-deleted-remotely', title: 'Sopa', updatedAt: '2026-11-15T10:00:00.000Z' }
+      ];
+
+      const recipeQueries = [];
+      const mockSupabase = {
+        from: vi.fn().mockImplementation((table) => {
+          const stateObj = { selectCols: null, gtArgs: null };
+          const chain = {
+            select: (cols) => {
+              stateObj.selectCols = cols;
+              return chain;
+            },
+            or: () => chain,
+            eq: () => chain,
+            limit: () => chain,
+            gt: (col, val) => {
+              stateObj.gtArgs = [col, val];
+              return chain;
+            },
+            then: (resolve) => {
+              if (table === 'recipes') {
+                recipeQueries.push({ ...stateObj });
+                if (stateObj.selectCols === 'id') {
+                  return Promise.resolve({ data: [{ id: 'rec-keep' }, { id: 'rec-new' }], error: null }).then(resolve);
+                }
+                return Promise.resolve({
+                  data: [{ id: 'rec-new', title: 'Pasta nueva', updated_at: '2026-11-16T10:05:00.000Z' }],
+                  error: null
+                }).then(resolve);
+              }
+              return Promise.resolve({ data: [], error: null }).then(resolve);
+            }
+          };
+          return chain;
+        })
+      };
+
+      appInstance.supabaseClient = mockSupabase;
+      appInstance.userRealtimeChannel = { id: 'mock-ch' };
+      const res = await appInstance.pullFromCloud();
+
+      expect(res.success).toBe(true);
+      const deltaQuery = recipeQueries.find(q => q.selectCols === '*');
+      const idsQuery = recipeQueries.find(q => q.selectCols === 'id');
+      expect(deltaQuery).toBeDefined();
+      expect(deltaQuery.gtArgs[0]).toBe('updated_at');
+      expect(idsQuery).toBeDefined();
+
+      // rec-keep se conserva sin haber sido re-descargada; rec-new se añade; rec-deleted-remotely se elimina
+      expect(state.recipes.map(r => r.id)).toEqual(['rec-keep', 'rec-new']);
+    });
+
+    it('el refresco periódico en app.js usa pullViewUpdatesFromCloud cada 30s y no pullFromCloud cada 5s', () => {
+      expect(appCode).toContain('await this.pullViewUpdatesFromCloud(this.activeView);');
+      expect(appCode).toContain('}, 30000);');
+    });
+  });
 });
 
