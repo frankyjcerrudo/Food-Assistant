@@ -18069,8 +18069,6 @@ ${isEn
       }
       if (startVoice && this.speechRecognitionSupported) {
         this.toggleVoiceRecognition(true);
-      } else if (input && typeof input.focus === 'function') {
-        setTimeout(() => input.focus(), 100);
       }
       return;
     }
