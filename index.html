@@ -2865,10 +2865,38 @@
         </div>
         <h3 class="app-tour-title" id="app-tour-title"></h3>
         <p class="app-tour-desc" id="app-tour-desc"></p>
+        <div class="app-tour-comparison is-hidden" id="app-tour-comparison">
+          <div class="app-tour-plan-col app-tour-plan-free">
+            <div class="app-tour-plan-header">
+              <span class="app-tour-plan-name" data-i18n="plan.free">Free</span>
+              <span class="app-tour-plan-price" data-i18n="tour.freePrice">Gratis</span>
+            </div>
+            <ul class="app-tour-plan-list">
+              <li><span class="material-symbols-outlined icon-14">check</span><span data-i18n="tour.freeFeat1">Recetario y Modo Cocina</span></li>
+              <li><span class="material-symbols-outlined icon-14">check</span><span data-i18n="tour.freeFeat2">Lista de la Compra por pasillos</span></li>
+              <li><span class="material-symbols-outlined icon-14">check</span><span data-i18n="tour.freeFeat3">Cuotas gratuitas de IA y menú</span></li>
+            </ul>
+          </div>
+          <div class="app-tour-plan-col app-tour-plan-pro">
+            <div class="app-tour-plan-header">
+              <span class="app-tour-plan-name">Sabory Pro</span>
+              <span class="app-tour-plan-price" data-i18n="paywall.monthly">2,99 €/mes</span>
+            </div>
+            <ul class="app-tour-plan-list">
+              <li><span class="material-symbols-outlined icon-14">auto_awesome</span><span data-i18n="tour.proFeat1">Menús e importaciones IA ilimitados</span></li>
+              <li><span class="material-symbols-outlined icon-14">record_voice_over</span><span data-i18n="tour.proFeat2">Chat y voz libres con Sous Chef</span></li>
+              <li><span class="material-symbols-outlined icon-14">groups</span><span data-i18n="tour.proFeat3">Modo Familia para todo el hogar</span></li>
+            </ul>
+          </div>
+        </div>
       </div>
       <div class="app-tour-card-footer">
         <div class="app-tour-dots" id="app-tour-dots"></div>
         <div class="app-tour-actions">
+          <button type="button" class="btn btn-secondary btn-sm is-hidden" id="btn-app-tour-upgrade" data-action="openUpgradeFromTour">
+            <span class="material-symbols-outlined icon-sm">workspace_premium</span>
+            <span data-i18n="plan.upgrade">Hazte Pro</span>
+          </button>
           <button type="button" class="btn btn-secondary btn-sm" id="btn-app-tour-prev" data-action="prevAppTourStep">
             <span class="material-symbols-outlined icon-sm">arrow_back</span>
             <span data-i18n="tour.prev">Anterior</span>

@@ -8224,6 +8224,9 @@ class FoodAssistantApp {
         case 'closeAppTour':
           this.closeAppTour();
           break;
+        case 'openUpgradeFromTour':
+          this.openUpgradeFromTour();
+          break;
         default:
           if (typeof this[action] === 'function') {
             this[action](target.dataset);
@@ -22490,6 +22493,16 @@ REGLAS CRÍTICAS:
         descKey: 'tour.step5Desc',
         titleFallback: 'Sous Chef con IA',
         descFallback: 'Pídele ideas con lo que tienes en la nevera, adapta recetas a tus alergias o resuelve cualquier duda mientras cocinas.'
+      },
+      {
+        view: 'view-today',
+        icon: 'workspace_premium',
+        isComparison: true,
+        selectors: [],
+        titleKey: 'tour.step6Title',
+        descKey: 'tour.step6Desc',
+        titleFallback: 'Plan Free vs Sabory Pro',
+        descFallback: 'Empieza gratis con todo lo esencial o pásate a Pro cuando quieras IA ilimitada y Modo Familia.'
       }
     ];
   }
@@ -22500,6 +22513,7 @@ REGLAS CRÍTICAS:
     const steps = this.getAppTourSteps();
     this.appTourStep = Math.max(0, Math.min(steps.length - 1, Number(stepIndex) || 0));
     overlay.classList.remove('is-hidden');
+    document.body.classList.add('app-tour-active');
 
     if (!this._appTourResizeBound) {
       this._appTourResizeBound = () => {
@@ -22535,6 +22549,8 @@ REGLAS CRÍTICAS:
     const icon = document.getElementById('app-tour-icon');
     const title = document.getElementById('app-tour-title');
     const desc = document.getElementById('app-tour-desc');
+    const comparison = document.getElementById('app-tour-comparison');
+    const upgradeBtn = document.getElementById('btn-app-tour-upgrade');
     const dots = document.getElementById('app-tour-dots');
     const prevBtn = document.getElementById('btn-app-tour-prev');
     const nextLabel = document.getElementById('app-tour-next-label');
@@ -22543,6 +22559,15 @@ REGLAS CRÍTICAS:
     if (icon) icon.textContent = step.icon;
     if (title) title.textContent = window.I18n ? window.I18n.t(step.titleKey) : step.titleFallback;
     if (desc) desc.textContent = window.I18n ? window.I18n.t(step.descKey) : step.descFallback;
+    if (comparison) comparison.classList.toggle('is-hidden', !step.isComparison);
+    if (upgradeBtn) upgradeBtn.classList.toggle('is-hidden', !step.isComparison);
+
+    document.querySelectorAll('.app-tour-nav-target').forEach(el => el.classList.remove('app-tour-nav-target'));
+    if (!step.isComparison && step.view) {
+      document.querySelectorAll(`.nav-item[data-view="${step.view}"], .header-nav-btn[data-view="${step.view}"]`).forEach(el => {
+        el.classList.add('app-tour-nav-target');
+      });
+    }
 
     if (dots) {
       dots.innerHTML = steps.map((_, i) => `<span class="app-tour-dot ${i === idx ? 'active' : ''}"></span>`).join('');
@@ -22555,18 +22580,18 @@ REGLAS CRÍTICAS:
       nextLabel.textContent = window.I18n ? window.I18n.t(key) : (isLast ? '¡Entendido!' : 'Siguiente');
     }
 
-    const targetEl = (step.selectors || [])
+    const targetEl = step.isComparison ? null : ((step.selectors || [])
       .map(sel => document.querySelector(sel))
       .find(el => {
         if (!el) return false;
         const rect = el.getBoundingClientRect();
         return rect.width > 0 && rect.height > 0;
-      }) || document.getElementById(step.view);
+      }) || document.getElementById(step.view));
 
-    this.positionAppTourElements(targetEl);
+    this.positionAppTourElements(targetEl, Boolean(step.isComparison));
   }
 
-  positionAppTourElements(targetEl) {
+  positionAppTourElements(targetEl, isCentered = false) {
     const spotlight = document.getElementById('app-tour-spotlight');
     const card = document.getElementById('app-tour-card');
     if (!spotlight || !card) return;
@@ -22574,35 +22599,50 @@ REGLAS CRÍTICAS:
     const vw = window.innerWidth || 375;
     const vh = window.innerHeight || 667;
     const pad = 8;
+    const bottomNav = document.querySelector('.bottom-nav');
+    const hasBottomNav = bottomNav && bottomNav.getBoundingClientRect().height > 0;
+    const safeTop = hasBottomNav ? 12 : 76;
+    const safeBottom = hasBottomNav ? 92 : 16;
+
+    const cardRect = card.getBoundingClientRect();
+    const cardW = cardRect.width || Math.min(380, vw - 24);
+    const cardH = cardRect.height || 260;
+
+    if (isCentered) {
+      spotlight.style.top = '50%';
+      spotlight.style.left = '50%';
+      spotlight.style.width = '0px';
+      spotlight.style.height = '0px';
+      card.style.top = `${Math.max(safeTop, Math.min(vh - cardH - safeBottom, (vh - cardH) / 2))}px`;
+      card.style.left = `${Math.max(12, (vw - cardW) / 2)}px`;
+      return;
+    }
 
     let rect = targetEl ? targetEl.getBoundingClientRect() : null;
     if (!rect || rect.width === 0 || rect.height === 0) {
-      rect = { top: 80, left: 16, width: Math.max(200, vw - 32), height: 140, bottom: 220, right: vw - 16 };
+      rect = { top: safeTop + 8, left: 16, width: Math.max(200, vw - 32), height: 140, bottom: safeTop + 148, right: vw - 16 };
     }
 
-    const spotTop = Math.max(8, rect.top - pad);
+    const spotTop = Math.max(safeTop, rect.top - pad);
     const spotLeft = Math.max(8, rect.left - pad);
     const spotWidth = Math.min(vw - spotLeft - 8, rect.width + pad * 2);
-    const spotHeight = Math.min(vh - spotTop - 8, Math.min(rect.height + pad * 2, vh * 0.48));
+    const spotHeight = Math.min(vh - spotTop - safeBottom, Math.min(rect.height + pad * 2, vh * 0.44));
 
     spotlight.style.top = `${spotTop}px`;
     spotlight.style.left = `${spotLeft}px`;
     spotlight.style.width = `${Math.max(40, spotWidth)}px`;
     spotlight.style.height = `${Math.max(40, spotHeight)}px`;
 
-    const cardRect = card.getBoundingClientRect();
-    const cardW = cardRect.width || Math.min(380, vw - 24);
-    const cardH = cardRect.height || 230;
-    const spaceBelow = vh - (spotTop + spotHeight);
-    const spaceAbove = spotTop;
+    const spaceBelow = vh - safeBottom - (spotTop + spotHeight);
+    const spaceAbove = spotTop - safeTop;
 
     let cardTop;
-    if (spaceBelow >= cardH + 20) {
+    if (spaceBelow >= cardH + 14) {
       cardTop = spotTop + spotHeight + 14;
-    } else if (spaceAbove >= cardH + 20) {
+    } else if (spaceAbove >= cardH + 14) {
       cardTop = spotTop - cardH - 14;
     } else {
-      cardTop = Math.max(12, vh - cardH - 16);
+      cardTop = Math.max(safeTop, vh - cardH - safeBottom);
     }
 
     const cardLeft = Math.max(12, Math.min(vw - cardW - 12, spotLeft + (spotWidth - cardW) / 2));
@@ -22627,9 +22667,18 @@ REGLAS CRÍTICAS:
     }
   }
 
+  openUpgradeFromTour() {
+    this.closeAppTour(false);
+    if (typeof this.openUpgradeModal === 'function') {
+      this.openUpgradeModal('tour');
+    }
+  }
+
   closeAppTour(completed = false) {
     const overlay = document.getElementById('app-tour-overlay');
     if (overlay) overlay.classList.add('is-hidden');
+    document.body.classList.remove('app-tour-active');
+    document.querySelectorAll('.app-tour-nav-target').forEach(el => el.classList.remove('app-tour-nav-target'));
     if (typeof this.switchView === 'function') {
       this.switchView('view-today');
     }

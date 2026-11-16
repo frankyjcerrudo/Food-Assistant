@@ -559,11 +559,20 @@ describe('US-68: Asistente de Bienvenida (Onboarding Wizard)', () => {
         <span id="app-tour-icon"></span>
         <h3 id="app-tour-title"></h3>
         <p id="app-tour-desc"></p>
+        <div id="app-tour-comparison" class="is-hidden"></div>
         <div id="app-tour-dots"></div>
+        <button id="btn-app-tour-upgrade" class="is-hidden"></button>
         <button id="btn-app-tour-prev"></button>
         <button id="btn-app-tour-next"><span id="app-tour-next-label"></span></button>
       </div>
     </div>
+    <nav class="bottom-nav">
+      <button class="nav-item" data-view="view-today"></button>
+      <button class="nav-item" data-view="view-recipes"></button>
+      <button class="nav-item nav-item-gemini" data-view="view-ai"></button>
+      <button class="nav-item" data-view="view-planner"></button>
+      <button class="nav-item" data-view="view-shopping"></button>
+    </nav>
     <main id="view-today"></main>
     <section id="view-recipes"></section>
     <section id="view-planner"></section>
@@ -716,7 +725,7 @@ describe('US-68: Asistente de Bienvenida (Onboarding Wizard)', () => {
     expect(document.getElementById('btn-onboarding-next-label').getAttribute('data-i18n')).toBe('onboarding.nextBtn');
   });
 
-  it('en el paso 5 ofrece hacer tour por la app y recorre las 5 vistas reales', () => {
+  it('en el paso 5 ofrece hacer tour por la app, resalta el dock y muestra comparativa Free vs Pro', () => {
     appInstance.switchView = vi.fn();
     appInstance.openOnboardingModal(5);
     expect(document.getElementById('btn-onboarding-start-tour').classList.contains('is-hidden')).toBe(false);
@@ -724,13 +733,16 @@ describe('US-68: Asistente de Bienvenida (Onboarding Wizard)', () => {
 
     appInstance.completeOnboardingAndStartTour();
     expect(isModalOpen()).toBe(false);
+    expect(document.body.classList.contains('app-tour-active')).toBe(true);
     expect(document.getElementById('app-tour-overlay').classList.contains('is-hidden')).toBe(false);
     expect(appInstance.switchView).toHaveBeenCalledWith('view-today');
-    expect(document.getElementById('app-tour-step-badge').textContent).toBe('1 / 5');
+    expect(document.getElementById('app-tour-step-badge').textContent).toBe('1 / 6');
+    expect(document.querySelector('.nav-item[data-view="view-today"]').classList.contains('app-tour-nav-target')).toBe(true);
 
     appInstance.nextAppTourStep();
     expect(appInstance.switchView).toHaveBeenCalledWith('view-recipes');
-    expect(document.getElementById('app-tour-step-badge').textContent).toBe('2 / 5');
+    expect(document.getElementById('app-tour-step-badge').textContent).toBe('2 / 6');
+    expect(document.querySelector('.nav-item[data-view="view-recipes"]').classList.contains('app-tour-nav-target')).toBe(true);
 
     appInstance.nextAppTourStep();
     expect(appInstance.switchView).toHaveBeenCalledWith('view-planner');
@@ -740,14 +752,22 @@ describe('US-68: Asistente de Bienvenida (Onboarding Wizard)', () => {
 
     appInstance.nextAppTourStep();
     expect(appInstance.switchView).toHaveBeenCalledWith('view-ai');
-    expect(document.getElementById('app-tour-step-badge').textContent).toBe('5 / 5');
+    expect(document.getElementById('app-tour-step-badge').textContent).toBe('5 / 6');
+    expect(document.querySelector('.nav-item[data-view="view-ai"]').classList.contains('app-tour-nav-target')).toBe(true);
+
+    appInstance.nextAppTourStep(); // paso 6: comparativa Free vs Pro
+    expect(document.getElementById('app-tour-step-badge').textContent).toBe('6 / 6');
+    expect(document.getElementById('app-tour-comparison').classList.contains('is-hidden')).toBe(false);
+    expect(document.getElementById('btn-app-tour-upgrade').classList.contains('is-hidden')).toBe(false);
 
     appInstance.prevAppTourStep();
-    expect(document.getElementById('app-tour-step-badge').textContent).toBe('4 / 5');
+    expect(document.getElementById('app-tour-step-badge').textContent).toBe('5 / 6');
+    expect(document.getElementById('app-tour-comparison').classList.contains('is-hidden')).toBe(true);
 
-    appInstance.nextAppTourStep();
+    appInstance.nextAppTourStep(); // back to 6
     appInstance.nextAppTourStep(); // finish tour
     expect(document.getElementById('app-tour-overlay').classList.contains('is-hidden')).toBe(true);
+    expect(document.body.classList.contains('app-tour-active')).toBe(false);
     expect(appInstance.switchView).toHaveBeenLastCalledWith('view-today');
   });
 });

@@ -797,7 +797,16 @@
         step4Title: 'Lista de la Compra Inteligente',
         step4Desc: 'Envía tu menú semanal a la lista con un toque y agrúpala por pasillos del súper o por receta mientras compras.',
         step5Title: 'Sous Chef con IA',
-        step5Desc: 'Pídele ideas con lo que tienes en la nevera, adapta recetas a tus alergias o resuelve cualquier duda mientras cocinas.'
+        step5Desc: 'Pídele ideas con lo que tienes en la nevera, adapta recetas a tus alergias o resuelve cualquier duda mientras cocinas.',
+        step6Title: 'Plan Free vs Sabory Pro',
+        step6Desc: 'Empieza gratis con todo lo esencial o pásate a Pro cuando quieras IA ilimitada y Modo Familia.',
+        freePrice: 'Gratis',
+        freeFeat1: 'Recetario y Modo Cocina',
+        freeFeat2: 'Lista de la Compra por pasillos',
+        freeFeat3: 'Cuotas gratuitas de IA y menú',
+        proFeat1: 'Menús e importaciones IA ilimitados',
+        proFeat2: 'Chat y voz libres con Sous Chef',
+        proFeat3: 'Modo Familia para todo el hogar'
       },
       goals: {
         calories: 'Calorías',
@@ -1924,7 +1933,16 @@
         step4Title: 'Smart Shopping List',
         step4Desc: 'Send your weekly plan to the shopping list in one tap and group items by supermarket aisle or by recipe.',
         step5Title: 'AI Sous Chef',
-        step5Desc: 'Ask for recipe ideas using what is in your fridge, adapt dishes to your dietary needs or get cooking help anytime.'
+        step5Desc: 'Ask for recipe ideas using what is in your fridge, adapt dishes to your dietary needs or get cooking help anytime.',
+        step6Title: 'Free Plan vs Sabory Pro',
+        step6Desc: 'Start free with all the essentials or upgrade to Pro anytime for unlimited AI and Family Mode.',
+        freePrice: 'Free',
+        freeFeat1: 'Recipes & Cooking Mode',
+        freeFeat2: 'Smart aisle shopping list',
+        freeFeat3: 'Free AI & weekly plan quotas',
+        proFeat1: 'Unlimited AI plans & imports',
+        proFeat2: 'Unlimited Sous Chef chat & voice',
+        proFeat3: 'Family Mode for your household'
       },
       goals: {
         calories: 'Calories',
