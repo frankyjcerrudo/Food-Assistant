@@ -2866,28 +2866,42 @@
         <h3 class="app-tour-title" id="app-tour-title"></h3>
         <p class="app-tour-desc" id="app-tour-desc"></p>
         <div class="app-tour-comparison is-hidden" id="app-tour-comparison">
-          <div class="app-tour-plan-col app-tour-plan-free">
-            <div class="app-tour-plan-header">
-              <span class="app-tour-plan-name" data-i18n="plan.free">Free</span>
-              <span class="app-tour-plan-price" data-i18n="tour.freePrice">Gratis</span>
-            </div>
-            <ul class="app-tour-plan-list">
-              <li><span class="material-symbols-outlined icon-14">check</span><span data-i18n="tour.freeFeat1">Recetario y Modo Cocina</span></li>
-              <li><span class="material-symbols-outlined icon-14">check</span><span data-i18n="tour.freeFeat2">Lista de la Compra por pasillos</span></li>
-              <li><span class="material-symbols-outlined icon-14">check</span><span data-i18n="tour.freeFeat3">Cuotas gratuitas de IA y menú</span></li>
-            </ul>
-          </div>
-          <div class="app-tour-plan-col app-tour-plan-pro">
-            <div class="app-tour-plan-header">
-              <span class="app-tour-plan-name">Sabory Pro</span>
-              <span class="app-tour-plan-price" data-i18n="paywall.monthly">2,99 €/mes</span>
-            </div>
-            <ul class="app-tour-plan-list">
-              <li><span class="material-symbols-outlined icon-14">auto_awesome</span><span data-i18n="tour.proFeat1">Menús e importaciones IA ilimitados</span></li>
-              <li><span class="material-symbols-outlined icon-14">record_voice_over</span><span data-i18n="tour.proFeat2">Chat y voz libres con Sous Chef</span></li>
-              <li><span class="material-symbols-outlined icon-14">groups</span><span data-i18n="tour.proFeat3">Modo Familia para todo el hogar</span></li>
-            </ul>
-          </div>
+          <table class="app-tour-compare-table">
+            <thead>
+              <tr>
+                <th data-i18n="tour.colFeature">Función</th>
+                <th data-i18n="plan.free">Free</th>
+                <th class="is-pro">Pro</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td data-i18n="tour.row1Label">Recetas, Modo Cocina y Compra</td>
+                <td><span class="material-symbols-outlined icon-14 app-tour-check">check</span></td>
+                <td class="is-pro"><span class="material-symbols-outlined icon-14 app-tour-check">check</span></td>
+              </tr>
+              <tr>
+                <td data-i18n="tour.row2Label">Menú semanal IA</td>
+                <td data-i18n="tour.row2Free">1 / sem</td>
+                <td class="is-pro" data-i18n="tour.unlimited">Ilimitado</td>
+              </tr>
+              <tr>
+                <td data-i18n="tour.row3Label">Importaciones IA</td>
+                <td data-i18n="tour.row3Free">Limitado</td>
+                <td class="is-pro" data-i18n="tour.unlimited">Ilimitado</td>
+              </tr>
+              <tr>
+                <td data-i18n="tour.row4Label">Sous Chef (Chat/Voz)</td>
+                <td data-i18n="tour.row4Free">Guiado</td>
+                <td class="is-pro" data-i18n="tour.row4Pro">Libre</td>
+              </tr>
+              <tr>
+                <td data-i18n="tour.row5Label">Modo Familia (Hogar)</td>
+                <td>—</td>
+                <td class="is-pro"><span class="material-symbols-outlined icon-14 app-tour-check">check</span></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
       <div class="app-tour-card-footer">

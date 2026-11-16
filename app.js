@@ -22450,7 +22450,7 @@ REGLAS CRÍTICAS:
       {
         view: 'view-today',
         icon: 'today',
-        selectors: ['#today-nutrition-card', '#today-slots-container', '#view-today .today-header'],
+        selectors: ['#view-today .today-header', '#today-nutrition-card'],
         titleKey: 'tour.step1Title',
         descKey: 'tour.step1Desc',
         titleFallback: 'Hoy: tu menú y macros al día',
@@ -22459,7 +22459,7 @@ REGLAS CRÍTICAS:
       {
         view: 'view-recipes',
         icon: 'menu_book',
-        selectors: ['#view-recipes .recipes-section-header', '#recipes-toolbar', '#view-recipes'],
+        selectors: ['#view-recipes .recipes-section-header', '#view-recipes'],
         titleKey: 'tour.step2Title',
         descKey: 'tour.step2Desc',
         titleFallback: 'Recetario y Modo Cocina',
@@ -22468,7 +22468,7 @@ REGLAS CRÍTICAS:
       {
         view: 'view-planner',
         icon: 'calendar_month',
-        selectors: ['#btn-planner-ai-auto', '#planner-week-nav-bar', '#view-planner .section-header'],
+        selectors: ['#view-planner .section-header', '#planner-week-nav-bar'],
         titleKey: 'tour.step3Title',
         descKey: 'tour.step3Desc',
         titleFallback: 'Planificador Semanal',
@@ -22477,7 +22477,7 @@ REGLAS CRÍTICAS:
       {
         view: 'view-shopping',
         icon: 'shopping_cart',
-        selectors: ['#shopping-view-toggle', '#view-shopping .shopping-section-header'],
+        selectors: ['#view-shopping .shopping-section-header', '#shopping-view-toggle'],
         titleKey: 'tour.step4Title',
         descKey: 'tour.step4Desc',
         titleFallback: 'Lista de la Compra Inteligente',
@@ -22542,6 +22542,11 @@ REGLAS CRÍTICAS:
     if (step.view && typeof this.switchView === 'function') {
       this.switchView(step.view);
     }
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+      window.scrollTo(0, 0);
+    }
+    const activePanel = step.view ? document.getElementById(step.view) : null;
+    if (activePanel) activePanel.scrollTop = 0;
 
     const badge = document.getElementById('app-tour-step-badge');
     const icon = document.getElementById('app-tour-icon');
@@ -22578,15 +22583,22 @@ REGLAS CRÍTICAS:
       nextLabel.textContent = window.I18n ? window.I18n.t(key) : (isLast ? '¡Entendido!' : 'Siguiente');
     }
 
-    const targetEl = step.isComparison ? null : ((step.selectors || [])
-      .map(sel => document.querySelector(sel))
-      .find(el => {
-        if (!el) return false;
-        const rect = el.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
-      }) || document.getElementById(step.view));
+    const positionNow = () => {
+      const targetEl = step.isComparison ? null : ((step.selectors || [])
+        .map(sel => document.querySelector(sel))
+        .find(el => {
+          if (!el) return false;
+          const rect = el.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        }) || document.getElementById(step.view));
 
-    this.positionAppTourElements(targetEl, Boolean(step.isComparison));
+      this.positionAppTourElements(targetEl, Boolean(step.isComparison));
+    };
+
+    positionNow();
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(positionNow);
+    }
   }
 
   positionAppTourElements(targetEl, isCentered = false) {

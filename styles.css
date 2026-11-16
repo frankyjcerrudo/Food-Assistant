@@ -7113,6 +7113,7 @@ h2,
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 10px;
   padding-top: 8px;
   border-top: var(--border-subtle);
@@ -7140,30 +7141,52 @@ h2,
 .app-tour-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 6px;
+  margin-left: auto;
 }
 
-/* Keep dock & header nav visible above tour backdrop so tab switching is unmistakable */
+/* Lock scroll and keep dock & header nav bright above tour backdrop */
+html:has(body.app-tour-active),
+body.app-tour-active {
+  overflow: hidden !important;
+  touch-action: none;
+}
+
 body.app-tour-active .bottom-nav,
 body.app-tour-active .app-header {
-  z-index: 12003;
+  z-index: 12003 !important;
+  background: var(--m3-surface) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 -2px 14px rgba(0, 0, 0, 0.14);
 }
 
 body.app-tour-active .bottom-nav .nav-item:not(.app-tour-nav-target),
 body.app-tour-active .header-nav .header-nav-btn:not(.app-tour-nav-target) {
-  opacity: 0.38;
+  opacity: 0.35;
   transition: opacity 0.2s ease;
 }
 
 body.app-tour-active .app-tour-nav-target {
   position: relative;
   opacity: 1 !important;
+  background-color: var(--m3-primary-container) !important;
+  color: var(--m3-primary) !important;
   border-radius: var(--radius-full);
-  box-shadow: 0 0 0 3px var(--m3-surface), 0 0 0 6px var(--m3-primary);
+  box-shadow: 0 0 0 2px var(--m3-primary), 0 4px 12px rgba(200, 90, 50, 0.28);
   animation: tourNavPulse 1.5s ease-in-out infinite;
 }
 
+body.app-tour-active .app-tour-nav-target .material-symbols-outlined,
+body.app-tour-active .app-tour-nav-target .nav-label {
+  color: var(--m3-primary) !important;
+  font-weight: 700;
+}
+
 body.app-tour-active .nav-item-gemini.app-tour-nav-target {
+  background-color: transparent !important;
   box-shadow: none;
 }
 
@@ -7177,76 +7200,62 @@ body.app-tour-active .nav-item-gemini.app-tour-nav-target .nav-gemini-fab {
 }
 
 .app-tour-comparison {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 4px;
+  margin-top: 2px;
+  border-radius: var(--radius-md);
+  border: var(--border-subtle);
+  overflow: hidden;
+  background-color: var(--m3-surface-container-low);
 }
 
 .app-tour-comparison.is-hidden {
   display: none !important;
 }
 
-.app-tour-plan-col {
-  border-radius: var(--radius-md);
-  padding: 10px 11px;
-  border: var(--border-subtle);
-  background-color: var(--m3-surface-container-low);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.app-tour-compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+  line-height: 1.25;
 }
 
-.app-tour-plan-pro {
-  background: linear-gradient(155deg, var(--m3-primary-container) 0%, var(--m3-surface-container-low) 100%);
-  border: 1.5px solid color-mix(in srgb, var(--m3-primary) 45%, transparent);
-}
-
-.app-tour-plan-header {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.app-tour-plan-name {
-  font-size: 13px;
-  font-weight: 700;
+.app-tour-compare-table th,
+.app-tour-compare-table td {
+  padding: 7px 8px;
+  text-align: center;
+  border-bottom: var(--border-subtle);
   color: var(--m3-on-surface);
 }
 
-.app-tour-plan-pro .app-tour-plan-name {
-  color: var(--m3-primary);
+.app-tour-compare-table th:first-child,
+.app-tour-compare-table td:first-child {
+  text-align: left;
+  font-weight: 500;
 }
 
-.app-tour-plan-price {
+.app-tour-compare-table thead th {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background-color: var(--m3-surface-container);
   color: var(--m3-on-surface-variant);
 }
 
-.app-tour-plan-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.app-tour-plan-list li {
-  display: flex;
-  align-items: flex-start;
-  gap: 5px;
-  font-size: 11.5px;
-  line-height: 1.3;
-  color: var(--m3-on-surface);
-}
-
-.app-tour-plan-list .material-symbols-outlined {
-  font-size: 14px;
+.app-tour-compare-table th.is-pro,
+.app-tour-compare-table td.is-pro {
+  background-color: color-mix(in srgb, var(--m3-primary-container) 55%, transparent);
   color: var(--m3-primary);
-  margin-top: 1px;
-  flex-shrink: 0;
+  font-weight: 700;
+}
+
+.app-tour-compare-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.app-tour-check {
+  font-size: 15px !important;
+  vertical-align: middle;
+  color: var(--m3-primary);
 }
 
 
