@@ -6135,7 +6135,8 @@ class FoodAssistantApp {
   }
 
   updateUserAccountUI() {
-    if (this.modalOnboarding && (this.modalOnboarding.open || this.modalOnboarding.classList.contains('active')) && this.onboardingStep === 1) {
+    const onboardingModal = this.modalOnboarding || document.getElementById('modal-onboarding');
+    if (onboardingModal && (onboardingModal.open || onboardingModal.classList.contains('active')) && (this.onboardingStep || 1) === 1) {
       this.renderOnboardingStep();
     }
     const user = state.cloudUser;
@@ -15873,9 +15874,13 @@ class FoodAssistantApp {
     return criteria;
   }
 
-  selectRelevantRecipesForPrompt(recipes, prompt = '') {
+  selectRelevantRecipesForPrompt(recipes, prompt = '', requiredIds = null) {
     if (!Array.isArray(recipes) || recipes.length === 0) return [];
     if (recipes.length <= 80) return recipes;
+
+    const requiredSet = requiredIds instanceof Set
+      ? requiredIds
+      : (Array.isArray(requiredIds) ? new Set(requiredIds.filter(Boolean)) : new Set());
 
     const lowerPrompt = (prompt || '').toLowerCase();
     const criteria = this.detectPromptCriteria(prompt);
@@ -16010,22 +16015,43 @@ class FoodAssistantApp {
     // o 90 recetas para planificación semanal completa (con balance de slots).
     // NUNCA enviar el catálogo masivo completo (ej. 887 recetas) para evitar timeouts.
     const targetLimit = isSingleSlotQuery ? 50 : 90;
-
-    if (isSingleSlotQuery) {
-      return scored.slice(0, targetLimit).map(s => s.recipe);
-    }
-
-    // Para menú semanal o peticiones genéricas: garantizar variedad entre desayunos, meriendas y platos principales
     const selected = [];
     const selectedIds = new Set();
 
+    // Garantizar que todas las recetas ya planificadas en el calendario se incluyan siempre
+    if (requiredSet.size > 0) {
+      for (const item of scored) {
+        if (requiredSet.has(item.recipe.id) && !selectedIds.has(item.recipe.id)) {
+          selected.push(item.recipe);
+          selectedIds.add(item.recipe.id);
+        }
+      }
+    }
+
+    if (isSingleSlotQuery) {
+      for (const item of scored) {
+        if (selected.length >= targetLimit) break;
+        if (!selectedIds.has(item.recipe.id)) {
+          selected.push(item.recipe);
+          selectedIds.add(item.recipe.id);
+        }
+      }
+      return selected;
+    }
+
+    // Para menú semanal o peticiones genéricas: garantizar variedad entre desayunos, meriendas y platos principales
     const bAndS = scored.filter(s => s.isBreakfastOrSnack);
     const mains = scored.filter(s => !s.isBreakfastOrSnack);
 
     // Reservar ~20 desayunos y meriendas
-    for (const item of bAndS.slice(0, 20)) {
-      selected.push(item.recipe);
-      selectedIds.add(item.recipe.id);
+    let bAndSCount = selected.filter(r => bAndS.some(item => item.recipe.id === r.id)).length;
+    for (const item of bAndS) {
+      if (bAndSCount >= 20 || selected.length >= targetLimit) break;
+      if (!selectedIds.has(item.recipe.id)) {
+        selected.push(item.recipe);
+        selectedIds.add(item.recipe.id);
+        bAndSCount++;
+      }
     }
 
     // Rellenar con los mejores platos principales (almuerzos y cenas)
@@ -16050,14 +16076,49 @@ class FoodAssistantApp {
   }
 
   buildAiSystemInstruction(prompt = '') {
-    const todayKey = toLocalDateKey(new Date());
+    const now = new Date();
+    const todayKey = toLocalDateKey(now);
+    const tomorrowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const tomorrowKey = toLocalDateKey(tomorrowDate);
     const weekDays = this.getPlannerWeekDates();
+    const planDays = [...weekDays];
+    const planDayKeys = new Set(planDays.map(d => d.dateKey));
+    [
+      { date: now, dateKey: todayKey },
+      { date: tomorrowDate, dateKey: tomorrowKey }
+    ].forEach(({ date, dateKey }) => {
+      if (!planDayKeys.has(dateKey)) {
+        const dayIdx = (date.getDay() + 6) % 7;
+        planDays.push({ dateKey, dayName: DAYS_OF_WEEK_ES[dayIdx] || 'Día' });
+        planDayKeys.add(dateKey);
+      }
+    });
+
+    const allRecipes = state.recipes || [];
+    const recipesById = new Map(allRecipes.map(r => [r.id, r]));
+    const scheduledRecipeIds = new Set();
+    const collectScheduledId = (val) => {
+      if (typeof val === 'string' && recipesById.has(val)) {
+        scheduledRecipeIds.add(val);
+      }
+    };
+    planDays.forEach(d => {
+      const dayPlan = state.getDayPlan(d.dateKey, d.dayName);
+      collectScheduledId(dayPlan.breakfast);
+      collectScheduledId(dayPlan.lunch);
+      collectScheduledId(dayPlan.snack);
+      collectScheduledId(dayPlan.dinner);
+      if (Array.isArray(dayPlan.customSlots)) {
+        dayPlan.customSlots.forEach(cs => collectScheduledId(cs?.recipeId || cs?.recipe || cs?.value));
+      }
+    });
+
     const prefs = (state.dietaryPreferences || []).join(', ') || 'Ninguna restricción específica';
     const goals = state.settings?.nutritionGoals?.enabled
       ? `${state.settings.nutritionGoals.calories} kcal, ${state.settings.nutritionGoals.protein}g Proteínas, ${state.settings.nutritionGoals.carbs}g Carbos, ${state.settings.nutritionGoals.fat}g Grasas`
       : 'Sin metas numéricas estrictas activas';
 
-    const sourceRecipes = this.selectRelevantRecipesForPrompt(state.recipes || [], prompt);
+    const sourceRecipes = this.selectRelevantRecipesForPrompt(allRecipes, prompt, scheduledRecipeIds);
     const recipesCatalog = sourceRecipes.map(r => {
       const nut = getRecipeNutrition(r);
       const cleanTitle = String(r.title || '').replace(/[\r\n]+/g, ' ').slice(0, 80);
@@ -16071,9 +16132,25 @@ class FoodAssistantApp {
       return `- ID: "${r.id}" | "${cleanTitle}" | Ingredientes: [${cleanIngredients}] | Tags: [${cleanTags}] | Macros: ${nut.calories}kcal, P:${nut.protein}g, C:${nut.carbs}g, G:${nut.fat}g${r.isFavorite ? ' | ❤️ FAVORITA: Sí' : ''}`;
     }).join('\n');
 
-    const currentPlanSummary = weekDays.map(d => {
+    const formatPlanSlot = (val) => {
+      if (!val) return 'vacío';
+      const rec = recipesById.get(val);
+      if (rec) {
+        const cleanTitle = String(rec.title || '').replace(/[\r\n]+/g, ' ').trim();
+        return `"${cleanTitle}" (${rec.id})`;
+      }
+      return String(val);
+    };
+
+    const currentPlanSummary = planDays.map(d => {
       const dayPlan = state.getDayPlan(d.dateKey, d.dayName);
-      return `- ${d.dayName} (${d.dateKey}): Desayuno=${dayPlan.breakfast || 'vacío'}, Almuerzo=${dayPlan.lunch || 'vacío'}, Merienda=${dayPlan.snack || 'vacío'}, Cena=${dayPlan.dinner || 'vacío'}`;
+      const extraSlots = Array.isArray(dayPlan.customSlots)
+        ? dayPlan.customSlots
+          .filter(cs => cs && (cs.recipeId || cs.recipe || cs.value))
+          .map(cs => `${cs.label || 'Extra'}=${formatPlanSlot(cs.recipeId || cs.recipe || cs.value)}`)
+        : [];
+      const extraText = extraSlots.length > 0 ? `, ${extraSlots.join(', ')}` : '';
+      return `- ${d.dayName} (${d.dateKey}): Desayuno=${formatPlanSlot(dayPlan.breakfast)}, Almuerzo=${formatPlanSlot(dayPlan.lunch)}, Merienda=${formatPlanSlot(dayPlan.snack)}, Cena=${formatPlanSlot(dayPlan.dinner)}${extraText}`;
     }).join('\n');
 
     const pendingShop = (state.shoppingList || []).filter(i => !i.isChecked).map(i => `${i.name} (${i.amount || 1} ${i.unit || ''})`).join(', ') || 'Vacía';
@@ -20319,13 +20396,35 @@ REGLAS CRÍTICAS:
       };
     }
 
-    const selectServings = document.getElementById('select-default-servings');
-    if (selectServings) {
-      selectServings.value = String(state.settings.defaultServings || 2);
-      selectServings.onchange = (e) => {
-        state.settings.defaultServings = parseInt(e.target.value, 10);
-        state.save('fa_settings', state.settings);
+    const settingsServingsInput = document.getElementById('settings-servings-input');
+    const settingsServingsDec = document.getElementById('btn-settings-servings-dec');
+    const settingsServingsInc = document.getElementById('btn-settings-servings-inc');
+    const settingsServingsUnit = document.getElementById('settings-servings-unit-text');
+    const applySettingsServings = (nextVal, updateInput = true) => {
+      const clamped = Math.min(50, Math.max(1, parseInt(nextVal, 10) || 2));
+      state.settings.defaultServings = clamped;
+      state.defaultServings = clamped;
+      state.save('fa_settings', state.settings);
+      try { localStorage.setItem('fa_servings', String(clamped)); } catch (e) { }
+      if (settingsServingsInput && updateInput) settingsServingsInput.value = clamped;
+      if (settingsServingsUnit) {
+        const isEn = window.I18n && window.I18n.getLanguage() === 'en';
+        settingsServingsUnit.textContent = clamped === 1 ? (isEn ? 'person' : 'persona') : (isEn ? 'people' : 'personas');
+      }
+    };
+    if (settingsServingsInput) {
+      applySettingsServings(state.settings.defaultServings || state.defaultServings || 2, true);
+      settingsServingsInput.oninput = (e) => {
+        const parsed = this.sanitizeServingsInput(e.target);
+        if (parsed !== null) applySettingsServings(parsed, false);
       };
+      settingsServingsInput.onblur = () => applySettingsServings(state.settings.defaultServings || 2, true);
+      if (settingsServingsDec) {
+        settingsServingsDec.onclick = () => applySettingsServings((Number(state.settings.defaultServings) || 2) - 1, true);
+      }
+      if (settingsServingsInc) {
+        settingsServingsInc.onclick = () => applySettingsServings((Number(state.settings.defaultServings) || 2) + 1, true);
+      }
     }
 
     this.renderDietaryPreferencesSettings();
@@ -22291,21 +22390,48 @@ REGLAS CRÍTICAS:
     this.selectOnboardingServings(nextVal);
   }
 
+  /**
+   * Sanitiza un input numérico de comensales (solo dígitos 1..50; bloquea negativos y texto).
+   */
+  sanitizeServingsInput(inputEl) {
+    if (!inputEl) return null;
+    const digits = String(inputEl.value ?? '').replace(/[^0-9]/g, '');
+    if (!digits) {
+      inputEl.value = '';
+      return null;
+    }
+    const clamped = Math.min(50, Math.max(1, parseInt(digits, 10)));
+    if (String(clamped) !== String(inputEl.value)) {
+      inputEl.value = String(clamped);
+    }
+    return clamped;
+  }
+
   inputOnboardingServings(e) {
-    const raw = e?.target?.value;
-    const num = parseInt(raw, 10);
-    if (!isNaN(num) && num > 0) {
-      this.onboardingServings = Math.min(50, Math.max(1, num));
+    const parsed = this.sanitizeServingsInput(e?.target);
+    if (parsed !== null) {
+      this.onboardingServings = parsed;
       this.updateOnboardingServingsUI(false);
     }
   }
 
   updateOnboardingServingsUI(updateInput = true) {
-    const num = Number(this.onboardingServings) || 2;
+    const num = Math.min(50, Math.max(1, Number(this.onboardingServings) || 2));
+    this.onboardingServings = num;
     const input = document.getElementById('onboarding-servings-input');
     const unitText = document.getElementById('onboarding-servings-unit-text');
-    if (input && updateInput) input.value = num;
-    if (unitText) unitText.textContent = num === 1 ? 'persona' : 'personas';
+    if (input) {
+      if (updateInput) input.value = num;
+      if (!input.dataset.servingsBound) {
+        input.dataset.servingsBound = 'true';
+        input.addEventListener('input', (ev) => this.inputOnboardingServings(ev));
+        input.addEventListener('blur', () => this.updateOnboardingServingsUI(true));
+      }
+    }
+    if (unitText) {
+      const isEn = window.I18n && window.I18n.getLanguage() === 'en';
+      unitText.textContent = num === 1 ? (isEn ? 'person' : 'persona') : (isEn ? 'people' : 'personas');
+    }
 
     document.querySelectorAll('#onboarding-servings-grid .onboarding-serving-chip, #onboarding-servings-grid .onboarding-serving-card').forEach(btn => {
       const btnVal = parseInt(btn.dataset.servings, 10);
@@ -22367,11 +22493,14 @@ REGLAS CRÍTICAS:
     if (step === 1) {
       const accountCard = document.getElementById('onboarding-account-card');
       const statusText = document.getElementById('onboarding-account-status-text');
+      const actionsBox = document.getElementById('onboarding-account-actions');
       const connectBtn = document.getElementById('btn-onboarding-connect-account');
       const signupBtn = document.getElementById('btn-onboarding-signup-account');
       const isConnected = Boolean(state.cloudUser?.email);
 
       if (accountCard) accountCard.classList.toggle('is-connected', isConnected);
+      if (actionsBox) actionsBox.classList.toggle('is-hidden', isConnected);
+      if (connectBtn) connectBtn.classList.toggle('is-hidden', isConnected);
       if (signupBtn) signupBtn.classList.toggle('is-hidden', isConnected);
 
       if (isConnected) {
@@ -22379,12 +22508,6 @@ REGLAS CRÍTICAS:
           statusText.textContent = window.I18n && window.I18n.getLanguage() === 'en'
             ? `Connected as ${state.cloudUser.email}`
             : `Conectado como ${state.cloudUser.email}`;
-        }
-        if (connectBtn) {
-          const labelSpan = connectBtn.querySelector('span[data-i18n]') || connectBtn;
-          labelSpan.textContent = window.I18n && window.I18n.getLanguage() === 'en'
-            ? 'Account connected'
-            : 'Cuenta conectada';
         }
       } else {
         if (statusText) {

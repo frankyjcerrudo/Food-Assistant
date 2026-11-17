@@ -840,13 +840,23 @@
           <span class="material-symbols-outlined" style="color: var(--m3-primary);">group</span>
           <span data-i18n="settings.servingsTitle">Porciones por defecto</span>
         </h3>
-        <select class="form-select" id="select-default-servings">
-          <option value="1">1 persona</option>
-          <option value="2" selected>2 personas</option>
-          <option value="3">3 personas</option>
-          <option value="4">4 personas</option>
-          <option value="6">6 personas</option>
-        </select>
+        <div class="onboarding-servings-stepper-card">
+          <button type="button" class="btn btn-icon btn-ghost btn-servings-step" id="btn-settings-servings-dec"
+            aria-label="Reducir comensales" data-i18n-aria-label="onboarding.decreaseServings">
+            <span class="material-symbols-outlined">remove</span>
+          </button>
+          <div class="onboarding-servings-center">
+            <div class="onboarding-servings-input-row">
+              <input type="number" id="settings-servings-input" class="onboarding-servings-number-input" min="1"
+                max="50" step="1" inputmode="numeric" pattern="[0-9]*" value="2" aria-label="Número de personas">
+              <span class="onboarding-servings-unit" id="settings-servings-unit-text" data-i18n="onboarding.persons">personas</span>
+            </div>
+          </div>
+          <button type="button" class="btn btn-icon btn-ghost btn-servings-step" id="btn-settings-servings-inc"
+            aria-label="Aumentar comensales" data-i18n-aria-label="onboarding.increaseServings">
+            <span class="material-symbols-outlined">add</span>
+          </button>
+        </div>
       </div>
 
       <!-- 6: PRIVACIDAD Y CONTROL DE DATOS (US-74 & US-75) -->
@@ -2795,7 +2805,7 @@
           <div class="onboarding-servings-center">
             <div class="onboarding-servings-input-row">
               <input type="number" id="onboarding-servings-input" class="onboarding-servings-number-input" min="1"
-                max="50" value="2" data-action="inputOnboardingServings" aria-label="Número de personas">
+                max="50" step="1" inputmode="numeric" pattern="[0-9]*" value="2" data-action="inputOnboardingServings" aria-label="Número de personas">
               <span class="onboarding-servings-unit" id="onboarding-servings-unit-text" data-i18n="onboarding.persons">personas</span>
             </div>
           </div>

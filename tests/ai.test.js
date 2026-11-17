@@ -1328,4 +1328,64 @@ describe('US-79a: AiGateway', () => {
     const appSource = fs.readFileSync(path.resolve(process.cwd(), 'app.js'), 'utf8');
     expect(appSource).not.toContain('generativelanguage.googleapis.com');
   });
+
+  it('buildAiSystemInstruction resuelve títulos del plan semanal, incluye hoy/mañana aunque plannerWeekOffset != 0 y garantiza recetas planificadas en catálogos >80', () => {
+    const origRecipes = state.recipes;
+    const origMealPlan = state.mealPlan;
+    const origOffset = appInstance.plannerWeekOffset;
+    try {
+      const scheduledRecipe = {
+        id: 'rec-turkey-scheduled',
+        title: 'Pechuga de pavo a la plancha con puré de patata y judías verdes',
+        tags: [],
+        ingredients: [{ name: 'pechuga de pavo' }],
+        nutrition: { calories: 420, protein: 40, carbs: 35, fat: 8 },
+        isFavorite: false
+      };
+
+      const fillerRecipes = Array.from({ length: 100 }, (_, i) => ({
+        id: `rec-filler-${i}`,
+        title: `Pechugas salteadas variante ${i}`,
+        tags: ['Almuerzo'],
+        ingredients: [{ name: 'pollo' }],
+        nutrition: { calories: 450, protein: 35, carbs: 30, fat: 12 },
+        isFavorite: true,
+        image: 'https://example.com/img.jpg',
+        instructions: [{ step: 1, text: 'Cocinar' }]
+      }));
+
+      state.recipes = [scheduledRecipe, ...fillerRecipes];
+
+      const now = new Date();
+      const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      const tomorrowKey = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+      state.mealPlan = {
+        [tomorrowKey]: {
+          dayName: 'Mañana',
+          breakfast: null,
+          lunch: 'rec-turkey-scheduled',
+          snack: null,
+          dinner: null,
+          customSlots: []
+        }
+      };
+
+      // Simular que el usuario está viendo otra semana en el Planificador
+      appInstance.plannerWeekOffset = 2;
+
+      const sysPrompt = appInstance.buildAiSystemInstruction('Puedes ver qué tengo mañana para comer?');
+
+      // 1. Debe incluir el título legible en PLAN SEMANAL ACTUAL aunque plannerWeekOffset != 0
+      expect(sysPrompt).toContain(tomorrowKey);
+      expect(sysPrompt).toContain('"Pechuga de pavo a la plancha con puré de patata y judías verdes" (rec-turkey-scheduled)');
+
+      // 2. La receta planificada debe estar garantizada en CATÁLOGO DE RECETAS pese al límite de 50 por "comer"
+      const catalogSection = sysPrompt.split('CATÁLOGO DE RECETAS')[1].split('PLAN SEMANAL ACTUAL')[0];
+      expect(catalogSection).toContain('rec-turkey-scheduled');
+    } finally {
+      state.recipes = origRecipes;
+      state.mealPlan = origMealPlan;
+      appInstance.plannerWeekOffset = origOffset;
+    }
+  });
 });
