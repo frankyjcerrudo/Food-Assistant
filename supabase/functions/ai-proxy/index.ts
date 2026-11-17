@@ -1,6 +1,7 @@
 // @ts-ignore - resolución de Deno
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
+  applySousChefIdentityGuard,
   extractUsage,
   mapQuotaResult,
   MAX_PAYLOAD_BYTES,
@@ -97,7 +98,7 @@ Deno.serve(async (req: Request) => {
     plan
   };
 
-  const cleanPayload = sanitizePayload(body.payload);
+  const cleanPayload = applySousChefIdentityGuard(sanitizePayload(body.payload));
   const models = resolveModelChain(plan);
   let lastError = 'Upstream request failed';
 
