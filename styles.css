@@ -7027,18 +7027,32 @@ h2,
   position: fixed;
   inset: 0;
   background: transparent;
+  transition: background-color 0.25s ease, backdrop-filter 0.25s ease;
+}
+
+.app-tour-backdrop.is-dimmed {
+  background: rgba(15, 18, 16, 0.72);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 .app-tour-spotlight {
   position: fixed;
   border-radius: var(--radius-lg);
-  box-shadow: 0 0 0 9999px rgba(15, 18, 16, 0.68), 0 0 0 3px var(--m3-primary);
+  box-shadow: 0 0 0 9999px rgba(15, 18, 16, 0.68), 0 0 0 2.5px var(--m3-primary), 0 8px 28px rgba(0, 0, 0, 0.28);
   pointer-events: none;
+  opacity: 1;
   transition: top 0.28s cubic-bezier(0.2, 0, 0, 1),
               left 0.28s cubic-bezier(0.2, 0, 0, 1),
               width 0.28s cubic-bezier(0.2, 0, 0, 1),
-              height 0.28s cubic-bezier(0.2, 0, 0, 1);
+              height 0.28s cubic-bezier(0.2, 0, 0, 1),
+              opacity 0.2s ease;
   z-index: 12001;
+}
+
+.app-tour-spotlight.is-hidden-spot {
+  opacity: 0;
+  box-shadow: none;
 }
 
 .app-tour-card {
@@ -7049,13 +7063,39 @@ h2,
   border-radius: var(--radius-xl);
   border: var(--border-subtle);
   box-shadow: var(--shadow-lg, 0 18px 40px rgba(0, 0, 0, 0.28));
-  padding: 18px;
+  padding: 16px 18px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   z-index: 12002;
   transition: top 0.28s cubic-bezier(0.2, 0, 0, 1),
               left 0.28s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.app-tour-caret {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background-color: var(--m3-surface);
+  transform: rotate(45deg);
+  left: var(--caret-left, 50%);
+  margin-left: -6px;
+  pointer-events: none;
+  display: none;
+}
+
+.app-tour-card[data-caret="top"] .app-tour-caret {
+  display: block;
+  top: -6px;
+  border-left: var(--border-subtle);
+  border-top: var(--border-subtle);
+}
+
+.app-tour-card[data-caret="bottom"] .app-tour-caret {
+  display: block;
+  bottom: -6px;
+  border-right: var(--border-subtle);
+  border-bottom: var(--border-subtle);
 }
 
 .app-tour-card-header {
@@ -7082,9 +7122,16 @@ h2,
   gap: 8px;
 }
 
+.app-tour-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .app-tour-icon-wrap {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
   border-radius: var(--radius-md);
   background-color: var(--m3-primary-container);
   color: var(--m3-on-primary-container);
@@ -7096,7 +7143,7 @@ h2,
 .app-tour-title {
   margin: 0;
   font-family: var(--font-serif);
-  font-size: 18px;
+  font-size: 17.5px;
   font-weight: 700;
   color: var(--m3-on-surface);
   line-height: 1.25;
@@ -7109,12 +7156,18 @@ h2,
   color: var(--m3-on-surface-variant);
 }
 
+.app-tour-upgrade-cta {
+  width: 100%;
+  justify-content: center;
+  margin-top: 2px;
+}
+
 .app-tour-card-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
+  flex-wrap: nowrap;
+  gap: 8px;
   padding-top: 8px;
   border-top: var(--border-subtle);
 }
@@ -7142,12 +7195,11 @@ h2,
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  flex-wrap: wrap;
   gap: 6px;
   margin-left: auto;
 }
 
-/* Lock scroll and keep dock & header nav bright above tour backdrop */
+/* Lock scroll and disable accidental nav taps during tour without breaking dock glassmorphism */
 html:has(body.app-tour-active),
 body.app-tour-active {
   overflow: hidden !important;
@@ -7156,48 +7208,24 @@ body.app-tour-active {
 
 body.app-tour-active .bottom-nav,
 body.app-tour-active .app-header {
-  z-index: 12003 !important;
-  background: var(--m3-surface) !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  box-shadow: 0 -2px 14px rgba(0, 0, 0, 0.14);
+  pointer-events: none !important;
 }
 
 body.app-tour-active .bottom-nav .nav-item:not(.app-tour-nav-target),
 body.app-tour-active .header-nav .header-nav-btn:not(.app-tour-nav-target) {
-  opacity: 0.35;
+  opacity: 0.45;
   transition: opacity 0.2s ease;
 }
 
 body.app-tour-active .app-tour-nav-target {
-  position: relative;
   opacity: 1 !important;
-  background-color: var(--m3-primary-container) !important;
   color: var(--m3-primary) !important;
-  border-radius: var(--radius-lg);
-  padding: 4px 6px;
-  box-shadow: 0 0 0 2px var(--m3-primary), 0 4px 12px rgba(200, 90, 50, 0.28);
-  animation: tourNavPulse 1.5s ease-in-out infinite;
 }
 
 body.app-tour-active .app-tour-nav-target .material-symbols-outlined,
 body.app-tour-active .app-tour-nav-target .nav-label {
   color: var(--m3-primary) !important;
   font-weight: 700;
-}
-
-body.app-tour-active .nav-item-gemini.app-tour-nav-target {
-  background-color: transparent !important;
-  box-shadow: none;
-}
-
-body.app-tour-active .nav-item-gemini.app-tour-nav-target .nav-gemini-fab {
-  box-shadow: 0 0 0 3px var(--m3-surface), 0 0 0 6px var(--m3-primary), 0 10px 26px rgba(200, 90, 50, 0.58);
-}
-
-@keyframes tourNavPulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
 }
 
 .app-tour-comparison {

@@ -770,4 +770,44 @@ describe('US-68: Asistente de Bienvenida (Onboarding Wizard)', () => {
     expect(document.body.classList.contains('app-tour-active')).toBe(false);
     expect(appInstance.switchView).toHaveBeenLastCalledWith('view-today');
   });
+
+  it('el Tour oculta el spotlight sin encogerlo en Free vs Pro, calcula unión de bounding boxes y soporta flechas de teclado', () => {
+    appInstance.switchView = vi.fn();
+    appInstance.startAppTour(0);
+
+    // Paso 1: spotlight visible
+    const spotlight = document.getElementById('app-tour-spotlight');
+    const card = document.getElementById('app-tour-card');
+    expect(spotlight.classList.contains('is-hidden-spot')).toBe(false);
+    expect(card.getAttribute('data-caret')).toBeTruthy();
+
+    // Tecla ArrowRight avanza al paso 2
+    window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    expect(document.getElementById('app-tour-step-badge').textContent).toBe('2 / 6');
+
+    // Tecla ArrowLeft vuelve al paso 1
+    window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowLeft' }));
+    expect(document.getElementById('app-tour-step-badge').textContent).toBe('1 / 6');
+
+    // Ir al paso 6 (comparativa): spotlight oculto limpiamente y caret en 'none'
+    appInstance.appTourStep = 5;
+    appInstance.renderAppTourStep();
+    expect(spotlight.classList.contains('is-hidden-spot')).toBe(true);
+    expect(card.getAttribute('data-caret')).toBe('none');
+
+    // getCombinedTourRect combina bounding boxes de múltiples selectores visibles
+    const elA = document.createElement('div');
+    elA.id = 'tour-union-a';
+    elA.getBoundingClientRect = () => ({ left: 20, top: 40, right: 120, bottom: 90, width: 100, height: 50 });
+    const elB = document.createElement('div');
+    elB.id = 'tour-union-b';
+    elB.getBoundingClientRect = () => ({ left: 10, top: 100, right: 220, bottom: 160, width: 210, height: 60 });
+    document.body.appendChild(elA);
+    document.body.appendChild(elB);
+
+    const combined = appInstance.getCombinedTourRect(['#tour-union-a', '#tour-union-b']);
+    expect(combined).toEqual({ left: 10, top: 40, right: 220, bottom: 160, width: 210, height: 120 });
+
+    appInstance.closeAppTour(false);
+  });
 });

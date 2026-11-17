@@ -22504,7 +22504,7 @@ REGLAS CRÍTICAS:
       {
         view: 'view-today',
         icon: 'today',
-        selectors: ['#view-today .today-header-info', '#view-today .today-header'],
+        selectors: ['#view-today .today-header-info', '#view-today .today-nutrition-card'],
         titleKey: 'tour.step1Title',
         descKey: 'tour.step1Desc',
         titleFallback: 'Hoy: tu menú y macros al día',
@@ -22513,7 +22513,7 @@ REGLAS CRÍTICAS:
       {
         view: 'view-recipes',
         icon: 'menu_book',
-        selectors: ['#view-recipes .recipes-header-title-group', '#view-recipes .recipes-section-header'],
+        selectors: ['#view-recipes .recipes-search-action-row'],
         titleKey: 'tour.step2Title',
         descKey: 'tour.step2Desc',
         titleFallback: 'Recetario y Modo Cocina',
@@ -22522,7 +22522,7 @@ REGLAS CRÍTICAS:
       {
         view: 'view-planner',
         icon: 'calendar_month',
-        selectors: ['#view-planner .section-header > div:first-child', '#view-planner .section-header'],
+        selectors: ['#view-planner .section-header', '#planner-week-nav-bar'],
         titleKey: 'tour.step3Title',
         descKey: 'tour.step3Desc',
         titleFallback: 'Planificador Semanal',
@@ -22531,7 +22531,7 @@ REGLAS CRÍTICAS:
       {
         view: 'view-shopping',
         icon: 'shopping_cart',
-        selectors: ['#view-shopping .shopping-section-header'],
+        selectors: ['#view-shopping .shopping-toolbar-row', '#view-shopping .shopping-unified-add-bar'],
         titleKey: 'tour.step4Title',
         descKey: 'tour.step4Desc',
         titleFallback: 'Lista de la Compra Inteligente',
@@ -22540,7 +22540,7 @@ REGLAS CRÍTICAS:
       {
         view: 'view-ai',
         icon: 'auto_awesome',
-        selectors: ['#view-ai .gemini-invoke-header-top', '#view-ai .gemini-invoke-header'],
+        selectors: ['#view-ai #ai-hub-actions-panel', '#view-ai .gemini-invoke-header'],
         titleKey: 'tour.step5Title',
         descKey: 'tour.step5Desc',
         titleFallback: 'Sous Chef con IA',
@@ -22574,15 +22574,71 @@ REGLAS CRÍTICAS:
         }
       };
       this._appTourKeydownBound = (e) => {
-        if (e.key === 'Escape' && !document.getElementById('app-tour-overlay')?.classList.contains('is-hidden')) {
+        if (document.getElementById('app-tour-overlay')?.classList.contains('is-hidden')) return;
+        if (e.key === 'Escape') {
           this.closeAppTour();
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          this.nextAppTourStep();
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          this.prevAppTourStep();
         }
       };
       window.addEventListener('resize', this._appTourResizeBound);
       window.addEventListener('keydown', this._appTourKeydownBound);
+
+      const card = document.getElementById('app-tour-card');
+      if (card && !this._appTourSwipeBound) {
+        this._appTourSwipeBound = true;
+        let touchStartX = null;
+        card.addEventListener('touchstart', (e) => {
+          touchStartX = e.changedTouches?.[0]?.clientX ?? null;
+        }, { passive: true });
+        card.addEventListener('touchend', (e) => {
+          if (touchStartX === null) return;
+          const touchEndX = e.changedTouches?.[0]?.clientX ?? touchStartX;
+          const dx = touchEndX - touchStartX;
+          touchStartX = null;
+          if (Math.abs(dx) >= 48) {
+            if (dx < 0) this.nextAppTourStep();
+            else this.prevAppTourStep();
+          }
+        }, { passive: true });
+      }
     }
 
     this.renderAppTourStep();
+  }
+
+  getCombinedTourRect(selectors = [], fallbackViewId = null) {
+    const rects = (selectors || [])
+      .map(sel => document.querySelector(sel))
+      .filter(Boolean)
+      .map(el => el.getBoundingClientRect())
+      .filter(r => r && r.width > 0 && r.height > 0);
+
+    if (rects.length > 0) {
+      const left = Math.min(...rects.map(r => r.left));
+      const top = Math.min(...rects.map(r => r.top));
+      const right = Math.max(...rects.map(r => r.right));
+      const bottom = Math.max(...rects.map(r => r.bottom));
+      return {
+        left,
+        top,
+        right,
+        bottom,
+        width: Math.max(40, right - left),
+        height: Math.max(40, bottom - top)
+      };
+    }
+
+    const fallbackEl = fallbackViewId ? document.getElementById(fallbackViewId) : null;
+    const fallbackRect = fallbackEl ? fallbackEl.getBoundingClientRect() : null;
+    if (fallbackRect && fallbackRect.width > 0 && fallbackRect.height > 0) {
+      return fallbackRect;
+    }
+    return null;
   }
 
   renderAppTourStep() {
@@ -22638,15 +22694,8 @@ REGLAS CRÍTICAS:
     }
 
     const positionNow = () => {
-      const targetEl = step.isComparison ? null : ((step.selectors || [])
-        .map(sel => document.querySelector(sel))
-        .find(el => {
-          if (!el) return false;
-          const rect = el.getBoundingClientRect();
-          return rect.width > 0 && rect.height > 0;
-        }) || document.getElementById(step.view));
-
-      this.positionAppTourElements(targetEl, Boolean(step.isComparison));
+      const targetRect = step.isComparison ? null : this.getCombinedTourRect(step.selectors, step.view);
+      this.positionAppTourElements(targetRect, Boolean(step.isComparison));
     };
 
     positionNow();
@@ -22655,7 +22704,8 @@ REGLAS CRÍTICAS:
     }
   }
 
-  positionAppTourElements(targetEl, isCentered = false) {
+  positionAppTourElements(targetRectOrEl, isCentered = false) {
+    const backdrop = document.getElementById('app-tour-backdrop');
     const spotlight = document.getElementById('app-tour-spotlight');
     const card = document.getElementById('app-tour-card');
     if (!spotlight || !card) return;
@@ -22676,16 +22726,23 @@ REGLAS CRÍTICAS:
     const cardH = cardRect.height || 260;
 
     if (isCentered) {
-      spotlight.style.top = '50%';
-      spotlight.style.left = '50%';
-      spotlight.style.width = '0px';
-      spotlight.style.height = '0px';
+      spotlight.classList.add('is-hidden-spot');
+      if (backdrop) backdrop.classList.add('is-dimmed');
+      card.setAttribute('data-caret', 'none');
       card.style.top = `${Math.max(safeTop, Math.min(vh - cardH - safeBottom, (vh - cardH) / 2))}px`;
       card.style.left = `${Math.max(12, (vw - cardW) / 2)}px`;
       return;
     }
 
-    let rect = targetEl ? targetEl.getBoundingClientRect() : null;
+    spotlight.classList.remove('is-hidden-spot');
+    if (backdrop) backdrop.classList.remove('is-dimmed');
+
+    let rect = null;
+    if (targetRectOrEl && typeof targetRectOrEl.getBoundingClientRect === 'function') {
+      rect = targetRectOrEl.getBoundingClientRect();
+    } else if (targetRectOrEl && typeof targetRectOrEl.top === 'number') {
+      rect = targetRectOrEl;
+    }
     if (!rect || rect.width === 0 || rect.height === 0) {
       rect = { top: safeTop + 8, left: 16, width: Math.max(200, vw - 32), height: 140, bottom: safeTop + 148, right: vw - 16 };
     }
@@ -22704,15 +22761,24 @@ REGLAS CRÍTICAS:
     const spaceAbove = spotTop - safeTop;
 
     let cardTop;
+    let caretPos = 'none';
     if (spaceBelow >= cardH + 14) {
       cardTop = spotTop + spotHeight + 14;
+      caretPos = 'top';
     } else if (spaceAbove >= cardH + 14) {
       cardTop = spotTop - cardH - 14;
+      caretPos = 'bottom';
     } else {
       cardTop = Math.max(safeTop, vh - cardH - safeBottom);
+      caretPos = 'none';
     }
 
     const cardLeft = Math.max(12, Math.min(vw - cardW - 12, spotLeft + (spotWidth - cardW) / 2));
+    const spotCenterX = spotLeft + spotWidth / 2;
+    const caretOffset = Math.max(24, Math.min(cardW - 24, spotCenterX - cardLeft));
+
+    card.setAttribute('data-caret', caretPos);
+    card.style.setProperty('--caret-left', `${Math.round(caretOffset)}px`);
     card.style.top = `${cardTop}px`;
     card.style.left = `${cardLeft}px`;
   }
@@ -22746,6 +22812,14 @@ REGLAS CRÍTICAS:
     if (overlay) overlay.classList.add('is-hidden');
     document.body.classList.remove('app-tour-active');
     document.querySelectorAll('.app-tour-nav-target').forEach(el => el.classList.remove('app-tour-nav-target'));
+    if (this._appTourResizeBound) {
+      window.removeEventListener('resize', this._appTourResizeBound);
+      this._appTourResizeBound = null;
+    }
+    if (this._appTourKeydownBound) {
+      window.removeEventListener('keydown', this._appTourKeydownBound);
+      this._appTourKeydownBound = null;
+    }
     if (typeof this.switchView === 'function') {
       this.switchView('view-today');
     }

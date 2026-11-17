@@ -2851,19 +2851,22 @@
     aria-labelledby="app-tour-title">
     <div class="app-tour-backdrop" id="app-tour-backdrop"></div>
     <div class="app-tour-spotlight" id="app-tour-spotlight"></div>
-    <div class="app-tour-card" id="app-tour-card">
+    <div class="app-tour-card" id="app-tour-card" data-caret="none">
+      <div class="app-tour-caret" id="app-tour-caret" aria-hidden="true"></div>
       <div class="app-tour-card-header">
-        <span class="app-tour-badge" id="app-tour-step-badge">1 / 5</span>
+        <span class="app-tour-badge" id="app-tour-step-badge">1 / 6</span>
         <button type="button" class="btn btn-ghost btn-sm" id="btn-app-tour-skip" data-action="closeAppTour"
           data-i18n="tour.skip">
           Saltar tour
         </button>
       </div>
       <div class="app-tour-card-body">
-        <div class="app-tour-icon-wrap" id="app-tour-icon-wrap">
-          <span class="material-symbols-outlined" id="app-tour-icon">today</span>
+        <div class="app-tour-title-row">
+          <div class="app-tour-icon-wrap" id="app-tour-icon-wrap">
+            <span class="material-symbols-outlined" id="app-tour-icon">today</span>
+          </div>
+          <h3 class="app-tour-title" id="app-tour-title"></h3>
         </div>
-        <h3 class="app-tour-title" id="app-tour-title"></h3>
         <p class="app-tour-desc" id="app-tour-desc"></p>
         <div class="app-tour-comparison is-hidden" id="app-tour-comparison">
           <table class="app-tour-compare-table">
@@ -2903,14 +2906,14 @@
             </tbody>
           </table>
         </div>
+        <button type="button" class="btn btn-tonal btn-sm app-tour-upgrade-cta is-hidden" id="btn-app-tour-upgrade" data-action="openUpgradeFromTour">
+          <span class="material-symbols-outlined icon-sm">workspace_premium</span>
+          <span data-i18n="plan.upgrade">Hazte Pro</span>
+        </button>
       </div>
       <div class="app-tour-card-footer">
         <div class="app-tour-dots" id="app-tour-dots"></div>
         <div class="app-tour-actions">
-          <button type="button" class="btn btn-secondary btn-sm is-hidden" id="btn-app-tour-upgrade" data-action="openUpgradeFromTour">
-            <span class="material-symbols-outlined icon-sm">workspace_premium</span>
-            <span data-i18n="plan.upgrade">Hazte Pro</span>
-          </button>
           <button type="button" class="btn btn-secondary btn-sm" id="btn-app-tour-prev" data-action="prevAppTourStep">
             <span class="material-symbols-outlined icon-sm">arrow_back</span>
             <span data-i18n="tour.prev">Anterior</span>
