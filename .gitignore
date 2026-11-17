@@ -23,3 +23,14 @@ supabase/.temp/
 test-results/
 playwright-report/
 
+# Android / Bubblewrap TWA secrets and build artifacts
+*.jks
+*.keystore
+twa/.gradle/
+twa/build/
+twa/app/build/
+twa/*.apk
+twa/*.aab
+twa/*.idsig
+twa/local.properties
+
