@@ -27,13 +27,27 @@ describe('Fase 3 Google Play: Requisitos Legales y Políticas (US-74 & US-75)', 
       expect(privacyHtml).toContain('saboryfood@gmail.com');
     });
 
-    it('privacy.html detalla la arquitectura Offline-First, Supabase (RLS), BYOK y Google Gemini API', () => {
+    it('privacy.html detalla la arquitectura Offline-First, Supabase (RLS), Google Play, ai_usage, entitlements y sin menciones a BYOK/MCP', () => {
       expect(privacyHtml).toContain('Offline-First');
       expect(privacyHtml).toContain('IndexedDB');
       expect(privacyHtml).toContain('Supabase');
       expect(privacyHtml).toContain('Row Level Security');
       expect(privacyHtml).toContain('Gemini');
-      expect(privacyHtml).toContain('Bring Your Own Key');
+      expect(privacyHtml).toContain('Google Play');
+      expect(privacyHtml).toContain('ai_usage');
+      expect(privacyHtml).toContain('entitlements');
+      expect(privacyHtml).not.toContain('BYOK');
+      expect(privacyHtml).not.toContain('tu propia clave');
+      expect(privacyHtml).not.toContain('MCP');
+      expect(privacyHtml).not.toContain('fa_live_');
+    });
+
+    it('terms.html existe con precios, renovación automática, 14 días gratis, cancelación y contacto', () => {
+      const termsHtml = read('terms.html');
+      expect(termsHtml).toContain('renovación automática');
+      expect(termsHtml).toContain('14 días');
+      expect(termsHtml).toContain('play.google.com/store/account/subscriptions');
+      expect(termsHtml).toContain('saboryfood@gmail.com');
     });
 
     it('privacy.html explica los permisos del dispositivo (cámara/fotos, micrófono y screen wake lock)', () => {
@@ -42,15 +56,24 @@ describe('Fase 3 Google Play: Requisitos Legales y Políticas (US-74 & US-75)', 
       expect(privacyHtml).toContain('Screen Wake Lock');
     });
 
-    it('sw.js incluye ./privacy.html en ASSETS_TO_CACHE para disponibilidad offline', () => {
+    it('sw.js incluye ./privacy.html y ./terms.html en ASSETS_TO_CACHE para disponibilidad offline', () => {
       expect(swJs).toContain("'./privacy.html'");
+      expect(swJs).toContain("'./terms.html'");
     });
 
-    it('index.html incluye enlaces visibles a privacy.html en Ajustes y en el modal de autenticación', () => {
+    it('index.html incluye enlaces visibles a privacy.html y terms.html en Ajustes, Paywall y modal de autenticación', () => {
       expect(html).toContain('id="card-legal-privacy"');
       expect(html).toContain('id="link-privacy-policy"');
+      expect(html).toContain('id="link-terms"');
       expect(html).toContain('href="privacy.html"');
+      expect(html).toContain('href="terms.html"');
+      expect(html).toContain('id="link-paywall-terms"');
       expect(html).toContain('id="link-auth-privacy"');
+    });
+
+    it('el diálogo de borrado de cuenta avisa que no cancela la suscripción de Google Play', () => {
+      const i18nCode = read('i18n.js');
+      expect(i18nCode).toContain('play.google.com/store/account/subscriptions');
     });
   });
 

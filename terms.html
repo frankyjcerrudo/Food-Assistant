@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Términos de Uso y Suscripción — Sabory</title>
+  <meta name="description" content="Términos de uso, planes Free y Sabory Pro, suscripciones con Google Play, renovación automática y cancelación.">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="theme-color" content="#A0401B">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
+
+  <style>
+    :root {
+      --color-brand: #A0401B;
+      --color-brand-hover: #863414;
+      --color-brand-container: #FFDBCF;
+      --color-surface: #FBF9F6;
+      --color-surface-card: #FFFFFF;
+      --color-on-surface: #1E1B16;
+      --color-on-surface-variant: #52443C;
+      --color-outline-variant: #E8E0DB;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-full: 9999px;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      background-color: var(--color-surface);
+      color: var(--color-on-surface);
+      line-height: 1.65;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+      padding: 0 16px 48px;
+    }
+
+    .container { max-width: 820px; margin: 0 auto; }
+
+    .header-bar {
+      padding: 24px 0 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--color-outline-variant);
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .brand-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--color-on-surface);
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--color-brand-container);
+      color: var(--color-brand);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .brand-title {
+      font-family: 'Newsreader', Georgia, serif;
+      font-size: 26px;
+      font-weight: 500;
+      color: var(--color-brand);
+      letter-spacing: -0.5px;
+    }
+
+    .header-actions { display: inline-flex; align-items: center; gap: 10px; }
+
+    .lang-switcher {
+      display: inline-flex;
+      align-items: center;
+      background: var(--color-surface-card);
+      border: 1px solid var(--color-outline-variant);
+      border-radius: var(--radius-full);
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .lang-pill-btn {
+      border: none;
+      background: transparent;
+      padding: 5px 12px;
+      border-radius: var(--radius-full);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--color-on-surface-variant);
+      cursor: pointer;
+    }
+
+    .lang-pill-btn.active {
+      background: var(--color-brand);
+      color: #fff;
+    }
+
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: var(--radius-full);
+      background: var(--color-surface-card);
+      border: 1px solid var(--color-outline-variant);
+      color: var(--color-on-surface);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .hero { margin-bottom: 28px; }
+    .hero h1 { font-size: 28px; font-weight: 800; margin-bottom: 8px; letter-spacing: -0.4px; }
+    .hero p { color: var(--color-on-surface-variant); }
+
+    .section-card {
+      background: var(--color-surface-card);
+      border: 1px solid var(--color-outline-variant);
+      border-radius: var(--radius-lg);
+      padding: 22px 24px;
+      margin-bottom: 18px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .section-card h2 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 18px;
+      margin-bottom: 12px;
+      color: var(--color-brand);
+    }
+
+    .section-card p, .section-card li { color: var(--color-on-surface); margin-bottom: 8px; }
+    .section-card ul { padding-left: 20px; }
+
+    .footer-bar {
+      margin-top: 32px;
+      padding-top: 20px;
+      border-top: 1px solid var(--color-outline-variant);
+      text-align: center;
+      font-size: 13px;
+      color: var(--color-on-surface-variant);
+    }
+
+    .footer-bar a { color: var(--color-brand); text-decoration: none; font-weight: 600; }
+
+    body.lang-es [data-lang="en"] { display: none !important; }
+    body.lang-en [data-lang="es"] { display: none !important; }
+  </style>
+</head>
+<body class="lang-es">
+  <div class="container">
+    <header class="header-bar">
+      <a href="index.html" class="brand-link">
+        <div class="brand-icon">
+          <span class="material-symbols-outlined">restaurant_menu</span>
+        </div>
+        <span class="brand-title">Sabory</span>
+      </a>
+      <div class="header-actions">
+        <div class="lang-switcher" role="group" aria-label="Idioma / Language">
+          <button type="button" class="lang-pill-btn active" id="btn-lang-es" onclick="setTermsLanguage('es')">ES</button>
+          <button type="button" class="lang-pill-btn" id="btn-lang-en" onclick="setTermsLanguage('en')">EN</button>
+        </div>
+        <a href="index.html" class="back-btn">
+          <span class="material-symbols-outlined" style="font-size: 18px;">arrow_back</span>
+          <span data-lang="es">Volver a la App</span>
+          <span data-lang="en">Back to App</span>
+        </a>
+      </div>
+    </header>
+
+    <div class="hero">
+      <h1 data-lang="es">Términos de Uso y Suscripción</h1>
+      <h1 data-lang="en">Terms of Use &amp; Subscription</h1>
+      <p data-lang="es">Última actualización: noviembre de 2026 · Aplicable a Sabory Web y Android (Google Play).</p>
+      <p data-lang="en">Last updated: November 2026 · Applies to Sabory Web and Android (Google Play).</p>
+    </div>
+
+    <section class="section-card">
+      <h2>
+        <span class="material-symbols-outlined">workspace_premium</span>
+        <span data-lang="es">1. Planes Disponibles: Free y Sabory Pro</span>
+        <span data-lang="en">1. Available Plans: Free and Sabory Pro</span>
+      </h2>
+      <div data-lang="es">
+        <ul>
+          <li><strong>Plan Free (Gratuito):</strong> Gestión completa de recetas, importador clásico por URL/texto ilimitado, planificador semanal, lista de la compra inteligente y cuotas básicas de IA con cuenta iniciada (1 menú semanal con IA/semana, 3 consultas guiadas/día y 3 importaciones con IA/mes).</li>
+          <li><strong>Plan Sabory Pro:</strong> Menús semanales con IA ilimitados, chat libre y voz con el Sous Chef, escaneo e importación con IA ilimitados y acceso completo al <strong>Modo Familia</strong> (una única suscripción Pro cubre a todos los miembros de un mismo hogar).</li>
+        </ul>
+      </div>
+      <div data-lang="en">
+        <ul>
+          <li><strong>Free Plan:</strong> Full recipe management, unlimited classic URL/text import, weekly planner, smart shopping list, and basic AI quotas when signed in (1 AI weekly menu/week, 3 guided queries/day, and 3 AI imports/month).</li>
+          <li><strong>Sabory Pro Plan:</strong> Unlimited AI weekly menus, free chat and voice with the Sous Chef, unlimited AI scanning/import, and full <strong>Family Mode</strong> access (one Pro subscription covers all members of the same household).</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <h2>
+        <span class="material-symbols-outlined">payments</span>
+        <span data-lang="es">2. Precios, Prueba Gratuita y Renovación Automática</span>
+        <span data-lang="en">2. Pricing, Free Trial &amp; Auto-Renewal</span>
+      </h2>
+      <div data-lang="es">
+        <ul>
+          <li><strong>Precio (IVA incluido):</strong> <strong>2,99 €/mes</strong> (plan mensual) o <strong>24,99 €/año</strong> (plan anual). El precio exacto localizado se muestra en el momento de la compra en Google Play.</li>
+          <li><strong>Prueba gratuita de 14 días:</strong> Los nuevos suscriptores elegibles disfrutan de <strong>14 días</strong> gratis antes del primer cobro. Si cancelas antes de que termine el periodo de prueba, no se te cobrará nada.</li>
+          <li><strong>Renovación automática:</strong> La suscripción se renueva automáticamente al finalizar cada periodo mensual o anual salvo que la canceles al menos 24 horas antes de la fecha de renovación a través de Google Play.</li>
+        </ul>
+      </div>
+      <div data-lang="en">
+        <ul>
+          <li><strong>Pricing (VAT included):</strong> <strong>€2.99/month</strong> (monthly plan) or <strong>€24.99/year</strong> (annual plan). The exact localized price is displayed at checkout in Google Play.</li>
+          <li><strong>14-day free trial:</strong> Eligible new subscribers receive a <strong>14 days</strong> free trial before the first charge. Cancel before the trial ends to avoid any charge.</li>
+          <li><strong>Auto-renewal:</strong> Subscriptions renew automatically at the end of each monthly or annual billing cycle unless canceled at least 24 hours before renewal via Google Play.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <h2>
+        <span class="material-symbols-outlined">cancel</span>
+        <span data-lang="es">3. Cancelación y Reembolsos</span>
+        <span data-lang="en">3. Cancellation &amp; Refunds</span>
+      </h2>
+      <div data-lang="es">
+        <p>Puedes gestionar o cancelar tu suscripción en cualquier momento desde Google Play:</p>
+        <p><a href="https://play.google.com/store/account/subscriptions?package=food.sabory.app" target="_blank" rel="noopener noreferrer" style="color: var(--color-brand); font-weight: 600;">https://play.google.com/store/account/subscriptions</a></p>
+        <p>Al cancelar, conservarás las ventajas de Sabory Pro hasta el final del periodo ya abonado. Ten en cuenta que eliminar tu cuenta dentro de la app borra tus datos pero no cancela automáticamente la suscripción en Google Play. Los reembolsos se rigen por las políticas oficiales de Google Play.</p>
+      </div>
+      <div data-lang="en">
+        <p>You can manage or cancel your subscription anytime from Google Play:</p>
+        <p><a href="https://play.google.com/store/account/subscriptions?package=food.sabory.app" target="_blank" rel="noopener noreferrer" style="color: var(--color-brand); font-weight: 600;">https://play.google.com/store/account/subscriptions</a></p>
+        <p>Upon cancellation, you retain Sabory Pro access until the end of your current paid cycle. Deleting your in-app account removes your data but does not automatically cancel your Google Play subscription. Refunds follow Google Play's official refund policies.</p>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <h2>
+        <span class="material-symbols-outlined">shield</span>
+        <span data-lang="es">4. Uso Razonable y Contacto</span>
+        <span data-lang="en">4. Fair Use &amp; Contact</span>
+      </h2>
+      <div data-lang="es">
+        <p>Para garantizar la estabilidad del servicio de IA frente a usos automatizados o abusivos, Sabory Pro aplica un límite técnico de seguridad de uso razonable (200 peticiones de IA al día por usuario).</p>
+        <p>Para cualquier consulta sobre estos términos o tu suscripción, escríbenos a <a href="mailto:saboryfood@gmail.com" style="color: var(--color-brand); font-weight: 600;">saboryfood@gmail.com</a>.</p>
+      </div>
+      <div data-lang="en">
+        <p>To protect AI service availability against automated abuse, Sabory Pro enforces a fair-use technical safeguard limit (200 AI requests per day per user).</p>
+        <p>For any questions regarding these terms or your subscription, contact us at <a href="mailto:saboryfood@gmail.com" style="color: var(--color-brand); font-weight: 600;">saboryfood@gmail.com</a>.</p>
+      </div>
+    </section>
+
+    <footer class="footer-bar">
+      <p data-lang="es">© 2026 <strong>Sabory</strong></p>
+      <p data-lang="en">© 2026 <strong>Sabory</strong></p>
+      <p style="margin-top: 6px;">
+        <a href="index.html"><span data-lang="es">Abrir Aplicación</span><span data-lang="en">Open App</span></a> ·
+        <a href="privacy.html"><span data-lang="es">Política de Privacidad</span><span data-lang="en">Privacy Policy</span></a> ·
+        <a href="mailto:saboryfood@gmail.com">saboryfood@gmail.com</a>
+      </p>
+    </footer>
+  </div>
+
+  <script>
+    function setTermsLanguage(lang) {
+      const isEn = lang === 'en';
+      document.body.classList.toggle('lang-en', isEn);
+      document.body.classList.toggle('lang-es', !isEn);
+      document.documentElement.setAttribute('lang', isEn ? 'en' : 'es');
+      document.title = isEn ? 'Terms of Use & Subscription — Sabory' : 'Términos de Uso y Suscripción — Sabory';
+      document.getElementById('btn-lang-es')?.classList.toggle('active', !isEn);
+      document.getElementById('btn-lang-en')?.classList.toggle('active', isEn);
+      try { localStorage.setItem('fa_language', lang); } catch (e) {}
+    }
+    (function initTermsLang() {
+      let saved = null;
+      try { saved = localStorage.getItem('fa_language'); } catch (e) {}
+      const navLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
+      setTermsLanguage(saved === 'en' || saved === 'es' ? saved : (navLang.startsWith('es') ? 'es' : 'en'));
+    })();
+  </script>
+</body>
+</html>

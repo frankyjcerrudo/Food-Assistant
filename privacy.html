@@ -405,11 +405,11 @@
         <p data-lang="en">We do not collect data for advertising, integrate ad networks, or sell your personal information.</p>
       </div>
       <div class="point-card">
-        <span class="material-symbols-outlined icon">key</span>
-        <h4 data-lang="es">Claves Seguras (BYOK)</h4>
-        <h4 data-lang="en">Secure Keys (BYOK)</h4>
-        <p data-lang="es">Tus claves personales de IA se almacenan exclusivamente en el almacenamiento seguro de tu propio navegador.</p>
-        <p data-lang="en">Your personal AI keys are stored exclusively inside your device browser's secure local storage.</p>
+        <span class="material-symbols-outlined icon">smart_toy</span>
+        <h4 data-lang="es">IA Privada Sin Entrenamiento</h4>
+        <h4 data-lang="en">Private AI, Never Trained</h4>
+        <p data-lang="es">Las peticiones de IA se procesan de forma efímera a través del proxy seguro de Sabory sin guardar tus conversaciones.</p>
+        <p data-lang="en">AI requests are processed ephemerally through Sabory's secure proxy without storing your chat history.</p>
       </div>
       <div class="point-card">
         <span class="material-symbols-outlined icon">delete_forever</span>
@@ -466,7 +466,8 @@
           <li><strong>Lista de la Compra:</strong> Productos, cantidades e ingredientes añadidos manualmente o extraídos de tus recetas y planes semanales.</li>
           <li><strong>Preferencias Dietéticas y Nutricionales:</strong> Selección de tipos de dieta (ej. vegana, vegetariana, sin gluten) y objetivos diarios de calorías y macronutrientes. Su única finalidad es mostrar avisos y orientaciones dentro de la app.</li>
           <li><strong>Cuenta de Usuario (Opcional):</strong> Dirección de correo electrónico y nombre de perfil en caso de que decidas registrarte voluntariamente para sincronizar tu recetario entre varios dispositivos móviles o de escritorio.</li>
-          <li><strong>Claves de API Personales (BYOK - Bring Your Own Key):</strong> Si decides conectar tus propias claves para Google Gemini, OpenAI o Anthropic Claude, estas claves se almacenan <em>exclusivamente en el LocalStorage de tu dispositivo</em> y nunca son enviadas ni almacenadas en servidores del Desarrollador.</li>
+          <li><strong>Contadores de Uso de IA (<code>ai_usage</code>):</strong> Registramos únicamente la función utilizada, el modelo, el número de tokens y la fecha para gestionar cuotas de uso. <strong>No</strong> almacenamos en el servidor el contenido de tus prompts ni tus conversaciones.</li>
+          <li><strong>Suscripciones y Pagos (<code>entitlements</code>):</strong> Los pagos de <strong>Sabory Pro</strong> los gestiona íntegramente <strong>Google Play</strong>; Sabory nunca accede ni almacena datos de tarjeta. En <code>entitlements</code> guardamos únicamente tu estado de plan, producto, fecha de caducidad/renovación y el token de compra de Google Play.</li>
         </ul>
       </div>
       <div data-lang="en">
@@ -477,7 +478,8 @@
           <li><strong>Shopping List:</strong> Items, quantities, and ingredients added manually or extracted from your recipes and meal plans.</li>
           <li><strong>Dietary & Nutritional Preferences:</strong> Selection of diet types (e.g. vegan, vegetarian, gluten-free) and daily calorie and macronutrient targets. Solely used to display guides and balance hints within the app.</li>
           <li><strong>User Account (Optional):</strong> Email address and profile name if you choose to sign in to sync your cookbook across multiple devices.</li>
-          <li><strong>Personal API Keys (BYOK - Bring Your Own Key):</strong> If you connect your own keys for Google Gemini, OpenAI, or Claude, these keys are stored <em>exclusively inside your browser's LocalStorage</em> and are never sent to or stored on Developer servers.</li>
+          <li><strong>AI Usage Counters (<code>ai_usage</code>):</strong> We only record the feature used, model, token count, and timestamp to enforce usage quotas. We do <strong>not</strong> store conversation contents or prompts on the server.</li>
+          <li><strong>Subscriptions & Billing (<code>entitlements</code>):</strong> <strong>Sabory Pro</strong> payments are handled exclusively by <strong>Google Play</strong>; Sabory never sees or stores payment card details. In <code>entitlements</code> we only store your plan status, product ID, renewal/expiry date, and Google Play purchase token.</li>
         </ul>
       </div>
     </section>
@@ -522,7 +524,7 @@
       </h2>
       <div data-lang="es">
         <p>
-          Sabory integra capacidades de asistencia inteligente mediante los modelos oficiales de Google Gemini (tales como <code>gemini-3.5-flash-lite</code> y <code>gemini-3.8-flash</code>):
+          Sabory procesa las peticiones de IA a través de su servidor seguro en Supabase Edge Functions (<code>ai-proxy</code>) conectado a la API de pago de Google Gemini (modelos tales como <code>gemini-3.5-flash-lite</code> y <code>gemini-3.8-flash</code>):
         </p>
         <ul>
           <li><strong>Importación por Foto/Texto:</strong> Si decides fotografiar una página de un libro de cocina o pegar texto de una red social, el fragmento o imagen comprimida se envía a la API de Google Gemini para extraer y estructurar automáticamente los ingredientes y los pasos.</li>
@@ -584,7 +586,7 @@
         </p>
 
         <div class="callout-danger">
-          <strong>Efecto de la eliminación:</strong> Al solicitar el borrado, se destruyen permanentemente de la base de datos remota todas las recetas, los planes semanales de comidas, las listas de la compra, las configuraciones de usuario y los tokens de acceso vinculados a tu identificador de usuario. Esta acción es irreversible.
+          <strong>Efecto de la eliminación:</strong> Al solicitar el borrado, se destruyen permanentemente de la base de datos remota todas las recetas, planes semanales, listas de la compra, configuraciones de usuario, registros de <code>ai_usage</code> y registros de <code>entitlements</code> vinculados a tu identificador de usuario (borrado en cascada). Esta acción es irreversible y no cancela automáticamente una suscripción activa en Google Play, la cual debes gestionar desde tu cuenta de Google Play.
         </div>
 
         <h3>A. Eliminación Directa desde la Aplicación (Recomendado)</h3>
@@ -621,7 +623,7 @@
         </p>
 
         <div class="callout-danger">
-          <strong>Effect of deletion:</strong> When account deletion is requested, all recipes, weekly meal plans, grocery lists, user configurations, and access tokens associated with your user ID are permanently destroyed from the remote database. This action is irreversible.
+          <strong>Effect of deletion:</strong> When account deletion is requested, all recipes, weekly meal plans, grocery lists, user configurations, <code>ai_usage</code> records, and <code>entitlements</code> rows associated with your user ID are permanently destroyed (cascade delete). This action is irreversible and does not automatically cancel an active Google Play subscription, which must be managed from your Google Play account.
         </div>
 
         <h3>A. Direct Deletion from the Application (Recommended)</h3>
@@ -703,6 +705,10 @@
         <a href="index.html">
           <span data-lang="es">Abrir Aplicación</span>
           <span data-lang="en">Open App</span>
+        </a> · 
+        <a href="terms.html">
+          <span data-lang="es">Términos de Uso</span>
+          <span data-lang="en">Terms of Use</span>
         </a> · 
         <a href="#account-deletion">
           <span data-lang="es">Eliminar Cuenta</span>

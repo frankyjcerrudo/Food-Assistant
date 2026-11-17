@@ -5007,7 +5007,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.14';
+  window.APP_VERSION = 'v2.15';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -5055,7 +5055,7 @@ class FoodAssistantApp {
   constructor() {
     if (typeof window !== 'undefined') window.app = this;
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.14';
+    this.appVersion = window.APP_VERSION || 'v2.15';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -6490,7 +6490,7 @@ class FoodAssistantApp {
     const isCloud = !!(this.supabaseClient && state.cloudUser?.id && !state.cloudUser.isDemo);
     const t = window.I18n ? (k, p) => window.I18n.t(k, p) : null;
     const confirmMessage = isCloud
-      ? (t ? t('auth.deleteAccountCloudMsg') : '¿Estás seguro de que deseas eliminar definitivamente tu cuenta y todos tus datos? Esta acción es irreversible: se borrarán de la nube todas tus recetas, planificaciones y listas de la compra, y se cerrará tu sesión.')
+      ? (t ? t('auth.deleteAccountCloudMsg') : '¿Estás seguro de que deseas eliminar definitivamente tu cuenta y todos tus datos? Esta acción es irreversible: se borrarán de la nube todas tus recetas, planificaciones y listas de la compra, y se cerrará tu sesión. Aviso: eliminar la cuenta no cancela automáticamente una suscripción activa en Google Play (debes gestionarla en play.google.com/store/account/subscriptions).')
       : (t ? t('auth.deleteAccountLocalMsg') : '¿Estás seguro de que deseas eliminar todos tus datos? Esta acción es irreversible: se borrarán todas tus recetas personalizadas, planes semanales y listas de la compra locales.');
 
     const confirmed = skipConfirm === true ? true : await this.showConfirmDialog({
@@ -8784,11 +8784,22 @@ class FoodAssistantApp {
       window.open('https://play.google.com/store/account/subscriptions?package=food.sabory.app', '_blank', 'noopener');
     });
     document.getElementById('btn-close-paywall')?.addEventListener('click', () => this.closePaywall());
-    ['btn-paywall-monthly', 'btn-paywall-annual'].forEach(id => {
-      document.getElementById(id)?.addEventListener('click', () => {
+    document.getElementById('btn-plan-restore')?.addEventListener('click', () => this.restorePlayPurchases({ silent: false }));
+    document.getElementById('btn-paywall-monthly')?.addEventListener('click', () => {
+      if (!this.isPlayBillingAvailable()) {
         const notice = document.getElementById('paywall-web-notice');
-        if (notice && !this.isPlayBillingAvailable()) notice.style.display = 'block';
-      });
+        if (notice) notice.style.display = 'block';
+        return;
+      }
+      this.purchasePro('sabory_pro_monthly');
+    });
+    document.getElementById('btn-paywall-annual')?.addEventListener('click', () => {
+      if (!this.isPlayBillingAvailable()) {
+        const notice = document.getElementById('paywall-web-notice');
+        if (notice) notice.style.display = 'block';
+        return;
+      }
+      this.purchasePro('sabory_pro_annual');
     });
     ['gemini-invoke-input', 'ai-chat-input'].forEach(id => {
       document.getElementById(id)?.addEventListener('click', (e) => {
@@ -16259,6 +16270,157 @@ ${isEn
     return typeof window !== 'undefined' && 'getDigitalGoodsService' in window;
   }
 
+  getVerifyPurchaseEndpoint() {
+    const rawUrl = (typeof APP_CONFIG !== 'undefined' && APP_CONFIG?.supabaseUrl)
+      || (typeof window !== 'undefined' && window.APP_CONFIG?.supabaseUrl)
+      || (typeof localStorage !== 'undefined' ? localStorage.getItem('fa_sb_url') : '')
+      || '';
+    const base = String(rawUrl).trim().replace(/\/+$/, '');
+    return base ? `${base}/functions/v1/verify-purchase` : '';
+  }
+
+  async getPlayBillingService() {
+    if (!this.isPlayBillingAvailable()) return null;
+    try {
+      return await window.getDigitalGoodsService('https://play.google.com/billing');
+    } catch {
+      return null;
+    }
+  }
+
+  async loadPlayPrices() {
+    const service = await this.getPlayBillingService();
+    if (!service || typeof service.getDetails !== 'function') return;
+    try {
+      const details = await service.getDetails(['sabory_pro_monthly', 'sabory_pro_annual']);
+      if (!Array.isArray(details)) return;
+      const locale = window.I18n?.resolvedLang === 'en' ? 'en-GB' : 'es-ES';
+      const isEn = window.I18n?.resolvedLang === 'en';
+      details.forEach(item => {
+        if (!item?.itemId || !item?.price?.value || !item?.price?.currency) return;
+        const formatted = new Intl.NumberFormat(locale, {
+          style: 'currency',
+          currency: item.price.currency
+        }).format(Number(item.price.value));
+        if (item.itemId === 'sabory_pro_monthly') {
+          const el = document.querySelector('#btn-paywall-monthly strong');
+          if (el) el.textContent = `${formatted}${isEn ? '/month' : '/mes'}`;
+        } else if (item.itemId === 'sabory_pro_annual') {
+          const el = document.querySelector('#btn-paywall-annual strong');
+          if (el) el.textContent = `${formatted}${isEn ? '/year' : '/año'}`;
+        }
+      });
+    } catch (e) {
+      console.warn('[PlayBilling] No se pudieron cargar precios:', e);
+    }
+  }
+
+  async verifyPlayPurchaseWithServer(productId, purchaseToken) {
+    const endpoint = this.getVerifyPurchaseEndpoint();
+    const token = await this.getAiAuthToken();
+    if (!endpoint || !token) {
+      return { ok: false, status: 401, code: 'AUTH_REQUIRED' };
+    }
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ productId, purchaseToken })
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok && !!data?.ok, status: res.status, ...data };
+  }
+
+  async purchasePro(productId) {
+    if (!state.cloudUser?.id) {
+      this.showToast(this.tr('ai.loginRequired', undefined, 'Inicia sesión para suscribirte.'), 'info');
+      this.openAuthModal?.();
+      return { ok: false, reason: 'auth_required' };
+    }
+    if (!this.isPlayBillingAvailable() || typeof window.PaymentRequest !== 'function') {
+      const webNotice = document.getElementById('paywall-web-notice');
+      if (webNotice) webNotice.style.display = 'block';
+      return { ok: false, reason: 'not_in_twa' };
+    }
+
+    let paymentResponse = null;
+    try {
+      const request = new window.PaymentRequest(
+        [{ supportedMethods: 'https://play.google.com/billing', data: { sku: productId } }],
+        { total: { label: 'Total', amount: { currency: 'EUR', value: '0' } } }
+      );
+      paymentResponse = await request.show();
+    } catch (err) {
+      if (err?.name === 'AbortError') {
+        return { ok: false, reason: 'cancelled' };
+      }
+      console.warn('[PlayBilling] PaymentRequest error:', err);
+      this.showToast(this.tr('paywall.purchaseError', undefined, 'No se pudo completar la compra. Inténtalo de nuevo.'), 'error');
+      return { ok: false, reason: 'payment_error', error: err };
+    }
+
+    const purchaseToken = paymentResponse?.details?.purchaseToken;
+    if (!purchaseToken) {
+      await paymentResponse?.complete?.('fail');
+      this.showToast(this.tr('paywall.purchaseError', undefined, 'No se pudo completar la compra. Inténtalo de nuevo.'), 'error');
+      return { ok: false, reason: 'missing_token' };
+    }
+
+    try {
+      const verification = await this.verifyPlayPurchaseWithServer(productId, purchaseToken);
+      if (verification.ok) {
+        await paymentResponse?.complete?.('success');
+        await this.loadAiPlanStatus();
+        this.closePaywall();
+        this.showToast(this.tr('paywall.welcomePro', undefined, '¡Bienvenido a Sabory Pro!'), 'success');
+        return { ok: true, ...verification };
+      }
+      await paymentResponse?.complete?.('fail');
+      const errMsg = verification.status === 409
+        ? this.tr('paywall.tokenInUse', undefined, 'Esta suscripción de Google Play ya está vinculada a otra cuenta.')
+        : this.tr('paywall.purchaseError', undefined, 'No se pudo completar la compra. Inténtalo de nuevo.');
+      this.showToast(errMsg, 'error');
+      return { ok: false, ...verification };
+    } catch (err) {
+      await paymentResponse?.complete?.('fail');
+      this.showToast(this.tr('paywall.purchaseError', undefined, 'No se pudo completar la compra. Inténtalo de nuevo.'), 'error');
+      return { ok: false, reason: 'network_error', error: err };
+    }
+  }
+
+  async restorePlayPurchases({ silent = false } = {}) {
+    if (!state.cloudUser?.id || !this.isPlayBillingAvailable()) {
+      return { ok: false, restored: 0 };
+    }
+    const service = await this.getPlayBillingService();
+    if (!service || typeof service.listPurchases !== 'function') {
+      if (!silent) this.showToast(this.tr('paywall.restoreNone', undefined, 'No se encontraron compras activas en Google Play.'), 'info');
+      return { ok: false, restored: 0 };
+    }
+    try {
+      const purchases = await service.listPurchases();
+      const validList = Array.isArray(purchases) ? purchases.filter(p => p?.purchaseToken && p?.itemId) : [];
+      let restored = 0;
+      for (const p of validList) {
+        const res = await this.verifyPlayPurchaseWithServer(p.itemId, p.purchaseToken);
+        if (res.ok) restored++;
+      }
+      if (restored > 0) {
+        await this.loadAiPlanStatus();
+        if (!silent) this.showToast(this.tr('paywall.restoreSuccess', undefined, 'Compras restauradas.'), 'success');
+      } else if (!silent) {
+        this.showToast(this.tr('paywall.restoreNone', undefined, 'No se encontraron compras activas en Google Play.'), 'info');
+      }
+      return { ok: true, restored };
+    } catch (err) {
+      console.warn('[PlayBilling] restorePlayPurchases error:', err);
+      if (!silent) this.showToast(this.tr('paywall.purchaseError', undefined, 'No se pudo completar la compra. Inténtalo de nuevo.'), 'error');
+      return { ok: false, restored: 0, error: err };
+    }
+  }
+
   getAiQuotaRemaining(feature) {
     const q = state.aiPlan?.quotas?.[feature];
     if (!q) return null;
@@ -16310,6 +16472,9 @@ ${isEn
     dialog.dataset.reason = reason;
     const webNotice = document.getElementById('paywall-web-notice');
     if (webNotice) webNotice.style.display = this.isPlayBillingAvailable() ? 'none' : 'block';
+    if (this.isPlayBillingAvailable()) {
+      this.loadPlayPrices();
+    }
     this.openDialogModal(dialog);
     return { reason, shown: true };
   }
@@ -16341,6 +16506,7 @@ ${isEn
     const quotasEl = document.getElementById('plan-quotas');
     const btnUpgrade = document.getElementById('btn-plan-upgrade');
     const btnManage = document.getElementById('btn-plan-manage');
+    const btnRestore = document.getElementById('btn-plan-restore');
     const btnLogin = document.getElementById('btn-plan-login');
     const isPro = plan.plan === 'pro';
     const fmtDate = (iso) => {
@@ -16421,6 +16587,7 @@ ${isEn
 
     if (btnUpgrade) btnUpgrade.style.display = loggedIn && !isPro ? '' : 'none';
     if (btnManage) btnManage.style.display = loggedIn && isPro && plan.source === 'play' ? '' : 'none';
+    if (btnRestore) btnRestore.style.display = loggedIn && !isPro && this.isPlayBillingAvailable() ? '' : 'none';
     if (btnLogin) btnLogin.style.display = loggedIn ? 'none' : '';
 
     const headerPlanBadge = document.getElementById('header-plan-badge');
@@ -16506,6 +16673,15 @@ ${isEn
     this.checkAdminRoleStatus();
     if (state.household?.id && prevPlan !== state.aiPlan?.plan && this.supabaseClient) {
       this.initHouseholdRealtimeSubscription();
+    }
+    if (
+      state.cloudUser?.id &&
+      state.aiPlan?.plan !== 'pro' &&
+      this.isPlayBillingAvailable() &&
+      this._playRestoreAttemptedUserId !== state.cloudUser.id
+    ) {
+      this._playRestoreAttemptedUserId = state.cloudUser.id;
+      this.restorePlayPurchases({ silent: true }).catch(() => {});
     }
     return result;
   }

@@ -132,6 +132,7 @@
         privacyTitle: 'Privacidad y Control de Datos',
         privacyDesc: 'Sabory funciona offline de forma predeterminada y solo sincroniza tus datos si decides iniciar sesión.',
         privacyBtn: 'Política de Privacidad',
+        termsBtn: 'Términos de Uso',
         deleteAccountBtn: 'Eliminar cuenta y datos',
         installedVersion: 'Versión instalada:',
         connectedSynced: 'Conectado y Sincronizado',
@@ -598,7 +599,7 @@
         syncSafeNote: 'Tus recetas y planes se sincronizan de forma segura.',
         privacyLink: 'Privacidad',
         deleteAccountTitle: 'Eliminar cuenta y datos',
-        deleteAccountCloudMsg: '¿Estás seguro de que deseas eliminar definitivamente tu cuenta y todos tus datos? Esta acción es irreversible: se borrarán de la nube todas tus recetas, planificaciones y listas de la compra, y se cerrará tu sesión.',
+        deleteAccountCloudMsg: '¿Estás seguro de que deseas eliminar definitivamente tu cuenta y todos tus datos? Esta acción es irreversible: se borrarán de la nube todas tus recetas, planificaciones y listas de la compra, y se cerrará tu sesión. Aviso: eliminar la cuenta no cancela automáticamente una suscripción activa en Google Play (debes gestionarla en play.google.com/store/account/subscriptions).',
         deleteAccountLocalMsg: '¿Estás seguro de que deseas eliminar todos tus datos? Esta acción es irreversible: se borrarán todas tus recetas personalizadas, planes semanales y listas de la compra locales.',
         deleteAccountConfirm: 'Eliminar definitivamente',
         deleteAccountCloudToast: 'Tu cuenta y tus datos han sido eliminados de la nube.',
@@ -628,7 +629,8 @@
         usedWeek: '{used}/{limit} esta semana',
         usedMonth: '{used}/{limit} este mes',
         remainingToday: 'Te quedan {n} consultas hoy',
-        householdPaused: 'El Pro del hogar ha caducado: la colaboración está en pausa'
+        householdPaused: 'El Pro del hogar ha caducado: la colaboración está en pausa',
+        restore: 'Restaurar compras'
       },
       paywall: {
         familyPro: 'Modo Familia es una función Sabory Pro. Mejora tu plan para crear o unirte a un Hogar.',
@@ -651,7 +653,13 @@
         webNotice: 'Hazte Pro desde la app Android',
         playLink: 'Abrir en Google Play',
         rateLimited: 'Demasiadas peticiones seguidas. Espera un momento.',
-        chatLocked: 'El chat libre es Pro ✨'
+        chatLocked: 'El chat libre es Pro ✨',
+        welcomePro: '¡Bienvenido a Sabory Pro!',
+        purchaseError: 'No se pudo completar la compra. Inténtalo de nuevo.',
+        tokenInUse: 'Esta suscripción de Google Play ya está vinculada a otra cuenta.',
+        restoreSuccess: 'Compras restauradas.',
+        restoreNone: 'No se encontraron compras activas en Google Play.',
+        termsLink: 'Términos de suscripción'
       },
       shopping: {
         title: 'Lista de la Compra',
@@ -1281,6 +1289,7 @@
         privacyTitle: 'Privacy & Data Control',
         privacyDesc: 'Sabory works offline by default and only syncs your data if you choose to sign in.',
         privacyBtn: 'Privacy Policy',
+        termsBtn: 'Terms of Use',
         deleteAccountBtn: 'Delete account & data',
         installedVersion: 'Installed version:',
         connectedSynced: 'Connected & Synced',
@@ -1747,7 +1756,7 @@
         syncSafeNote: 'Your recipes and meal plans sync securely.',
         privacyLink: 'Privacy',
         deleteAccountTitle: 'Delete account & data',
-        deleteAccountCloudMsg: 'Are you sure you want to permanently delete your account and all your data? This action cannot be undone: all your cloud recipes, meal plans and shopping lists will be deleted and you will be signed out.',
+        deleteAccountCloudMsg: 'Are you sure you want to permanently delete your account and all your data? This action cannot be undone: all your cloud recipes, meal plans and shopping lists will be deleted and you will be signed out. Note: deleting your account does not automatically cancel an active Google Play subscription (manage it at play.google.com/store/account/subscriptions).',
         deleteAccountLocalMsg: 'Are you sure you want to delete all your data? This action cannot be undone: all your custom recipes, weekly plans and local shopping lists will be deleted.',
         deleteAccountConfirm: 'Delete permanently',
         deleteAccountCloudToast: 'Your account and data have been deleted from the cloud.',
@@ -1777,7 +1786,8 @@
         usedWeek: '{used}/{limit} this week',
         usedMonth: '{used}/{limit} this month',
         remainingToday: 'You have {n} queries left today',
-        householdPaused: "The household's Pro has expired: collaboration is paused"
+        householdPaused: "The household's Pro has expired: collaboration is paused",
+        restore: 'Restore purchases'
       },
       paywall: {
         familyPro: 'Family Mode is a Sabory Pro feature. Upgrade to create or join a Household.',
@@ -1800,7 +1810,13 @@
         webNotice: 'Go Pro from the Android app',
         playLink: 'Open in Google Play',
         rateLimited: 'Too many requests in a row. Please wait a moment.',
-        chatLocked: 'Free chat is Pro ✨'
+        chatLocked: 'Free chat is Pro ✨',
+        welcomePro: 'Welcome to Sabory Pro!',
+        purchaseError: 'Could not complete purchase. Please try again.',
+        tokenInUse: 'This Google Play subscription is already linked to another account.',
+        restoreSuccess: 'Purchases restored.',
+        restoreNone: 'No active Google Play purchases found.',
+        termsLink: 'Subscription terms'
       },
       shopping: {
         title: 'Shopping List',
