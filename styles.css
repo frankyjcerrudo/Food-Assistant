@@ -9137,6 +9137,31 @@ body.app-tour-active .app-tour-nav-target .nav-label {
   padding: 0 !important;
 }
 
+.recipes-title-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.recipes-header-add-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-weight: 600;
+  box-shadow: 0 3px 10px rgba(184, 77, 39, 0.28);
+}
+
+.header-family-btn[hidden] {
+  display: none !important;
+}
+
 .recipes-action-add-btn {
   width: 44px !important;
   height: 44px !important;

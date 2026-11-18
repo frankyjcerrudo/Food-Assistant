@@ -36,7 +36,7 @@
   <meta name="apple-mobile-web-app-title" content="Sabory">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="manifest" href="manifest.json?v=2.16">
+  <link rel="manifest" href="manifest.json?v=2.15">
   <meta name="theme-color" content="#FAF7F2">
   <script>
     (function() {
@@ -84,17 +84,17 @@
     href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..600&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Google+Sans:wght@400;500;700&display=swap">
   <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="styles.css?v=2.16">
-  <link rel="icon" type="image/svg+xml" href="icon.svg?v=2.16">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=2.16">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2.16">
+  <link rel="stylesheet" href="styles.css?v=2.15">
+  <link rel="icon" type="image/svg+xml" href="icon.svg?v=2.15">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=2.15">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2.15">
   <!-- Supabase Client for Cloud Auth and Sync -->
   <!-- US-41: versión fija + Subresource Integrity (sha384) para el SDK de Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"
     integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"
     referrerpolicy="no-referrer"></script>
   <!-- US-12: i18n Core Engine (in head for instant zero-flash localization) -->
-  <script src="i18n.js?v=2.16"></script>
+  <script src="i18n.js?v=2.15"></script>
 </head>
 
 <body>
@@ -149,10 +149,13 @@
       </nav>
 
       <div class="header-actions">
-        <!-- US-77: Active Household Header Pill -->
+        <!-- US-77: Active Household Header Pill / Family Mode Shortcut -->
         <button type="button" class="household-header-pill" id="header-household-badge" hidden data-action="openHouseholdSettings" title="Modo Familia activo — Pulsa para gestionar tu Hogar">
           <span class="material-symbols-outlined icon-sm">home</span>
           <span class="household-header-pill-text" id="header-household-name">Mi Hogar</span>
+        </button>
+        <button type="button" class="btn btn-ghost btn-icon header-family-btn" id="btn-header-family" data-action="openFamilyShortcut" title="Modo Familia — Comparte menús y compra con tu hogar" aria-label="Modo Familia">
+          <span class="material-symbols-outlined">group</span>
         </button>
 
         <!-- Cloud User Account Pill -->
@@ -172,7 +175,7 @@
     <aside class="pwa-smart-banner" id="pwa-smart-banner" hidden aria-label="Instalación de la app en la pantalla de inicio">
       <div class="pwa-smart-banner-content">
         <div class="pwa-smart-banner-icon" aria-hidden="true">
-          <img src="icon-192.png?v=2.16" alt="" width="28" height="28" class="pwa-smart-banner-img">
+          <img src="icon-192.png?v=2.15" alt="" width="28" height="28" class="pwa-smart-banner-img">
         </div>
         <div class="pwa-smart-banner-texts">
           <strong class="pwa-smart-banner-title" data-i18n="pwa.bannerTitle">Prueba Sabory como App</strong>
@@ -227,10 +230,17 @@
               <span class="material-symbols-outlined">more_vert</span>
             </button>
           </div>
-          <h2 class="section-title">
-            <span id="recipes-section-title-text" data-i18n="recipes.title">Recetario</span>
-            <span class="recipes-header-count-pill" id="recipes-count-badge">0</span>
-          </h2>
+          <div class="recipes-title-action-row">
+            <h2 class="section-title">
+              <span id="recipes-section-title-text" data-i18n="recipes.title">Recetario</span>
+              <span class="recipes-header-count-pill" id="recipes-count-badge">0</span>
+            </h2>
+            <button type="button" class="btn btn-primary btn-sm recipes-header-add-pill" id="btn-open-create-recipe"
+              title="Añadir o importar receta" aria-label="Añadir o importar receta">
+              <span class="material-symbols-outlined icon-sm">add</span>
+              <span data-i18n="recipes.addOrImport">Añadir / Importar</span>
+            </button>
+          </div>
           <p class="section-subtitle" id="recipes-count-subtitle" data-i18n="recipes.subtitle">Tu colección culinaria personal.</p>
         </div>
       </div>
@@ -280,10 +290,6 @@
             title="Seleccionar recetas para gestión o borrado masivo" aria-label="Seleccionar recetas">
             <span class="material-symbols-outlined">checklist</span>
             <span id="btn-toggle-recipes-select-text" class="sr-only" data-i18n="recipes.select">Seleccionar</span>
-          </button>
-          <button type="button" class="btn btn-primary btn-sm btn-icon recipes-action-add-btn" id="btn-open-create-recipe"
-            title="Añadir nueva receta" aria-label="Añadir receta">
-            <span class="material-symbols-outlined">add</span>
           </button>
         </div>
       </div>
@@ -978,8 +984,8 @@
             </h3>
             <p
               style="font-size: 12px; color: var(--m3-on-surface-variant); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-              <span data-i18n="settings.installedVersion">Versión instalada:</span> <strong id="settings-app-version-text" style="color: var(--m3-primary);">v2.16</strong>
-              <span class="app-version-badge" id="app-version-badge">v2.16</span>
+              <span data-i18n="settings.installedVersion">Versión instalada:</span> <strong id="settings-app-version-text" style="color: var(--m3-primary);">v2.15</strong>
+              <span class="app-version-badge" id="app-version-badge">v2.15</span>
             </p>
             <div
               style="background: var(--m3-surface-container); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; font-size: 12px; color: var(--m3-on-surface-variant); line-height: 1.4;" data-i18n="settings.versionCacheNotice">
@@ -2644,8 +2650,7 @@
         </div>
         <h3 class="onboarding-title" id="onboarding-modal-title" data-i18n="onboarding.welcomeTitle">¡Te damos la bienvenida a Sabory!</h3>
         <p class="onboarding-subtitle" data-i18n="onboarding.welcomeSubtitle">
-          Tu recetario editorial, planificador semanal y asistente de cocina inteligente. Configura Sabory a tu medida
-          en menos de un minuto.
+          Guarda e importa tus propias recetas desde webs, redes sociales o fotos (las iniciales son solo ejemplos). Organiza tu menú y lista de la compra en un minuto.
         </p>
 
         <div class="onboarding-account-card" id="onboarding-account-card">
@@ -2676,8 +2681,8 @@
           <div class="onboarding-feature-item">
             <span class="material-symbols-outlined icon-sm icon-primary">menu_book</span>
             <div>
-              <strong data-i18n="onboarding.feature1Title">Recetario y Modo Cocina</strong>
-              <span data-i18n="onboarding.feature1Desc">Importa recetas de webs, redes o fotos y cocina con pantalla siempre activa.</span>
+              <strong data-i18n="onboarding.feature1Title">Importa tus recetas y Modo Cocina</strong>
+              <span data-i18n="onboarding.feature1Desc">Trae tus platos desde webs, TikTok/Instagram, texto o foto y cocina con la pantalla siempre activa.</span>
             </div>
           </div>
           <div class="onboarding-feature-item">
@@ -2685,6 +2690,13 @@
             <div>
               <strong data-i18n="onboarding.feature2Title">Planificación y Compra Inteligente</strong>
               <span data-i18n="onboarding.feature2Desc">Organiza tu semana y genera la lista agrupada por pasillos o por receta.</span>
+            </div>
+          </div>
+          <div class="onboarding-feature-item">
+            <span class="material-symbols-outlined icon-sm icon-primary">group</span>
+            <div>
+              <strong data-i18n="onboarding.feature3Title">Modo Familia en tiempo real</strong>
+              <span data-i18n="onboarding.feature3Desc">Comparte tu recetario, menú semanal y lista de la compra al instante con tu hogar.</span>
             </div>
           </div>
         </div>
@@ -3000,8 +3012,8 @@
     </div>
   </div>
 
-  <script src="config.js?v=2.16"></script>
-  <script src="app.js?v=2.16"></script>
+  <script src="config.js?v=2.15"></script>
+  <script src="app.js?v=2.15"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

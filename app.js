@@ -5007,7 +5007,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.16';
+  window.APP_VERSION = 'v2.15';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -5055,7 +5055,7 @@ class FoodAssistantApp {
   constructor() {
     if (typeof window !== 'undefined') window.app = this;
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.16';
+    this.appVersion = window.APP_VERSION || 'v2.15';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -8239,6 +8239,9 @@ class FoodAssistantApp {
           break;
         case 'openHouseholdSettings':
           this.openHouseholdSettings();
+          break;
+        case 'openFamilyShortcut':
+          this.openFamilyShortcut();
           break;
         case 'copyHouseholdInviteCode':
           this.copyHouseholdInviteCode();
@@ -20670,6 +20673,21 @@ REGLAS CRÍTICAS:
     }
   }
 
+  openFamilyShortcut() {
+    if (typeof this.isPro === 'function' && !this.isPro()) {
+      if (typeof this.openPaywall === 'function') {
+        const isEn = window.I18n && window.I18n.getLanguage() === 'en';
+        this.openPaywall(
+          isEn
+            ? 'Share your cookbook, weekly menu, and grocery list in real time with Sabory Pro Family Mode.'
+            : 'Comparte tu recetario, menú semanal y lista de la compra en tiempo real con el Modo Familia de Sabory Pro.'
+        );
+        return;
+      }
+    }
+    this.openHouseholdSettings();
+  }
+
   openHouseholdSettings() {
     this.switchView('view-settings');
     const card = document.getElementById('card-family-household');
@@ -20684,6 +20702,7 @@ REGLAS CRÍTICAS:
 
     const headerBadge = document.getElementById('header-household-badge');
     const headerName = document.getElementById('header-household-name');
+    const headerFamilyBtn = document.getElementById('btn-header-family');
     if (headerBadge) {
       if (isActive) {
         headerBadge.removeAttribute('hidden');
@@ -20692,6 +20711,15 @@ REGLAS CRÍTICAS:
       } else {
         headerBadge.setAttribute('hidden', '');
         headerBadge.style.display = 'none';
+      }
+    }
+    if (headerFamilyBtn) {
+      if (isActive) {
+        headerFamilyBtn.setAttribute('hidden', '');
+        headerFamilyBtn.style.display = 'none';
+      } else {
+        headerFamilyBtn.removeAttribute('hidden');
+        headerFamilyBtn.style.display = 'inline-flex';
       }
     }
 
