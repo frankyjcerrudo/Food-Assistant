@@ -1160,6 +1160,116 @@ describe('US-35 & Bugs Bloqueantes: Sincronización Supabase, IDs Únicos y Esqu
       expect(appCode).toContain('await this.pullViewUpdatesFromCloud(this.activeView);');
       expect(appCode).toContain('}, 30000);');
     });
+
+    it('US-91: sincroniza allergenAudit en recetas (push/pull) y elige el slot household_prefs más reciente por su propio updatedAt', async () => {
+      const auditObj = {
+        auditedAt: '2026-11-18T18:00:00.000Z',
+        model: 'gemini-decision-1',
+        conflicts: [{ key: 'has_custom_allergen_kiwi', preference: 'Sin Kiwi', ingredient: 'Kiwi / trazas', isHiddenTrace: true }]
+      };
+      state.recipes = [
+        {
+          id: 'rec-audit-sync',
+          title: 'Ensalada auditada',
+          ingredients: [{ name: 'Lechuga', aisle: 'produce' }],
+          instructions: [{ step: 1, text: 'Mezclar todo.' }],
+          allergenAudit: auditObj,
+          updatedAt: '2026-11-18T18:05:00.000Z'
+        }
+      ];
+      state.household = { id: 'hh-sync-1', name: 'Casa Test' };
+      state.save('fa_household', state.household);
+      localStorage.setItem('fa_allergens_whatsnew_v1', 'true');
+
+      let pushedRecipes = [];
+      let pushedUserMeta = null;
+      const mockSupabasePush = {
+        from: vi.fn().mockImplementation((table) => ({
+          delete: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) })
+          }),
+          upsert: vi.fn().mockImplementation((payload) => {
+            if (table === 'recipes') pushedRecipes = payload;
+            return Promise.resolve({ data: payload, error: null });
+          }),
+          update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) })
+        })),
+        auth: {
+          updateUser: vi.fn().mockImplementation(({ data }) => {
+            pushedUserMeta = data;
+            return Promise.resolve({ data: { user: { user_metadata: data } }, error: null });
+          })
+        }
+      };
+
+      appInstance.supabaseClient = mockSupabasePush;
+      const pushRes = await appInstance.pushToCloud(true);
+      expect(pushRes.success).toBe(true);
+      expect(pushedRecipes[0].instructions[0]._allergenAudit).toEqual(auditObj);
+      expect(pushedUserMeta.allergens_whatsnew_v1).toBe(true);
+
+      // Simular otro dispositivo con fila __household_prefs__ de otro miembro que tuvo deleted_shopping_items más tarde,
+      // pero cuyo slot household_prefs es más antiguo que el del primer miembro.
+      state.recipes = [];
+      state.dietaryPreferences = [];
+      state.dietaryUpdatedAt = null;
+      localStorage.removeItem('fa_allergens_whatsnew_v1');
+
+      const hhRowNewerDietary = {
+        id: '__household_prefs__',
+        plan_date: '__household_prefs__',
+        user_id: 'member-a',
+        household_id: 'hh-sync-1',
+        updated_at: '2026-11-18T18:10:00.000Z',
+        custom_slots: [
+          { type: 'household_prefs', dietaryPreferences: ['Sin Kiwi', 'Sin Gluten'], updatedAt: '2026-11-18T18:10:00.000Z' }
+        ]
+      };
+      const hhRowNewerShoppingDelete = {
+        id: '__household_prefs__',
+        plan_date: '__household_prefs__',
+        user_id: 'member-b',
+        household_id: 'hh-sync-1',
+        updated_at: '2026-11-18T18:15:00.000Z',
+        custom_slots: [
+          { type: 'household_prefs', dietaryPreferences: [], updatedAt: '2026-11-18T17:00:00.000Z' },
+          { type: 'deleted_shopping_items', deletedIds: ['shop-1'], updatedAt: '2026-11-18T18:15:00.000Z' }
+        ]
+      };
+
+      const makeChain = (rows) => {
+        const chain = {
+          select: vi.fn().mockImplementation(() => chain),
+          eq: vi.fn().mockImplementation(() => chain),
+          or: vi.fn().mockImplementation(() => chain),
+          is: vi.fn().mockImplementation(() => chain),
+          gt: vi.fn().mockImplementation(() => chain),
+          then: (resolve) => Promise.resolve({ data: rows, error: null }).then(resolve)
+        };
+        return chain;
+      };
+
+      appInstance.supabaseClient = {
+        from: vi.fn().mockImplementation((table) => {
+          if (table === 'recipes') return makeChain(pushedRecipes.map(r => ({ ...r, updated_at: r.updated_at })));
+          if (table === 'meal_plans') return makeChain([hhRowNewerDietary, hhRowNewerShoppingDelete]);
+          return makeChain([]);
+        }),
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: 'test-user-uuid-1234', user_metadata: { allergens_whatsnew_v1: true } } },
+            error: null
+          })
+        }
+      };
+
+      const pullRes = await appInstance.pullFromCloud();
+      expect(pullRes.success).toBe(true);
+      expect(state.recipes[0].allergenAudit).toEqual(auditObj);
+      expect(state.recipes[0].instructions[0]._allergenAudit).toBeUndefined();
+      expect(state.dietaryPreferences).toEqual(['Sin Kiwi', 'Sin Gluten']);
+      expect(localStorage.getItem('fa_allergens_whatsnew_v1')).toBe('true');
+    });
   });
 });
 

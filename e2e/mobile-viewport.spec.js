@@ -5,6 +5,7 @@ test.describe('Mobile Viewport & Layout Integrity (Zero-Overflow & Editorial Hea
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.setItem('fa_onboarding_completed', 'true');
+      localStorage.setItem('fa_allergens_whatsnew_v1', 'true');
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register = () => Promise.resolve({
           update: () => Promise.resolve(),
@@ -192,6 +193,59 @@ test.describe('Mobile Viewport & Layout Integrity (Zero-Overflow & Editorial Hea
       expect(switchBox).not.toBeNull();
       expect(infoBox).not.toBeNull();
       expect(infoBox.x + infoBox.width).toBeLessThanOrEqual(switchBox.x + 1);
+    }
+  });
+
+  test('la ficha de receta (botones de Ingredientes) y la pestaña Sous Chef no desbordan ni recortan el botón activo', async ({ page }) => {
+    const viewportSize = page.viewportSize();
+    expect(viewportSize).not.toBeNull();
+    const isDesktop = viewportSize.width >= 900;
+
+    // 1. Ficha de receta con preferencias dietéticas activas (botón Auditar + Enviar a la Compra)
+    await page.evaluate(() => {
+      window.state.cloudUser = { id: 'e2e-user', email: 'e2e@sabory.food' };
+      window.state.saveDietaryPreferences(['Sin Frutos Secos']);
+      window.app.openRecipeDetail(window.state.recipes[0].id);
+    });
+    await expect(page.locator('#modal-recipe-detail')).toBeVisible();
+
+    const headerActions = page.locator('#modal-recipe-detail .recipe-detail-section-actions');
+    const modalContent = page.locator('#modal-recipe-detail .modal-content');
+    const actionsBox = await headerActions.boundingBox();
+    const modalBox = await modalContent.boundingBox();
+    expect(actionsBox).not.toBeNull();
+    expect(modalBox).not.toBeNull();
+    expect(actionsBox.x + actionsBox.width).toBeLessThanOrEqual(modalBox.x + modalBox.width + 2);
+
+    if (isDesktop) {
+      const instructionsTitle = page.locator('#modal-recipe-detail .recipe-detail-col-instructions .recipe-detail-section-title-mb');
+      const instrBox = await instructionsTitle.boundingBox();
+      expect(instrBox).not.toBeNull();
+      expect(actionsBox.x + actionsBox.width).toBeLessThanOrEqual(instrBox.x + 1);
+    }
+
+    await page.evaluate(() => window.app.closeRecipeModal());
+
+    // 2. Pestaña Sous Chef (#view-ai) y estado activo del botón central en .bottom-nav
+    await page.evaluate(() => window.app.switchView('view-ai'));
+    await page.waitForSelector('#view-ai.active');
+    await page.waitForTimeout(100);
+
+    const overflowAi = await page.evaluate(() => {
+      const doc = document.documentElement;
+      return doc.scrollWidth > doc.clientWidth + 2;
+    });
+    expect(overflowAi).toBe(false);
+
+    if (!isDesktop) {
+      const navBox = await page.locator('.bottom-nav').boundingBox();
+      const labelBox = await page.locator('.bottom-nav .nav-item-gemini.active .nav-gemini-label').boundingBox();
+      const fabBox = await page.locator('.bottom-nav .nav-item-gemini.active .nav-gemini-fab').boundingBox();
+      expect(navBox).not.toBeNull();
+      expect(labelBox).not.toBeNull();
+      expect(fabBox).not.toBeNull();
+      expect(labelBox.y + labelBox.height).toBeLessThanOrEqual(navBox.y + navBox.height + 1);
+      expect(fabBox.y).toBeGreaterThanOrEqual(navBox.y - 2);
     }
   });
 

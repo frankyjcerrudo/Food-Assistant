@@ -5675,7 +5675,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.21';
+  window.APP_VERSION = 'v2.22';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -5733,7 +5733,7 @@ class FoodAssistantApp {
   constructor() {
     if (typeof window !== 'undefined') window.app = this;
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.21';
+    this.appVersion = window.APP_VERSION || 'v2.22';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -7303,31 +7303,41 @@ class FoodAssistantApp {
       delete state.mealPlan['__user_prefs__'];
     }
 
-    if (Array.isArray(remoteRows)) {
-      const dedupedPlansMap = new Map();
-      remoteRows.forEach(row => {
-        const dKey = row?.plan_date || row?.id;
-        if (!dKey) return;
-        if (dKey === '__household_prefs__' || dKey === '__user_prefs__') {
-          if (Array.isArray(row.custom_slots)) {
-            row.custom_slots.forEach(slot => {
-              if (slot && slot.type === 'deleted_shopping_items' && Array.isArray(slot.deletedIds)) {
-                slot.deletedIds.forEach(delId => {
-                  if (delId) {
-                    remoteDeletedShoppingIds.add(delId);
-                    if (typeof state.addTombstone === 'function') {
-                      state.addTombstone('shoppingItems', delId);
+      let latestHouseholdPrefsSlotTime = -1;
+
+      if (Array.isArray(remoteRows)) {
+        const dedupedPlansMap = new Map();
+        remoteRows.forEach(row => {
+          const dKey = row?.plan_date || row?.id;
+          if (!dKey) return;
+          if (dKey === '__household_prefs__' || dKey === '__user_prefs__') {
+            let rowHasNewerDietarySlot = false;
+            if (Array.isArray(row.custom_slots)) {
+              row.custom_slots.forEach(slot => {
+                if (slot && slot.type === 'deleted_shopping_items' && Array.isArray(slot.deletedIds)) {
+                  slot.deletedIds.forEach(delId => {
+                    if (delId) {
+                      remoteDeletedShoppingIds.add(delId);
+                      if (typeof state.addTombstone === 'function') {
+                        state.addTombstone('shoppingItems', delId);
+                      }
                     }
+                  });
+                }
+                if (slot && slot.type === 'household_prefs' && Array.isArray(slot.dietaryPreferences)) {
+                  const slotTime = new Date(slot.updatedAt || row.updated_at || 0).getTime();
+                  if (slotTime >= latestHouseholdPrefsSlotTime) {
+                    latestHouseholdPrefsSlotTime = slotTime;
+                    rowHasNewerDietarySlot = true;
                   }
-                });
-              }
-            });
+                }
+              });
+            }
+            if (rowHasNewerDietarySlot || (!remoteHouseholdPrefsRow && new Date(row.updated_at || 0).getTime() >= new Date(remoteHouseholdPrefsRow?.updated_at || 0).getTime())) {
+              remoteHouseholdPrefsRow = row;
+            }
+            return;
           }
-          if (!remoteHouseholdPrefsRow || new Date(row.updated_at || 0).getTime() >= new Date(remoteHouseholdPrefsRow.updated_at || 0).getTime()) {
-            remoteHouseholdPrefsRow = row;
-          }
-          return;
-        }
         const prev = dedupedPlansMap.get(dKey);
         if (!prev) {
           dedupedPlansMap.set(dKey, row);
@@ -7755,6 +7765,12 @@ class FoodAssistantApp {
             ? !!remoteRow.is_favorite
             : !!remoteRow.instructions?.[0]?._isFavorite;
 
+          const remoteAllergenAudit = (remoteRow.allergen_audit && typeof remoteRow.allergen_audit === 'object')
+            ? remoteRow.allergen_audit
+            : (remoteRow.instructions?.[0]?._allergenAudit && typeof remoteRow.instructions[0]._allergenAudit === 'object'
+              ? remoteRow.instructions[0]._allergenAudit
+              : null);
+
           const hasExplicitRemoteCookbooks = Array.isArray(remoteRow.cookbooks) ||
             Array.isArray(remoteRow.instructions?.[0]?._cookbooks);
 
@@ -7764,11 +7780,12 @@ class FoodAssistantApp {
 
           const cleanInstructions = Array.isArray(remoteRow.instructions)
             ? remoteRow.instructions.map((inst, idx) => {
-              if (idx === 0 && inst && typeof inst === 'object' && ('_nutrition' in inst || '_isFavorite' in inst || '_cookbooks' in inst)) {
+              if (idx === 0 && inst && typeof inst === 'object' && ('_nutrition' in inst || '_isFavorite' in inst || '_cookbooks' in inst || '_allergenAudit' in inst)) {
                 const copy = { ...inst };
                 delete copy._nutrition;
                 delete copy._isFavorite;
                 delete copy._cookbooks;
+                delete copy._allergenAudit;
                 return copy;
               }
               return inst;
@@ -7791,6 +7808,7 @@ class FoodAssistantApp {
             nutrition: remoteNutrition,
             isFavorite: remoteFavorite,
             cookbooks: remoteCookbooks,
+            ...(remoteAllergenAudit ? { allergenAudit: remoteAllergenAudit } : {}),
             createdAt: remoteRow.created_at || remoteRow.updated_at || null,
             updatedAt: remoteRow.updated_at
           };
@@ -7814,7 +7832,8 @@ class FoodAssistantApp {
                 ...local,
                 ...remoteRecipe,
                 nutrition: remoteRecipe.nutrition || local.nutrition || null,
-                cookbooks: hasExplicitRemoteCookbooks ? remoteRecipe.cookbooks : (local.cookbooks || [])
+                cookbooks: hasExplicitRemoteCookbooks ? remoteRecipe.cookbooks : (local.cookbooks || []),
+                ...(remoteRecipe.allergenAudit ? { allergenAudit: remoteRecipe.allergenAudit } : {})
               };
               delete state.recipes[localIdx]._cachedNutrition;
               delete state.recipes[localIdx]._cachedNutritionKey;
@@ -7825,6 +7844,10 @@ class FoodAssistantApp {
                 local.nutrition = remoteRecipe.nutrition;
                 delete local._cachedNutrition;
                 delete local._cachedNutritionKey;
+                updated = true;
+              }
+              if (!local.allergenAudit && remoteRecipe.allergenAudit) {
+                local.allergenAudit = remoteRecipe.allergenAudit;
                 updated = true;
               }
               if (tagsDiffer) {
@@ -7943,6 +7966,15 @@ class FoodAssistantApp {
             if (Array.isArray(meta.cookbooks)) {
               metaCookbooks = meta.cookbooks;
               metaCookbooksUpdatedAt = meta.cookbooks_updated_at || meta.dietary_updated_at || null;
+            }
+            if (meta.allergens_whatsnew_v1 === true && typeof localStorage !== 'undefined') {
+              try {
+                localStorage.setItem('fa_allergens_whatsnew_v1', 'true');
+                const whatsNewModal = document.getElementById('modal-allergens-whatsnew');
+                if (whatsNewModal && (whatsNewModal.open || whatsNewModal.classList.contains('active'))) {
+                  this.closeDialogModal(whatsNewModal);
+                }
+              } catch (e) { }
             }
             if (state.cloudUser) {
               state.cloudUser.user_metadata = {
@@ -8386,8 +8418,8 @@ class FoodAssistantApp {
             })
             : [];
 
-          // Adjuntar _nutrition, _isFavorite y _cookbooks como metadato seguro en instructions[0] para persistencia ante fallbacks de esquema
-          if (recipe.nutrition || recipe.isFavorite !== undefined || recipe.cookbooks !== undefined) {
+          // Adjuntar _nutrition, _isFavorite, _cookbooks y _allergenAudit como metadato seguro en instructions[0] para persistencia ante fallbacks de esquema
+          if (recipe.nutrition || recipe.isFavorite !== undefined || recipe.cookbooks !== undefined || recipe.allergenAudit) {
             if (instructionsCopy.length === 0) {
               instructionsCopy.push({ text: '' });
             }
@@ -8399,6 +8431,9 @@ class FoodAssistantApp {
             }
             if (Array.isArray(recipe.cookbooks)) {
               instructionsCopy[0]._cookbooks = recipe.cookbooks;
+            }
+            if (recipe.allergenAudit && typeof recipe.allergenAudit === 'object') {
+              instructionsCopy[0]._allergenAudit = recipe.allergenAudit;
             }
           }
 
@@ -8651,7 +8686,8 @@ class FoodAssistantApp {
             nutrition_goals: state.settings?.nutritionGoals || null,
             cookbooks: state.cookbooks || [],
             cookbooks_updated_at: state.cookbooksUpdatedAt || new Date().toISOString(),
-            dietary_updated_at: state.dietaryUpdatedAt || new Date().toISOString()
+            dietary_updated_at: state.dietaryUpdatedAt || new Date().toISOString(),
+            allergens_whatsnew_v1: typeof localStorage !== 'undefined' && localStorage.getItem('fa_allergens_whatsnew_v1') === 'true'
           };
           await this.supabaseClient.auth.updateUser({ data: metaPayload });
           if (state.cloudUser) {
@@ -12024,19 +12060,22 @@ class FoodAssistantApp {
       : { compliant: true, violations: [], violatingIngredients: [], allergenViolations: [] };
     const safeRecipeId = escapeHtml(r.id).replace(/'/g, "\\'");
     const isEn = window.I18n && window.I18n.getLanguage() === 'en';
-    const allergenBannerHtml = (!comp.compliant && activePrefs.length > 0) ? `
+    const hasIngredientConflicts = Array.isArray(comp.violatingIngredients) && comp.violatingIngredients.length > 0;
+    const hasAllergenViolations = Array.isArray(comp.allergenViolations) && comp.allergenViolations.length > 0;
+    const showAllergenAlertBanner = !comp.compliant && activePrefs.length > 0 && (hasIngredientConflicts || hasAllergenViolations);
+    const allergenBannerHtml = showAllergenAlertBanner ? `
       <div class="recipe-allergen-alert-banner" id="recipe-allergen-alert-banner" role="alert">
         <div class="recipe-allergen-alert-header">
           <span class="material-symbols-outlined icon-sm">warning</span>
           <span>${escapeHtml(window.I18n ? window.I18n.t('recipes.allergenAlertTitle') : 'Alerta de alérgenos o incompatibilidad')}</span>
         </div>
         <div class="recipe-allergen-conflicts-list">
-          ${(comp.violatingIngredients && comp.violatingIngredients.length > 0)
+          ${hasIngredientConflicts
             ? comp.violatingIngredients.map(c => {
                 const prefLabel = window.I18n ? window.I18n.getTagLabel(c.preference) : c.preference;
                 return `<span class="recipe-allergen-conflict-chip">${escapeHtml(c.ingredient)} (${escapeHtml(prefLabel)})</span>`;
               }).join('')
-            : comp.violations.map(v => {
+            : comp.allergenViolations.map(v => {
                 const prefLabel = window.I18n ? window.I18n.getTagLabel(v) : v;
                 return `<span class="recipe-allergen-conflict-chip">${isEn ? 'Does not comply' : 'No cumple'}: ${escapeHtml(prefLabel)}</span>`;
               }).join('')}
@@ -12175,7 +12214,7 @@ class FoodAssistantApp {
             <div class="recipe-detail-section">
               <div class="recipe-detail-section-header">
                 <h3 class="recipe-detail-section-title">${window.I18n ? window.I18n.t('recipes.ingredients') : 'Ingredientes'}</h3>
-                <div class="u-flex-row-center-gap-8">
+                <div class="recipe-detail-section-actions">
                   ${(comp.compliant && activePrefs.length > 0 && state.cloudUser) ? `
                     <button type="button" class="btn btn-secondary btn-sm" id="btn-recipe-audit-allergens-ai" onclick="app.auditRecipeAllergensWithDecisionsApi('${safeRecipeId}')">
                       <span class="material-symbols-outlined icon-sm">verified_user</span>
@@ -17819,11 +17858,20 @@ ${isEn
     const conflicts = (comp.violatingIngredients || [])
       .map(c => `${c.ingredient} (${c.preference})`)
       .join(', ');
+    const allergenViolationsList = (comp.allergenViolations || []).join(', ');
     const prefsList = (state.dietaryPreferences || []).join(', ');
     const isEn = window.I18n && window.I18n.getLanguage() === 'en';
-    const promptText = isEn
-      ? `In the recipe "${recipe.title}", how can I safely substitute these conflicting ingredients [${conflicts || comp.violations.join(', ')}] to comply with my restrictions (${prefsList})?`
-      : `En la receta "${recipe.title}", ¿cómo puedo sustituir de forma segura estos ingredientes en conflicto [${conflicts || comp.violations.join(', ')}] para cumplir con mis restricciones (${prefsList})?`;
+    let promptText = '';
+    if (conflicts) {
+      promptText = isEn
+        ? `In the recipe "${recipe.title}", how can I safely substitute these conflicting ingredients [${conflicts}] to comply with my restrictions (${prefsList})?`
+        : `En la receta "${recipe.title}", ¿cómo puedo sustituir de forma segura estos ingredientes en conflicto [${conflicts}] para cumplir con mis restricciones (${prefsList})?`;
+    } else {
+      const targetRestrictions = allergenViolationsList || prefsList;
+      promptText = isEn
+        ? `How can I adapt the recipe "${recipe.title}" so it complies with [${targetRestrictions}]?`
+        : `¿Cómo puedo adaptar la receta "${recipe.title}" para que cumpla con [${targetRestrictions}]?`;
+    }
 
     this.closeRecipeModal();
     this.switchView('view-ai');

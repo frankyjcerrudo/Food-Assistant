@@ -5323,9 +5323,24 @@ h2,
 
 .recipe-detail-section-header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   margin-bottom: 10px;
+}
+
+.recipe-detail-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.recipe-detail-col-ingredients,
+.recipe-detail-col-instructions {
+  min-width: 0;
 }
 
 .recipe-detail-section-title {
@@ -9224,6 +9239,16 @@ body.app-tour-active .app-tour-nav-target .nav-label {
   flex-shrink: 0 !important;
 }
 
+.bottom-nav .nav-item-gemini.active::after {
+  display: none !important;
+  content: none !important;
+}
+
+.bottom-nav .nav-item-gemini.active .nav-gemini-fab {
+  transform: scale(1.04) !important;
+  box-shadow: 0 0 0 2px var(--m3-surface), 0 0 0 4px var(--m3-primary), 0 4px 12px rgba(200, 90, 50, 0.45) !important;
+}
+
 .bottom-nav .nav-gemini-fab .chef-toque-icon {
   width: 18px !important;
   height: 18px !important;
@@ -12197,13 +12222,17 @@ dialog.admin-confirm-modal::backdrop {
 
 @media (max-width: 899px) {
   .ai-chat-composer {
-    bottom: calc(82px + env(safe-area-inset-bottom, 0px));
+    bottom: 0;
+    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+    margin-bottom: calc(-88px - env(safe-area-inset-bottom, 0px));
   }
 }
 
 html.is-mobile-device .ai-chat-composer,
 body.is-mobile-device .ai-chat-composer {
-  bottom: calc(82px + env(safe-area-inset-bottom, 0px));
+  bottom: 0;
+  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  margin-bottom: calc(-88px - env(safe-area-inset-bottom, 0px));
 }
 
 .ai-chat-attachment-preview {

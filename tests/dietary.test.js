@@ -756,5 +756,32 @@ describe('US-02: Filtros Dietéticos, Selector de Chips & Advertencias Nutricion
       expect(state.dietaryPreferences).toEqual(['Keto', 'Sin Frutos Secos', 'Sin Melocotón']);
       expect(app.checkAndLaunchAllergensWhatsNew()).toBe(false);
     });
+
+    it('no muestra alerta de alérgenos ni pasa estilos de dieta como ingredientes en conflicto en requestAllergenSubstitutionWithAi', async () => {
+      const lowProteinCleanRecipe = {
+        id: 'rec-style-only-check',
+        title: 'Crema de verduras suaves',
+        tags: ['Sin Pescado', 'Sin Marisco'],
+        ingredients: [
+          { name: 'Calabacín', aisle: 'produce' },
+          { name: 'Patata', aisle: 'produce' }
+        ],
+        instructions: [{ step: 1, text: 'Cocer y triturar.' }]
+      };
+      state.recipes.push(lowProteinCleanRecipe);
+      state.saveDietaryPreferences(['Alta en Proteínas', 'Sin Marisco', 'Sin Pescado']);
+
+      app.openRecipeDetail('rec-style-only-check');
+      expect(document.getElementById('recipe-allergen-alert-banner')).toBeNull();
+
+      let sentPrompt = '';
+      app.switchView = () => {};
+      app.closeRecipeModal = () => {};
+      app.handleGeminiInvokeSubmit = async () => {
+        sentPrompt = document.getElementById('gemini-invoke-input').value;
+      };
+      await app.requestAllergenSubstitutionWithAi('rec-style-only-check');
+      expect(sentPrompt).not.toContain('ingredientes en conflicto [Alta en Proteínas]');
+    });
   });
 });

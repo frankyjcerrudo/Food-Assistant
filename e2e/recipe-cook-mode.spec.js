@@ -5,6 +5,7 @@ test.describe('Recipe Catalog, Servings Scaling & Cook Mode Flow', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.setItem('fa_onboarding_completed', 'true');
+      localStorage.setItem('fa_allergens_whatsnew_v1', 'true');
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register = () => Promise.resolve({
           update: () => Promise.resolve(),
