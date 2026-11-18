@@ -5678,7 +5678,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.25';
+  window.APP_VERSION = 'v2.26';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -5736,7 +5736,7 @@ class FoodAssistantApp {
   constructor() {
     if (typeof window !== 'undefined') window.app = this;
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.25';
+    this.appVersion = window.APP_VERSION || 'v2.26';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -6745,6 +6745,13 @@ class FoodAssistantApp {
           this.sanitizeRecipeProteinTags();
           this.render();
           if (this.supabaseClient && state.cloudUser?.id) {
+            if (typeof this.initHouseholdRealtimeSubscription === 'function') {
+              const hhDead = state.household?.id && (!this.householdRealtimeChannel || (this.householdRealtimeChannel.state && this.householdRealtimeChannel.state !== 'joined'));
+              const userDead = !this.userRealtimeChannel || (this.userRealtimeChannel.state && this.userRealtimeChannel.state !== 'joined');
+              if (hhDead || userDead) {
+                this.initHouseholdRealtimeSubscription();
+              }
+            }
             // US-69 & US-88: refresco reactivo al volver a la app (debounce de 10 s para reducir egress en cambios de pestaña)
             const nowMs = Date.now();
             if (!this._lastVisibilitySyncAt || nowMs - this._lastVisibilitySyncAt > 10000) {
@@ -6760,7 +6767,7 @@ class FoodAssistantApp {
       setInterval(async () => {
         try {
           if (typeof document !== 'undefined' && document.visibilityState === 'visible' && !this.isPushingToCloud) {
-            if (this.activeView === 'view-shopping' || this.activeView === 'view-planner') {
+            if (this.activeView === 'view-shopping' || this.activeView === 'view-planner' || this.activeView === 'view-settings') {
               if (this.supabaseClient && state.cloudUser?.id && (typeof navigator === 'undefined' || navigator.onLine)) {
                 await this.pullViewUpdatesFromCloud(this.activeView);
               }
@@ -7586,7 +7593,7 @@ class FoodAssistantApp {
   async pullViewUpdatesFromCloud(viewName = this.activeView) {
     if (!this.supabaseClient || !state.cloudUser?.id) return { success: false, reason: 'no_session' };
     if (typeof navigator !== 'undefined' && !navigator.onLine) return { success: false, reason: 'offline' };
-    if (viewName !== 'view-shopping' && viewName !== 'view-planner') return { success: false, reason: 'unsupported_view' };
+    if (viewName !== 'view-shopping' && viewName !== 'view-planner' && viewName !== 'view-settings') return { success: false, reason: 'unsupported_view' };
 
     try {
       const activeHouseholdId = state.household?.id || null;
@@ -7607,17 +7614,43 @@ class FoodAssistantApp {
         return { success: true, scope: 'shopping_items' };
       }
 
-      if (viewName === 'view-planner') {
+      if (viewName === 'view-planner' || viewName === 'view-settings') {
         const planRes = await this._buildScopedQuery('meal_plans', '*', activeHouseholdId);
         if (planRes?.error) throw planRes.error;
         if (Array.isArray(planRes?.data)) {
-          const { stateChanged } = this._mergeRemoteMealPlans(planRes.data);
+          const { stateChanged, remoteHouseholdPrefsRow } = this._mergeRemoteMealPlans(planRes.data);
+          let dietaryChanged = false;
+          if (remoteHouseholdPrefsRow && Array.isArray(remoteHouseholdPrefsRow.custom_slots)) {
+            const prefType = activeHouseholdId ? 'household_prefs' : 'user_prefs';
+            const slot = remoteHouseholdPrefsRow.custom_slots.find(s => s && s.type === prefType)
+              || remoteHouseholdPrefsRow.custom_slots.find(s => s && (s.type === 'household_prefs' || s.type === 'user_prefs'));
+            if (slot && Array.isArray(slot.dietaryPreferences)) {
+              const parsedRemoteTime = new Date(String(slot.updatedAt || remoteHouseholdPrefsRow.updated_at || 0).replace(/^"+|"+$/g, '')).getTime();
+              const remoteTime = Number.isFinite(parsedRemoteTime) ? parsedRemoteTime : 0;
+              const parsedLocalTime = state.dietaryUpdatedAt ? new Date(String(state.dietaryUpdatedAt).replace(/^"+|"+$/g, '')).getTime() : 0;
+              const localTime = Number.isFinite(parsedLocalTime) ? parsedLocalTime : 0;
+              if ((remoteTime >= localTime || localTime === 0) && JSON.stringify(state.dietaryPreferences || []) !== JSON.stringify(slot.dietaryPreferences)) {
+                state.dietaryPreferences = [...slot.dietaryPreferences];
+                state.save('fa_dietary_preferences', state.dietaryPreferences);
+                if (slot.updatedAt || remoteHouseholdPrefsRow.updated_at) {
+                  state.dietaryUpdatedAt = slot.updatedAt || remoteHouseholdPrefsRow.updated_at;
+                  state.save('fa_dietary_updated_at', state.dietaryUpdatedAt);
+                }
+                dietaryChanged = true;
+              }
+            }
+          }
           if (stateChanged) {
             state.save('fa_mealplan', state.mealPlan);
+          }
+          if (dietaryChanged) {
+            this.renderDietaryPreferencesSettings();
+          }
+          if (stateChanged || dietaryChanged) {
             this.render();
           }
         }
-        return { success: true, scope: 'meal_plans' };
+        return { success: true, scope: viewName === 'view-settings' ? 'dietary_preferences' : 'meal_plans' };
       }
 
       return { success: false, reason: 'unsupported_view' };
@@ -22595,7 +22628,9 @@ REGLAS CRÍTICAS:
 
   broadcastRealtimeChange(event, payload) {
     if (!this.supabaseClient) return;
-    if (!this.householdRealtimeChannel && !this.userRealtimeChannel && typeof this.initHouseholdRealtimeSubscription === 'function') {
+    const hhDead = state.household?.id && (!this.householdRealtimeChannel || (this.householdRealtimeChannel.state && this.householdRealtimeChannel.state !== 'joined'));
+    const userDead = !this.userRealtimeChannel || (this.userRealtimeChannel.state && this.userRealtimeChannel.state !== 'joined');
+    if ((hhDead || userDead) && typeof this.initHouseholdRealtimeSubscription === 'function') {
       this.initHouseholdRealtimeSubscription();
     }
     const body = {
