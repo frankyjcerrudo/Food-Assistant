@@ -13,7 +13,7 @@ import {
   validateQuotaResetRequest,
   formatAuditSummary,
   summarizeSupabaseStorage
-} from './admin-core.js?v=2.20';
+} from './admin-core.js?v=2.17';
 
 const PLAN_BREAKDOWN_SPEC = Object.freeze([
   { key: 'free', labelKey: 'admin.planFree', tone: 'terracotta' },

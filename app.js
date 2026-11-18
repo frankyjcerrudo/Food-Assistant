@@ -5191,7 +5191,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.20';
+  window.APP_VERSION = 'v2.17';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -5241,7 +5241,7 @@ class FoodAssistantApp {
   constructor() {
     if (typeof window !== 'undefined') window.app = this;
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.20';
+    this.appVersion = window.APP_VERSION || 'v2.17';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -8428,6 +8428,9 @@ class FoodAssistantApp {
           break;
         case 'openFamilyShortcut':
           this.openFamilyShortcut();
+          break;
+        case 'closeFamilyModal':
+          this.closeFamilyModal();
           break;
         case 'copyHouseholdInviteCode':
           this.copyHouseholdInviteCode();
@@ -20946,25 +20949,34 @@ REGLAS CRÍTICAS:
   }
 
   openFamilyShortcut() {
-    if (typeof this.isPro === 'function' && !this.isPro()) {
-      if (typeof this.openPaywall === 'function') {
-        const isEn = window.I18n && window.I18n.getLanguage() === 'en';
-        this.openPaywall(
-          isEn
-            ? 'Share your cookbook, weekly menu, and grocery list in real time with Sabory Pro Family Mode.'
-            : 'Comparte tu recetario, menú semanal y lista de la compra en tiempo real con el Modo Familia de Sabory Pro.'
-        );
-        return;
-      }
-    }
     this.openHouseholdSettings();
   }
 
   openHouseholdSettings() {
+    this.renderHouseholdSettings();
+    const modal = document.getElementById('modal-family');
+    if (modal) {
+      if (typeof modal.showModal === 'function' && !modal.open) {
+        modal.showModal();
+      } else {
+        modal.classList.add('active');
+      }
+      return;
+    }
     this.switchView('view-settings');
     const card = document.getElementById('card-family-household');
     if (card && typeof card.scrollIntoView === 'function') {
       card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  closeFamilyModal() {
+    const modal = document.getElementById('modal-family');
+    if (!modal) return;
+    if (typeof modal.close === 'function' && modal.open) {
+      modal.close();
+    } else {
+      modal.classList.remove('active');
     }
   }
 
