@@ -9137,6 +9137,12 @@ body.app-tour-active .app-tour-nav-target .nav-label {
   padding: 0 !important;
 }
 
+.recipes-section-header,
+.recipes-header-title-group {
+  width: 100%;
+  flex: 1;
+}
+
 .recipes-title-action-row {
   display: flex;
   align-items: center;
