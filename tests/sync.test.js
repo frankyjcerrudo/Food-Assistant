@@ -1283,6 +1283,11 @@ describe('US-35 & Bugs Bloqueantes: Sincronización Supabase, IDs Únicos y Esqu
         dietaryUpdatedAt: '2026-11-18T18:20:00.000Z'
       });
       expect(state.dietaryPreferences).toEqual(['Sin Kiwi', 'Sin Lactosa']);
+
+      // Regresión: StateStore debe leer fa_dietary_updated_at sin comillas JSON (evitar NaN en Date.getTime())
+      state.saveDietaryPreferences(['Sin Gluten']);
+      const reloaded = new StateStore();
+      expect(Number.isFinite(new Date(reloaded.dietaryUpdatedAt).getTime())).toBe(true);
     });
   });
 });

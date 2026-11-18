@@ -3236,7 +3236,10 @@ class StateStore {
       this.settings.nutritionGoals = { enabled: false, calories: 2000, protein: 140, carbs: 200, fat: 65 };
     }
     this.dietaryPreferences = this.load('fa_dietary_preferences', []);
-    this.dietaryUpdatedAt = localStorage.getItem('fa_dietary_updated_at') || null;
+    const rawDietaryUpdatedAt = this.load('fa_dietary_updated_at', null);
+    this.dietaryUpdatedAt = (typeof rawDietaryUpdatedAt === 'string' && !isNaN(new Date(rawDietaryUpdatedAt).getTime()))
+      ? rawDietaryUpdatedAt
+      : null;
     this.customTags = this.load('fa_custom_tags', []);
     this.theme = localStorage.getItem('fa_theme_mode') || 'light';
     this.cloudUser = this.load('fa_cloud_user', null);
@@ -5675,7 +5678,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.23';
+  window.APP_VERSION = 'v2.24';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -5733,7 +5736,7 @@ class FoodAssistantApp {
   constructor() {
     if (typeof window !== 'undefined') window.app = this;
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.23';
+    this.appVersion = window.APP_VERSION || 'v2.24';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -8020,9 +8023,11 @@ class FoodAssistantApp {
       }
 
       if (Array.isArray(remoteDietary)) {
-        const localTime = state.dietaryUpdatedAt ? new Date(state.dietaryUpdatedAt).getTime() : 0;
-        const remoteTime = remoteDietaryUpdatedAt ? new Date(remoteDietaryUpdatedAt).getTime() : 0;
-        if (remoteTime >= localTime || !state.dietaryUpdatedAt) {
+        const parsedLocalTime = state.dietaryUpdatedAt ? new Date(String(state.dietaryUpdatedAt).replace(/^"+|"+$/g, '')).getTime() : 0;
+        const localTime = Number.isFinite(parsedLocalTime) ? parsedLocalTime : 0;
+        const parsedRemoteTime = remoteDietaryUpdatedAt ? new Date(String(remoteDietaryUpdatedAt).replace(/^"+|"+$/g, '')).getTime() : 0;
+        const remoteTime = Number.isFinite(parsedRemoteTime) ? parsedRemoteTime : 0;
+        if (remoteTime >= localTime || localTime === 0) {
           const localJson = JSON.stringify(state.dietaryPreferences || []);
           const remoteJson = JSON.stringify(remoteDietary);
           if (localJson !== remoteJson) {
@@ -22771,9 +22776,11 @@ REGLAS CRÍTICAS:
     if (payload.clientId && this.clientId && payload.clientId === this.clientId) {
       return;
     }
-    const remoteTime = payload.dietaryUpdatedAt ? new Date(payload.dietaryUpdatedAt).getTime() : Date.now();
-    const localTime = state.dietaryUpdatedAt ? new Date(state.dietaryUpdatedAt).getTime() : 0;
-    if (remoteTime >= localTime || !state.dietaryUpdatedAt) {
+    const parsedRemoteTime = payload.dietaryUpdatedAt ? new Date(String(payload.dietaryUpdatedAt).replace(/^"+|"+$/g, '')).getTime() : Date.now();
+    const remoteTime = Number.isFinite(parsedRemoteTime) ? parsedRemoteTime : Date.now();
+    const parsedLocalTime = state.dietaryUpdatedAt ? new Date(String(state.dietaryUpdatedAt).replace(/^"+|"+$/g, '')).getTime() : 0;
+    const localTime = Number.isFinite(parsedLocalTime) ? parsedLocalTime : 0;
+    if (remoteTime >= localTime || localTime === 0) {
       if (JSON.stringify(state.dietaryPreferences || []) !== JSON.stringify(payload.dietaryPreferences)) {
         state.dietaryPreferences = [...payload.dietaryPreferences];
         state.save('fa_dietary_preferences', state.dietaryPreferences);
