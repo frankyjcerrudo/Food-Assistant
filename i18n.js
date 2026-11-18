@@ -659,7 +659,8 @@
         tokenInUse: 'Esta suscripción de Google Play ya está vinculada a otra cuenta.',
         restoreSuccess: 'Compras restauradas.',
         restoreNone: 'No se encontraron compras activas en Google Play.',
-        termsLink: 'Términos de suscripción'
+        termsLink: 'Términos de suscripción',
+        webOnlyToast: 'Para suscribirte a Sabory Pro, abre la app instalada desde Google Play.'
       },
       shopping: {
         title: 'Lista de la Compra',
@@ -1816,7 +1817,8 @@
         tokenInUse: 'This Google Play subscription is already linked to another account.',
         restoreSuccess: 'Purchases restored.',
         restoreNone: 'No active Google Play purchases found.',
-        termsLink: 'Subscription terms'
+        termsLink: 'Subscription terms',
+        webOnlyToast: 'To subscribe to Sabory Pro, please open the app installed from Google Play.'
       },
       shopping: {
         title: 'Shopping List',

@@ -243,6 +243,15 @@ describe('US-79e: Google Play Billing (Digital Goods API, verify-purchase y RTDN
       expect(res.reason).toBe('not_in_twa');
       expect(document.getElementById('paywall-web-notice').style.display).toBe('block');
     });
+
+    it('en navegador web con getDigitalGoodsService presente pero rechazando o NotSupportedError, muestra aviso web sin error de compra', async () => {
+      window.getDigitalGoodsService = vi.fn().mockRejectedValue(new Error('Not in TWA'));
+      const res = await app.purchasePro('sabory_pro_monthly');
+      expect(res.ok).toBe(false);
+      expect(res.reason).toBe('not_in_twa');
+      expect(document.getElementById('paywall-web-notice').style.display).toBe('block');
+      expect(app.showToast).toHaveBeenCalledWith(expect.any(String), 'info');
+    });
   });
 
   describe('Verificación estática de seguridad en Edge Functions', () => {

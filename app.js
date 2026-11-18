@@ -5007,7 +5007,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.15';
+  window.APP_VERSION = 'v2.16';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -5055,7 +5055,7 @@ class FoodAssistantApp {
   constructor() {
     if (typeof window !== 'undefined') window.app = this;
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.15';
+    this.appVersion = window.APP_VERSION || 'v2.16';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -16282,7 +16282,8 @@ ${isEn
   async getPlayBillingService() {
     if (!this.isPlayBillingAvailable()) return null;
     try {
-      return await window.getDigitalGoodsService('https://play.google.com/billing');
+      const svc = await window.getDigitalGoodsService('https://play.google.com/billing');
+      return svc || null;
     } catch {
       return null;
     }
@@ -16290,10 +16291,16 @@ ${isEn
 
   async loadPlayPrices() {
     const service = await this.getPlayBillingService();
-    if (!service || typeof service.getDetails !== 'function') return;
+    const webNotice = document.getElementById('paywall-web-notice');
+    if (!service) {
+      if (webNotice) webNotice.style.display = 'block';
+      return false;
+    }
+    if (webNotice) webNotice.style.display = 'none';
+    if (typeof service.getDetails !== 'function') return true;
     try {
       const details = await service.getDetails(['sabory_pro_monthly', 'sabory_pro_annual']);
-      if (!Array.isArray(details)) return;
+      if (!Array.isArray(details)) return true;
       const locale = window.I18n?.resolvedLang === 'en' ? 'en-GB' : 'es-ES';
       const isEn = window.I18n?.resolvedLang === 'en';
       details.forEach(item => {
@@ -16313,6 +16320,7 @@ ${isEn
     } catch (e) {
       console.warn('[PlayBilling] No se pudieron cargar precios:', e);
     }
+    return true;
   }
 
   async verifyPlayPurchaseWithServer(productId, purchaseToken) {
@@ -16339,9 +16347,11 @@ ${isEn
       this.openAuthModal?.();
       return { ok: false, reason: 'auth_required' };
     }
-    if (!this.isPlayBillingAvailable() || typeof window.PaymentRequest !== 'function') {
+    const billingService = await this.getPlayBillingService();
+    if (!billingService || typeof window.PaymentRequest !== 'function') {
       const webNotice = document.getElementById('paywall-web-notice');
       if (webNotice) webNotice.style.display = 'block';
+      this.showToast(this.tr('paywall.webOnlyToast', undefined, 'Para suscribirte a Sabory Pro, abre la app instalada desde Google Play.'), 'info');
       return { ok: false, reason: 'not_in_twa' };
     }
 
@@ -16355,6 +16365,12 @@ ${isEn
     } catch (err) {
       if (err?.name === 'AbortError') {
         return { ok: false, reason: 'cancelled' };
+      }
+      if (err?.name === 'NotSupportedError' || String(err?.message || '').toLowerCase().includes('not supported')) {
+        const webNotice = document.getElementById('paywall-web-notice');
+        if (webNotice) webNotice.style.display = 'block';
+        this.showToast(this.tr('paywall.webOnlyToast', undefined, 'Para suscribirte a Sabory Pro, abre la app instalada desde Google Play.'), 'info');
+        return { ok: false, reason: 'not_in_twa' };
       }
       console.warn('[PlayBilling] PaymentRequest error:', err);
       this.showToast(this.tr('paywall.purchaseError', undefined, 'No se pudo completar la compra. Inténtalo de nuevo.'), 'error');
