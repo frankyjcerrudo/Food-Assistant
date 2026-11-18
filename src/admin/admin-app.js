@@ -13,7 +13,7 @@ import {
   validateQuotaResetRequest,
   formatAuditSummary,
   summarizeSupabaseStorage
-} from './admin-core.js';
+} from './admin-core.js?v=2.19';
 
 const PLAN_BREAKDOWN_SPEC = Object.freeze([
   { key: 'free', labelKey: 'admin.planFree', tone: 'terracotta' },
@@ -114,6 +114,14 @@ export class SaboryAdminApp {
 
   formatEur(value) {
     return `${this.formatDecimal(value, 2)} €`;
+  }
+
+  formatSmartEur(value) {
+    const num = Number(value) || 0;
+    if (num > 0 && num < 0.01) {
+      return `${this.formatDecimal(num, 4)} €`;
+    }
+    return this.formatEur(num);
   }
 
   cacheElements() {
@@ -850,9 +858,10 @@ export class SaboryAdminApp {
       this.els.kpiAiCostMonth.textContent = `${this.formatEur(aiSummary.costEur)} ($${this.formatDecimal(aiSummary.costUsd, 2)})`;
     }
     if (this.els.kpiAiTokensSub) {
-      this.els.kpiAiTokensSub.textContent = this.t('admin.kpiAiTokensMeta', {
+      const baseTokensMeta = this.t('admin.kpiAiTokensMeta', {
         tokens: this.formatInt(totalTokens)
       });
+      this.els.kpiAiTokensSub.textContent = `${baseTokensMeta} · ${this.t('admin.aiKpiRoutingSaved', { savings: this.formatSmartEur(aiSummary.routingSavingsEur || 0) })}`;
     }
 
     if (this.els.kpiAiErrorRate) this.els.kpiAiErrorRate.textContent = `${this.formatDecimal(errorRatePct, 2)}%`;
@@ -1546,9 +1555,7 @@ export class SaboryAdminApp {
         usd: this.formatDecimal(aiSummary.costUsd, 2),
         rate: this.formatDecimal(DEFAULT_EUR_PER_USD, 2)
       });
-      this.els.aiKpiCostMeta.textContent = aiSummary.routingSavingsEur > 0
-        ? `${baseCostMeta} · ${this.t('admin.aiKpiRoutingSaved', { savings: this.formatEur(aiSummary.routingSavingsEur) })}`
-        : baseCostMeta;
+      this.els.aiKpiCostMeta.textContent = `${baseCostMeta} · ${this.t('admin.aiKpiRoutingSaved', { savings: this.formatSmartEur(aiSummary.routingSavingsEur || 0) })}`;
     }
     if (this.els.aiKpiTokens) this.els.aiKpiTokens.textContent = this.formatInt(totalTokens);
     if (this.els.aiKpiTokensMeta) {

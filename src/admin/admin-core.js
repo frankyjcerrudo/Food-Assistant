@@ -76,6 +76,22 @@ export function estimateDecisionsRoutingSavingsUsd(rows = [], pricing = GEMINI_P
 
     const pTok = toNonNegativeInt(row.prompt_tokens ?? row.promptTokens);
     const oTok = toNonNegativeInt(row.output_tokens ?? row.outputTokens);
+
+    if (isDecisionDirect && pTok === 0 && oTok === 0) {
+      const isAggregated = row.calls !== undefined || row.ok_calls !== undefined;
+      const okCalls = isAggregated
+        ? toNonNegativeInt(row.ok_calls ?? row.ok ?? row.calls)
+        : (row.status === undefined || row.status === 'ok' ? 1 : 0);
+      if (okCalls > 0) {
+        const avoidedBaselineUsd = okCalls * (
+          (2000 / 1_000_000) * flash38Rates.inputPer1M
+          + (120 / 1_000_000) * flash38Rates.outputPer1M
+        );
+        totalSavings += avoidedBaselineUsd;
+      }
+      continue;
+    }
+
     const actualUsd = estimateAiRowCostUsd({ model, promptTokens: pTok, outputTokens: isDecisionDirect ? 0 : oTok }, pricing);
     const baselineUsd = (pTok / 1_000_000) * flash38Rates.inputPer1M + (oTok / 1_000_000) * flash38Rates.outputPer1M;
     if (baselineUsd > actualUsd) {

@@ -135,10 +135,14 @@ export function sanitizePayload(payload = {}) {
   return clean;
 }
 
-export function extractUsage(geminiData) {
+export function extractUsage(geminiData, fallbackInputText = '') {
   const meta = geminiData?.usageMetadata;
+  let promptTokens = Number(meta?.promptTokenCount) || 0;
+  if (promptTokens === 0 && typeof fallbackInputText === 'string' && fallbackInputText.trim().length > 0) {
+    promptTokens = Math.max(1, Math.ceil(fallbackInputText.trim().length / 4));
+  }
   return {
-    promptTokens: Number(meta?.promptTokenCount) || 0,
+    promptTokens,
     outputTokens: Number(meta?.candidatesTokenCount) || 0
   };
 }

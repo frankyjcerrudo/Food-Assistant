@@ -33,6 +33,7 @@ edit('index.html', s => s.replace(/\?v=[\d.]+/g, `?v=${arg}`)
   .replace(/(id="app-version-badge">)v[\d.]+(<)/, `$1${tag}$2`));
 edit('admin.html', s => s.replace(/\?v=[\d.]+/g, `?v=${arg}`)
   .replace(/(id="admin-version-badge">)v[\d.]+(<)/, `$1${tag}$2`));
+edit('src/admin/admin-app.js', s => s.replace(/admin-core\.js\?v=[\d.]+/g, `admin-core.js?v=${arg}`));
 edit('tests/modals.test.js', s => s.replace(/(APP_VERSION\)\.toBe\(')v[\d.]+('\))/, `$1${tag}$2`)
   .replace(/(appVersion\)\.toBe\(')v[\d.]+('\))/, `$1${tag}$2`)
   .replace(/(badge\.textContent\)\.toBe\(')v[\d.]+('\))/, `$1${tag}$2`)

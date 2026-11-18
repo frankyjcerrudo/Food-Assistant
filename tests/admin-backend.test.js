@@ -171,6 +171,13 @@ describe('US-87a: Backend Admin Seguro, SQL §12 y admin-core.js', () => {
       const summary = summarizeAiUsage(rows, 0.90);
       expect(summary.routingSavingsUsd).toBeCloseTo(2.50, 6);
       expect(summary.routingSavingsEur).toBeCloseTo(2.25, 6);
+
+      // Si gemini-decision-1 llega con prompt_tokens=0 (p.ej. endpoint sin usageMetadata), estima ahorro medio por llamada ok
+      const zeroTokenDecision = [
+        { feature: 'chat', model: 'gemini-decision-1', ok_calls: 2, prompt_tokens: 0, output_tokens: 0 }
+      ];
+      // 2 * (2000/1M * 0.30 + 120/1M * 2.50) = 2 * (0.0006 + 0.0003) = 0.0018 USD
+      expect(estimateDecisionsRoutingSavingsUsd(zeroTokenDecision)).toBeCloseTo(0.0018, 6);
     });
   });
 

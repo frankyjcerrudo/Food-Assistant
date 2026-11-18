@@ -93,11 +93,12 @@ describe('US-79a: ai-proxy core', () => {
   });
 
   describe('extractUsage & timeoutForModel', () => {
-    it('lee usageMetadata y devuelve 0 si falta', () => {
+    it('lee usageMetadata, devuelve 0 si falta y estima tokens de entrada con fallbackInputText si falta promptTokenCount', () => {
       expect(extractUsage({ usageMetadata: { promptTokenCount: 120, candidatesTokenCount: 45 } }))
         .toEqual({ promptTokens: 120, outputTokens: 45 });
       expect(extractUsage({})).toEqual({ promptTokens: 0, outputTokens: 0 });
       expect(extractUsage(null)).toEqual({ promptTokens: 0, outputTokens: 0 });
+      expect(extractUsage({}, 'Hola Sous Chef')).toEqual({ promptTokens: 4, outputTokens: 0 });
     });
 
     it('aplica timeout adecuado según modelo', () => {

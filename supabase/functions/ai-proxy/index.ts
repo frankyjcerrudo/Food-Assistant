@@ -115,6 +115,11 @@ Deno.serve(async (req: Request) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutForModel(DECISION_MODEL));
     let decisionError = 'Decision upstream request failed';
+    const directRequestBody = JSON.stringify({
+      model: DECISION_MODEL,
+      input: cleanPayload.decisions.input,
+      questions: cleanPayload.decisions.questions
+    });
     try {
       const decisionRes = await fetch(
         'https://generativelanguage.googleapis.com/v1beta/decisions',
@@ -124,18 +129,14 @@ Deno.serve(async (req: Request) => {
             'Content-Type': 'application/json',
             'x-goog-api-key': geminiApiKey
           },
-          body: JSON.stringify({
-            model: DECISION_MODEL,
-            input: cleanPayload.decisions.input,
-            questions: cleanPayload.decisions.questions
-          }),
+          body: directRequestBody,
           signal: controller.signal
         }
       );
 
       if (decisionRes.ok) {
         const decisionData = await decisionRes.json();
-        const usage = extractUsage(decisionData);
+        const usage = extractUsage(decisionData, directRequestBody);
 
         if (usageId !== null) {
           await adminClient
@@ -183,6 +184,7 @@ Deno.serve(async (req: Request) => {
 
   if (shouldRunRoutingDecision(body.feature, cleanPayload)) {
     const lastUserText = extractLastUserText(cleanPayload);
+    const routingRequestBody = JSON.stringify(buildRoutingDecisionRequest(lastUserText, body.feature));
     const decisionController = new AbortController();
     const decisionTimer = setTimeout(() => decisionController.abort(), timeoutForModel(DECISION_MODEL));
     try {
@@ -194,14 +196,14 @@ Deno.serve(async (req: Request) => {
             'Content-Type': 'application/json',
             'x-goog-api-key': geminiApiKey
           },
-          body: JSON.stringify(buildRoutingDecisionRequest(lastUserText, body.feature)),
+          body: routingRequestBody,
           signal: decisionController.signal
         }
       );
 
       if (decisionRes.ok) {
         const decisionJson = await decisionRes.json();
-        const decisionUsage = extractUsage(decisionJson);
+        const decisionUsage = extractUsage(decisionJson, routingRequestBody);
         decisionPromptTokens = decisionUsage.promptTokens;
         const decisionEval = evaluateRoutingDecision(decisionJson, plan, body.feature);
 
