@@ -5007,7 +5007,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.15';
+  window.APP_VERSION = 'v2.16';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -5055,7 +5055,7 @@ class FoodAssistantApp {
   constructor() {
     if (typeof window !== 'undefined') window.app = this;
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.15';
+    this.appVersion = window.APP_VERSION || 'v2.16';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
