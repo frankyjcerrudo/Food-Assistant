@@ -5,6 +5,7 @@ import {
   GEMINI_PRICING_USD,
   DEFAULT_EUR_PER_USD,
   estimateAiRowCostUsd,
+  estimateDecisionsRoutingSavingsUsd,
   summarizeAiUsage,
   computeRevenueMetrics,
   derivePlanBreakdownFromUsers,
@@ -149,6 +150,27 @@ describe('US-87a: Backend Admin Seguro, SQL §12 y admin-core.js', () => {
       expect(aggSummary.callsError).toBe(1);
       expect(aggSummary.errorRatePct).toBe(10);
       expect(aggSummary.costEur).toBeCloseTo(aggSummary.costUsd * DEFAULT_EUR_PER_USD, 6);
+    });
+
+    it('US-89: registra tarifa de gemini-decision-1 (outputPer1M: 0) y calcula ahorro por routing en summarizeAiUsage', () => {
+      expect(GEMINI_PRICING_USD['gemini-decision-1']).toEqual({ inputPer1M: 0.10, outputPer1M: 0 });
+      expect(estimateAiRowCostUsd({
+        model: 'gemini-decision-1',
+        prompt_tokens: 1_000_000,
+        output_tokens: 999
+      })).toBe(0.10);
+
+      const rows = [
+        { feature: 'chat', model: 'gemini-3.5-flash-lite', status: 'ok', prompt_tokens: 1_000_000, output_tokens: 1_000_000 },
+        { feature: 'chat', model: 'gemini-decision-1', status: 'ok', prompt_tokens: 1_000_000, output_tokens: 0 }
+      ];
+      // flash-lite vs 3.8-flash: (0.30-0.10) + (2.50-0.40) = 0.20 + 2.10 = 2.30 USD
+      // decision-1 vs 3.8-flash input: (0.30-0.10) = 0.20 USD
+      expect(estimateDecisionsRoutingSavingsUsd(rows)).toBeCloseTo(2.50, 6);
+
+      const summary = summarizeAiUsage(rows, 0.90);
+      expect(summary.routingSavingsUsd).toBeCloseTo(2.50, 6);
+      expect(summary.routingSavingsEur).toBeCloseTo(2.25, 6);
     });
   });
 

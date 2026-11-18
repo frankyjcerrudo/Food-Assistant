@@ -803,6 +803,190 @@ function getAisleLabel(aisleKey) {
   return AISLE_METADATA[aisleKey]?.label || AISLE_METADATA.other.label;
 }
 
+// US-89: Clasificación en lote de recetas e ingredientes vía Gemini Decisions API
+function buildRecipeDecisionsQuestions(recipe = {}) {
+  const questions = {
+    is_vegan: {
+      type: 'noul',
+      instructions: '¿Esta receta es 100% vegana (sin carne, pescado, marisco, lácteos, huevos ni miel)?'
+    },
+    is_vegetarian: {
+      type: 'noul',
+      instructions: '¿Esta receta es vegetariana (sin carne, aves, pescado ni marisco)?'
+    },
+    is_gluten_free: {
+      type: 'noul',
+      instructions: '¿Esta receta es sin gluten (sin trigo, cebada, centeno ni pasta o harina con gluten)?'
+    },
+    is_dairy_free: {
+      type: 'noul',
+      instructions: '¿Esta receta es sin lactosa / sin lácteos animales?'
+    },
+    is_keto: {
+      type: 'noul',
+      instructions: '¿Esta receta es apta para dieta keto / cetogénica (muy baja en carbohidratos, sin azúcar, pan, arroz ni pasta)?'
+    },
+    meal_slot: {
+      type: 'choice',
+      instructions: '¿Para qué momento del día es más adecuada esta receta?',
+      criteria: {
+        Desayuno: 'Receta típica de desayuno o primera comida de la mañana.',
+        Almuerzo: 'Plato principal consistente para comer al mediodía.',
+        Merienda: 'Snack ligero, batido o tentempié de media tarde.',
+        Cena: 'Plato principal ligero o adecuado para cenar por la noche.'
+      }
+    },
+    cooking_method: {
+      type: 'choice',
+      instructions: '¿Cuál es el método o estilo de preparación principal de esta receta?',
+      criteria: {
+        Airfryer: 'Preparada principalmente en freidora de aire / airfryer.',
+        Horno: 'Preparada principalmente horneando o gratinando al horno.',
+        'Rápida': 'Receta exprés lista en unos 25 minutos o menos sin cocciones largas.',
+        Tradicional: 'Cocción clásica en sartén, olla, guiso, plancha o preparación estándar.'
+      }
+    },
+    difficulty: {
+      type: 'score',
+      instructions: 'Evalúa la dificultad culinaria de la receta del 1 (muy fácil) al 5 (alta complejidad técnica).',
+      criteria: {
+        '1': 'Muy fácil: pocos ingredientes, pasos básicos.',
+        '2': 'Fácil: elaboración sencilla cotidiana.',
+        '3': 'Media: requiere cierta técnica o control de tiempos.',
+        '4': 'Difícil: múltiples elaboraciones o técnica avanzada.',
+        '5': 'Experto: alta cocina o repostería muy técnica.'
+      }
+    }
+  };
+
+  const ingredients = Array.isArray(recipe?.ingredients) ? recipe.ingredients : [];
+  ingredients.forEach((ing, idx) => {
+    if (!ing) return;
+    const ingName = typeof ing === 'string' ? ing.trim() : String(ing.name || '').trim();
+    if (!ingName) return;
+    const currentAisle = typeof ing === 'object' && ing.aisle
+      ? ing.aisle
+      : (typeof categorizeIngredientAisle === 'function' ? categorizeIngredientAisle(ingName) : 'other');
+    if (currentAisle === 'other') {
+      questions[`aisle_${idx}`] = {
+        type: 'choice',
+        instructions: `¿A qué pasillo de supermercado pertenece el ingrediente "${ingName}"?`,
+        criteria: {
+          produce: 'Frutas, verduras, hortalizas y hierbas frescas.',
+          meat: 'Carnes, aves, pescados y mariscos.',
+          dairy: 'Lácteos, quesos, yogures y huevos.',
+          bakery: 'Panadería, masas, bollería y harinas de panificación.',
+          pantry: 'Despensa seca, conservas, legumbres, arroz, pasta y frutos secos.',
+          spices: 'Especias, condimentos, salsas, aceites y vinagres.',
+          frozen: 'Productos congelados o helados.',
+          beverages: 'Bebidas, aguas, zumos, cafés, tés o vinos.',
+          other: 'Otros productos no clasificables en las categorías anteriores.'
+        }
+      };
+    }
+  });
+
+  return questions;
+}
+
+function pickRecipeDecisionTopChoice(answer = {}) {
+  if (!answer || typeof answer !== 'object') return { choice: null, probability: 0 };
+  const probs = answer.probabilities && typeof answer.probabilities === 'object' ? answer.probabilities : null;
+  let bestChoice = typeof answer.choice === 'string' && answer.choice.trim() ? answer.choice.trim() : null;
+  let bestProb = bestChoice && probs && typeof probs[bestChoice] === 'number' ? Number(probs[bestChoice]) : 0;
+  if (probs) {
+    for (const [k, v] of Object.entries(probs)) {
+      const p = Number(v);
+      if (Number.isFinite(p) && p > bestProb) {
+        bestProb = p;
+        if (!answer.choice) bestChoice = k;
+      }
+    }
+  }
+  return { choice: bestChoice, probability: bestProb };
+}
+
+function applyRecipeDecisionsResult(recipe = {}, decisionData = {}, minConfidence = 0.75) {
+  const answers = decisionData?.answers && typeof decisionData.answers === 'object' ? decisionData.answers : {};
+  const tagMap = new Map();
+  const addTag = (tag) => {
+    const clean = String(tag || '').trim();
+    if (!clean) return;
+    const key = clean.toLowerCase();
+    if (!tagMap.has(key)) tagMap.set(key, clean);
+  };
+
+  (Array.isArray(recipe?.tags) ? recipe.tags : []).forEach(addTag);
+  if (typeof analyzeAndInferRecipeTags === 'function') {
+    analyzeAndInferRecipeTags(recipe).forEach(addTag);
+  }
+
+  const noulTagPairs = [
+    ['is_vegan', 'Vegano'],
+    ['is_vegetarian', 'Vegetariano'],
+    ['is_gluten_free', 'Sin Gluten'],
+    ['is_dairy_free', 'Sin Lactosa'],
+    ['is_keto', 'Keto']
+  ];
+  for (const [qKey, tagName] of noulTagPairs) {
+    const ans = answers[qKey];
+    const conf = Number(ans?.confidence);
+    const prob = Number(ans?.noul);
+    if (Number.isFinite(conf) && conf >= minConfidence && Number.isFinite(prob) && prob >= minConfidence) {
+      addTag(tagName);
+      if (tagName === 'Vegano') addTag('Vegetariano');
+    }
+  }
+
+  const mealSlotAns = answers.meal_slot;
+  if (mealSlotAns) {
+    const { choice, probability } = pickRecipeDecisionTopChoice(mealSlotAns);
+    const conf = Number(mealSlotAns.confidence) || probability;
+    if (choice && ['Desayuno', 'Almuerzo', 'Merienda', 'Cena'].includes(choice) && conf >= minConfidence) {
+      addTag(choice);
+    }
+  }
+
+  const methodAns = answers.cooking_method;
+  if (methodAns) {
+    const { choice, probability } = pickRecipeDecisionTopChoice(methodAns);
+    const conf = Number(methodAns.confidence) || probability;
+    if (choice && ['Airfryer', 'Horno', 'Rápida'].includes(choice) && conf >= minConfidence) {
+      addTag(choice);
+    }
+  }
+
+  const updatedIngredients = (Array.isArray(recipe?.ingredients) ? recipe.ingredients : []).map((ing, idx) => {
+    const ans = answers[`aisle_${idx}`];
+    if (!ans) return typeof ing === 'object' ? { ...ing } : ing;
+    const { choice, probability } = pickRecipeDecisionTopChoice(ans);
+    const conf = Number(ans.confidence) || probability;
+    if (choice && choice !== 'other' && AISLE_METADATA[choice] && conf >= minConfidence) {
+      return typeof ing === 'string'
+        ? { name: ing, aisle: choice }
+        : { ...ing, aisle: choice };
+    }
+    return typeof ing === 'object' ? { ...ing } : ing;
+  });
+
+  let difficultyScore = null;
+  const diffAns = answers.difficulty;
+  if (diffAns) {
+    const rawScore = Number(diffAns.score ?? diffAns.expectedScore ?? diffAns.value);
+    const conf = Number(diffAns.confidence);
+    if (Number.isFinite(rawScore) && (!Number.isFinite(conf) || conf >= minConfidence)) {
+      difficultyScore = Math.round(rawScore * 100) / 100;
+    }
+  }
+
+  return {
+    ...recipe,
+    tags: Array.from(tagMap.values()),
+    ingredients: updatedIngredients,
+    ...(difficultyScore !== null ? { difficultyScore } : {})
+  };
+}
+
 // ==========================================================================
 // UNIFIED INGREDIENT CLASSIFIER, ICONS & AUTOCOMPLETE CATALOG (US-20, BUG-14)
 // ==========================================================================
@@ -5007,7 +5191,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.16';
+  window.APP_VERSION = 'v2.17';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -5039,6 +5223,8 @@ if (typeof window !== 'undefined') {
   window.ALL_PREDEFINED_TAGS = ALL_PREDEFINED_TAGS;
   window.checkDietaryCompliance = checkDietaryCompliance;
   window.analyzeAndInferRecipeTags = analyzeAndInferRecipeTags;
+  window.buildRecipeDecisionsQuestions = buildRecipeDecisionsQuestions;
+  window.applyRecipeDecisionsResult = applyRecipeDecisionsResult;
   window.estimateRecipeNutrition = estimateRecipeNutrition;
   window.getRecipeNutrition = getRecipeNutrition;
   window.detectRecipeLanguage = detectRecipeLanguage;
@@ -5055,7 +5241,7 @@ class FoodAssistantApp {
   constructor() {
     if (typeof window !== 'undefined') window.app = this;
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.16';
+    this.appVersion = window.APP_VERSION || 'v2.17';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -15831,6 +16017,42 @@ class FoodAssistantApp {
     return /\b(asigna|pon\s+en\s+el|cambia\s+el|actualiza\s+el\s+plan|crea\s+una\s+receta|crea\s+recetas|inventa|nueva\s+receta|compra|a[ñn]ade|apunta|agrega|quita|borra|elimina|tacha|planifica|organiza)\b/i.test(prompt);
   }
 
+  resolvePromptIntentScope(prompt, decision = null) {
+    const scope = decision?.intentScope;
+    const confidence = Number(decision?.intentConfidence ?? decision?.confidence ?? 0);
+    if (scope && confidence >= 0.75 && scope !== 'off_topic') {
+      return {
+        isSingleDay: scope === 'single_day',
+        isWeekend: scope === 'weekend',
+        isWeeklyIntent: scope === 'weekly_plan',
+        isRecurringSlot: scope === 'recurring_slot',
+        intentScope: scope,
+        source: 'decisions_api'
+      };
+    }
+
+    const isSingleDay = this.isSingleDayPrompt(prompt);
+    const isWeekend = this.isWeekendPrompt(prompt);
+    const isWeeklyIntent = !isSingleDay && !isWeekend && this.isWeeklyPlanPrompt(prompt);
+    const isRecurringSlot = this.isRecurringWeeklySlotPrompt(prompt);
+    const fallbackScope = isSingleDay
+      ? 'single_day'
+      : (isWeekend
+        ? 'weekend'
+        : (isRecurringSlot
+          ? 'recurring_slot'
+          : (isWeeklyIntent ? 'weekly_plan' : 'general_query')));
+
+    return {
+      isSingleDay,
+      isWeekend,
+      isWeeklyIntent,
+      isRecurringSlot,
+      intentScope: fallbackScope,
+      source: 'heuristic'
+    };
+  }
+
   stripRecipeIdsFromText(text) {
     if (!text || typeof text !== 'string') return '';
     return text
@@ -16899,10 +17121,51 @@ ${isEn
     });
 
     this.lastAiToolCalls = toolCalls;
+    this.lastAiDecision = res.decision || null;
     return {
       text: textParts.join('\n').trim(),
-      toolCalls
+      toolCalls,
+      decision: res.decision || null,
+      model: res.model || null
     };
+  }
+
+  async classifyRecipeWithDecisionsApi(recipe, options = {}) {
+    if (!recipe || typeof recipe !== 'object') return recipe;
+    const fallbackTags = Array.from(new Set([
+      ...(Array.isArray(recipe.tags) ? recipe.tags : []),
+      ...(typeof analyzeAndInferRecipeTags === 'function' ? analyzeAndInferRecipeTags(recipe) : [])
+    ]));
+
+    if (!state.cloudUser || typeof this.invokeAiProxy !== 'function') {
+      return { ...recipe, tags: fallbackTags, _classificationSource: 'heuristic' };
+    }
+
+    const questions = buildRecipeDecisionsQuestions(recipe);
+    const ingText = (Array.isArray(recipe.ingredients) ? recipe.ingredients : [])
+      .map(i => (typeof i === 'string' ? i : `${i.amount || ''} ${i.unit || ''} ${i.name || ''}`.trim()))
+      .filter(Boolean)
+      .join(', ');
+    const stepsText = (Array.isArray(recipe.instructions) ? recipe.instructions : [])
+      .map(s => (typeof s === 'string' ? s : (s.text || '')))
+      .filter(Boolean)
+      .join(' ');
+    const input = [
+      `Título: ${recipe.title || ''}`,
+      recipe.description ? `Descripción: ${recipe.description}` : '',
+      `Tiempo preparación: ${recipe.prepTimeMinutes || 0} min, cocción: ${recipe.cookTimeMinutes || 0} min`,
+      ingText ? `Ingredientes: ${ingText}` : '',
+      stepsText ? `Preparación: ${stepsText}` : ''
+    ].filter(Boolean).join('\n').slice(0, 6000);
+
+    const res = await this.invokeAiProxy(options.feature || 'guided_query', {
+      decisions: { input, questions }
+    });
+    if (!res?.ok || !res?.data?.answers) {
+      return { ...recipe, tags: fallbackTags, _classificationSource: 'heuristic' };
+    }
+    const updated = applyRecipeDecisionsResult(recipe, res.data, options.minConfidence ?? 0.75);
+    return { ...updated, _classificationSource: 'decisions_api' };
   }
 
   async callGeminiApi(prompt, systemInstruction = "", options = {}) {
@@ -17954,9 +18217,7 @@ ${isEn
         this.openAuthModal?.();
         return;
       }
-      const isSingleDay = this.isSingleDayPrompt(text);
-      const isWeekend = this.isWeekendPrompt(text);
-      const isWeeklyIntent = !isSingleDay && !isWeekend && this.isWeeklyPlanPrompt(text);
+      const { isSingleDay, isWeekend, isWeeklyIntent } = this.resolvePromptIntentScope(text, agentResult.decision);
 
       let rawToolCalls = Array.isArray(agentResult.toolCalls) ? [...agentResult.toolCalls] : [];
 
@@ -23380,6 +23641,8 @@ if (typeof window !== 'undefined') {
   window.FoodAssistantApp = FoodAssistantApp;
   window.generateId = generateId;
   window.analyzeAndInferRecipeTags = analyzeAndInferRecipeTags;
+  window.buildRecipeDecisionsQuestions = buildRecipeDecisionsQuestions;
+  window.applyRecipeDecisionsResult = applyRecipeDecisionsResult;
   window.estimateRecipeNutrition = estimateRecipeNutrition;
   window.getRecipeNutrition = getRecipeNutrition;
   window.formatSafeAiMarkdown = formatSafeAiMarkdown;
@@ -23428,6 +23691,8 @@ if (typeof module !== 'undefined' && module.exports) {
     cleanRecipeImageUrl,
     generateId,
     analyzeAndInferRecipeTags,
+    buildRecipeDecisionsQuestions,
+    applyRecipeDecisionsResult,
     estimateRecipeNutrition,
     getRecipeNutrition,
     formatSafeAiMarkdown,

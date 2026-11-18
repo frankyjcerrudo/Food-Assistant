@@ -1388,4 +1388,90 @@ describe('US-79a: AiGateway', () => {
       appInstance.plannerWeekOffset = origOffset;
     }
   });
+
+  it('US-89: resolvePromptIntentScope prioriza Gemini Decisions API con confianza alta y cae a heurísticas si falta o tiene baja confianza', () => {
+    const apiScope = appInstance.resolvePromptIntentScope('¿Qué me recomiendas?', {
+      intentScope: 'single_day',
+      intentConfidence: 0.91
+    });
+    expect(apiScope.source).toBe('decisions_api');
+    expect(apiScope.isSingleDay).toBe(true);
+    expect(apiScope.isWeekend).toBe(false);
+    expect(apiScope.isWeeklyIntent).toBe(false);
+
+    const lowConfFallback = appInstance.resolvePromptIntentScope('Planifica mi semana completa', {
+      intentScope: 'single_day',
+      intentConfidence: 0.45
+    });
+    expect(lowConfFallback.source).toBe('heuristic');
+    expect(lowConfFallback.isWeeklyIntent).toBe(true);
+    expect(lowConfFallback.isSingleDay).toBe(false);
+  });
+
+  it('US-89: buildRecipeDecisionsQuestions, applyRecipeDecisionsResult y classifyRecipeWithDecisionsApi etiquetan recetas y pasillos desconocidos en lote', async () => {
+    const recipe = {
+      id: 'rec-decisions-test',
+      title: 'Tofu crujiente con salsa tamari',
+      description: 'Plato vegetal rápido en freidora de aire',
+      prepTimeMinutes: 10,
+      cookTimeMinutes: 15,
+      ingredients: [
+        { name: 'tofu firme', amount: 200, unit: 'g', aisle: 'pantry' },
+        { name: 'tahini negro artesanal', amount: 30, unit: 'g', aisle: 'other' }
+      ],
+      instructions: [{ step: 1, text: 'Cocinar en airfryer 15 minutos.' }]
+    };
+
+    const questions = window.buildRecipeDecisionsQuestions(recipe);
+    expect(questions.is_vegan.type).toBe('noul');
+    expect(questions.meal_slot.type).toBe('choice');
+    expect(questions.difficulty.type).toBe('score');
+    expect(questions.aisle_1).toBeDefined();
+    expect(questions.aisle_0).toBeUndefined();
+
+    const merged = window.applyRecipeDecisionsResult(recipe, {
+      answers: {
+        is_vegan: { type: 'noul', noul: 0.96, confidence: 0.95 },
+        is_keto: { type: 'noul', noul: 0.30, confidence: 0.40 },
+        meal_slot: { type: 'choice', choice: 'Cena', probabilities: { Cena: 0.89 }, confidence: 0.89 },
+        cooking_method: { type: 'choice', choice: 'Airfryer', probabilities: { Airfryer: 0.92 }, confidence: 0.92 },
+        difficulty: { type: 'score', expectedScore: 2.15, confidence: 0.88 },
+        aisle_1: { type: 'choice', choice: 'spices', probabilities: { spices: 0.86 }, confidence: 0.86 }
+      }
+    });
+
+    expect(merged.tags).toContain('Vegano');
+    expect(merged.tags).toContain('Cena');
+    expect(merged.tags).toContain('Airfryer');
+    expect(merged.difficultyScore).toBe(2.15);
+    expect(merged.ingredients[1].aisle).toBe('spices');
+
+    const origFetch = globalThis.fetch;
+    localStorage.setItem('fa_sb_url', 'https://test.supabase.co');
+    appInstance.getAiAuthToken = vi.fn().mockResolvedValue('tok');
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ok: true,
+        model: 'gemini-decision-1',
+        data: {
+          answers: {
+            is_vegan: { type: 'noul', noul: 0.94, confidence: 0.94 },
+            aisle_1: { type: 'choice', choice: 'pantry', probabilities: { pantry: 0.91 }, confidence: 0.91 }
+          }
+        }
+      })
+    });
+
+    try {
+      const classified = await appInstance.classifyRecipeWithDecisionsApi(recipe);
+      expect(classified._classificationSource).toBe('decisions_api');
+      expect(classified.ingredients[1].aisle).toBe('pantry');
+      const sentBody = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+      expect(sentBody.payload.decisions.questions.is_vegan.type).toBe('noul');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
 });

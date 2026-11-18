@@ -7,6 +7,7 @@ export const GEMINI_PRICING_USD = Object.freeze({
   'gemini-3.8-flash': Object.freeze({ inputPer1M: 0.30, outputPer1M: 2.50 }),
   'gemini-3.5-flash-lite': Object.freeze({ inputPer1M: 0.10, outputPer1M: 0.40 }),
   'gemini-3.1-flash-lite': Object.freeze({ inputPer1M: 0.075, outputPer1M: 0.30 }),
+  'gemini-decision-1': Object.freeze({ inputPer1M: 0.10, outputPer1M: 0 }),
   default: Object.freeze({ inputPer1M: 0.15, outputPer1M: 0.60 })
 });
 
@@ -48,6 +49,41 @@ export function estimateAiRowCostUsd(row = {}, pricing = GEMINI_PRICING_USD) {
   const outputTokens = toNonNegativeInt(row?.output_tokens ?? row?.outputTokens);
   const usd = (promptTokens / 1_000_000) * rates.inputPer1M + (outputTokens / 1_000_000) * rates.outputPer1M;
   return roundTo(usd, 6);
+}
+
+const ROUTED_INTERACTIVE_FEATURES = new Set(['chat', 'voice', 'guided_query']);
+
+/**
+ * Estima el ahorro neto en USD frente a ejecutar todas esas peticiones directamente
+ * sobre `gemini-3.8-flash` (llamadas resueltas con `gemini-decision-1` y consultas
+ * interactivas redirigidas a `gemini-3.5-flash-lite`).
+ * @param {Array<object>} rows
+ * @param {object} [pricing]
+ * @returns {number}
+ */
+export function estimateDecisionsRoutingSavingsUsd(rows = [], pricing = GEMINI_PRICING_USD) {
+  const list = Array.isArray(rows) ? rows : [];
+  const flash38Rates = pricing['gemini-3.8-flash'] || GEMINI_PRICING_USD['gemini-3.8-flash'];
+  let totalSavings = 0;
+
+  for (const row of list) {
+    if (!row || typeof row !== 'object') continue;
+    const model = typeof row.model === 'string' ? row.model.trim() : '';
+    const feature = typeof row.feature === 'string' ? row.feature.trim() : '';
+    const isDecisionDirect = model === 'gemini-decision-1';
+    const isRoutedLite = model === 'gemini-3.5-flash-lite' && ROUTED_INTERACTIVE_FEATURES.has(feature);
+    if (!isDecisionDirect && !isRoutedLite) continue;
+
+    const pTok = toNonNegativeInt(row.prompt_tokens ?? row.promptTokens);
+    const oTok = toNonNegativeInt(row.output_tokens ?? row.outputTokens);
+    const actualUsd = estimateAiRowCostUsd({ model, promptTokens: pTok, outputTokens: isDecisionDirect ? 0 : oTok }, pricing);
+    const baselineUsd = (pTok / 1_000_000) * flash38Rates.inputPer1M + (oTok / 1_000_000) * flash38Rates.outputPer1M;
+    if (baselineUsd > actualUsd) {
+      totalSavings += (baselineUsd - actualUsd);
+    }
+  }
+
+  return roundTo(totalSavings, 6);
 }
 
 function createUsageBucket() {
@@ -131,6 +167,8 @@ export function summarizeAiUsage(rows = [], eurPerUsd = DEFAULT_EUR_PER_USD, pri
 
   const costEur = roundTo(costUsd * rate, 6);
   const errorRatePct = callsTotal > 0 ? roundTo((callsError / callsTotal) * 100, 2) : 0;
+  const routingSavingsUsd = estimateDecisionsRoutingSavingsUsd(list, pricing);
+  const routingSavingsEur = roundTo(routingSavingsUsd * rate, 6);
 
   return {
     callsTotal,
@@ -143,6 +181,8 @@ export function summarizeAiUsage(rows = [], eurPerUsd = DEFAULT_EUR_PER_USD, pri
     totalTokens: promptTokens + outputTokens,
     costUsd,
     costEur,
+    routingSavingsUsd,
+    routingSavingsEur,
     byFeature,
     byModel
   };

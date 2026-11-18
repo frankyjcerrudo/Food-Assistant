@@ -2,11 +2,18 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
   applySousChefIdentityGuard,
+  buildRoutingDecisionRequest,
+  DECISION_MODEL,
+  evaluateRoutingDecision,
+  extractLastUserText,
   extractUsage,
   mapQuotaResult,
   MAX_PAYLOAD_BYTES,
   resolveModelChain,
   sanitizePayload,
+  shouldRunRoutingDecision,
+  SOUS_CHEF_GUARDRAIL_REPLY_EN,
+  SOUS_CHEF_GUARDRAIL_REPLY_ES,
   timeoutForModel,
   validateAiRequest
 } from './core.js';
@@ -99,7 +106,150 @@ Deno.serve(async (req: Request) => {
   };
 
   const cleanPayload = applySousChefIdentityGuard(sanitizePayload(body.payload));
-  const models = resolveModelChain(plan);
+  const isDirectDecision = Boolean(
+    cleanPayload.decisions
+    && (!Array.isArray(cleanPayload.contents) || cleanPayload.contents.length === 0)
+  );
+
+  if (isDirectDecision) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutForModel(DECISION_MODEL));
+    let decisionError = 'Decision upstream request failed';
+    try {
+      const decisionRes = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/decisions',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': geminiApiKey
+          },
+          body: JSON.stringify({
+            model: DECISION_MODEL,
+            input: cleanPayload.decisions.input,
+            questions: cleanPayload.decisions.questions
+          }),
+          signal: controller.signal
+        }
+      );
+
+      if (decisionRes.ok) {
+        const decisionData = await decisionRes.json();
+        const usage = extractUsage(decisionData);
+
+        if (usageId !== null) {
+          await adminClient
+            .from('ai_usage')
+            .update({
+              status: 'ok',
+              model: DECISION_MODEL,
+              prompt_tokens: usage.promptTokens,
+              output_tokens: 0
+            })
+            .eq('id', usageId);
+        }
+
+        return json({
+          ok: true,
+          model: DECISION_MODEL,
+          data: decisionData,
+          quota: quotaInfo
+        });
+      }
+
+      const errData = await decisionRes.json().catch(() => ({}));
+      decisionError = errData?.error?.message || `HTTP ${decisionRes.status} on ${DECISION_MODEL}`;
+    } catch (err: any) {
+      decisionError = err?.name === 'AbortError'
+        ? `Timeout on ${DECISION_MODEL}`
+        : (err?.message || 'Decision fetch error');
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (usageId !== null) {
+      await adminClient
+        .from('ai_usage')
+        .update({ status: 'error' })
+        .eq('id', usageId);
+    }
+
+    return json({ ok: false, code: 'UPSTREAM_ERROR', message: decisionError }, 502);
+  }
+
+  let models = resolveModelChain(plan);
+  let decisionMeta: Record<string, unknown> | null = null;
+  let decisionPromptTokens = 0;
+
+  if (shouldRunRoutingDecision(body.feature, cleanPayload)) {
+    const lastUserText = extractLastUserText(cleanPayload);
+    const decisionController = new AbortController();
+    const decisionTimer = setTimeout(() => decisionController.abort(), timeoutForModel(DECISION_MODEL));
+    try {
+      const decisionRes = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/decisions',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': geminiApiKey
+          },
+          body: JSON.stringify(buildRoutingDecisionRequest(lastUserText, body.feature)),
+          signal: decisionController.signal
+        }
+      );
+
+      if (decisionRes.ok) {
+        const decisionJson = await decisionRes.json();
+        const decisionUsage = extractUsage(decisionJson);
+        decisionPromptTokens = decisionUsage.promptTokens;
+        const decisionEval = evaluateRoutingDecision(decisionJson, plan, body.feature);
+
+        if (decisionEval.blockedByGuardrail) {
+          const sysText = JSON.stringify(cleanPayload.systemInstruction || '');
+          const isEnglish = sysText.includes('STRICTLY SPANISH & ENGLISH ONLY');
+          const replyText = isEnglish ? SOUS_CHEF_GUARDRAIL_REPLY_EN : SOUS_CHEF_GUARDRAIL_REPLY_ES;
+
+          if (usageId !== null) {
+            await adminClient
+              .from('ai_usage')
+              .update({
+                status: 'ok',
+                model: DECISION_MODEL,
+                prompt_tokens: decisionPromptTokens,
+                output_tokens: 0
+              })
+              .eq('id', usageId);
+          }
+
+          return json({
+            ok: true,
+            model: DECISION_MODEL,
+            decision: decisionEval,
+            data: {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ text: replyText }]
+                  }
+                }
+              ]
+            },
+            quota: quotaInfo
+          });
+        }
+
+        models = decisionEval.models;
+        decisionMeta = decisionEval;
+      }
+    } catch {
+      // Fallback transparente a la cadena estándar de modelos si Decisions API falla o excede el timeout
+    } finally {
+      clearTimeout(decisionTimer);
+    }
+  }
+
   let lastError = 'Upstream request failed';
 
   for (const model of models) {
@@ -139,7 +289,7 @@ Deno.serve(async (req: Request) => {
           .update({
             status: 'ok',
             model,
-            prompt_tokens: usage.promptTokens,
+            prompt_tokens: usage.promptTokens + decisionPromptTokens,
             output_tokens: usage.outputTokens
           })
           .eq('id', usageId);
@@ -148,6 +298,7 @@ Deno.serve(async (req: Request) => {
       return json({
         ok: true,
         model,
+        ...(decisionMeta ? { decision: decisionMeta } : {}),
         data: geminiData,
         quota: quotaInfo
       });

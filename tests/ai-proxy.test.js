@@ -3,13 +3,20 @@ import fs from 'fs';
 import path from 'path';
 import {
   AI_FEATURES,
+  DECISION_MODEL,
+  DECISION_TIMEOUT_MS,
   MAX_PAYLOAD_BYTES,
   MAX_OUTPUT_TOKENS,
   resolveModelChain,
+  validateDecisionQuestions,
   validateAiRequest,
   sanitizePayload,
   extractUsage,
-  timeoutForModel
+  timeoutForModel,
+  extractLastUserText,
+  shouldRunRoutingDecision,
+  buildRoutingDecisionRequest,
+  evaluateRoutingDecision
 } from '../supabase/functions/ai-proxy/core.js';
 
 describe('US-79a: ai-proxy core', () => {
@@ -106,7 +113,136 @@ describe('US-79a: ai-proxy core', () => {
         'utf8'
       );
       expect(indexTs).toContain("Deno.env.get('GEMINI_API_KEY')");
+      expect(indexTs).toContain('/v1beta/decisions');
       expect(indexTs).not.toMatch(/AIza/);
+    });
+  });
+
+  describe('US-89: Gemini Decisions API (gemini-decision-1) routing, guardrails y batch', () => {
+    it('expone DECISION_MODEL, timeout dedicado y valida payloads directos decisions', () => {
+      expect(DECISION_MODEL).toBe('gemini-decision-1');
+      expect(timeoutForModel(DECISION_MODEL)).toBe(DECISION_TIMEOUT_MS);
+      expect(DECISION_TIMEOUT_MS).toBe(1800);
+
+      expect(validateDecisionQuestions({
+        is_vegan: { type: 'noul', instructions: '¿Es vegana?' }
+      })).toEqual({ ok: true });
+      expect(validateDecisionQuestions({})).toEqual({ ok: false, reason: 'QUESTIONS_COUNT_OUT_OF_RANGE' });
+
+      const validDirect = validateAiRequest({
+        feature: 'guided_query',
+        payload: {
+          decisions: {
+            input: 'Ensalada de garbanzos con tomate',
+            questions: {
+              is_vegan: { type: 'noul', instructions: '¿Es vegana?' }
+            }
+          }
+        }
+      }, 200);
+      expect(validDirect).toEqual({ ok: true });
+
+      const cleanDirect = sanitizePayload({
+        model: 'gemini-custom',
+        decisions: {
+          input: 'Ensalada',
+          questions: { is_vegan: { type: 'noul', instructions: '¿Es vegana?' } }
+        }
+      });
+      expect(cleanDirect.model).toBeUndefined();
+      expect(cleanDirect.decisions.input).toBe('Ensalada');
+    });
+
+    it('extractLastUserText y shouldRunRoutingDecision omiten media inline, decisiones directas y features no interactivos', () => {
+      const textPayload = {
+        contents: [
+          { role: 'user', parts: [{ text: 'Hola' }] },
+          { role: 'model', parts: [{ text: 'Hola, ¿qué cocinamos?' }] },
+          { role: 'user', parts: [{ text: 'Dame un sustituto para la nata' }] }
+        ]
+      };
+      expect(extractLastUserText(textPayload)).toBe('Dame un sustituto para la nata');
+      expect(shouldRunRoutingDecision('chat', textPayload)).toBe(true);
+      expect(shouldRunRoutingDecision('voice', textPayload)).toBe(true);
+      expect(shouldRunRoutingDecision('guided_query', textPayload)).toBe(true);
+      expect(shouldRunRoutingDecision('weekly_plan', textPayload)).toBe(false);
+      expect(shouldRunRoutingDecision('import_ai', textPayload)).toBe(false);
+
+      const mediaPayload = {
+        contents: [{ role: 'user', parts: [{ inlineData: { mimeType: 'image/jpeg', data: 'abc' } }, { text: 'Analiza' }] }]
+      };
+      expect(extractLastUserText(mediaPayload)).toBe('');
+      expect(shouldRunRoutingDecision('chat', mediaPayload)).toBe(false);
+    });
+
+    it('buildRoutingDecisionRequest construye las 4 preguntas para gemini-decision-1', () => {
+      const req = buildRoutingDecisionRequest('¿Puedo sustituir el yogur por queso crema?', 'chat');
+      expect(req.model).toBe('gemini-decision-1');
+      expect(Object.keys(req.questions)).toEqual([
+        'is_culinary_domain',
+        'is_prompt_injection',
+        'complexity_tier',
+        'intent_scope'
+      ]);
+      expect(req.questions.is_culinary_domain.type).toBe('noul');
+      expect(req.questions.complexity_tier.type).toBe('choice');
+    });
+
+    it('evaluateRoutingDecision bloquea prompt injection y mensajes fuera de dominio con alta confianza', () => {
+      const inj = evaluateRoutingDecision({
+        answers: {
+          is_prompt_injection: { type: 'noul', noul: 0.96, confidence: 0.95 },
+          is_culinary_domain: { type: 'noul', noul: 0.10, confidence: 0.90 }
+        }
+      }, 'pro', 'chat');
+      expect(inj.blockedByGuardrail).toBe(true);
+      expect(inj.reason).toBe('prompt_injection');
+      expect(inj.models).toEqual(['gemini-decision-1']);
+
+      const offTopic = evaluateRoutingDecision({
+        answers: {
+          is_prompt_injection: { type: 'noul', noul: 0.05, confidence: 0.90 },
+          is_culinary_domain: { type: 'noul', noul: 0.08, confidence: 0.92 }
+        }
+      }, 'pro', 'chat');
+      expect(offTopic.blockedByGuardrail).toBe(true);
+      expect(offTopic.reason).toBe('off_topic');
+    });
+
+    it('evaluateRoutingDecision enruta consultas simples de Pro a gemini-3.5-flash-lite y mantiene 3.8-flash en complejas o baja confianza', () => {
+      const simplePro = evaluateRoutingDecision({
+        answers: {
+          is_prompt_injection: { type: 'noul', noul: 0.01, confidence: 0.98 },
+          is_culinary_domain: { type: 'noul', noul: 0.97, confidence: 0.95 },
+          complexity_tier: { type: 'choice', choice: 'lite', probabilities: { lite: 0.91, full: 0.09 }, confidence: 0.91 },
+          intent_scope: { type: 'choice', choice: 'general_query', probabilities: { general_query: 0.88 }, confidence: 0.88 }
+        }
+      }, 'pro', 'chat');
+      expect(simplePro.blockedByGuardrail).toBe(false);
+      expect(simplePro.routedToLite).toBe(true);
+      expect(simplePro.models).toEqual(['gemini-3.5-flash-lite', 'gemini-3.8-flash']);
+
+      const weeklyPro = evaluateRoutingDecision({
+        answers: {
+          is_prompt_injection: { type: 'noul', noul: 0.01, confidence: 0.99 },
+          is_culinary_domain: { type: 'noul', noul: 0.99, confidence: 0.99 },
+          complexity_tier: { type: 'choice', choice: 'full', probabilities: { lite: 0.10, full: 0.90 }, confidence: 0.90 },
+          intent_scope: { type: 'choice', choice: 'weekly_plan', probabilities: { weekly_plan: 0.93 }, confidence: 0.93 }
+        }
+      }, 'pro', 'chat');
+      expect(weeklyPro.routedToLite).toBe(false);
+      expect(weeklyPro.models).toEqual(['gemini-3.8-flash', 'gemini-3.5-flash-lite']);
+
+      const lowConfPro = evaluateRoutingDecision({
+        answers: {
+          is_prompt_injection: { type: 'noul', noul: 0.10, confidence: 0.80 },
+          is_culinary_domain: { type: 'noul', noul: 0.85, confidence: 0.85 },
+          complexity_tier: { type: 'choice', choice: 'lite', probabilities: { lite: 0.52, full: 0.48 }, confidence: 0.52 },
+          intent_scope: { type: 'choice', choice: 'general_query', probabilities: { general_query: 0.55 }, confidence: 0.55 }
+        }
+      }, 'pro', 'chat');
+      expect(lowConfPro.routedToLite).toBe(false);
+      expect(lowConfPro.models).toEqual(['gemini-3.8-flash', 'gemini-3.5-flash-lite']);
     });
   });
 });
