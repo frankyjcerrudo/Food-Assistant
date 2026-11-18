@@ -14,12 +14,18 @@ new Function(appCode)();
 const {
   StateStore,
   FoodAssistantApp,
+  PREDEFINED_DIET_STYLES,
+  PREDEFINED_ALLERGEN_RESTRICTIONS,
   PREDEFINED_DIETARY_TAGS,
   PREDEFINED_OCCASION_TAGS,
   PREDEFINED_PRACTICAL_TAGS,
   ALL_PREDEFINED_TAGS,
+  isStrictAllergenPreference,
+  auditRecipeIngredientsForPreference,
   checkDietaryCompliance,
   analyzeAndInferRecipeTags,
+  buildAllergenAuditDecisionsQuestions,
+  applyRecipeDecisionsResult,
   getDietaryTagEmoji,
   toLocalDateKey,
   state,
@@ -534,6 +540,112 @@ describe('US-02: Filtros Dietéticos, Selector de Chips & Advertencias Nutricion
       expect(salmon.tags).toContain('Sin Gluten');
       expect(salmon.tags).toContain('Sin Lactosa');
       expect(salmon.tags).toContain('Alta en Proteínas');
+    });
+  });
+
+  describe('7. US-91: Perfil Ampliado de Dietas/Alergias y Auditoría de Alérgenos por Ingrediente (gemini-decision-1)', () => {
+    it('separa 7 estilos de dieta y 9 alergias estrictas con emojis únicos dentro de PREDEFINED_DIETARY_TAGS', () => {
+      expect(PREDEFINED_DIET_STYLES).toHaveLength(7);
+      expect(PREDEFINED_ALLERGEN_RESTRICTIONS).toHaveLength(9);
+      expect(PREDEFINED_DIETARY_TAGS).toHaveLength(16);
+      expect(PREDEFINED_DIETARY_TAGS).toEqual([...PREDEFINED_DIET_STYLES, ...PREDEFINED_ALLERGEN_RESTRICTIONS]);
+      expect(isStrictAllergenPreference('Sin Frutos Secos')).toBe(true);
+      expect(isStrictAllergenPreference('Bajo en FODMAP')).toBe(true);
+      expect(isStrictAllergenPreference('Keto')).toBe(false);
+
+      const emojis = PREDEFINED_DIETARY_TAGS.map(getDietaryTagEmoji);
+      expect(emojis.every(e => Boolean(e))).toBe(true);
+      expect(new Set(emojis).size).toBe(16);
+    });
+
+    it('checkDietaryCompliance audita ingredientes reales y trazas ocultas devolviendo violatingIngredients', () => {
+      const pesto = state.recipes.find(r => r.id === 'rec-pesto-pasta');
+      const nutAudit = checkDietaryCompliance(pesto, ['Sin Frutos Secos']);
+      expect(nutAudit.compliant).toBe(false);
+      expect(nutAudit.violations).toContain('Sin Frutos Secos');
+      expect(nutAudit.allergenViolations).toContain('Sin Frutos Secos');
+      expect(nutAudit.violatingIngredients.some(c => /Piñones/i.test(c.ingredient))).toBe(true);
+
+      const hiddenCases = [
+        { pref: 'Sin Marisco', recipe: { title: 'Wok', tags: [], ingredients: [{ name: 'Salsa de ostras' }] }, match: /ostras/i },
+        { pref: 'Sin Sésamo', recipe: { title: 'Hummus', tags: [], ingredients: [{ name: 'Tahini' }] }, match: /tahini/i },
+        { pref: 'Sin Soja', recipe: { title: 'Bowl', tags: [], ingredients: [{ name: 'Tofu firme' }] }, match: /tofu/i },
+        { pref: 'Bajo en FODMAP', recipe: { title: 'Sofrito', tags: [], ingredients: [{ name: 'Cebolla morada' }, { name: 'Ajo' }] }, match: /cebolla|ajo/i },
+        { pref: 'Vegetariano', recipe: { title: 'Crema', tags: ['Vegetariano'], ingredients: [{ name: 'Caldo de pollo' }] }, match: /caldo de pollo/i }
+      ];
+
+      hiddenCases.forEach(({ pref, recipe, match }) => {
+        const res = checkDietaryCompliance(recipe, [pref]);
+        expect(res.compliant).toBe(false);
+        expect(res.violations).toContain(pref);
+        expect(res.violatingIngredients.some(c => match.test(c.ingredient))).toBe(true);
+      });
+    });
+
+    it('cumple automáticamente restricciones de alérgenos cuando los ingredientes auditados están libres aunque falte el chip manual', () => {
+      const cleanRecipe = {
+        id: 'rec-clean-untagged',
+        title: 'Arroz blanco con zanahoria y aceite',
+        tags: [],
+        ingredients: [
+          { name: 'Arroz basmati', aisle: 'pantry' },
+          { name: 'Zanahoria', aisle: 'produce' },
+          { name: 'Aceite de oliva', aisle: 'spices' }
+        ]
+      };
+      const res = checkDietaryCompliance(cleanRecipe, ['Sin Gluten', 'Sin Lactosa', 'Sin Frutos Secos', 'Sin Marisco', 'Sin Huevo']);
+      expect(res.compliant).toBe(true);
+      expect(res.violations).toEqual([]);
+      expect(auditRecipeIngredientsForPreference(cleanRecipe, 'Sin Frutos Secos').hasViolation).toBe(false);
+    });
+
+    it('applyRecipeDecisionsResult aplica umbral >= 0.90 en preguntas de alérgenos ocultos, invalida etiquetas falsas y registra allergenAudit', () => {
+      const questions = buildAllergenAuditDecisionsQuestions();
+      expect(Object.keys(questions)).toContain('has_hidden_gluten');
+      expect(Object.keys(questions)).toContain('has_nuts_or_traces');
+      expect(questions.has_hidden_gluten.type).toBe('noul');
+
+      const falselyTagged = {
+        id: 'rec-soy-false-gf',
+        title: 'Salteado oriental',
+        tags: ['Sin Gluten', 'Vegano'],
+        ingredients: [{ name: 'Verduras variadas', aisle: 'produce' }, { name: 'Aderezo especial', aisle: 'spices' }]
+      };
+
+      const audited = applyRecipeDecisionsResult(falselyTagged, {
+        answers: {
+          has_hidden_gluten: { type: 'noul', noul: 0.95, confidence: 0.94 },
+          has_nuts_or_traces: { type: 'noul', noul: 0.72, confidence: 0.80 } // debajo de 0.90: no dispara falsa alarma
+        }
+      });
+
+      expect(audited.tags).not.toContain('Sin Gluten');
+      expect(audited.tags).toContain('Vegano');
+      expect(audited.allergenAudit.model).toBe('gemini-decision-1');
+      expect(audited.allergenAudit.conflicts).toHaveLength(1);
+      expect(audited.allergenAudit.conflicts[0].preference).toBe('Sin Gluten');
+
+      const postAuditCheck = checkDietaryCompliance(audited, ['Sin Gluten']);
+      expect(postAuditCheck.compliant).toBe(false);
+      expect(postAuditCheck.violatingIngredients.some(c => c.isHiddenTrace)).toBe(true);
+    });
+
+    it('renderDietaryPreferencesSettings agrupa estilos vs alergias y renderRecipeModalContent muestra banner e ingrediente conflictivo', () => {
+      app.renderDietaryPreferencesSettings();
+      const settingsContainer = document.getElementById('settings-dietary-chips');
+      expect(settingsContainer.querySelectorAll('.dietary-prefs-group')).toHaveLength(2);
+      expect(settingsContainer.querySelectorAll('.allergen-chip').length).toBe(9);
+
+      state.saveDietaryPreferences(['Sin Frutos Secos']);
+      app.openRecipeDetail('rec-pesto-pasta');
+      const banner = document.getElementById('recipe-allergen-alert-banner');
+      expect(banner).not.toBeNull();
+      expect(banner.textContent).toContain('Piñones');
+      expect(document.getElementById('btn-recipe-substitute-allergen')).not.toBeNull();
+
+      const modalBody = document.getElementById('recipe-modal-body');
+      expect(modalBody.querySelector('.recipe-ingredient-item.has-allergen-conflict')).not.toBeNull();
+      expect(modalBody.querySelector('.ingredient-allergen-pill')).not.toBeNull();
     });
   });
 });

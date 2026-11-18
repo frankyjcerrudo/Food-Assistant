@@ -1,4 +1,4 @@
-// Food Assistant - Core Utilities (US-42)
+import { auditRecipeIngredientsForPreference, isStrictAllergenPreference } from './constants.js';
 import {
   DAYS_OF_WEEK_ES,
   MONTHS_SHORT_ES,
@@ -74,35 +74,47 @@ function cleanRecipeImageUrl(url) {
 
 function checkDietaryCompliance(recipe, preferences) {
   if (!recipe || !Array.isArray(preferences) || preferences.length === 0) {
-    return { compliant: true, violations: [] };
+    return { compliant: true, violations: [], violatingIngredients: [], allergenViolations: [] };
   }
   const recipeTagsLower = (Array.isArray(recipe.tags) ? recipe.tags : []).map(t => String(t).toLowerCase().trim());
+  const hasIngredients = Array.isArray(recipe.ingredients) && recipe.ingredients.length > 0;
   const violations = [];
+  const allergenViolations = [];
+  const violatingIngredients = [];
+  const seenIng = new Set();
 
   preferences.forEach(pref => {
     const prefLower = String(pref).toLowerCase().trim();
-    let isCompliant = recipeTagsLower.includes(prefLower);
+    const isAllergen = isStrictAllergenPreference(pref);
+    const audit = auditRecipeIngredientsForPreference(recipe, pref);
+    let isCompliant = false;
 
-    if (prefLower === 'vegano' || prefLower === 'vegetariano') {
-      const hasMeatAisle = Array.isArray(recipe.ingredients) && recipe.ingredients.some(i => i && (i.aisle === 'meat' || i.aisle === 'fish'));
-      const hasMeatTag = recipeTagsLower.some(t => ['pollo', 'carne', 'pescado', 'ternera', 'cerdo', 'jamon', 'jamón'].includes(t));
-      if (hasMeatAisle || hasMeatTag) {
-        isCompliant = false;
-      }
-      if (prefLower === 'vegano') {
-        const hasDairy = Array.isArray(recipe.ingredients) && recipe.ingredients.some(i => i && i.aisle === 'dairy');
-        if (hasDairy) isCompliant = false;
-      }
+    if (audit.hasViolation) {
+      isCompliant = false;
+    } else if (recipeTagsLower.includes(prefLower)) {
+      isCompliant = true;
+    } else if ((isAllergen || prefLower === 'sin azúcar añadido') && hasIngredients) {
+      isCompliant = true;
     }
 
     if (!isCompliant) {
       violations.push(pref);
+      if (isAllergen) allergenViolations.push(pref);
+      audit.conflictingIngredients.forEach(c => {
+        const key = `${c.ingredient.toLowerCase()}::${prefLower}`;
+        if (!seenIng.has(key)) {
+          seenIng.add(key);
+          violatingIngredients.push(c);
+        }
+      });
     }
   });
 
   return {
     compliant: violations.length === 0,
-    violations
+    violations,
+    violatingIngredients,
+    allergenViolations
   };
 }
 

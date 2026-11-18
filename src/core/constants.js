@@ -411,9 +411,32 @@ function getRecipeNutrition(recipe) {
 }
 
 // ==========================================================================
-// PREDEFINED TAGS & DIETARY CLASSIFIER (US-02)
+// PREDEFINED TAGS & DIETARY CLASSIFIER (US-02, US-91)
 // ==========================================================================
-const PREDEFINED_DIETARY_TAGS = ['Keto', 'Vegano', 'Vegetariano', 'Sin Gluten', 'Sin Lactosa', 'Bajo en Carbos', 'Alta en Proteínas'];
+const PREDEFINED_DIET_STYLES = [
+  'Keto',
+  'Vegano',
+  'Vegetariano',
+  'Bajo en Carbos',
+  'Alta en Proteínas',
+  'Mediterránea',
+  'Sin Azúcar Añadido'
+];
+const PREDEFINED_ALLERGEN_RESTRICTIONS = [
+  'Sin Gluten',
+  'Sin Lactosa',
+  'Sin Frutos Secos',
+  'Sin Marisco',
+  'Sin Pescado',
+  'Sin Huevo',
+  'Sin Soja',
+  'Sin Sésamo',
+  'Bajo en FODMAP'
+];
+const PREDEFINED_DIETARY_TAGS = [
+  ...PREDEFINED_DIET_STYLES,
+  ...PREDEFINED_ALLERGEN_RESTRICTIONS
+];
 const DIETARY_TAG_EMOJIS = {
   'Keto': '🥑',
   'Vegano': '🌱',
@@ -421,10 +444,23 @@ const DIETARY_TAG_EMOJIS = {
   'Sin Gluten': '🌾',
   'Sin Lactosa': '🥛',
   'Bajo en Carbos': '🥦',
-  'Alta en Proteínas': '💪'
+  'Alta en Proteínas': '💪',
+  'Mediterránea': '🫒',
+  'Sin Azúcar Añadido': '🍯',
+  'Sin Frutos Secos': '🥜',
+  'Sin Marisco': '🦐',
+  'Sin Pescado': '🐟',
+  'Sin Huevo': '🥚',
+  'Sin Soja': '🫘',
+  'Sin Sésamo': '🥯',
+  'Bajo en FODMAP': '🫚'
 };
 function getDietaryTagEmoji(tag) {
   return DIETARY_TAG_EMOJIS[tag] || '';
+}
+function isStrictAllergenPreference(pref) {
+  const clean = String(pref || '').toLowerCase().trim();
+  return PREDEFINED_ALLERGEN_RESTRICTIONS.some(r => r.toLowerCase() === clean);
 }
 const PREDEFINED_OCCASION_TAGS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena'];
 const PREDEFINED_PRACTICAL_TAGS = ['Rápida', 'Horno', 'Tupper', 'Airfryer', 'Saludable', 'Robot de Cocina'];
@@ -434,38 +470,220 @@ const ALL_PREDEFINED_TAGS = [
   ...PREDEFINED_PRACTICAL_TAGS
 ];
 
+function auditRecipeIngredientsForPreference(recipe, pref) {
+  const prefLower = String(pref || '').toLowerCase().trim();
+  const isAllergen = isStrictAllergenPreference(pref);
+  const conflictingIngredients = [];
+  if (!recipe || !prefLower) {
+    return { hasViolation: false, conflictingIngredients };
+  }
+
+  const recipeTagsLower = (Array.isArray(recipe.tags) ? recipe.tags : []).map(t => String(t).toLowerCase().trim());
+  const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
+  const seen = new Set();
+  const pushConflict = (ingredientName, isHiddenTrace = false) => {
+    const cleanName = String(ingredientName || '').trim();
+    if (!cleanName) return;
+    const key = `${cleanName.toLowerCase()}::${prefLower}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    conflictingIngredients.push({
+      ingredient: cleanName,
+      preference: pref,
+      isAllergen,
+      isHiddenTrace
+    });
+  };
+
+  if (Array.isArray(recipe.allergenAudit?.conflicts)) {
+    recipe.allergenAudit.conflicts.forEach(c => {
+      if (c && String(c.preference || '').toLowerCase().trim() === prefLower) {
+        pushConflict(c.ingredient || c.label || pref, true);
+      }
+    });
+  }
+
+  for (const ing of ingredients) {
+    if (!ing) continue;
+    const rawName = typeof ing === 'string' ? ing : (ing.name || '');
+    const lowerName = rawName.toLowerCase().trim();
+    const aisle = typeof ing === 'object' ? String(ing.aisle || '').toLowerCase() : '';
+    if (!lowerName && !aisle) continue;
+
+    if (prefLower === 'vegano' || prefLower === 'vegetariano') {
+      const isPlantAlternative = /\b(vegano|vegana|vegetal|de soja|tofu|seit[aá]n|heura)\b/i.test(lowerName);
+      const isMeat = !isPlantAlternative && (
+        aisle === 'meat'
+        || /\b(pollo|pechuga|pavo|carne|ternera|vaca|buey|cerdo|lomo|jam[oó]n|bacon|beicon|panceta|chorizo|salchicha|hamburguesa|cordero|conejo|solomillo|alitas|pato)\b/i.test(lowerName)
+      );
+      const isFish = aisle === 'fish'
+        || /\b(pescados?|salm[oó]n|salmones|at[uú]n|atunes|merluzas?|bacalaos?|doradas?|lubinas?|truchas?|sardinas?|anchoas?|boquer[oó]n|boquerones|rape|lenguado|caballa|gambas?|langostinos?|camar[oó]n|camarones|calamar(?:es)?|pulpos?|sepias?|mejill[oó]n|mejillones|almejas?|mariscos?|ostras?)\b/i.test(lowerName);
+      const isAnimalBrothOrGelatin = /\b(gelatina|caldo de pollo|caldo de carne|caldo de pescado|caldo de ave|manteca de cerdo|salsa de ostras|salsa de pescado|fumet)\b/i.test(lowerName);
+      if (isMeat || isFish) pushConflict(rawName, false);
+      else if (isAnimalBrothOrGelatin) pushConflict(rawName, true);
+
+      if (prefLower === 'vegano') {
+        const isPlantMilk = /\b(sin lactosa|vegetal|de avena|de soja|de almendra|de coco|de arroz|vegano|vegana)\b/i.test(lowerName);
+        const isEgg = !/\b(sin huevo|vegano|vegana)\b/i.test(lowerName) && /\b(huevos?|claras?|yemas?|mayonesa|merengue)\b/i.test(lowerName);
+        const isDairy = !isPlantMilk && !isEgg && (
+          (aisle === 'dairy' && !/\b(huevos?|claras?|yemas?)\b/i.test(lowerName))
+          || /\b(leche|queso|yogur|mantequilla|nata|parmesano|mozzarella|feta|ricotta|mascarpone|cheddar|gouda|cuajada|suero|whey|case[ií]na)\b/i.test(lowerName)
+        );
+        const isHoney = /\b(miel)\b/i.test(lowerName);
+        if (isDairy || isEgg || isHoney) pushConflict(rawName, false);
+      }
+      continue;
+    }
+
+    if (prefLower === 'sin gluten') {
+      const isSafeGf = /\b(sin gluten|gluten[ -]?free|tamari|de ma[ií]z|de arroz|de almendra|de garbanzo|de coco|trigo sarraceno|alforf[oó]n)\b/i.test(lowerName);
+      if (isSafeGf) continue;
+      if (/\b(trigo|harina|pan|tostada|tostadas|baguette|pan rallado|panko|pasta|espaguetis?|tagliatelle|macarrones?|tallarines?|fideos?|lasa[ñn]a|gnocchi|ñoquis|cusc[uú]s|couscous|bulgur|seit[aá]n|cebada|centeno|espelta|kamut|malta|cerveza|galletas?|bizcocho|hojaldre|masa de pizza|empanadilla|tortilla de trigo|wrap|teriyaki|udon|ramen|rebozado|empanado|bechamel)\b/i.test(lowerName)) {
+        pushConflict(rawName, false);
+      } else if (/\bsalsa de soja\b/i.test(lowerName) && !recipeTagsLower.includes('sin gluten')) {
+        pushConflict(rawName, true);
+      }
+      continue;
+    }
+
+    if (prefLower === 'sin lactosa') {
+      const isPlantMilk = /\b(sin lactosa|lactose[ -]?free|vegetal|de avena|de soja|de almendra|de coco|de arroz|vegano|vegana)\b/i.test(lowerName);
+      const isPureEgg = /\b(huevos?|claras?|yemas?)\b/i.test(lowerName) && !/\b(leche|queso|nata|mantequilla|yogur)\b/i.test(lowerName);
+      if (isPlantMilk || isPureEgg) continue;
+      if ((aisle === 'dairy' && !/\b(huevos?|claras?|yemas?)\b/i.test(lowerName))
+        || /\b(leche|nata|crema de leche|queso|mantequilla|yogur|parmesano|mozzarella|feta|ricotta|mascarpone|cheddar|gouda|cuajada|suero de leche|whey|bechamel|leche condensada)\b/i.test(lowerName)) {
+        pushConflict(rawName, false);
+      }
+      continue;
+    }
+
+    if (prefLower === 'sin frutos secos') {
+      if (/\b(sin frutos secos|nut[ -]?free)\b/i.test(lowerName)) continue;
+      if (/\b(nuez|nueces|almendras?|avellanas?|pistachos?|anacardos?|pi[ñn][oó]n|pi[ñn]ones|cacahuetes?|man[ií]|pacanas?|macadamia|crema de cacahuete|mantequilla de cacahuete)\b/i.test(lowerName)) {
+        pushConflict(rawName, false);
+      } else if (/\b(pesto|satay|pralin[eé]|mazap[aá]n|gianduja|frangipane)\b/i.test(lowerName)) {
+        pushConflict(rawName, true);
+      }
+      continue;
+    }
+
+    if (prefLower === 'sin marisco') {
+      if (/\b(gambas?|langostinos?|camar[oó]n|camarones|mejill[oó]n|mejillones|almejas?|berberechos?|calamar(?:es)?|sepias?|pulpos?|bogavantes?|langostas?|cangrejos?|n[eé]coras?|cigalas?|ostras?|mariscos?)\b/i.test(lowerName)) {
+        pushConflict(rawName, false);
+      } else if (/\bsalsa de ostras\b/i.test(lowerName)) {
+        pushConflict(rawName, true);
+      }
+      continue;
+    }
+
+    if (prefLower === 'sin pescado') {
+      if (aisle === 'fish' || /\b(pescados?|salm[oó]n|salmones|at[uú]n|atunes|bonito|merluzas?|bacalaos?|doradas?|lubinas?|truchas?|sardinas?|anchoas?|boquer[oó]n|boquerones|rape|lenguado|caballa)\b/i.test(lowerName)) {
+        pushConflict(rawName, false);
+      } else if (/\b(caldo de pescado|salsa de pescado|fumet)\b/i.test(lowerName)) {
+        pushConflict(rawName, true);
+      }
+      continue;
+    }
+
+    if (prefLower === 'sin huevo') {
+      if (/\b(sin huevo|egg[ -]?free|vegano|vegana)\b/i.test(lowerName)) continue;
+      if (/\b(huevos?|claras?|yemas?)\b/i.test(lowerName)) pushConflict(rawName, false);
+      else if (/\b(mayonesa|merengue)\b/i.test(lowerName)) pushConflict(rawName, true);
+      continue;
+    }
+
+    if (prefLower === 'sin soja') {
+      if (/\b(sin soja|soy[ -]?free)\b/i.test(lowerName)) continue;
+      if (/\b(soja|tofu|edamame|tempeh|bebida de soja|heura|soja texturizada)\b/i.test(lowerName)) pushConflict(rawName, false);
+      else if (/\b(salsa de soja|tamari|miso|lecitina de soja)\b/i.test(lowerName)) pushConflict(rawName, true);
+      continue;
+    }
+
+    if (prefLower === 'sin sésamo') {
+      if (/\b(sin s[eé]samo|sesame[ -]?free)\b/i.test(lowerName)) continue;
+      if (/\b(s[eé]samo|ajonjol[ií]|aceite de s[eé]samo)\b/i.test(lowerName)) pushConflict(rawName, false);
+      else if (/\b(tahini|tahina|gomasio)\b/i.test(lowerName)) pushConflict(rawName, true);
+      continue;
+    }
+
+    if (prefLower === 'bajo en fodmap') {
+      if (/\b(ajo|dientes de ajo|cebollas?|puerros?|chalotas?|trigo|centeno|miel|manzanas?|peras?|sand[ií]as?|lentejas?|garbanzos?|alubias?|frijoles?)\b/i.test(lowerName)) {
+        pushConflict(rawName, false);
+      }
+      continue;
+    }
+
+    if (prefLower === 'sin azúcar añadido') {
+      if (/\b(sin az[uú]car(?:es)?(?: a[ñn]adidos?)?|0% az[uú]car|sugar[ -]?free)\b/i.test(lowerName)) continue;
+      if (/\b(az[uú]car(?: moreno| glas)?|miel|sirope|jarabe|caramelo|leche condensada|melaza)\b/i.test(lowerName)) {
+        pushConflict(rawName, false);
+      }
+    }
+  }
+
+  // Comprobación complementaria de título/pasos para trazas ocultas (ej. pesto, caldo de pollo)
+  const titleAndSteps = `${recipe.title || ''} ${(Array.isArray(recipe.instructions) ? recipe.instructions : []).map(s => typeof s === 'string' ? s : (s?.text || '')).join(' ')}`.toLowerCase();
+  if (prefLower === 'vegano' || prefLower === 'vegetariano') {
+    const hasMeatTag = recipeTagsLower.some(t => ['pollo', 'carne', 'pescado', 'ternera', 'cerdo', 'jamon', 'jamón'].includes(t));
+    if (hasMeatTag && conflictingIngredients.length === 0) {
+      pushConflict(recipe.title || pref, false);
+    }
+    const hiddenAnimalStep = titleAndSteps.match(/\b(caldo de pollo|caldo de carne|caldo de pescado|gelatina|salsa de ostras|salsa de pescado)\b/i);
+    if (hiddenAnimalStep) pushConflict(hiddenAnimalStep[0], true);
+  } else if (prefLower === 'sin frutos secos') {
+    const hiddenNutTitle = titleAndSteps.match(/\b(pesto|satay|pralin[eé]|mazap[aá]n)\b/i);
+    if (hiddenNutTitle && !/\bsin frutos secos\b/i.test(titleAndSteps)) pushConflict(hiddenNutTitle[0], true);
+  }
+
+  return {
+    hasViolation: conflictingIngredients.length > 0,
+    conflictingIngredients
+  };
+}
+
 function checkDietaryCompliance(recipe, preferences) {
   if (!recipe || !Array.isArray(preferences) || preferences.length === 0) {
-    return { compliant: true, violations: [] };
+    return { compliant: true, violations: [], violatingIngredients: [], allergenViolations: [] };
   }
   const recipeTagsLower = (Array.isArray(recipe.tags) ? recipe.tags : []).map(t => String(t).toLowerCase().trim());
+  const hasIngredients = Array.isArray(recipe.ingredients) && recipe.ingredients.length > 0;
   const violations = [];
+  const allergenViolations = [];
+  const violatingIngredients = [];
+  const seenIng = new Set();
 
   preferences.forEach(pref => {
     const prefLower = String(pref).toLowerCase().trim();
-    let isCompliant = recipeTagsLower.includes(prefLower);
+    const isAllergen = isStrictAllergenPreference(pref);
+    const audit = auditRecipeIngredientsForPreference(recipe, pref);
+    let isCompliant = false;
 
-    // Negative ingredient/tag check for vegetarian / vegan
-    if (prefLower === 'vegano' || prefLower === 'vegetariano') {
-      const hasMeatAisle = Array.isArray(recipe.ingredients) && recipe.ingredients.some(i => i && (i.aisle === 'meat' || i.aisle === 'fish'));
-      const hasMeatTag = recipeTagsLower.some(t => ['pollo', 'carne', 'pescado', 'ternera', 'cerdo', 'jamon', 'jamón'].includes(t));
-      if (hasMeatAisle || hasMeatTag) {
-        isCompliant = false;
-      }
-      if (prefLower === 'vegano') {
-        const hasDairy = Array.isArray(recipe.ingredients) && recipe.ingredients.some(i => i && i.aisle === 'dairy');
-        if (hasDairy) isCompliant = false;
-      }
+    if (audit.hasViolation) {
+      isCompliant = false;
+    } else if (recipeTagsLower.includes(prefLower)) {
+      isCompliant = true;
+    } else if ((isAllergen || prefLower === 'sin azúcar añadido') && hasIngredients) {
+      isCompliant = true;
     }
 
     if (!isCompliant) {
       violations.push(pref);
+      if (isAllergen) allergenViolations.push(pref);
+      audit.conflictingIngredients.forEach(c => {
+        const key = `${c.ingredient.toLowerCase()}::${prefLower}`;
+        if (!seenIng.has(key)) {
+          seenIng.add(key);
+          violatingIngredients.push(c);
+        }
+      });
     }
   });
 
   return {
     compliant: violations.length === 0,
-    violations
+    violations,
+    violatingIngredients,
+    allergenViolations
   };
 }
 
@@ -693,9 +911,13 @@ export {
   AISLE_METADATA,
   DAYS_OF_WEEK_ES,
   MONTHS_SHORT_ES,
+  PREDEFINED_DIET_STYLES,
+  PREDEFINED_ALLERGEN_RESTRICTIONS,
   PREDEFINED_DIETARY_TAGS,
   DIETARY_TAG_EMOJIS,
   PREDEFINED_OCCASION_TAGS,
   PREDEFINED_PRACTICAL_TAGS,
-  ALL_PREDEFINED_TAGS
+  ALL_PREDEFINED_TAGS,
+  isStrictAllergenPreference,
+  auditRecipeIngredientsForPreference
 };

@@ -3182,6 +3182,132 @@ dialog.modal-overlay:is([open], .active):where(:not([data-closing]))::backdrop {
   font-weight: 500;
 }
 
+/* US-91: Grupos Dietas vs Alergias y Alerta por Ingrediente */
+.dietary-prefs-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.dietary-prefs-group:last-child {
+  margin-bottom: 0;
+}
+
+.dietary-prefs-group-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--m3-on-surface-variant);
+  letter-spacing: 0.02em;
+}
+
+.dietary-prefs-chips-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.m3-filter-chip.allergen-chip {
+  border-color: rgba(185, 28, 28, 0.35);
+}
+
+.m3-filter-chip.allergen-chip.active {
+  background-color: #fde8e8;
+  color: #9b1c1c;
+  border-color: #dc2626;
+}
+
+:root[data-theme="dark"] .m3-filter-chip.allergen-chip {
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
+:root[data-theme="dark"] .m3-filter-chip.allergen-chip.active {
+  background-color: rgba(248, 113, 113, 0.2);
+  color: #fecaca;
+  border-color: #f87171;
+}
+
+.recipe-allergen-alert-banner {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+:root[data-theme="dark"] .recipe-allergen-alert-banner {
+  background-color: rgba(239, 68, 68, 0.14);
+  border-color: rgba(248, 113, 113, 0.35);
+  color: #fecaca;
+}
+
+.recipe-allergen-alert-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.recipe-allergen-conflicts-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.recipe-allergen-conflict-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  background-color: rgba(220, 38, 38, 0.12);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.recipe-allergen-alert-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.recipe-ingredient-item.has-allergen-conflict {
+  border-color: rgba(220, 38, 38, 0.45);
+  background-color: rgba(254, 226, 226, 0.55);
+}
+
+:root[data-theme="dark"] .recipe-ingredient-item.has-allergen-conflict {
+  border-color: rgba(248, 113, 113, 0.45);
+  background-color: rgba(239, 68, 68, 0.12);
+}
+
+.ingredient-allergen-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background-color: #fde8e8;
+  color: #9b1c1c;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+:root[data-theme="dark"] .ingredient-allergen-pill {
+  background-color: rgba(248, 113, 113, 0.22);
+  color: #fecaca;
+}
+
 @keyframes chipFadeIn {
   from {
     opacity: 0;
