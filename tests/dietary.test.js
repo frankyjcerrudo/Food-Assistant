@@ -787,3 +787,27 @@ describe('US-02: Filtros Dietéticos, Selector de Chips & Advertencias Nutricion
     });
   });
 });
+
+describe('US-91: sincronización móvil → PC de preferencias dietéticas', () => {
+  it('saveDietaryPreferences genera marca temporal monotónica ante reloj remoto adelantado', () => {
+    const future = new Date(Date.now() + 60000).toISOString();
+    state.dietaryUpdatedAt = future;
+    state.saveDietaryPreferences(['Sin Gluten']);
+    expect(new Date(state.dietaryUpdatedAt).getTime()).toBeGreaterThan(new Date(future).getTime());
+  });
+
+  it('syncDietaryPreferencesInstant persiste en user_settings y auth sin pasar por pushToCloud', async () => {
+    const app = new FoodAssistantApp();
+    const calls = [];
+    app.supabaseClient = { auth: { updateUser: async (p) => { calls.push(['auth', p]); return {}; } } };
+    app.upsertWithSchemaFallback = async (table, rows) => { calls.push([table, rows]); return { success: true }; };
+    state.cloudUser = { id: 'u1' };
+    state.household = null;
+    app.isPushingToCloud = true;
+    state.saveDietaryPreferences(['Sin Lactosa']);
+    await app.syncDietaryPreferencesInstant();
+    expect(calls.find(c => c[0] === 'user_settings')[1][0].dietary_preferences).toEqual(['Sin Lactosa']);
+    expect(calls.find(c => c[0] === 'auth')[1].data.dietary_preferences).toEqual(['Sin Lactosa']);
+    state.cloudUser = null;
+  });
+});

@@ -3360,7 +3360,14 @@ class StateStore {
 
   saveDietaryPreferences(prefs) {
     this.dietaryPreferences = Array.isArray(prefs) ? prefs : [];
-    this.dietaryUpdatedAt = new Date().toISOString();
+    // Marca temporal monotónica: siempre estrictamente posterior a la última recibida,
+    // aunque el reloj de este dispositivo vaya por detrás del de otro (clock skew).
+    const prevMs = this.dietaryUpdatedAt
+      ? new Date(String(this.dietaryUpdatedAt).replace(/^"+|"+$/g, '')).getTime()
+      : 0;
+    const nowMs = Date.now();
+    const nextMs = (Number.isFinite(prevMs) && prevMs >= nowMs) ? (prevMs + 1000) : nowMs;
+    this.dietaryUpdatedAt = new Date(nextMs).toISOString();
     this.save('fa_dietary_preferences', this.dietaryPreferences);
     this.save('fa_dietary_updated_at', this.dietaryUpdatedAt);
     if (this.household && typeof this.household === 'object') {
@@ -5678,7 +5685,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.26';
+  window.APP_VERSION = 'v2.27';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -5736,7 +5743,7 @@ class FoodAssistantApp {
   constructor() {
     if (typeof window !== 'undefined') window.app = this;
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.26';
+    this.appVersion = window.APP_VERSION || 'v2.27';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -7978,6 +7985,8 @@ class FoodAssistantApp {
 
       let metaCookbooks = null;
       let metaCookbooksUpdatedAt = null;
+      let metaDietary = null;
+      let metaDietaryUpdatedAt = null;
       if (this.supabaseClient?.auth && typeof this.supabaseClient.auth.getUser === 'function') {
         try {
           const authRes = await this.supabaseClient.auth.getUser();
@@ -7986,6 +7995,8 @@ class FoodAssistantApp {
             if (Array.isArray(meta.dietary_preferences)) {
               const metaTime = meta.dietary_updated_at ? new Date(meta.dietary_updated_at).getTime() : 0;
               const rowTime = remoteDietaryUpdatedAt ? new Date(remoteDietaryUpdatedAt).getTime() : 0;
+              metaDietary = meta.dietary_preferences;
+              metaDietaryUpdatedAt = meta.dietary_updated_at || null;
               if (!remoteDietary || metaTime >= rowTime) {
                 remoteDietary = meta.dietary_preferences;
                 remoteDietaryUpdatedAt = meta.dietary_updated_at;
@@ -8044,8 +8055,16 @@ class FoodAssistantApp {
           ? remoteHouseholdPrefsRow.custom_slots.find(s => s && s.type === 'household_prefs')
           : null;
         if (hhPrefSlot && Array.isArray(hhPrefSlot.dietaryPreferences)) {
-          remoteDietary = hhPrefSlot.dietaryPreferences;
-          remoteDietaryUpdatedAt = hhPrefSlot.updatedAt || remoteHouseholdPrefsRow.updated_at || remoteDietaryUpdatedAt;
+          const hhSlotUpdatedAt = hhPrefSlot.updatedAt || remoteHouseholdPrefsRow.updated_at || remoteDietaryUpdatedAt;
+          const hhTime = new Date(String(hhSlotUpdatedAt || 0).replace(/^"+|"+$/g, '')).getTime() || 0;
+          const metaTime = metaDietaryUpdatedAt ? (new Date(String(metaDietaryUpdatedAt).replace(/^"+|"+$/g, '')).getTime() || 0) : 0;
+          if (Array.isArray(metaDietary) && metaTime > hhTime) {
+            remoteDietary = metaDietary;
+            remoteDietaryUpdatedAt = metaDietaryUpdatedAt;
+          } else {
+            remoteDietary = hhPrefSlot.dietaryPreferences;
+            remoteDietaryUpdatedAt = hhSlotUpdatedAt;
+          }
         }
       }
       if (!remoteCustomTags && Array.isArray(state.cloudUser?.user_metadata?.custom_tags)) {
@@ -23065,7 +23084,53 @@ REGLAS CRÍTICAS:
       dietaryPreferences: Array.isArray(state.dietaryPreferences) ? [...state.dietaryPreferences] : [],
       dietaryUpdatedAt: state.dietaryUpdatedAt || new Date().toISOString()
     });
-    this.scheduleSyncWithCloud(250);
+    if (this.supabaseClient && state.cloudUser?.id) {
+      this.syncDietaryPreferencesInstant().catch(() => { });
+    }
+    this.scheduleSyncWithCloud(800);
+  }
+
+  // Persistencia inmediata de preferencias dietéticas (sin esperar al push completo ni a su mutex)
+  async syncDietaryPreferencesInstant() {
+    if (!this.supabaseClient || !state.cloudUser?.id) return;
+    const prefs = Array.isArray(state.dietaryPreferences) ? [...state.dietaryPreferences] : [];
+    const updatedAt = state.dietaryUpdatedAt || new Date().toISOString();
+    const activeHouseholdId = state.household?.id || null;
+    const tasks = [];
+
+    const prefRow = activeHouseholdId
+      ? {
+        id: '__household_prefs__',
+        user_id: state.cloudUser.id,
+        plan_date: '__household_prefs__',
+        day_name: 'Preferencias del Hogar',
+        breakfast_recipe_id: null,
+        lunch_recipe_id: null,
+        snack_recipe_id: null,
+        dinner_recipe_id: null,
+        custom_slots: [
+          { type: 'household_prefs', dietaryPreferences: prefs, updatedAt },
+          { type: 'household_cookbooks', cookbooks: Array.isArray(state.cookbooks) ? state.cookbooks : [], updatedAt: state.cookbooksUpdatedAt || updatedAt }
+        ],
+        household_id: activeHouseholdId,
+        updated_at: updatedAt
+      }
+      : null;
+    if (prefRow) tasks.push(this.upsertWithSchemaFallback('meal_plans', [prefRow]));
+
+    tasks.push(this.upsertWithSchemaFallback('user_settings', [{
+      user_id: state.cloudUser.id,
+      dietary_preferences: prefs,
+      updated_at: updatedAt,
+      ...(activeHouseholdId ? { active_household_id: activeHouseholdId } : {})
+    }]));
+
+    if (this.supabaseClient.auth?.updateUser) {
+      tasks.push(this.supabaseClient.auth.updateUser({
+        data: { dietary_preferences: prefs, dietary_updated_at: updatedAt }
+      }));
+    }
+    await Promise.allSettled(tasks);
   }
 
   addCustomAllergenFromSettings() {
