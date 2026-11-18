@@ -136,4 +136,63 @@ test.describe('Mobile Viewport & Layout Integrity (Zero-Overflow & Editorial Hea
     await expect(page.locator('.bottom-nav')).not.toBeVisible();
   });
 
+  test('ajustes y controles avanzados no se desbordan ni se solapan en móviles estrechos (320px y 360px)', async ({ page }) => {
+    await page.evaluate(() => window.app.switchView('view-settings'));
+    await page.waitForSelector('#view-settings.active');
+
+    // Abrir el acordeón de configuración avanzada
+    const accordion = page.locator('#settings-advanced-accordion');
+    await expect(accordion).toBeVisible();
+    const isOpen = await accordion.evaluate((el) => el.hasAttribute('open'));
+    if (!isOpen) {
+      await accordion.locator('summary').click();
+    }
+
+    for (const viewport of [{ width: 320, height: 700 }, { width: 360, height: 740 }]) {
+      await page.setViewportSize(viewport);
+      await page.waitForTimeout(100);
+
+      // 1. Verificar que los botones segmentados permanecen dentro de su contenedor
+      for (const groupId of ['#theme-segmented-group', '#language-segmented-group']) {
+        const group = page.locator(groupId);
+        const groupBox = await group.boundingBox();
+        expect(groupBox).not.toBeNull();
+
+        const buttons = group.locator('.segmented-btn');
+        const count = await buttons.count();
+        expect(count).toBe(3);
+
+        for (let i = 0; i < count; i++) {
+          const btnBox = await buttons.nth(i).boundingBox();
+          expect(btnBox).not.toBeNull();
+          expect(btnBox.x).toBeGreaterThanOrEqual(groupBox.x - 1);
+          expect(btnBox.x + btnBox.width).toBeLessThanOrEqual(groupBox.x + groupBox.width + 2);
+        }
+      }
+
+      // 2. Verificar que los botones dentro de tarjetas avanzadas no se salen de su tarjeta
+      for (const btnId of ['#btn-force-cache-update', '#btn-auto-tag-recipes', '#btn-reset-demo']) {
+        const btn = page.locator(btnId);
+        await btn.scrollIntoViewIfNeeded();
+        await expect(btn).toBeVisible();
+        const btnBox = await btn.boundingBox();
+        const cardBox = await btn.locator('xpath=ancestor::div[contains(@class,"card")]').boundingBox();
+        expect(btnBox).not.toBeNull();
+        expect(cardBox).not.toBeNull();
+        expect(btnBox.x).toBeGreaterThanOrEqual(cardBox.x - 1);
+        expect(btnBox.x + btnBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width + 2);
+      }
+
+      // 3. Verificar que el switch de TTS es visible y no se solapa con el texto descriptivo
+      const ttsSwitch = page.locator('#card-tts-settings .m3-switch');
+      const ttsInfo = page.locator('#card-tts-settings .goals-switch-info');
+      await expect(ttsSwitch).toBeVisible();
+      const switchBox = await ttsSwitch.boundingBox();
+      const infoBox = await ttsInfo.boundingBox();
+      expect(switchBox).not.toBeNull();
+      expect(infoBox).not.toBeNull();
+      expect(infoBox.x + infoBox.width).toBeLessThanOrEqual(switchBox.x + 1);
+    }
+  });
+
 });

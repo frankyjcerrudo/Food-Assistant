@@ -725,10 +725,14 @@ textarea {
   gap: 4px;
   border: 1px solid var(--m3-outline-variant);
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .segmented-btn {
   flex: 1;
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -742,6 +746,10 @@ textarea {
   background: transparent;
   color: var(--m3-on-surface-variant);
   cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
   transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out), background-color var(--duration-normal) ease, border-color var(--duration-normal) ease, color var(--duration-normal) ease, box-shadow var(--duration-normal) var(--ease-out);
   user-select: none;
 }
@@ -3532,6 +3540,7 @@ dialog.modal-overlay:is([open], .active):where(:not([data-closing]))::backdrop {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 10px 14px;
   background: var(--m3-surface-container-low);
   border: 1px solid var(--m3-outline-variant);
@@ -3542,6 +3551,8 @@ dialog.modal-overlay:is([open], .active):where(:not([data-closing]))::backdrop {
 .goals-switch-info {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-width: 0;
 }
 
 .goals-switch-label {
@@ -7945,6 +7956,7 @@ body.app-tour-active .app-tour-nav-target .nav-label {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 14px;
 }
@@ -8114,6 +8126,7 @@ body.app-tour-active .app-tour-nav-target .nav-label {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 10px;
   background: var(--m3-surface);
   border: var(--border-subtle);
@@ -8142,6 +8155,7 @@ body.app-tour-active .app-tour-nav-target .nav-label {
 
 .household-invite-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -8949,6 +8963,7 @@ body.app-tour-active .app-tour-nav-target .nav-label {
   padding: 0 !important;
   height: 100% !important;
   flex: 1 !important;
+  min-width: 0 !important;
 }
 
 .bottom-nav .nav-item > span,
@@ -8960,6 +8975,10 @@ body.app-tour-active .app-tour-nav-target .nav-label {
   padding: 0 !important;
   display: block !important;
   text-align: center !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
 }
 
 .bottom-nav .nav-icon-wrapper {
@@ -9147,6 +9166,7 @@ body.app-tour-active .app-tour-nav-target .nav-label {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
   width: 100%;
 }
@@ -12476,5 +12496,95 @@ body.is-mobile-device .ai-chat-composer {
 
   .ai-autoplan-days-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ==========================================================================
+   BUG-29: Responsive Hardening for Small & Low-Density Mobile Screens
+   ========================================================================== */
+@media (max-width: 480px) {
+  .card {
+    padding: 16px;
+  }
+
+  .settings-advanced-body {
+    padding: 10px 10px 4px 10px;
+  }
+
+  .segmented-btn {
+    padding: 7px 6px;
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .segmented-btn .material-symbols-outlined {
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  .card .btn {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  #btn-force-cache-update,
+  #btn-auto-tag-recipes,
+  #btn-install-pwa {
+    white-space: normal;
+    text-align: left;
+    line-height: 1.25;
+    height: auto;
+    min-height: 36px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .settings-backup-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .settings-backup-actions #btn-reset-demo {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 420px) {
+  .bottom-nav {
+    padding: 6px 8px 7px !important;
+  }
+
+  .bottom-nav .nav-item > span,
+  .bottom-nav .nav-item-gemini .nav-gemini-label {
+    font-size: 10px !important;
+    letter-spacing: -0.01em !important;
+  }
+
+  .household-input-row {
+    flex-wrap: wrap;
+  }
+
+  .household-input-row .form-input {
+    flex: 1 1 140px;
+  }
+
+  .household-input-row .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 400px) {
+  .today-nutrition-pill-split {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .segmented-btn {
+    padding: 6px 4px;
+    gap: 3px;
+    font-size: 11px;
   }
 }

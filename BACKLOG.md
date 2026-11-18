@@ -2,7 +2,7 @@
 
 > **Metodología**: Kanban / MoSCoW (Must, Should, Could, Won't)  
 > **Estado**: Activo  
-> **Versión Actual**: v2.15  
+> **Versión Actual**: v2.20  
 > **Última actualización**: Noviembre 2026 (v2.15 — US-26, US-79, US-79d, US-79e y US-79f completadas: empaquetado Android TWA, Google Play Billing con verify-purchase/RTDN, términos legales y suscripciones probadas)
 
 ---
@@ -240,6 +240,7 @@
 | **BUG-26** | El autocompletado de ingredientes no reconoce plurales (ej. "Doradas") y arruina la estimación de macros | 🔴 Alta | `Done` | Lematización en `getIngredientSuggestions` para emparejar automáticamente plurales con el catálogo de ingredientes, y asignación de macros de pescado magro. Resuelto en v0.81. |
 | **BUG-27** | Recetas sin ingredientes muestran macronutrientes estimados inventados y badge erróneo de "Alta en Proteínas" | 🔴 Alta | `Done` | Cuando una receta no tiene ingredientes (`ingredients.length === 0`) ni valores nutricionales explícitos definidos por el usuario, `estimateRecipeNutrition` asignaba valores por defecto (450 kcal, 28g P, 45g C, 15g G) provocando el badge erróneo "Alta en Proteínas". Corregido devolviendo ceros, evitando la inferencia del badge proteico, saneando retroactivamente recetas persistidas en base de datos y mostrando la cajita de macros con datos vacíos ('—') según solicitud de Franky (`v1.50`). Probado y aprobado por Franky. |
 | **BUG-28** | En pantallas grandes / navegador de escritorio no se puede navegar horizontalmente por el selector de etiquetas | 🟡 Media | `Done` | Añadido soporte de scroll horizontal con rueda del ratón (`wheel`) y arrastre táctil/mouse drag (`grab-to-scroll` con `cursor: grab/grabbing`) en `.chips-scroll-container` (`v1.50`). Probado y aprobado por Franky. |
+| **BUG-29** | Descuadres y desbordamientos en móviles con menor densidad de píxeles o pantallas estrechas (selector de idioma/aspecto, switch TTS, botón actualizar caché, botones backup, cabecera metas y dock inferior) | 🟡 Media | In Progress | Corregido truncado/overflow en .m3-segmented-button, migrado #card-tts-settings a .m3-switch, añadidos lex-wrap y wrapping de botones largos en tarjetas de Ajustes, alineado #card-nutrition-goals, añadidas claves i18n cortas household.createBtn/joinBtn, endurecido .bottom-nav y .today-nutrition-pill-split en <=420px, y añadido test E2E en e2e/mobile-viewport.spec.js (2.20). |
 
 ---
 
