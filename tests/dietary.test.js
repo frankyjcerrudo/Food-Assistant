@@ -20,6 +20,9 @@ const {
   PREDEFINED_OCCASION_TAGS,
   PREDEFINED_PRACTICAL_TAGS,
   ALL_PREDEFINED_TAGS,
+  extractCustomAllergenTerm,
+  isCustomAllergenPreference,
+  normalizeCustomAllergenPreference,
   isStrictAllergenPreference,
   auditRecipeIngredientsForPreference,
   checkDietaryCompliance,
@@ -646,6 +649,112 @@ describe('US-02: Filtros Dietéticos, Selector de Chips & Advertencias Nutricion
       const modalBody = document.getElementById('recipe-modal-body');
       expect(modalBody.querySelector('.recipe-ingredient-item.has-allergen-conflict')).not.toBeNull();
       expect(modalBody.querySelector('.ingredient-allergen-pill')).not.toBeNull();
+    });
+
+    it('soporta alérgenos personalizados manuales (normalización, auditoría de ingredientes/pasos y preguntas dinámicas en Decisions API)', () => {
+      expect(normalizeCustomAllergenPreference('kiwi')).toBe('Sin Kiwi');
+      expect(normalizeCustomAllergenPreference('Sin mostaza')).toBe('Sin Mostaza');
+      expect(normalizeCustomAllergenPreference('alergia al melocotón')).toBe('Sin Melocotón');
+      expect(normalizeCustomAllergenPreference('lactosa')).toBe('Sin Lactosa');
+
+      expect(isCustomAllergenPreference('Sin Kiwi')).toBe(true);
+      expect(isCustomAllergenPreference('Sin Lactosa')).toBe(false);
+      expect(isStrictAllergenPreference('Sin Kiwi')).toBe(true);
+      expect(extractCustomAllergenTerm('Sin Kiwi')).toBe('kiwi');
+      expect(getDietaryTagEmoji('Sin Kiwi')).toBe('');
+
+      const recipeWithKiwi = {
+        id: 'rec-custom-kiwi',
+        title: 'Bol tropical de frutas',
+        tags: [],
+        ingredients: [
+          { name: 'Plátano maduro', aisle: 'produce' },
+          { name: '2 kiwis pelados', aisle: 'produce' }
+        ],
+        instructions: [{ step: 1, text: 'Cortar en láminas y servir.' }]
+      };
+      const recipeWithMustardInSteps = {
+        id: 'rec-custom-mustard',
+        title: 'Ensalada templada',
+        tags: [],
+        ingredients: [{ name: 'Espinacas frescas', aisle: 'produce' }],
+        instructions: [{ step: 1, text: 'Aliñar con una cucharadita de mostaza antigua y aceite.' }]
+      };
+      const cleanRecipe = {
+        id: 'rec-custom-clean',
+        title: 'Arroz blanco con calabacín',
+        tags: [],
+        ingredients: [{ name: 'Arroz blanco', aisle: 'pantry' }, { name: 'Calabacín', aisle: 'produce' }]
+      };
+
+      const kiwiCheck = checkDietaryCompliance(recipeWithKiwi, ['Sin Kiwi']);
+      expect(kiwiCheck.compliant).toBe(false);
+      expect(kiwiCheck.violations).toContain('Sin Kiwi');
+      expect(kiwiCheck.allergenViolations).toContain('Sin Kiwi');
+      expect(kiwiCheck.violatingIngredients[0].ingredient).toBe('2 kiwis pelados');
+
+      const mustardCheck = checkDietaryCompliance(recipeWithMustardInSteps, ['Sin Mostaza']);
+      expect(mustardCheck.compliant).toBe(false);
+      expect(mustardCheck.violatingIngredients[0].isHiddenTrace).toBe(true);
+
+      expect(checkDietaryCompliance(cleanRecipe, ['Sin Kiwi', 'Sin Mostaza']).compliant).toBe(true);
+
+      state.saveDietaryPreferences(['Sin Kiwi']);
+      const questions = buildAllergenAuditDecisionsQuestions();
+      expect(questions.has_custom_allergen_kiwi).toBeDefined();
+      expect(questions.has_custom_allergen_kiwi.type).toBe('noul');
+
+      const aiAudited = applyRecipeDecisionsResult(cleanRecipe, {
+        answers: {
+          has_custom_allergen_kiwi: { type: 'noul', noul: 0.94, confidence: 0.95 }
+        }
+      });
+      expect(aiAudited.allergenAudit.conflicts).toHaveLength(1);
+      expect(aiAudited.allergenAudit.conflicts[0].preference).toBe('Sin Kiwi');
+    });
+
+    it('permite añadir alérgenos manuales desde Ajustes y Onboarding', () => {
+      app.renderDietaryPreferencesSettings();
+      const settingsInput = document.getElementById('settings-custom-allergen-input');
+      settingsInput.value = 'mostaza';
+      app.addCustomAllergenFromSettings();
+      expect(state.dietaryPreferences).toContain('Sin Mostaza');
+
+      const settingsContainer = document.getElementById('settings-dietary-chips');
+      expect(settingsContainer.querySelectorAll('.allergen-chip')).toHaveLength(10);
+      expect(settingsContainer.textContent).toContain('Sin Mostaza');
+
+      app.openOnboardingModal(2);
+      const onboardingInput = document.getElementById('onboarding-custom-allergen-input');
+      onboardingInput.value = 'kiwi';
+      app.addOnboardingCustomAllergen();
+      expect(app.onboardingDietary.has('Sin Kiwi')).toBe(true);
+      app.closeOnboardingModal();
+    });
+
+    it('muestra modal único de novedad de alérgenos solo a usuarios existentes y conserva dietas previas al guardar', () => {
+      app.closeOnboardingModal();
+
+      // Usuario nuevo (onboarding no completado): no lanza What's New
+      expect(app.checkAndLaunchAllergensWhatsNew()).toBe(false);
+
+      // Usuario existente con estilo de dieta previo y sin haber visto aún la novedad
+      localStorage.setItem('fa_onboarding_completed', 'true');
+      state.saveDietaryPreferences(['Keto']);
+
+      expect(app.checkAndLaunchAllergensWhatsNew()).toBe(true);
+      const whatsNewModal = document.getElementById('modal-allergens-whatsnew');
+      expect(whatsNewModal.classList.contains('active') || whatsNewModal.open).toBe(true);
+
+      app.toggleWhatsNewAllergenTag('Sin Frutos Secos');
+      const customInput = document.getElementById('whatsnew-custom-allergen-input');
+      customInput.value = 'melocotón';
+      app.addWhatsNewCustomAllergen();
+      app.saveAllergensWhatsNew();
+
+      expect(localStorage.getItem('fa_allergens_whatsnew_v1')).toBe('true');
+      expect(state.dietaryPreferences).toEqual(['Keto', 'Sin Frutos Secos', 'Sin Melocotón']);
+      expect(app.checkAndLaunchAllergensWhatsNew()).toBe(false);
     });
   });
 });

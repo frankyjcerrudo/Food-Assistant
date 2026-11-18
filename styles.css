@@ -3303,6 +3303,88 @@ dialog.modal-overlay:is([open], .active):where(:not([data-closing]))::backdrop {
   font-weight: 600;
 }
 
+.custom-allergen-add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  width: 100%;
+}
+
+.custom-allergen-input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--m3-outline-variant);
+  background-color: var(--m3-surface-container-low);
+  color: var(--m3-on-surface);
+  font-size: 13px;
+}
+
+.custom-allergen-input:focus {
+  outline: none;
+  border-color: var(--m3-primary);
+}
+
+.custom-allergen-add-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.allergens-whatsnew-card {
+  max-width: 500px;
+  width: 94%;
+  padding: 24px;
+  border-radius: var(--radius-xl);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.allergens-whatsnew-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.allergens-whatsnew-badge {
+  background-color: #fde8e8;
+  color: #9b1c1c;
+}
+
+:root[data-theme="dark"] .allergens-whatsnew-badge {
+  background-color: rgba(248, 113, 113, 0.2);
+  color: #fecaca;
+}
+
+.allergens-whatsnew-chips {
+  margin-top: 4px;
+}
+
+.allergens-whatsnew-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+@media (max-width: 480px) {
+  .allergens-whatsnew-footer {
+    flex-direction: column-reverse;
+  }
+
+  .allergens-whatsnew-footer .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 :root[data-theme="dark"] .ingredient-allergen-pill {
   background-color: rgba(248, 113, 113, 0.22);
   color: #fecaca;

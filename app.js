@@ -545,9 +545,49 @@ const DIETARY_TAG_EMOJIS = {
 function getDietaryTagEmoji(tag) {
   return DIETARY_TAG_EMOJIS[tag] || '';
 }
+function extractCustomAllergenTerm(pref) {
+  return String(pref || '')
+    .trim()
+    .replace(/^(?:sin|no)\s+/i, '')
+    .trim()
+    .toLowerCase();
+}
+function isCustomAllergenPreference(pref) {
+  const clean = String(pref || '').trim();
+  if (!clean) return false;
+  const lower = clean.toLowerCase();
+  if (PREDEFINED_DIETARY_TAGS.some(t => t.toLowerCase() === lower)) return false;
+  return /^(?:sin|no)\s+\S+/i.test(clean);
+}
+function normalizeCustomAllergenPreference(rawText) {
+  let clean = String(rawText || '')
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/[,.;:!?/\\]+/g, ' ')
+    .trim();
+  if (!clean) return '';
+  clean = clean
+    .replace(/^(?:alergi[ao]s?\s+a(?:l| la| los| las)?|al[eé]rgic[oa]\s+a(?:l| la| los| las)?|intolerancia\s+a(?:l| la| los| las)?)\s+/i, '')
+    .replace(/^(?:sin|no)\s+/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!clean || clean.length > 40) return '';
+
+  const stripAccents = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const cleanNorm = stripAccents(clean);
+  for (const tag of PREDEFINED_DIETARY_TAGS) {
+    const tagNorm = stripAccents(tag);
+    if (tagNorm === cleanNorm || tagNorm === `sin ${cleanNorm}`) {
+      return tag;
+    }
+  }
+
+  const titled = clean.charAt(0).toUpperCase() + clean.slice(1);
+  return `Sin ${titled}`;
+}
 function isStrictAllergenPreference(pref) {
   const clean = String(pref || '').toLowerCase().trim();
-  return PREDEFINED_ALLERGEN_RESTRICTIONS.some(r => r.toLowerCase() === clean);
+  if (!clean) return false;
+  return PREDEFINED_ALLERGEN_RESTRICTIONS.some(r => r.toLowerCase() === clean) || isCustomAllergenPreference(pref);
 }
 const PREDEFINED_OCCASION_TAGS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena'];
 const PREDEFINED_PRACTICAL_TAGS = ['Rápida', 'Horno', 'Tupper', 'Airfryer', 'Saludable', 'Robot de Cocina'];
@@ -584,6 +624,40 @@ function auditRecipeIngredientsForPreference(recipe, pref) {
   const conflictingIngredients = [];
   if (!recipe || !prefLower) {
     return { hasViolation: false, conflictingIngredients };
+  }
+
+  const isCustomAllergen = isCustomAllergenPreference(pref);
+  let customAllergenRegex = null;
+  let customSafeRegex = null;
+  if (isCustomAllergen) {
+    const termNorm = extractCustomAllergenTerm(pref)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+    if (termNorm) {
+      const variants = new Set([termNorm]);
+      if (termNorm.length > 3 && termNorm.endsWith('es')) {
+        variants.add(termNorm.slice(0, -2));
+        variants.add(termNorm.slice(0, -1));
+      } else if (termNorm.length > 2 && termNorm.endsWith('s')) {
+        variants.add(termNorm.slice(0, -1));
+      } else if (/[aeiou]$/.test(termNorm)) {
+        variants.add(`${termNorm}s`);
+      } else if (termNorm.endsWith('z')) {
+        variants.add(`${termNorm.slice(0, -1)}ces`);
+      } else {
+        variants.add(`${termNorm}es`);
+      }
+      const escapedVariants = Array.from(variants)
+        .filter(Boolean)
+        .map(v => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+      if (escapedVariants.length > 0) {
+        customAllergenRegex = new RegExp(`\\b(${escapedVariants.join('|')})\\b`, 'i');
+        const escapedTerm = termNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        customSafeRegex = new RegExp(`\\b(?:sin\\s+${escapedTerm}|${escapedTerm}[ -]?free)\\b`, 'i');
+      }
+    }
   }
 
   const recipeTagsLower = (Array.isArray(recipe.tags) ? recipe.tags : []).map(t => String(t).toLowerCase().trim());
@@ -726,6 +800,15 @@ function auditRecipeIngredientsForPreference(recipe, pref) {
       if (/\b(az[uú]car(?: moreno| glas)?|miel|sirope|jarabe|caramelo|leche condensada|melaza)\b/i.test(lowerName)) {
         pushConflict(rawName, false);
       }
+      continue;
+    }
+
+    if (customAllergenRegex) {
+      const ingNorm = lowerName.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      if (customSafeRegex && customSafeRegex.test(ingNorm)) continue;
+      if (customAllergenRegex.test(ingNorm)) {
+        pushConflict(rawName, false);
+      }
     }
   }
 
@@ -740,6 +823,12 @@ function auditRecipeIngredientsForPreference(recipe, pref) {
   } else if (prefLower === 'sin frutos secos') {
     const hiddenNutTitle = titleAndSteps.match(/\b(pesto|satay|pralin[eé]|mazap[aá]n)\b/i);
     if (hiddenNutTitle && !/\bsin frutos secos\b/i.test(titleAndSteps)) pushConflict(hiddenNutTitle[0], true);
+  } else if (customAllergenRegex && conflictingIngredients.length === 0) {
+    const titleStepsNorm = titleAndSteps.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (!(customSafeRegex && customSafeRegex.test(titleStepsNorm))) {
+      const customMatch = titleStepsNorm.match(customAllergenRegex);
+      if (customMatch) pushConflict(customMatch[0], true);
+    }
   }
 
   return {
@@ -1101,8 +1190,16 @@ const ALLERGEN_AUDIT_QUESTION_SPEC = Object.freeze({
   }
 });
 
+function getCustomAllergenDecisionSlug(pref) {
+  return extractCustomAllergenTerm(pref)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+}
+
 // US-91: Preguntas `noul` de auditoría de alérgenos ocultos para Gemini Decisions API
-function buildAllergenAuditDecisionsQuestions() {
+function buildAllergenAuditDecisionsQuestions(preferences = (typeof state !== 'undefined' ? state?.dietaryPreferences : [])) {
   const questions = {};
   for (const [key, spec] of Object.entries(ALLERGEN_AUDIT_QUESTION_SPEC)) {
     questions[key] = {
@@ -1110,6 +1207,17 @@ function buildAllergenAuditDecisionsQuestions() {
       instructions: spec.instructions
     };
   }
+  const activePrefs = Array.isArray(preferences) ? preferences : [];
+  activePrefs.forEach(pref => {
+    if (!isCustomAllergenPreference(pref)) return;
+    const term = extractCustomAllergenTerm(pref);
+    const slug = getCustomAllergenDecisionSlug(pref);
+    if (!term || !slug) return;
+    questions[`has_custom_allergen_${slug}`] = {
+      type: 'noul',
+      instructions: `¿La receta contiene ${term} o derivados/trazas ocultas de ${term}?`
+    };
+  });
   return questions;
 }
 
@@ -1318,6 +1426,31 @@ function applyRecipeDecisionsResult(recipe = {}, decisionData = {}, minConfidenc
         });
       }
       spec.invalidatesTags.forEach(t => tagMap.delete(t.toLowerCase()));
+    }
+  }
+
+  const customPrefs = (typeof state !== 'undefined' && Array.isArray(state?.dietaryPreferences))
+    ? state.dietaryPreferences.filter(p => isCustomAllergenPreference(p))
+    : [];
+  for (const [qKey, ans] of Object.entries(answers)) {
+    if (!qKey.startsWith('has_custom_allergen_') || !ans) continue;
+    hasAllergenAnswers = true;
+    const prob = Number(ans.noul);
+    const conf = Number(ans.confidence);
+    if (Number.isFinite(prob) && prob >= ALLERGEN_STRICT_THRESHOLD && Number.isFinite(conf) && conf >= ALLERGEN_STRICT_THRESHOLD) {
+      const slug = qKey.slice('has_custom_allergen_'.length);
+      const matchedPref = customPrefs.find(p => getCustomAllergenDecisionSlug(p) === slug)
+        || `Sin ${slug.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase())}`;
+      const termDisplay = matchedPref.replace(/^Sin\s+/i, '').trim() || slug;
+      allergenConflicts.push({
+        key: qKey,
+        preference: matchedPref,
+        ingredient: `${termDisplay} / trazas`,
+        probability: prob,
+        confidence: conf,
+        isHiddenTrace: true
+      });
+      tagMap.delete(matchedPref.toLowerCase());
     }
   }
 
@@ -5542,7 +5675,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.20';
+  window.APP_VERSION = 'v2.21';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -5571,6 +5704,9 @@ if (typeof window !== 'undefined') {
   window.PREDEFINED_DIETARY_TAGS = PREDEFINED_DIETARY_TAGS;
   window.DIETARY_TAG_EMOJIS = DIETARY_TAG_EMOJIS;
   window.getDietaryTagEmoji = getDietaryTagEmoji;
+  window.extractCustomAllergenTerm = extractCustomAllergenTerm;
+  window.isCustomAllergenPreference = isCustomAllergenPreference;
+  window.normalizeCustomAllergenPreference = normalizeCustomAllergenPreference;
   window.isStrictAllergenPreference = isStrictAllergenPreference;
   window.auditRecipeIngredientsForPreference = auditRecipeIngredientsForPreference;
   window.PREDEFINED_OCCASION_TAGS = PREDEFINED_OCCASION_TAGS;
@@ -5597,7 +5733,7 @@ class FoodAssistantApp {
   constructor() {
     if (typeof window !== 'undefined') window.app = this;
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.20';
+    this.appVersion = window.APP_VERSION || 'v2.21';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -8770,6 +8906,24 @@ class FoodAssistantApp {
         case 'toggleOnboardingDietaryTag':
           this.toggleOnboardingDietaryTag(target.dataset.tag);
           break;
+        case 'addOnboardingCustomAllergen':
+          this.addOnboardingCustomAllergen();
+          break;
+        case 'addCustomAllergenFromSettings':
+          this.addCustomAllergenFromSettings();
+          break;
+        case 'toggleWhatsNewAllergenTag':
+          this.toggleWhatsNewAllergenTag(target.dataset.tag);
+          break;
+        case 'addWhatsNewCustomAllergen':
+          this.addWhatsNewCustomAllergen();
+          break;
+        case 'saveAllergensWhatsNew':
+          this.saveAllergensWhatsNew();
+          break;
+        case 'dismissAllergensWhatsNew':
+          this.dismissAllergensWhatsNew();
+          break;
         case 'applyOnboardingGoalPreset':
           this.applyOnboardingGoalPreset(target.dataset.preset);
           break;
@@ -8845,6 +8999,20 @@ class FoodAssistantApp {
       const target = e.target.closest('[data-action="inputOnboardingServings"]');
       if (target) {
         this.inputOnboardingServings(e);
+      }
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      const inputId = e.target?.id;
+      if (inputId === 'settings-custom-allergen-input') {
+        e.preventDefault();
+        this.addCustomAllergenFromSettings();
+      } else if (inputId === 'onboarding-custom-allergen-input') {
+        e.preventDefault();
+        this.addOnboardingCustomAllergen();
+      } else if (inputId === 'whatsnew-custom-allergen-input') {
+        e.preventDefault();
+        this.addWhatsNewCustomAllergen();
       }
     });
     // Navigation
@@ -11826,6 +11994,9 @@ class FoodAssistantApp {
         break;
       case 'modal-onboarding':
         this.closeOnboardingModal();
+        break;
+      case 'modal-allergens-whatsnew':
+        this.dismissAllergensWhatsNew();
         break;
       default:
         this.closeDialogModal(overlay);
@@ -22657,27 +22828,57 @@ REGLAS CRÍTICAS:
     }, 250);
   }
 
-  // US-02 & US-91: Preferencias dietéticas activas en Ajustes (Estilos de dieta vs Alergias estrictas)
-  renderDietaryPreferencesSettings() {
-    const container = document.getElementById('settings-dietary-chips');
-    if (!container) return;
+  _consumeCustomAllergenInput(inputId) {
+    const inputEl = document.getElementById(inputId);
+    if (!inputEl) return '';
+    const normalized = normalizeCustomAllergenPreference(inputEl.value);
+    if (!normalized) return '';
+    inputEl.value = '';
+    return normalized;
+  }
 
+  _buildCustomAllergenAddRowHtml(inputId, btnId, actionName) {
+    const placeholder = window.I18n ? window.I18n.t('settings.customAllergenPlaceholder') : 'Ej. Kiwi, mostaza, melocotón...';
+    const addLabel = window.I18n ? window.I18n.t('settings.customAllergenAddBtn') : 'Añadir';
+    return `
+      <div class="custom-allergen-add-row">
+        <input type="text" id="${escapeHtml(inputId)}" class="custom-allergen-input" maxlength="40"
+          placeholder="${escapeHtml(placeholder)}">
+        <button type="button" class="btn btn-secondary btn-sm custom-allergen-add-btn" id="${escapeHtml(btnId)}"
+          data-action="${escapeHtml(actionName)}">
+          <span class="material-symbols-outlined icon-14">add</span>
+          <span>${escapeHtml(addLabel)}</span>
+        </button>
+      </div>
+    `;
+  }
+
+  _buildDietaryGroupsHtml({ isSelectedFn, buildChipAttrsFn, showCheckWhenSelected, customAllergensList, addRowHtml }) {
     const stylesLabel = window.I18n ? window.I18n.t('settings.dietStylesGroupLabel') : 'Estilos de dieta y metas';
     const allergensLabel = window.I18n ? window.I18n.t('settings.allergensGroupLabel') : 'Alergias e intolerancias estrictas';
+    const allAllergens = [...PREDEFINED_ALLERGEN_RESTRICTIONS];
+    (customAllergensList || []).forEach(pref => {
+      if (!allAllergens.some(existing => existing.toLowerCase() === pref.toLowerCase())) {
+        allAllergens.push(pref);
+      }
+    });
 
     const renderGroupChips = (list, isAllergenGroup) => list.map(pref => {
-      const isSelected = (state.dietaryPreferences || []).includes(pref);
+      const isSelected = isSelectedFn(pref);
       const displayPref = window.I18n ? window.I18n.getTagLabel(pref) : pref;
-      const safePrefAttr = escapeHtml(pref).replace(/'/g, "\\'");
+      const emoji = getDietaryTagEmoji(pref) || (isCustomAllergenPreference(pref) ? '⚠️' : '');
+      const iconHtml = (showCheckWhenSelected && isSelected)
+        ? '<span class="material-symbols-outlined icon-14">check_circle</span>'
+        : `<span class="dietary-emoji">${emoji}</span>`;
       return `
-        <button type="button" class="m3-filter-chip dietary-chip ${isAllergenGroup ? 'allergen-chip' : ''} ${isSelected ? 'active' : ''}" data-tag="${escapeHtml(pref)}" onclick="app.toggleDietaryPreference('${safePrefAttr}')">
-          ${isSelected ? '<span class="material-symbols-outlined icon-14">check_circle</span>' : `<span class="dietary-emoji">${getDietaryTagEmoji(pref)}</span>`}
+        <button type="button" class="m3-filter-chip dietary-chip ${isAllergenGroup ? 'allergen-chip' : ''} ${isSelected ? 'active' : ''}" ${buildChipAttrsFn(pref, isSelected)}>
+          ${iconHtml}
           <span>${escapeHtml(displayPref)}</span>
         </button>
       `;
     }).join('');
 
-    container.innerHTML = `
+    return `
       <div class="dietary-prefs-group">
         <div class="dietary-prefs-group-title">
           <span class="material-symbols-outlined icon-14">eco</span>
@@ -22693,10 +22894,53 @@ REGLAS CRÍTICAS:
           <span>${escapeHtml(allergensLabel)}</span>
         </div>
         <div class="dietary-prefs-chips-grid">
-          ${renderGroupChips(PREDEFINED_ALLERGEN_RESTRICTIONS, true)}
+          ${renderGroupChips(allAllergens, true)}
         </div>
+        ${addRowHtml || ''}
       </div>
     `;
+  }
+
+  // US-02 & US-91: Preferencias dietéticas activas en Ajustes (Estilos de dieta vs Alergias estrictas + alérgenos manuales)
+  renderDietaryPreferencesSettings() {
+    const container = document.getElementById('settings-dietary-chips');
+    if (!container) return;
+
+    const activePrefs = Array.isArray(state.dietaryPreferences) ? state.dietaryPreferences : [];
+    const customAllergens = activePrefs.filter(p => isCustomAllergenPreference(p));
+
+    container.innerHTML = this._buildDietaryGroupsHtml({
+      isSelectedFn: (pref) => activePrefs.includes(pref),
+      buildChipAttrsFn: (pref) => {
+        const safePrefAttr = escapeHtml(pref).replace(/'/g, "\\'");
+        return `data-tag="${escapeHtml(pref)}" onclick="app.toggleDietaryPreference('${safePrefAttr}')"`;
+      },
+      showCheckWhenSelected: true,
+      customAllergensList: customAllergens,
+      addRowHtml: this._buildCustomAllergenAddRowHtml(
+        'settings-custom-allergen-input',
+        'btn-settings-add-custom-allergen',
+        'addCustomAllergenFromSettings'
+      )
+    });
+  }
+
+  addCustomAllergenFromSettings() {
+    const pref = this._consumeCustomAllergenInput('settings-custom-allergen-input');
+    if (!pref) return;
+    const prefs = [...(state.dietaryPreferences || [])];
+    if (!prefs.some(p => p.toLowerCase() === pref.toLowerCase())) {
+      prefs.push(pref);
+      state.saveDietaryPreferences(prefs);
+      this.renderDietaryPreferencesSettings();
+      this.renderPlanner();
+      this.renderTodayView();
+      this.scheduleSyncWithCloud();
+      const msg = window.I18n
+        ? window.I18n.t('settings.customAllergenAddedToast', { name: pref })
+        : `Alérgeno "${pref}" añadido a tus restricciones.`;
+      this.showToast(msg, 'success');
+    }
   }
 
   toggleDietaryPreference(pref) {
@@ -23358,6 +23602,7 @@ REGLAS CRÍTICAS:
     if (typeof localStorage !== 'undefined') {
       try {
         localStorage.setItem('fa_onboarding_completed', 'true');
+        localStorage.setItem('fa_allergens_whatsnew_v1', 'true');
       } catch (e) { }
     }
     this.closeOnboardingModal();
@@ -23395,43 +23640,26 @@ REGLAS CRÍTICAS:
     const container = document.getElementById('onboarding-dietary-chips');
     if (!container) return;
 
-    const stylesLabel = window.I18n ? window.I18n.t('settings.dietStylesGroupLabel') : 'Estilos de dieta y metas';
-    const allergensLabel = window.I18n ? window.I18n.t('settings.allergensGroupLabel') : 'Alergias e intolerancias estrictas';
+    const customAllergens = Array.from(this.onboardingDietary || []).filter(p => isCustomAllergenPreference(p));
+    container.innerHTML = this._buildDietaryGroupsHtml({
+      isSelectedFn: (tag) => this.onboardingDietary.has(tag),
+      buildChipAttrsFn: (tag, isSelected) => `data-action="toggleOnboardingDietaryTag" data-tag="${escapeHtml(tag)}" aria-pressed="${isSelected ? 'true' : 'false'}"`,
+      showCheckWhenSelected: false,
+      customAllergensList: customAllergens,
+      addRowHtml: this._buildCustomAllergenAddRowHtml(
+        'onboarding-custom-allergen-input',
+        'btn-onboarding-add-custom-allergen',
+        'addOnboardingCustomAllergen'
+      )
+    });
+  }
 
-    const renderGroup = (list, isAllergenGroup) => list.map(tag => {
-      const isSelected = this.onboardingDietary.has(tag);
-      const emoji = getDietaryTagEmoji(tag);
-      const displayTag = window.I18n ? window.I18n.getTagLabel(tag) : tag;
-      return `
-        <button type="button" class="m3-filter-chip dietary-chip ${isAllergenGroup ? 'allergen-chip' : ''} ${isSelected ? 'active' : ''}"
-          data-action="toggleOnboardingDietaryTag" data-tag="${escapeHtml(tag)}"
-          aria-pressed="${isSelected ? 'true' : 'false'}">
-          <span class="dietary-emoji">${emoji}</span>
-          <span>${escapeHtml(displayTag)}</span>
-        </button>
-      `;
-    }).join('');
-
-    container.innerHTML = `
-      <div class="dietary-prefs-group">
-        <div class="dietary-prefs-group-title">
-          <span class="material-symbols-outlined icon-14">eco</span>
-          <span>${escapeHtml(stylesLabel)}</span>
-        </div>
-        <div class="dietary-prefs-chips-grid">
-          ${renderGroup(PREDEFINED_DIET_STYLES, false)}
-        </div>
-      </div>
-      <div class="dietary-prefs-group">
-        <div class="dietary-prefs-group-title">
-          <span class="material-symbols-outlined icon-14">health_and_safety</span>
-          <span>${escapeHtml(allergensLabel)}</span>
-        </div>
-        <div class="dietary-prefs-chips-grid">
-          ${renderGroup(PREDEFINED_ALLERGEN_RESTRICTIONS, true)}
-        </div>
-      </div>
-    `;
+  addOnboardingCustomAllergen() {
+    const pref = this._consumeCustomAllergenInput('onboarding-custom-allergen-input');
+    if (!pref) return;
+    if (!this.onboardingDietary) this.onboardingDietary = new Set();
+    this.onboardingDietary.add(pref);
+    this.renderOnboardingDietaryChips();
   }
 
   applyOnboardingGoalPreset(presetOrDataset) {
@@ -23665,7 +23893,12 @@ REGLAS CRÍTICAS:
 
   completeOnboarding() {
     // 1. Preferencias dietéticas
-    state.dietaryPreferences = Array.from(this.onboardingDietary || []);
+    const onboardingPrefs = Array.from(this.onboardingDietary || []);
+    if (typeof state.saveDietaryPreferences === 'function') {
+      state.saveDietaryPreferences(onboardingPrefs);
+    } else {
+      state.dietaryPreferences = onboardingPrefs;
+    }
     state.save('fa_dietary_prefs', state.dietaryPreferences);
 
     // 2. Objetivos nutricionales diarios
@@ -23695,6 +23928,7 @@ REGLAS CRÍTICAS:
       try {
         localStorage.setItem('fa_servings', String(servings));
         localStorage.setItem('fa_onboarding_completed', 'true');
+        localStorage.setItem('fa_allergens_whatsnew_v1', 'true');
       } catch (e) { }
     }
 
@@ -23707,6 +23941,118 @@ REGLAS CRÍTICAS:
   completeOnboardingAndStartTour() {
     this.completeOnboarding();
     this.startAppTour();
+  }
+
+  // US-91: Modal informativo único de alérgenos para usuarios existentes
+  checkAndLaunchAllergensWhatsNew() {
+    if (typeof localStorage === 'undefined') return false;
+    if (localStorage.getItem('fa_onboarding_completed') !== 'true') return false;
+    if (localStorage.getItem('fa_allergens_whatsnew_v1') === 'true') return false;
+    const onboardingModal = this.modalOnboarding || document.getElementById('modal-onboarding');
+    if (onboardingModal?.open || onboardingModal?.classList?.contains('active')) return false;
+    const modal = document.getElementById('modal-allergens-whatsnew');
+    if (!modal) return false;
+    this.openAllergensWhatsNewModal();
+    return true;
+  }
+
+  openAllergensWhatsNewModal() {
+    const modal = document.getElementById('modal-allergens-whatsnew');
+    if (!modal) return;
+    const activePrefs = Array.isArray(state.dietaryPreferences) ? state.dietaryPreferences : [];
+    const activeAllergens = activePrefs.filter(p => isStrictAllergenPreference(p));
+    this.whatsNewAllergens = new Set(activeAllergens);
+    this.whatsNewCustomAllergens = new Set(activeAllergens.filter(p => isCustomAllergenPreference(p)));
+    this.renderWhatsNewAllergensChips();
+    if (window.I18n && typeof window.I18n.applyTranslations === 'function') {
+      window.I18n.applyTranslations(modal);
+    }
+    this.openDialogModal(modal);
+  }
+
+  renderWhatsNewAllergensChips() {
+    const container = document.getElementById('whatsnew-allergens-chips');
+    if (!container) return;
+    const customList = Array.from(this.whatsNewCustomAllergens || []);
+    const allAllergens = [...PREDEFINED_ALLERGEN_RESTRICTIONS];
+    customList.forEach(pref => {
+      if (!allAllergens.some(existing => existing.toLowerCase() === pref.toLowerCase())) {
+        allAllergens.push(pref);
+      }
+    });
+    container.innerHTML = allAllergens.map(tag => {
+      const isSelected = this.whatsNewAllergens?.has(tag);
+      const displayTag = window.I18n ? window.I18n.getTagLabel(tag) : tag;
+      const emoji = getDietaryTagEmoji(tag) || (isCustomAllergenPreference(tag) ? '⚠️' : '');
+      return `
+        <button type="button" class="m3-filter-chip dietary-chip allergen-chip ${isSelected ? 'active' : ''}"
+          data-action="toggleWhatsNewAllergenTag" data-tag="${escapeHtml(tag)}"
+          aria-pressed="${isSelected ? 'true' : 'false'}">
+          ${isSelected ? '<span class="material-symbols-outlined icon-14">check_circle</span>' : `<span class="dietary-emoji">${emoji}</span>`}
+          <span>${escapeHtml(displayTag)}</span>
+        </button>
+      `;
+    }).join('');
+  }
+
+  toggleWhatsNewAllergenTag(tagOrDataset) {
+    const tag = typeof tagOrDataset === 'object' && tagOrDataset !== null ? tagOrDataset.tag : tagOrDataset;
+    if (!tag) return;
+    if (!this.whatsNewAllergens) this.whatsNewAllergens = new Set();
+    if (this.whatsNewAllergens.has(tag)) {
+      this.whatsNewAllergens.delete(tag);
+    } else {
+      this.whatsNewAllergens.add(tag);
+    }
+    this.renderWhatsNewAllergensChips();
+  }
+
+  addWhatsNewCustomAllergen() {
+    const pref = this._consumeCustomAllergenInput('whatsnew-custom-allergen-input');
+    if (!pref) return;
+    if (!this.whatsNewAllergens) this.whatsNewAllergens = new Set();
+    if (!this.whatsNewCustomAllergens) this.whatsNewCustomAllergens = new Set();
+    this.whatsNewAllergens.add(pref);
+    if (isCustomAllergenPreference(pref)) {
+      this.whatsNewCustomAllergens.add(pref);
+    }
+    this.renderWhatsNewAllergensChips();
+  }
+
+  saveAllergensWhatsNew() {
+    const existingNonAllergens = (state.dietaryPreferences || []).filter(p => !isStrictAllergenPreference(p));
+    const merged = [...existingNonAllergens];
+    Array.from(this.whatsNewAllergens || []).forEach(pref => {
+      if (!merged.some(existing => existing.toLowerCase() === pref.toLowerCase())) {
+        merged.push(pref);
+      }
+    });
+    state.saveDietaryPreferences(merged);
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('fa_allergens_whatsnew_v1', 'true');
+      } catch (e) { }
+    }
+    const modal = document.getElementById('modal-allergens-whatsnew');
+    if (modal) this.closeDialogModal(modal);
+    this.renderDietaryPreferencesSettings();
+    this.renderPlanner();
+    this.renderTodayView();
+    this.scheduleSyncWithCloud();
+    const toastMsg = window.I18n
+      ? window.I18n.t('allergensWhatsNew.savedToast')
+      : 'Preferencias de alérgenos guardadas.';
+    this.showToast(toastMsg, 'success');
+  }
+
+  dismissAllergensWhatsNew() {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('fa_allergens_whatsnew_v1', 'true');
+      } catch (e) { }
+    }
+    const modal = document.getElementById('modal-allergens-whatsnew');
+    if (modal) this.closeDialogModal(modal);
   }
 
   getAppTourSteps() {
@@ -24199,7 +24545,10 @@ function bootstrapApp() {
       state.shoppingList = consolidateShoppingList(state.shoppingList);
       state.save('fa_shopping', state.shoppingList);
     }
-    app.checkAndLaunchOnboarding();
+    const launchedOnboarding = app.checkAndLaunchOnboarding();
+    if (!launchedOnboarding) {
+      app.checkAndLaunchAllergensWhatsNew();
+    }
   }
 }
 
@@ -24254,6 +24603,9 @@ if (typeof window !== 'undefined') {
   window.PREDEFINED_DIET_STYLES = PREDEFINED_DIET_STYLES;
   window.PREDEFINED_ALLERGEN_RESTRICTIONS = PREDEFINED_ALLERGEN_RESTRICTIONS;
   window.PREDEFINED_DIETARY_TAGS = PREDEFINED_DIETARY_TAGS;
+  window.extractCustomAllergenTerm = extractCustomAllergenTerm;
+  window.isCustomAllergenPreference = isCustomAllergenPreference;
+  window.normalizeCustomAllergenPreference = normalizeCustomAllergenPreference;
   window.isStrictAllergenPreference = isStrictAllergenPreference;
   window.auditRecipeIngredientsForPreference = auditRecipeIngredientsForPreference;
   window.checkDietaryCompliance = checkDietaryCompliance;
@@ -24310,6 +24662,9 @@ if (typeof module !== 'undefined' && module.exports) {
     PREDEFINED_DIET_STYLES,
     PREDEFINED_ALLERGEN_RESTRICTIONS,
     PREDEFINED_DIETARY_TAGS,
+    extractCustomAllergenTerm,
+    isCustomAllergenPreference,
+    normalizeCustomAllergenPreference,
     isStrictAllergenPreference,
     auditRecipeIngredientsForPreference,
     checkDietaryCompliance,

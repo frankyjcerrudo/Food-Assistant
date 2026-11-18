@@ -458,9 +458,49 @@ const DIETARY_TAG_EMOJIS = {
 function getDietaryTagEmoji(tag) {
   return DIETARY_TAG_EMOJIS[tag] || '';
 }
+function extractCustomAllergenTerm(pref) {
+  return String(pref || '')
+    .trim()
+    .replace(/^(?:sin|no)\s+/i, '')
+    .trim()
+    .toLowerCase();
+}
+function isCustomAllergenPreference(pref) {
+  const clean = String(pref || '').trim();
+  if (!clean) return false;
+  const lower = clean.toLowerCase();
+  if (PREDEFINED_DIETARY_TAGS.some(t => t.toLowerCase() === lower)) return false;
+  return /^(?:sin|no)\s+\S+/i.test(clean);
+}
+function normalizeCustomAllergenPreference(rawText) {
+  let clean = String(rawText || '')
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/[,.;:!?/\\]+/g, ' ')
+    .trim();
+  if (!clean) return '';
+  clean = clean
+    .replace(/^(?:alergi[ao]s?\s+a(?:l| la| los| las)?|al[eé]rgic[oa]\s+a(?:l| la| los| las)?|intolerancia\s+a(?:l| la| los| las)?)\s+/i, '')
+    .replace(/^(?:sin|no)\s+/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!clean || clean.length > 40) return '';
+
+  const stripAccents = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const cleanNorm = stripAccents(clean);
+  for (const tag of PREDEFINED_DIETARY_TAGS) {
+    const tagNorm = stripAccents(tag);
+    if (tagNorm === cleanNorm || tagNorm === `sin ${cleanNorm}`) {
+      return tag;
+    }
+  }
+
+  const titled = clean.charAt(0).toUpperCase() + clean.slice(1);
+  return `Sin ${titled}`;
+}
 function isStrictAllergenPreference(pref) {
   const clean = String(pref || '').toLowerCase().trim();
-  return PREDEFINED_ALLERGEN_RESTRICTIONS.some(r => r.toLowerCase() === clean);
+  if (!clean) return false;
+  return PREDEFINED_ALLERGEN_RESTRICTIONS.some(r => r.toLowerCase() === clean) || isCustomAllergenPreference(pref);
 }
 const PREDEFINED_OCCASION_TAGS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena'];
 const PREDEFINED_PRACTICAL_TAGS = ['Rápida', 'Horno', 'Tupper', 'Airfryer', 'Saludable', 'Robot de Cocina'];
@@ -476,6 +516,40 @@ function auditRecipeIngredientsForPreference(recipe, pref) {
   const conflictingIngredients = [];
   if (!recipe || !prefLower) {
     return { hasViolation: false, conflictingIngredients };
+  }
+
+  const isCustomAllergen = isCustomAllergenPreference(pref);
+  let customAllergenRegex = null;
+  let customSafeRegex = null;
+  if (isCustomAllergen) {
+    const termNorm = extractCustomAllergenTerm(pref)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+    if (termNorm) {
+      const variants = new Set([termNorm]);
+      if (termNorm.length > 3 && termNorm.endsWith('es')) {
+        variants.add(termNorm.slice(0, -2));
+        variants.add(termNorm.slice(0, -1));
+      } else if (termNorm.length > 2 && termNorm.endsWith('s')) {
+        variants.add(termNorm.slice(0, -1));
+      } else if (/[aeiou]$/.test(termNorm)) {
+        variants.add(`${termNorm}s`);
+      } else if (termNorm.endsWith('z')) {
+        variants.add(`${termNorm.slice(0, -1)}ces`);
+      } else {
+        variants.add(`${termNorm}es`);
+      }
+      const escapedVariants = Array.from(variants)
+        .filter(Boolean)
+        .map(v => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+      if (escapedVariants.length > 0) {
+        customAllergenRegex = new RegExp(`\\b(${escapedVariants.join('|')})\\b`, 'i');
+        const escapedTerm = termNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        customSafeRegex = new RegExp(`\\b(?:sin\\s+${escapedTerm}|${escapedTerm}[ -]?free)\\b`, 'i');
+      }
+    }
   }
 
   const recipeTagsLower = (Array.isArray(recipe.tags) ? recipe.tags : []).map(t => String(t).toLowerCase().trim());
@@ -618,6 +692,15 @@ function auditRecipeIngredientsForPreference(recipe, pref) {
       if (/\b(az[uú]car(?: moreno| glas)?|miel|sirope|jarabe|caramelo|leche condensada|melaza)\b/i.test(lowerName)) {
         pushConflict(rawName, false);
       }
+      continue;
+    }
+
+    if (customAllergenRegex) {
+      const ingNorm = lowerName.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      if (customSafeRegex && customSafeRegex.test(ingNorm)) continue;
+      if (customAllergenRegex.test(ingNorm)) {
+        pushConflict(rawName, false);
+      }
     }
   }
 
@@ -633,6 +716,12 @@ function auditRecipeIngredientsForPreference(recipe, pref) {
   } else if (prefLower === 'sin frutos secos') {
     const hiddenNutTitle = titleAndSteps.match(/\b(pesto|satay|pralin[eé]|mazap[aá]n)\b/i);
     if (hiddenNutTitle && !/\bsin frutos secos\b/i.test(titleAndSteps)) pushConflict(hiddenNutTitle[0], true);
+  } else if (customAllergenRegex && conflictingIngredients.length === 0) {
+    const titleStepsNorm = titleAndSteps.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (!(customSafeRegex && customSafeRegex.test(titleStepsNorm))) {
+      const customMatch = titleStepsNorm.match(customAllergenRegex);
+      if (customMatch) pushConflict(customMatch[0], true);
+    }
   }
 
   return {
@@ -918,6 +1007,9 @@ export {
   PREDEFINED_OCCASION_TAGS,
   PREDEFINED_PRACTICAL_TAGS,
   ALL_PREDEFINED_TAGS,
+  extractCustomAllergenTerm,
+  isCustomAllergenPreference,
+  normalizeCustomAllergenPreference,
   isStrictAllergenPreference,
   auditRecipeIngredientsForPreference
 };

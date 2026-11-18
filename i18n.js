@@ -99,6 +99,9 @@
         dietaryDesc: 'Filtra y avisa si una receta no encaja con tu estilo de vida.',
         dietStylesGroupLabel: 'Estilos de dieta y metas',
         allergensGroupLabel: 'Alergias e intolerancias estrictas',
+        customAllergenPlaceholder: 'Ej. Kiwi, mostaza, melocotón...',
+        customAllergenAddBtn: 'Añadir',
+        customAllergenAddedToast: 'Alérgeno "{name}" añadido a tus restricciones.',
         nutritionTitle: 'Objetivos Nutricionales Diarios',
         nutritionDesc: 'Metas calóricas y reparto de macronutrientes para balancear tus planes.',
         enableTracking: 'Activar seguimiento',
@@ -814,6 +817,14 @@
         finishBtn: '¡Empezar a cocinar!',
         startTourBtn: 'Hacer tour por la app'
       },
+      allergensWhatsNew: {
+        kicker: 'Novedad en Sabory · Seguridad alimentaria',
+        title: 'Nuevo control de alergias e intolerancias',
+        subtitle: 'Ahora Sabory revisa tus recetas ingrediente por ingrediente (y posibles trazas ocultas con IA) para avisarte al instante. Selecciona tus alergias o añade cualquier ingrediente a evitar:',
+        dismissBtn: 'No tengo alergias / Ahora no',
+        saveBtn: 'Guardar preferencias',
+        savedToast: 'Preferencias de alérgenos guardadas.'
+      },
       tour: {
         skip: 'Saltar tour',
         prev: 'Anterior',
@@ -1280,6 +1291,9 @@
         dietaryDesc: 'Filter and alert if a recipe does not match your dietary needs.',
         dietStylesGroupLabel: 'Diet styles & goals',
         allergensGroupLabel: 'Strict allergies & intolerances',
+        customAllergenPlaceholder: 'e.g. Kiwi, mustard, peach...',
+        customAllergenAddBtn: 'Add',
+        customAllergenAddedToast: 'Allergen "{name}" added to your restrictions.',
         nutritionTitle: 'Daily Nutritional Goals',
         nutritionDesc: 'Calorie targets and macronutrient split to balance your plans.',
         enableTracking: 'Enable tracking',
@@ -1994,6 +2008,14 @@
         prevBtn: 'Previous',
         finishBtn: 'Start cooking!',
         startTourBtn: 'Take app tour'
+      },
+      allergensWhatsNew: {
+        kicker: 'New in Sabory · Food safety',
+        title: 'New allergies & intolerances guard',
+        subtitle: 'Sabory now audits your recipes ingredient by ingredient (plus hidden traces with AI) to alert you right away. Pick your allergies or add any ingredient to avoid:',
+        dismissBtn: 'No allergies / Not now',
+        saveBtn: 'Save preferences',
+        savedToast: 'Allergen preferences saved.'
       },
       tour: {
         skip: 'Skip tour',
