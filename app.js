@@ -5675,7 +5675,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.22';
+  window.APP_VERSION = 'v2.23';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -5733,7 +5733,7 @@ class FoodAssistantApp {
   constructor() {
     if (typeof window !== 'undefined') window.app = this;
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.22';
+    this.appVersion = window.APP_VERSION || 'v2.23';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -8031,6 +8031,9 @@ class FoodAssistantApp {
             if (remoteDietaryUpdatedAt) {
               state.dietaryUpdatedAt = remoteDietaryUpdatedAt;
               state.save('fa_dietary_updated_at', state.dietaryUpdatedAt);
+            }
+            if (typeof this.renderDietaryPreferencesSettings === 'function') {
+              this.renderDietaryPreferencesSettings();
             }
             stateChanged = true;
           }
@@ -12085,12 +12088,6 @@ class FoodAssistantApp {
             <span class="material-symbols-outlined icon-sm">auto_awesome</span>
             <span>${escapeHtml(window.I18n ? window.I18n.t('recipes.substituteWithAiBtn') : 'Sustituir con Sous Chef')}</span>
           </button>
-          ${state.cloudUser ? `
-            <button type="button" class="btn btn-secondary btn-sm" id="btn-recipe-audit-allergens-ai" onclick="app.auditRecipeAllergensWithDecisionsApi('${safeRecipeId}')">
-              <span class="material-symbols-outlined icon-sm">verified_user</span>
-              <span>${escapeHtml(window.I18n ? window.I18n.t('recipes.auditAllergensAiBtn') : 'Auditar trazas ocultas (IA)')}</span>
-            </button>
-          ` : ''}
         </div>
       </div>
     ` : '';
@@ -12215,12 +12212,6 @@ class FoodAssistantApp {
               <div class="recipe-detail-section-header">
                 <h3 class="recipe-detail-section-title">${window.I18n ? window.I18n.t('recipes.ingredients') : 'Ingredientes'}</h3>
                 <div class="recipe-detail-section-actions">
-                  ${(comp.compliant && activePrefs.length > 0 && state.cloudUser) ? `
-                    <button type="button" class="btn btn-secondary btn-sm" id="btn-recipe-audit-allergens-ai" onclick="app.auditRecipeAllergensWithDecisionsApi('${safeRecipeId}')">
-                      <span class="material-symbols-outlined icon-sm">verified_user</span>
-                      <span>${escapeHtml(window.I18n ? window.I18n.t('recipes.auditAllergensAiBtn') : 'Auditar trazas ocultas (IA)')}</span>
-                    </button>
-                  ` : ''}
                   ${!this.isReviewingImport ? `
                     <button class="btn btn-tonal btn-sm" onclick="app.addRecipeIngredientsToShopping('${escapeHtml(r.id).replace(/'/g, "\\'")}')">
                       <span class="material-symbols-outlined icon-sm">add_shopping_cart</span> ${window.I18n ? window.I18n.t('recipes.sendToShopping') : 'Enviar a la Compra'}
@@ -13361,6 +13352,28 @@ class FoodAssistantApp {
     this.render();
     this.openRecipeDetail(id);
     this.scheduleSyncWithCloud();
+
+    if (state.cloudUser && ingredients.length > 0 && typeof this.classifyRecipeWithDecisionsApi === 'function') {
+      this.classifyRecipeWithDecisionsApi(finalRecipe, { feature: 'guided_query' })
+        .then((audited) => {
+          if (!audited || audited._classificationSource !== 'decisions_api') return;
+          const idx = (state.recipes || []).findIndex(r => r.id === id);
+          if (idx < 0) return;
+          state.recipes[idx] = {
+            ...state.recipes[idx],
+            tags: Array.isArray(audited.tags) ? audited.tags : state.recipes[idx].tags,
+            ...(audited.allergenAudit ? { allergenAudit: audited.allergenAudit } : {}),
+            updatedAt: new Date().toISOString()
+          };
+          state.save('fa_recipes', state.recipes);
+          this.scheduleSyncWithCloud();
+          if (this.activeRecipe && this.activeRecipe.id === id) {
+            this.activeRecipe = state.recipes[idx];
+            this.renderRecipeModalContent();
+          }
+        })
+        .catch(() => {});
+    }
   }
 
   // COOK MODE
@@ -17840,12 +17853,15 @@ ${isEn
     }
     this.render?.();
 
-    const conflicts = updated.allergenAudit?.conflicts || [];
-    if (conflicts.length > 0) {
-      const prefix = window.I18n ? window.I18n.t('recipes.allergenAuditDetected') : 'Trazas ocultas detectadas por IA:';
-      this.showToast(`${prefix} ${conflicts.map(c => c.preference).join(', ')}`, 'warning');
-    } else {
-      this.showToast(window.I18n ? window.I18n.t('recipes.allergenAuditClean') : 'Sin trazas ocultas detectadas para tus restricciones activas.', 'success');
+    if (!options?.silent) {
+      const conflicts = updated.allergenAudit?.conflicts || [];
+      if (conflicts.length > 0) {
+        const prefix = window.I18n ? window.I18n.t('recipes.allergenAuditDetected') : 'Trazas ocultas detectadas por IA:';
+        const detectedLabels = Array.from(new Set(conflicts.map(c => c.ingredient || c.preference).filter(Boolean)));
+        this.showToast(`${prefix} ${detectedLabels.join(', ')}`, 'warning');
+      } else {
+        this.showToast(window.I18n ? window.I18n.t('recipes.allergenAuditClean') : 'Sin trazas ocultas detectadas para tus restricciones activas.', 'success');
+      }
     }
 
     return updated;
@@ -22504,6 +22520,9 @@ REGLAS CRÍTICAS:
           })
           .on('broadcast', { event: 'cookbooks_change' }, (msg) => {
             this.handleRealtimeCookbooksBroadcast(msg?.payload);
+          })
+          .on('broadcast', { event: 'dietary_change' }, (msg) => {
+            this.handleRealtimeDietaryBroadcast(msg?.payload);
           });
 
         // 2. CDC fallback (postgres_changes)
@@ -22747,6 +22766,28 @@ REGLAS CRÍTICAS:
     }
   }
 
+  handleRealtimeDietaryBroadcast(payload) {
+    if (!payload || !Array.isArray(payload.dietaryPreferences)) return;
+    if (payload.clientId && this.clientId && payload.clientId === this.clientId) {
+      return;
+    }
+    const remoteTime = payload.dietaryUpdatedAt ? new Date(payload.dietaryUpdatedAt).getTime() : Date.now();
+    const localTime = state.dietaryUpdatedAt ? new Date(state.dietaryUpdatedAt).getTime() : 0;
+    if (remoteTime >= localTime || !state.dietaryUpdatedAt) {
+      if (JSON.stringify(state.dietaryPreferences || []) !== JSON.stringify(payload.dietaryPreferences)) {
+        state.dietaryPreferences = [...payload.dietaryPreferences];
+        state.save('fa_dietary_preferences', state.dietaryPreferences);
+        if (payload.dietaryUpdatedAt) {
+          state.dietaryUpdatedAt = payload.dietaryUpdatedAt;
+          state.save('fa_dietary_updated_at', state.dietaryUpdatedAt);
+        }
+        this.renderDietaryPreferencesSettings();
+        this.renderPlanner();
+        this.renderTodayView();
+      }
+    }
+  }
+
   handleHouseholdRealtimeEvent(payload) {
     if (!state.household?.id && !state.cloudUser?.id) return;
 
@@ -22973,6 +23014,14 @@ REGLAS CRÍTICAS:
     });
   }
 
+  _syncDietaryPreferencesChange() {
+    this.broadcastRealtimeChange?.('dietary_change', {
+      dietaryPreferences: Array.isArray(state.dietaryPreferences) ? [...state.dietaryPreferences] : [],
+      dietaryUpdatedAt: state.dietaryUpdatedAt || new Date().toISOString()
+    });
+    this.scheduleSyncWithCloud(250);
+  }
+
   addCustomAllergenFromSettings() {
     const pref = this._consumeCustomAllergenInput('settings-custom-allergen-input');
     if (!pref) return;
@@ -22983,7 +23032,7 @@ REGLAS CRÍTICAS:
       this.renderDietaryPreferencesSettings();
       this.renderPlanner();
       this.renderTodayView();
-      this.scheduleSyncWithCloud();
+      this._syncDietaryPreferencesChange();
       const msg = window.I18n
         ? window.I18n.t('settings.customAllergenAddedToast', { name: pref })
         : `Alérgeno "${pref}" añadido a tus restricciones.`;
@@ -23003,7 +23052,7 @@ REGLAS CRÍTICAS:
     this.renderDietaryPreferencesSettings();
     this.renderPlanner();
     this.renderTodayView();
-    this.scheduleSyncWithCloud();
+    this._syncDietaryPreferencesChange();
   }
 
   // US-03: Objetivos nutricionales diarios en Ajustes
@@ -24086,7 +24135,7 @@ REGLAS CRÍTICAS:
     this.renderDietaryPreferencesSettings();
     this.renderPlanner();
     this.renderTodayView();
-    this.scheduleSyncWithCloud();
+    this._syncDietaryPreferencesChange();
     const toastMsg = window.I18n
       ? window.I18n.t('allergensWhatsNew.savedToast')
       : 'Preferencias de alérgenos guardadas.';

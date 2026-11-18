@@ -1182,6 +1182,7 @@ describe('US-35 & Bugs Bloqueantes: Sincronización Supabase, IDs Únicos y Esqu
       localStorage.setItem('fa_allergens_whatsnew_v1', 'true');
 
       let pushedRecipes = [];
+      let pushedMealPlans = [];
       let pushedUserMeta = null;
       const mockSupabasePush = {
         from: vi.fn().mockImplementation((table) => ({
@@ -1190,6 +1191,7 @@ describe('US-35 & Bugs Bloqueantes: Sincronización Supabase, IDs Únicos y Esqu
           }),
           upsert: vi.fn().mockImplementation((payload) => {
             if (table === 'recipes') pushedRecipes = payload;
+            if (table === 'meal_plans') pushedMealPlans = payload;
             return Promise.resolve({ data: payload, error: null });
           }),
           update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) })
@@ -1207,12 +1209,16 @@ describe('US-35 & Bugs Bloqueantes: Sincronización Supabase, IDs Únicos y Esqu
       expect(pushRes.success).toBe(true);
       expect(pushedRecipes[0].instructions[0]._allergenAudit).toEqual(auditObj);
       expect(pushedUserMeta.allergens_whatsnew_v1).toBe(true);
+      const hhPrefsPushed = pushedMealPlans.find(r => r.plan_date === '__household_prefs__');
+      expect(hhPrefsPushed).toBeDefined();
+      expect(hhPrefsPushed.id).toBe('__household_prefs__');
 
       // Simular otro dispositivo con fila __household_prefs__ de otro miembro que tuvo deleted_shopping_items más tarde,
       // pero cuyo slot household_prefs es más antiguo que el del primer miembro.
       state.recipes = [];
       state.dietaryPreferences = [];
       state.dietaryUpdatedAt = null;
+      state.cloudUser.user_metadata = {};
       localStorage.removeItem('fa_allergens_whatsnew_v1');
 
       const hhRowNewerDietary = {
@@ -1269,6 +1275,14 @@ describe('US-35 & Bugs Bloqueantes: Sincronización Supabase, IDs Únicos y Esqu
       expect(state.recipes[0].instructions[0]._allergenAudit).toBeUndefined();
       expect(state.dietaryPreferences).toEqual(['Sin Kiwi', 'Sin Gluten']);
       expect(localStorage.getItem('fa_allergens_whatsnew_v1')).toBe('true');
+
+      // Broadcast instantáneo de preferencias desde otro dispositivo
+      appInstance.handleRealtimeDietaryBroadcast({
+        clientId: 'other-device',
+        dietaryPreferences: ['Sin Kiwi', 'Sin Lactosa'],
+        dietaryUpdatedAt: '2026-11-18T18:20:00.000Z'
+      });
+      expect(state.dietaryPreferences).toEqual(['Sin Kiwi', 'Sin Lactosa']);
     });
   });
 });
