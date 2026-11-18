@@ -644,11 +644,13 @@ describe('US-02: Filtros Dietéticos, Selector de Chips & Advertencias Nutricion
       const banner = document.getElementById('recipe-allergen-alert-banner');
       expect(banner).not.toBeNull();
       expect(banner.textContent).toContain('Piñones');
+      expect(banner.textContent).toContain('(Frutos Secos)');
+      expect(banner.textContent).not.toContain('(Sin Frutos Secos)');
       expect(document.getElementById('btn-recipe-substitute-allergen')).not.toBeNull();
 
       const modalBody = document.getElementById('recipe-modal-body');
       expect(modalBody.querySelector('.recipe-ingredient-item.has-allergen-conflict')).not.toBeNull();
-      expect(modalBody.querySelector('.ingredient-allergen-pill')).not.toBeNull();
+      expect(modalBody.querySelector('.ingredient-allergen-pill')).toBeNull();
     });
 
     it('soporta alérgenos personalizados manuales (normalización, auditoría de ingredientes/pasos y preguntas dinámicas en Decisions API)', () => {

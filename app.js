@@ -5678,7 +5678,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.24';
+  window.APP_VERSION = 'v2.25';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -5736,7 +5736,7 @@ class FoodAssistantApp {
   constructor() {
     if (typeof window !== 'undefined') window.app = this;
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.24';
+    this.appVersion = window.APP_VERSION || 'v2.25';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -12071,6 +12071,14 @@ class FoodAssistantApp {
     const hasIngredientConflicts = Array.isArray(comp.violatingIngredients) && comp.violatingIngredients.length > 0;
     const hasAllergenViolations = Array.isArray(comp.allergenViolations) && comp.allergenViolations.length > 0;
     const showAllergenAlertBanner = !comp.compliant && activePrefs.length > 0 && (hasIngredientConflicts || hasAllergenViolations);
+    const formatConflictLabel = (pref) => {
+      const label = window.I18n ? window.I18n.getTagLabel(pref) : String(pref || '');
+      return label
+        .replace(/^(?:sin|no|bajo en)\s+/i, '')
+        .replace(/^(?:low[- ]?)/i, '')
+        .replace(/[- ]?free$/i, '')
+        .trim() || label;
+    };
     const allergenBannerHtml = showAllergenAlertBanner ? `
       <div class="recipe-allergen-alert-banner" id="recipe-allergen-alert-banner" role="alert">
         <div class="recipe-allergen-alert-header">
@@ -12080,12 +12088,12 @@ class FoodAssistantApp {
         <div class="recipe-allergen-conflicts-list">
           ${hasIngredientConflicts
             ? comp.violatingIngredients.map(c => {
-                const prefLabel = window.I18n ? window.I18n.getTagLabel(c.preference) : c.preference;
+                const prefLabel = formatConflictLabel(c.preference);
                 return `<span class="recipe-allergen-conflict-chip">${escapeHtml(c.ingredient)} (${escapeHtml(prefLabel)})</span>`;
               }).join('')
             : comp.allergenViolations.map(v => {
-                const prefLabel = window.I18n ? window.I18n.getTagLabel(v) : v;
-                return `<span class="recipe-allergen-conflict-chip">${isEn ? 'Does not comply' : 'No cumple'}: ${escapeHtml(prefLabel)}</span>`;
+                const prefLabel = formatConflictLabel(v);
+                return `<span class="recipe-allergen-conflict-chip">${escapeHtml(prefLabel)}</span>`;
               }).join('')}
         </div>
         <div class="recipe-allergen-alert-actions">
@@ -12229,13 +12237,9 @@ class FoodAssistantApp {
       const adjustedAmount = ing.amount ? Math.round((ing.amount * scale) * 10) / 10 : null;
       const ingLower = String(ing?.name || '').trim().toLowerCase();
       const ingConflicts = (comp.violatingIngredients || []).filter(c => c.ingredient.toLowerCase() === ingLower);
-      const conflictPills = ingConflicts.map(c => {
-        const prefLabel = window.I18n ? window.I18n.getTagLabel(c.preference) : c.preference;
-        return `<span class="ingredient-allergen-pill">${escapeHtml(prefLabel)}</span>`;
-      }).join('');
       return `
                     <li class="recipe-ingredient-item${ingConflicts.length > 0 ? ' has-allergen-conflict' : ''}">
-                      <span>${escapeHtml(ing.name)}${conflictPills}</span>
+                      <span>${escapeHtml(ing.name)}</span>
                       <strong class="recipe-ingredient-amount">${adjustedAmount !== null ? `${adjustedAmount} ${ing.unit || ''}` : ''}</strong>
                     </li>
                   `;
