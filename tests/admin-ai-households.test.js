@@ -298,6 +298,7 @@ describe('US-87d — Monitor de IA, Reset de Cuotas, Consola de Hogares y Audito
     // - guided_query (gemini-3.5-flash-lite): 0.8M*0.10 + 0.2M*0.40 = 0.08 + 0.08 = 0.16 USD
     // Total USD = 1.27 * 0.92 = 1.17 EUR; Margen bruto = 18.21 - 1.17 = 17.04 €
     expect(document.getElementById('ai-kpi-cost').textContent).toContain('1,17 €');
+    expect(document.getElementById('ai-kpi-cost-meta').textContent).toContain('Ahorro routing:');
     expect(document.getElementById('ai-kpi-tokens').textContent).toMatch(/2\.500\.000|2,500,000/);
     expect(document.getElementById('ai-kpi-calls').textContent).toBe('400');
     expect(document.getElementById('ai-kpi-margin').textContent).toContain('17,04 €');

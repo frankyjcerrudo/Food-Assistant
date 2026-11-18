@@ -1470,6 +1470,13 @@ describe('US-79a: AiGateway', () => {
       expect(classified.ingredients[1].aisle).toBe('pantry');
       const sentBody = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
       expect(sentBody.payload.decisions.questions.is_vegan.type).toBe('noul');
+
+      // También en autoAnalyzeAndTagAllRecipes({ useDecisionsApi: true })
+      state.recipes = [JSON.parse(JSON.stringify(recipe))];
+      const tagRes = await appInstance.autoAnalyzeAndTagAllRecipes({ useDecisionsApi: true });
+      expect(tagRes.updatedCount).toBe(1);
+      expect(state.recipes[0].ingredients[1].aisle).toBe('pantry');
+      expect(state.recipes[0].tags).toContain('Vegano');
     } finally {
       globalThis.fetch = origFetch;
     }

@@ -5191,7 +5191,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.17';
+  window.APP_VERSION = 'v2.18';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -5241,7 +5241,7 @@ class FoodAssistantApp {
   constructor() {
     if (typeof window !== 'undefined') window.app = this;
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.17';
+    this.appVersion = window.APP_VERSION || 'v2.18';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -20728,6 +20728,17 @@ REGLAS CRÍTICAS:
         extractedRecipe.language = detectRecipeLanguage(extractedRecipe);
       }
 
+      if (extractedRecipe && !extractedRecipe._isHighDemandFallback && state.cloudUser && this.isPro()) {
+        const hasUnknownAisle = Array.isArray(extractedRecipe.ingredients)
+          && extractedRecipe.ingredients.some(ing => !ing?.aisle || ing.aisle === 'other');
+        const hasFewTags = !Array.isArray(extractedRecipe.tags) || extractedRecipe.tags.length < 2;
+        if (hasUnknownAisle || hasFewTags) {
+          try {
+            extractedRecipe = await this.classifyRecipeWithDecisionsApi(extractedRecipe, { feature: 'guided_query' });
+          } catch (e) { }
+        }
+      }
+
       // Store in memory for confirmation
       this.pendingImportRecipe = extractedRecipe;
 
@@ -22261,13 +22272,43 @@ REGLAS CRÍTICAS:
   }
 
   // US-02: Auto-análisis inteligente y etiquetado masivo de recetas guardadas
-  async autoAnalyzeAndTagAllRecipes() {
+  async autoAnalyzeAndTagAllRecipes(options = {}) {
     const recipes = state.recipes || [];
-    let updatedCount = 0;
+    const updatedRecipeKeys = new Set();
     let totalTagsAdded = 0;
     const nowIso = new Date().toISOString();
 
-    recipes.forEach(recipe => {
+    if (options?.useDecisionsApi && state.cloudUser && typeof this.classifyRecipeWithDecisionsApi === 'function') {
+      for (let i = 0; i < recipes.length; i++) {
+        const rec = recipes[i];
+        const hasUnknownAisle = Array.isArray(rec?.ingredients) && rec.ingredients.some(ing => {
+          const aisle = typeof ing === 'object' ? ing?.aisle : '';
+          return !aisle || aisle === 'other';
+        });
+        if (!hasUnknownAisle) continue;
+        try {
+          const prevTagsCount = Array.isArray(rec.tags) ? rec.tags.length : 0;
+          const prevIngJson = JSON.stringify(rec.ingredients || []);
+          const classified = await this.classifyRecipeWithDecisionsApi(rec, { feature: options.feature || 'guided_query' });
+          if (classified && classified._classificationSource === 'decisions_api') {
+            rec.tags = Array.isArray(classified.tags) ? classified.tags : rec.tags;
+            rec.ingredients = Array.isArray(classified.ingredients) ? classified.ingredients : rec.ingredients;
+            if (classified.difficultyScore !== undefined) rec.difficultyScore = classified.difficultyScore;
+            const ingChanged = JSON.stringify(rec.ingredients || []) !== prevIngJson;
+            const addedFromDecision = Math.max(0, (rec.tags?.length || 0) - prevTagsCount);
+            if (ingChanged || addedFromDecision > 0) {
+              rec.updatedAt = nowIso;
+              updatedRecipeKeys.add(rec.id || i);
+              totalTagsAdded += addedFromDecision;
+            }
+          }
+        } catch {
+          // Fallback silencioso al motor heurístico local
+        }
+      }
+    }
+
+    recipes.forEach((recipe, idx) => {
       // 1. Limpiar la etiqueta obsoleta "General" si existe
       if (Array.isArray(recipe.tags) && recipe.tags.some(t => t && String(t).trim().toLowerCase() === 'general')) {
         recipe.tags = recipe.tags.filter(t => t && String(t).trim().toLowerCase() !== 'general');
@@ -22296,10 +22337,12 @@ REGLAS CRÍTICAS:
       if (newTagsToAdd.length > 0 || tagsUpdated) {
         recipe.tags = [...currentTags, ...newTagsToAdd];
         recipe.updatedAt = nowIso;
-        updatedCount++;
+        updatedRecipeKeys.add(recipe.id || idx);
         totalTagsAdded += newTagsToAdd.length;
       }
     });
+
+    const updatedCount = updatedRecipeKeys.size;
 
     if (updatedCount > 0) {
       state.save('fa_recipes', state.recipes);

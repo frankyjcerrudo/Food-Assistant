@@ -1542,10 +1542,13 @@ export class SaboryAdminApp {
 
     if (this.els.aiKpiCost) this.els.aiKpiCost.textContent = this.formatEur(aiSummary.costEur);
     if (this.els.aiKpiCostMeta) {
-      this.els.aiKpiCostMeta.textContent = this.t('admin.aiKpiCostMeta', {
+      const baseCostMeta = this.t('admin.aiKpiCostMeta', {
         usd: this.formatDecimal(aiSummary.costUsd, 2),
         rate: this.formatDecimal(DEFAULT_EUR_PER_USD, 2)
       });
+      this.els.aiKpiCostMeta.textContent = aiSummary.routingSavingsEur > 0
+        ? `${baseCostMeta} · ${this.t('admin.aiKpiRoutingSaved', { savings: this.formatEur(aiSummary.routingSavingsEur) })}`
+        : baseCostMeta;
     }
     if (this.els.aiKpiTokens) this.els.aiKpiTokens.textContent = this.formatInt(totalTokens);
     if (this.els.aiKpiTokensMeta) {
