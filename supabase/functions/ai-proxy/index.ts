@@ -4,6 +4,7 @@ import {
   applySousChefIdentityGuard,
   buildRoutingDecisionRequest,
   DECISION_MODEL,
+  DECISION_ONLY_FEATURES,
   evaluateRoutingDecision,
   extractLastUserText,
   extractUsage,
@@ -86,24 +87,54 @@ Deno.serve(async (req: Request) => {
     p_user: user.id,
     p_feature: body.feature
   });
-  if (quotaErr) {
-    return json({ ok: false, code: 'QUOTA_CHECK_ERROR', message: quotaErr.message }, 502);
-  }
-  const mappedQuota = mapQuotaResult(quotaRpc);
-  if (mappedQuota) {
-    return json(mappedQuota.body, mappedQuota.status);
-  }
+  const isDecisionOnly = DECISION_ONLY_FEATURES.includes(body.feature);
+  const needsUtilityFallback = isDecisionOnly && (
+    (quotaErr && /ai_usage_feature_check|23514/i.test(`${quotaErr.message || ''} ${(quotaErr as any).code || ''}`))
+    || (!quotaErr && quotaRpc?.allowed === false && quotaRpc?.code === 'INVALID_FEATURE')
+  );
 
-  const plan = quotaRpc.plan === 'pro' ? 'pro' : 'free';
-  const usageId: number | null = quotaRpc.usage_id ?? null;
-  const quotaInfo = {
-    feature: quotaRpc.feature ?? body.feature,
-    used: quotaRpc.used ?? null,
-    limit: quotaRpc.limit ?? null,
-    remaining: quotaRpc.remaining ?? null,
-    period: quotaRpc.period ?? null,
-    plan
-  };
+  let plan: 'free' | 'pro' = 'free';
+  let usageId: number | null = null;
+  let quotaInfo: Record<string, unknown> | null = null;
+
+  if (needsUtilityFallback) {
+    // Degradación pre-migración: respetar techo global de seguridad (200/día) sin tocar cuotas visibles
+    const { count: dayCount, error: dayErr } = await adminClient
+      .from('ai_usage')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .in('status', ['pending', 'ok'])
+      .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+    if (dayErr) {
+      return json({ ok: false, code: 'QUOTA_CHECK_ERROR', message: dayErr.message }, 502);
+    }
+    if ((dayCount ?? 0) >= 200) {
+      return json({
+        ok: false,
+        code: 'RATE_LIMITED',
+        quota: { feature: body.feature, used: dayCount, limit: 200, remaining: 0, period: 'day', plan: 'free' }
+      }, 429);
+    }
+  } else {
+    if (quotaErr) {
+      return json({ ok: false, code: 'QUOTA_CHECK_ERROR', message: quotaErr.message }, 502);
+    }
+    const mappedQuota = mapQuotaResult(quotaRpc);
+    if (mappedQuota) {
+      return json(mappedQuota.body, mappedQuota.status);
+    }
+
+    plan = quotaRpc.plan === 'pro' ? 'pro' : 'free';
+    usageId = quotaRpc.usage_id ?? null;
+    quotaInfo = {
+      feature: quotaRpc.feature ?? body.feature,
+      used: quotaRpc.used ?? null,
+      limit: quotaRpc.limit ?? null,
+      remaining: quotaRpc.remaining ?? null,
+      period: quotaRpc.period ?? null,
+      plan
+    };
+  }
 
   const cleanPayload = applySousChefIdentityGuard(sanitizePayload(body.payload));
   const isDirectDecision = Boolean(
@@ -154,7 +185,7 @@ Deno.serve(async (req: Request) => {
           ok: true,
           model: DECISION_MODEL,
           data: decisionData,
-          quota: quotaInfo
+          ...(quotaInfo ? { quota: quotaInfo } : {})
         });
       }
 

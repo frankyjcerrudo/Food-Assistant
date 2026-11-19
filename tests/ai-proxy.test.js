@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import {
   AI_FEATURES,
+  DECISION_ONLY_FEATURES,
   DECISION_MODEL,
   DECISION_TIMEOUT_MS,
   MAX_PAYLOAD_BYTES,
@@ -46,15 +47,34 @@ describe('US-79a: ai-proxy core', () => {
       expect(res).toEqual({ ok: false, status: 413, code: 'PAYLOAD_TOO_LARGE' });
     });
 
-    it('acepta una petición válida para cada uno de los 5 features', () => {
-      expect(AI_FEATURES).toEqual(['chat', 'voice', 'guided_query', 'weekly_plan', 'import_ai']);
-      for (const feature of AI_FEATURES) {
+    it('acepta contents en los 5 features generativos y restringe utility_decision solo a decisions', () => {
+      expect(AI_FEATURES).toEqual(['chat', 'voice', 'guided_query', 'weekly_plan', 'import_ai', 'utility_decision']);
+      expect(DECISION_ONLY_FEATURES).toEqual(['utility_decision']);
+
+      for (const feature of ['chat', 'voice', 'guided_query', 'weekly_plan', 'import_ai']) {
         const res = validateAiRequest({
           feature,
           payload: { contents: [{ role: 'user', parts: [{ text: 'hola' }] }] }
         }, 256);
         expect(res).toEqual({ ok: true });
       }
+
+      const rejectedContents = validateAiRequest({
+        feature: 'utility_decision',
+        payload: { contents: [{ role: 'user', parts: [{ text: 'hola' }] }] }
+      }, 256);
+      expect(rejectedContents).toEqual({ ok: false, status: 400, code: 'INVALID_PAYLOAD' });
+
+      const acceptedDecisions = validateAiRequest({
+        feature: 'utility_decision',
+        payload: {
+          decisions: {
+            input: 'Ingrediente de supermercado: tahini',
+            questions: { aisle: { type: 'choice', instructions: '¿Pasillo?', criteria: { spices: 'Especias', other: 'Otros' } } }
+          }
+        }
+      }, 256);
+      expect(acceptedDecisions).toEqual({ ok: true });
     });
   });
 
@@ -258,6 +278,19 @@ describe('US-79a: ai-proxy core', () => {
       expect(recipeCreationPro.blockedByGuardrail).toBe(false);
       expect(recipeCreationPro.routedToLite).toBe(false);
       expect(recipeCreationPro.models).toEqual(['gemini-3.8-flash', 'gemini-3.5-flash-lite']);
+    });
+
+    it('US-90: migración SQL y routing excluyen utility_decision de cuotas visibles y habilitan techo 30/día en Free', () => {
+      const sql = fs.readFileSync(
+        path.resolve(__dirname, '../supabase/sql/us90-utility-decision.sql'),
+        'utf8'
+      );
+      expect(sql).toContain("'utility_decision'");
+      expect(sql).toContain('consume_ai_quota');
+      expect(sql).toContain("p_feature = 'utility_decision' then v_limit := 30");
+      expect(shouldRunRoutingDecision('utility_decision', {
+        decisions: { input: 'tahini', questions: { aisle: { type: 'choice', instructions: '¿Pasillo?' } } }
+      })).toBe(false);
     });
   });
 });

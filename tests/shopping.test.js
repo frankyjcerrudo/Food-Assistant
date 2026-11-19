@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 
@@ -8,6 +8,15 @@ new Function(appCode)();
 
 const {
   AISLE_METADATA,
+  AISLE_DECISION_MIN_CONFIDENCE,
+  AISLE_DECISION_CRITERIA,
+  normalizeAisleCacheKey,
+  buildAisleDecisionPayload,
+  parseAisleDecisionResult,
+  resolveAisleOnline,
+  getCachedAisle,
+  setCachedAisle,
+  applyRecipeDecisionsResult,
   RecipeParser,
   cleanInvisibleChars,
   deduplicateShoppingBreakdown,
@@ -883,5 +892,194 @@ describe('US-64: Conversión y normalización de unidades en la compra', () => {
       // Debe mantenerse completado
       expect(window.state.shoppingList[0].isChecked).toBe(true);
     });
+  });
+});
+
+describe('US-90: Clasificación Inteligente de Pasillos con Gemini Decisions API y Caché Persistente', () => {
+  const originalOnlineDescriptor = Object.getOwnPropertyDescriptor(Navigator.prototype, 'onLine');
+
+  beforeEach(() => {
+    localStorage.clear();
+    if (window.state) {
+      window.state.cloudUser = { id: 'user-us90' };
+      window.state.shoppingList = [];
+      window.state.aiPlan = {
+        plan: 'free',
+        quotas: {
+          weekly_plan: { used: 0, limit: 1, remaining: 1, period: 'week' },
+          guided_query: { used: 1, limit: 3, remaining: 2, period: 'day' },
+          import_ai: { used: 0, limit: 3, remaining: 3, period: 'month' }
+        }
+      };
+    }
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    if (originalOnlineDescriptor) {
+      Object.defineProperty(Navigator.prototype, 'onLine', originalOnlineDescriptor);
+    }
+    if (window.state) {
+      window.state.cloudUser = null;
+      window.state.shoppingList = [];
+    }
+    document.body.innerHTML = '';
+  });
+
+  it('elimina por completo las llamadas heredadas a wikipedia.org en app.js y src/core/utils.js', () => {
+    const utilsCode = fs.readFileSync(path.resolve(process.cwd(), 'src/core/utils.js'), 'utf-8');
+    expect(appCode).not.toContain('wikipedia.org');
+    expect(utilsCode).not.toContain('wikipedia.org');
+  });
+
+  it('construye el payload choice de 9 pasillos oficiales y valida umbral >= 0.75', () => {
+    expect(AISLE_DECISION_MIN_CONFIDENCE).toBe(0.75);
+    expect(Object.keys(AISLE_DECISION_CRITERIA)).toEqual([
+      'produce', 'meat', 'dairy', 'bakery', 'pantry', 'spices', 'frozen', 'beverages', 'other'
+    ]);
+
+    const payload = buildAisleDecisionPayload('tahini negro artesanal');
+    expect(payload.questions.aisle.type).toBe('choice');
+    expect(Object.keys(payload.questions.aisle.criteria)).toEqual(Object.keys(AISLE_METADATA));
+
+    expect(parseAisleDecisionResult({
+      answers: { aisle: { choice: 'spices', probabilities: { spices: 0.89 }, confidence: 0.89 } }
+    })).toEqual({ aisle: 'spices', confidence: 0.89 });
+
+    expect(parseAisleDecisionResult({
+      answers: { aisle: { choice: 'spices', probabilities: { spices: 0.74 }, confidence: 0.74 } }
+    })).toBeNull();
+
+    expect(parseAisleDecisionResult({
+      answers: { aisle: { choice: 'non_existent_aisle', probabilities: { non_existent_aisle: 0.99 }, confidence: 0.99 } }
+    })).toBeNull();
+  });
+
+  it('normaliza claves de caché quitando cantidades y unidades para reutilizar fa_aisle_cache', () => {
+    expect(normalizeAisleCacheKey('200 g de tahini')).toBe('tahini');
+    expect(normalizeAisleCacheKey('2 cucharadas de pasta de miso')).toBe('pasta de miso');
+
+    setCachedAisle('Tahini negro', 'spices');
+    expect(getCachedAisle('tahini negro')).toBe('spices');
+    expect(getCachedAisle('50g de Tahini negro')).toBe('spices');
+    const rawCache = JSON.parse(localStorage.getItem('fa_aisle_cache'));
+    expect(rawCache['tahini negro']).toBe('spices');
+  });
+
+  it('resolveAisleOnline llama a utility_decision (>=0.75), guarda en caché y no vuelve a llamar para el mismo ingrediente', async () => {
+    const appInstance = new window.FoodAssistantApp();
+    window.app = appInstance;
+    const mockProxy = vi.fn(async () => ({
+      ok: true,
+      data: {
+        answers: {
+          aisle: { choice: 'pantry', probabilities: { pantry: 0.91 }, confidence: 0.91 }
+        }
+      }
+    }));
+    appInstance.invokeAiProxy = mockProxy;
+
+    const cb1 = vi.fn();
+    const res1 = await resolveAisleOnline('Edamame pelado', cb1, { immediate: true, appInstance });
+    expect(res1).toBe('pantry');
+    expect(cb1).toHaveBeenCalledWith('pantry');
+    expect(mockProxy).toHaveBeenCalledTimes(1);
+    expect(mockProxy).toHaveBeenCalledWith('utility_decision', expect.objectContaining({
+      decisions: expect.objectContaining({ input: expect.stringContaining('edamame pelado') })
+    }));
+
+    // Segunda consulta con distinta cantidad debe salir de localStorage sin llamar a IA
+    const cb2 = vi.fn();
+    const res2 = resolveAisleOnline('250 g de edamame pelado', cb2, { immediate: true, appInstance });
+    expect(res2).toBe('pantry');
+    expect(cb2).toHaveBeenCalledWith('pantry');
+    expect(mockProxy).toHaveBeenCalledTimes(1);
+  });
+
+  it('no guarda en caché ni invoca callback si la confianza es menor de 0.75', async () => {
+    const appInstance = new window.FoodAssistantApp();
+    appInstance.invokeAiProxy = vi.fn(async () => ({
+      ok: true,
+      data: {
+        answers: {
+          aisle: { choice: 'spices', probabilities: { spices: 0.61 }, confidence: 0.61 }
+        }
+      }
+    }));
+
+    const cb = vi.fn();
+    const res = await resolveAisleOnline('Garum romano', cb, { immediate: true, appInstance });
+    expect(res).toBeNull();
+    expect(cb).not.toHaveBeenCalled();
+    expect(getCachedAisle('garum romano')).toBeNull();
+  });
+
+  it('degrada silenciosamente offline, sin sesión o ante error de cuota/red sin afectar a guided_query', async () => {
+    const appInstance = new window.FoodAssistantApp();
+    const mockProxy = vi.fn(async () => ({ ok: false, status: 429, code: 'RATE_LIMITED' }));
+    appInstance.invokeAiProxy = mockProxy;
+
+    // Sin sesión
+    window.state.cloudUser = null;
+    expect(resolveAisleOnline('Yuzu fresco', vi.fn(), { immediate: true, appInstance })).toBeNull();
+    expect(mockProxy).not.toHaveBeenCalled();
+
+    // Offline
+    window.state.cloudUser = { id: 'user-us90' };
+    Object.defineProperty(Navigator.prototype, 'onLine', { configurable: true, get: () => false });
+    expect(resolveAisleOnline('Yuzu fresco', vi.fn(), { immediate: true, appInstance })).toBeNull();
+    expect(mockProxy).not.toHaveBeenCalled();
+
+    // Online con error silencioso y cuotas visibles intactas
+    Object.defineProperty(Navigator.prototype, 'onLine', { configurable: true, get: () => true });
+    const resErr = await resolveAisleOnline('Yuzu fresco', vi.fn(), { immediate: true, appInstance });
+    expect(resErr).toBeNull();
+    expect(window.state.aiPlan.quotas.guided_query.used).toBe(1);
+  });
+
+  it('handleManualAddGrocery reclasifica un artículo desconocido en segundo plano con utility_decision y actualiza caché', async () => {
+    document.body.innerHTML = `
+      <input id="input-quick-grocery" value="Tahini artesanal" />
+      <div id="quick-grocery-autocomplete"></div>
+      <div id="shopping-aisles-container"></div>
+    `;
+    const appInstance = new window.FoodAssistantApp();
+    window.app = appInstance;
+    appInstance.renderShoppingList = vi.fn();
+    appInstance.broadcastRealtimeChange = vi.fn();
+    appInstance.scheduleSyncWithCloud = vi.fn();
+    appInstance.flushSync = vi.fn();
+    appInstance.invokeAiProxy = vi.fn(async () => ({
+      ok: true,
+      data: {
+        answers: {
+          aisle: { choice: 'spices', probabilities: { spices: 0.93 }, confidence: 0.93 }
+        }
+      }
+    }));
+
+    appInstance.handleManualAddGrocery();
+    expect(window.state.shoppingList).toHaveLength(1);
+    expect(window.state.shoppingList[0].aisle).toBe('other');
+
+    // Esperar a que termine la promesa asíncrona de resolveAisleOnline
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(window.state.shoppingList[0].aisle).toBe('spices');
+    expect(getCachedAisle('tahini artesanal')).toBe('spices');
+    expect(appInstance.renderShoppingList).toHaveBeenCalledTimes(2);
+  });
+
+  it('applyRecipeDecisionsResult alimenta fa_aisle_cache con pasillos de alta confianza', () => {
+    const recipe = {
+      id: 'rec-us90',
+      ingredients: [{ name: 'Miso blanco', amount: 30, unit: 'g', aisle: 'other' }]
+    };
+    const merged = applyRecipeDecisionsResult(recipe, {
+      answers: {
+        aisle_0: { choice: 'spices', probabilities: { spices: 0.88 }, confidence: 0.88 }
+      }
+    }, 0.75);
+    expect(merged.ingredients[0].aisle).toBe('spices');
+    expect(getCachedAisle('Miso blanco')).toBe('spices');
   });
 });

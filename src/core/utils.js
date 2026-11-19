@@ -759,93 +759,191 @@ function categorizeIngredientAisle(ingredientName) {
   return 'other';
 }
 
-// Persistent cache for background online ingredient classification
+// US-90: Caché local persistente y clasificación inteligente con Gemini Decisions API
 const AISLE_CACHE_KEY = 'fa_aisle_cache';
+const AISLE_CACHE_MAX_ENTRIES = 500;
+const AISLE_DECISION_MIN_CONFIDENCE = 0.75;
+const AISLE_DECISION_CRITERIA = {
+  produce: 'Frutas, verduras, hortalizas y hierbas frescas.',
+  meat: 'Carnes, aves, pescados y mariscos.',
+  dairy: 'Lácteos, quesos, yogures y huevos.',
+  bakery: 'Panadería, masas, bollería y harinas de panificación.',
+  pantry: 'Despensa seca, conservas, legumbres, arroz, pasta y frutos secos.',
+  spices: 'Especias, condimentos, salsas, aceites y vinagres.',
+  frozen: 'Productos congelados o helados.',
+  beverages: 'Bebidas, aguas, zumos, cafés, tés o vinos.',
+  other: 'Otros productos no clasificables en las categorías anteriores.'
+};
+const _aisleInFlightPromises = new Map();
+
+function normalizeAisleCacheKey(rawName) {
+  const norm = normalizeIngredientText(rawName);
+  if (!norm) return '';
+  const cleaned = norm
+    .replace(/^(?:[\d.,\/\u00BC-\u00BE\u2150-\u215E]+)\s*(?:(?:g|gr|kg|mg|ml|cl|dl|l|cda|cdas|cdta|cdtas|cucharada|cucharadas|cucharadita|cucharaditas|taza|tazas|vaso|vasos|ud|uds|unidad|unidades|diente|dientes|pizca|pizcas|lata|latas|bote|botes|paquete|paquetes|sobre|sobres)\b\.?\s*)?(?:de\s+|del\s+)?/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned || norm;
+}
+
+function buildAisleDecisionPayload(ingredientName) {
+  const clean = String(ingredientName || '').trim().slice(0, 120);
+  if (!clean) return null;
+  return {
+    input: `Ingrediente de supermercado: ${clean}`,
+    questions: {
+      aisle: {
+        type: 'choice',
+        instructions: `¿A qué pasillo de supermercado pertenece el ingrediente "${clean}"?`,
+        criteria: AISLE_DECISION_CRITERIA
+      }
+    }
+  };
+}
+
+function parseAisleDecisionResult(decisionData, minConfidence = AISLE_DECISION_MIN_CONFIDENCE) {
+  const ans = decisionData?.answers?.aisle;
+  if (!ans || typeof ans !== 'object') return null;
+  const probs = ans.probabilities && typeof ans.probabilities === 'object' ? ans.probabilities : null;
+  let choice = typeof ans.choice === 'string' && ans.choice.trim() ? ans.choice.trim() : null;
+  let bestProb = choice && probs && typeof probs[choice] === 'number' ? Number(probs[choice]) : 0;
+  if (probs) {
+    for (const [k, v] of Object.entries(probs)) {
+      const p = Number(v);
+      if (Number.isFinite(p) && p > bestProb) {
+        bestProb = p;
+        if (!ans.choice) choice = k;
+      }
+    }
+  }
+  const rawConf = Number(ans.confidence);
+  const confidence = Number.isFinite(rawConf) ? rawConf : bestProb;
+  if (!choice || !AISLE_METADATA[choice] || !Number.isFinite(confidence) || confidence < minConfidence) {
+    return null;
+  }
+  return { aisle: choice, confidence };
+}
+
 function getAisleCache() {
   try {
+    if (typeof localStorage === 'undefined') return {};
     return JSON.parse(localStorage.getItem(AISLE_CACHE_KEY)) || {};
   } catch (e) {
     return {};
   }
 }
-function getCachedAisle(normalizedText) {
-  if (!normalizedText) return null;
+
+function getCachedAisle(rawOrNorm) {
+  if (!rawOrNorm) return null;
+  const norm = normalizeIngredientText(rawOrNorm);
+  const key = normalizeAisleCacheKey(rawOrNorm);
   const cache = getAisleCache();
-  return cache[normalizedText] || null;
+  const candidate = (key && cache[key]) || (norm && cache[norm]) || null;
+  return candidate && AISLE_METADATA[candidate] ? candidate : null;
 }
-function setCachedAisle(normalizedText, aisle) {
-  if (!normalizedText || !aisle) return;
+
+function setCachedAisle(rawOrNorm, aisle) {
+  if (!rawOrNorm || !aisle || !AISLE_METADATA[aisle]) return;
+  const key = normalizeAisleCacheKey(rawOrNorm);
+  if (!key) return;
   try {
+    if (typeof localStorage === 'undefined') return;
     const cache = getAisleCache();
-    cache[normalizedText] = aisle;
+    if (key in cache) delete cache[key];
+    cache[key] = aisle;
+    const keys = Object.keys(cache);
+    if (keys.length > AISLE_CACHE_MAX_ENTRIES) {
+      keys.slice(0, keys.length - AISLE_CACHE_MAX_ENTRIES).forEach(k => delete cache[k]);
+    }
     localStorage.setItem(AISLE_CACHE_KEY, JSON.stringify(cache));
   } catch (e) {}
 }
 
 let _aisleLookupTimeout = null;
-function resolveAisleOnline(rawName, callback) {
-  if (!rawName || typeof rawName !== 'string') return;
+function resolveAisleOnline(rawName, callback, options = {}) {
+  if (!rawName || typeof rawName !== 'string') return null;
   const norm = normalizeIngredientText(rawName);
-  if (norm.length < 3) return;
+  const cacheKey = normalizeAisleCacheKey(rawName);
+  if (cacheKey.length < 3) return null;
 
-  // 1. Direct local rule
+  // 1. Direct local rule (incluye diccionario y caché persistente)
   const localAisle = categorizeIngredientAisle(norm);
   if (localAisle && localAisle !== 'other') {
     if (typeof callback === 'function') callback(localAisle);
-    return;
+    return localAisle;
   }
 
-  // 2. LocalStorage cache
-  const cached = getCachedAisle(norm);
+  // 2. LocalStorage cache (incluso si 'other' se guardó con alta confianza)
+  const cached = getCachedAisle(cacheKey) || getCachedAisle(norm);
   if (cached) {
     if (typeof callback === 'function') callback(cached);
-    return;
+    return cached;
   }
 
-  // 3. Debounced online lookup (600ms)
-  if (_aisleLookupTimeout) clearTimeout(_aisleLookupTimeout);
-  _aisleLookupTimeout = setTimeout(async () => {
+  // 3. Degradación elegante si offline, sin sesión o sin invokeAiProxy
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return null;
+  const activeCloudUser = typeof state !== 'undefined'
+    ? state?.cloudUser
+    : (typeof window !== 'undefined' ? window.state?.cloudUser : null);
+  const hasSession = options.hasSession !== undefined
+    ? Boolean(options.hasSession)
+    : Boolean(activeCloudUser?.id);
+  if (!hasSession) return null;
+
+  const appInstance = options.appInstance || (typeof window !== 'undefined' ? window.app : null);
+  if (!appInstance || typeof appInstance.invokeAiProxy !== 'function') return null;
+
+  const minConfidence = options.minConfidence ?? AISLE_DECISION_MIN_CONFIDENCE;
+
+  const executeLookup = async () => {
     try {
-      const cleanSearch = norm.replace(/^[\d\.,\/\s]+(?:g|kg|ml|cl|dl|l|cda|cdta|taza|vaso|ud|uds)?\s*(?:de\s+)?/i, '').trim();
-      if (!cleanSearch) return;
-
-      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      const timer = controller ? setTimeout(() => controller.abort(), 4000) : null;
-      const fetchOpts = controller ? { signal: controller.signal } : {};
-
-      const res = await fetch(`https://es.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cleanSearch)}`, fetchOpts);
-      if (timer) clearTimeout(timer);
-
-      if (res && res.ok) {
-        const data = await res.json();
-        const info = normalizeIngredientText(`${data.title || ''} ${data.description || ''} ${data.extract || ''}`);
-
-        let resolved = 'other';
-        if (/\b(bebida|alcohol|destilad|licor|vino|cerveza|fermentad|infusion)\b/.test(info)) {
-          resolved = 'beverages';
-        } else if (/\b(fruta|fruto|verdura|hortaliza|vegetal|tuberculo|hongo|seta|planta\s+herbacea)\b/.test(info)) {
-          resolved = 'produce';
-        } else if (/\b(carne|pescado|ave|embutido|marisco|molusco|crustaceo|mamifero)\b/.test(info)) {
-          resolved = 'meat';
-        } else if (/\b(lacteo|queso|leche|yogur|mantequilla)\b/.test(info)) {
-          resolved = 'dairy';
-        } else if (/\b(pan|harina|bollo|galleta|trigo|cereal|masa|pastel)\b/.test(info)) {
-          resolved = 'bakery';
-        } else if (/\b(especia|condimento|aderezo|aceite|vinagre)\b/.test(info)) {
-          resolved = 'spices';
-        } else if (/\b(grano|semilla|legumbre|arroz|pasta|conserva|despensa)\b/.test(info)) {
-          resolved = 'pantry';
-        }
-
-        if (resolved !== 'other') {
-          setCachedAisle(norm, resolved);
-          if (typeof callback === 'function') callback(resolved);
-        }
+      const freshCached = getCachedAisle(cacheKey);
+      if (freshCached) {
+        if (typeof callback === 'function') callback(freshCached);
+        return freshCached;
       }
+
+      const payload = buildAisleDecisionPayload(cacheKey);
+      if (!payload) return null;
+
+      let pending = _aisleInFlightPromises.get(cacheKey);
+      if (!pending) {
+        pending = (async () => {
+          const res = await appInstance.invokeAiProxy('utility_decision', { decisions: payload });
+          if (!res?.ok || !res?.data?.answers) return null;
+          const parsed = parseAisleDecisionResult(res.data, minConfidence);
+          if (parsed?.aisle) {
+            setCachedAisle(cacheKey, parsed.aisle);
+            return parsed.aisle;
+          }
+          return null;
+        })().catch(() => null).finally(() => {
+          _aisleInFlightPromises.delete(cacheKey);
+        });
+        _aisleInFlightPromises.set(cacheKey, pending);
+      }
+
+      const resolved = await pending;
+      if (resolved && typeof callback === 'function') {
+        callback(resolved);
+      }
+      return resolved;
     } catch (e) {
-      // Best-effort lookup, silent failure
+      return null;
     }
-  }, 600);
+  };
+
+  if (options.immediate) {
+    return executeLookup();
+  }
+
+  // 4. Debounced Gemini Decisions API lookup (600ms)
+  if (_aisleLookupTimeout) clearTimeout(_aisleLookupTimeout);
+  const delay = Number.isFinite(Number(options.debounceMs)) ? Number(options.debounceMs) : 600;
+  _aisleLookupTimeout = setTimeout(() => {
+    executeLookup();
+  }, delay);
+  return null;
 }
 
 function getIngredientIcon(name, aisle) {
@@ -1325,6 +1423,11 @@ export {
   mergeOrAddShoppingItem,
   recalculateShoppingItemQuantities,
   consolidateShoppingList,
+  AISLE_DECISION_MIN_CONFIDENCE,
+  AISLE_DECISION_CRITERIA,
+  normalizeAisleCacheKey,
+  buildAisleDecisionPayload,
+  parseAisleDecisionResult,
   resolveAisleOnline,
   getCachedAisle,
   setCachedAisle,

@@ -1,4 +1,5 @@
-export const AI_FEATURES = ['chat', 'voice', 'guided_query', 'weekly_plan', 'import_ai'];
+export const AI_FEATURES = ['chat', 'voice', 'guided_query', 'weekly_plan', 'import_ai', 'utility_decision'];
+export const DECISION_ONLY_FEATURES = Object.freeze(['utility_decision']);
 export const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024;
 export const MAX_OUTPUT_TOKENS = 8192;
 export const DECISION_MODEL = 'gemini-decision-1';
@@ -81,6 +82,9 @@ export function validateAiRequest(body, rawLength = 0) {
     && validateDecisionQuestions(payload.decisions.questions).ok
   );
   if (!hasContents && !hasDecisions) {
+    return { ok: false, status: 400, code: 'INVALID_PAYLOAD' };
+  }
+  if (DECISION_ONLY_FEATURES.includes(body.feature) && (hasContents || !hasDecisions)) {
     return { ok: false, status: 400, code: 'INVALID_PAYLOAD' };
   }
   return { ok: true };
