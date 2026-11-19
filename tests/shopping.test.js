@@ -9,6 +9,8 @@ new Function(appCode)();
 const {
   AISLE_METADATA,
   AISLE_DECISION_MIN_CONFIDENCE,
+  AISLE_DECISION_FOOD_MIN_CONFIDENCE,
+  AISLE_DECISION_OTHER_MIN_CONFIDENCE,
   AISLE_DECISION_CRITERIA,
   normalizeAisleCacheKey,
   buildAisleDecisionPayload,
@@ -942,9 +944,11 @@ describe('US-90: Clasificación Inteligente de Pasillos con Gemini Decisions API
     expect(payload.questions.aisle.type).toBe('choice');
     expect(Object.keys(payload.questions.aisle.criteria)).toEqual(Object.keys(AISLE_METADATA));
 
+    expect(AISLE_DECISION_CRITERIA.other).toMatch(/NO alimentarios/i);
+
     expect(parseAisleDecisionResult({
       answers: { aisle: { choice: 'spices', probabilities: { spices: 0.89 }, confidence: 0.89 } }
-    })).toEqual({ aisle: 'spices', confidence: 0.89 });
+    })).toEqual({ aisle: 'spices', confidence: 0.89, shouldCache: true });
 
     expect(parseAisleDecisionResult({
       answers: { aisle: { choice: 'spices', probabilities: { spices: 0.74 }, confidence: 0.74 } }
@@ -1081,5 +1085,77 @@ describe('US-90: Clasificación Inteligente de Pasillos con Gemini Decisions API
     }, 0.75);
     expect(merged.ingredients[0].aisle).toBe('spices');
     expect(getCachedAisle('Miso blanco')).toBe('spices');
+  });
+
+  it('calibración v2.30: acepta alimentos con probabilidad repartida (>= 0.50 con other < 0.30) como Edamame y Kimchi', async () => {
+    expect(AISLE_DECISION_FOOD_MIN_CONFIDENCE).toBe(0.5);
+    expect(AISLE_DECISION_OTHER_MIN_CONFIDENCE).toBe(0.85);
+
+    // Edamame repartido entre frozen (0.56) y produce (0.36), other mínimo (0.02) -> frozen y cacheado
+    expect(parseAisleDecisionResult({
+      answers: {
+        aisle: { choice: 'frozen', probabilities: { frozen: 0.56, produce: 0.36, pantry: 0.06, other: 0.02 }, confidence: 0.56 }
+      }
+    })).toEqual({ aisle: 'frozen', confidence: 0.56, shouldCache: true });
+
+    // Kimchi repartido entre pantry (0.52) y produce (0.38) -> se aplica en UI (pantry), sin bloquear caché permanente
+    expect(parseAisleDecisionResult({
+      answers: {
+        aisle: { choice: 'pantry', probabilities: { pantry: 0.52, produce: 0.38, spices: 0.07, other: 0.03 }, confidence: 0.52 }
+      }
+    })).toEqual({ aisle: 'pantry', confidence: 0.52, shouldCache: false });
+
+    const appInstance = new window.FoodAssistantApp();
+    appInstance.invokeAiProxy = vi.fn(async () => ({
+      ok: true,
+      data: {
+        answers: {
+          aisle: { choice: 'pantry', probabilities: { pantry: 0.52, produce: 0.38, spices: 0.07, other: 0.03 }, confidence: 0.52 }
+        }
+      }
+    }));
+    const cb = vi.fn();
+    const res = await resolveAisleOnline('Kimchi', cb, { immediate: true, appInstance });
+    expect(res).toBe('pantry');
+    expect(cb).toHaveBeenCalledWith('pantry');
+    expect(getCachedAisle('kimchi')).toBeNull();
+  });
+
+  it('calibración v2.30: exige >= 0.85 para cachear "other" y rescata alimentos si hay alternativa alimentaria >= 0.35', () => {
+    // Artículo no alimentario claro -> se acepta y cachea como 'other'
+    expect(parseAisleDecisionResult({
+      answers: {
+        aisle: { choice: 'other', probabilities: { other: 0.94, spices: 0.03 }, confidence: 0.94 }
+      }
+    })).toEqual({ aisle: 'other', confidence: 0.94, shouldCache: true });
+
+    // Dudoso 'other' (0.48) vs 'pantry' (0.39) -> rescata 'pantry' sin cachear
+    expect(parseAisleDecisionResult({
+      answers: {
+        aisle: { choice: 'other', probabilities: { other: 0.48, pantry: 0.39, produce: 0.08 }, confidence: 0.48 }
+      }
+    })).toEqual({ aisle: 'pantry', confidence: 0.39, shouldCache: false });
+
+    // 'other' ambiguo sin alternativa alimentaria clara -> descartado (null)
+    expect(parseAisleDecisionResult({
+      answers: {
+        aisle: { choice: 'other', probabilities: { other: 0.60, pantry: 0.20, produce: 0.15 }, confidence: 0.60 }
+      }
+    })).toBeNull();
+  });
+
+  it('migración caché v2: purga una vez los "other" heredados de v2.29 conservando pasillos válidos', () => {
+    localStorage.setItem('fa_aisle_cache', JSON.stringify({
+      kimchi: 'other',
+      edamame: 'other',
+      gochujang: 'spices'
+    }));
+    localStorage.removeItem('fa_aisle_cache_v');
+
+    expect(getCachedAisle('kimchi')).toBeNull();
+    expect(getCachedAisle('edamame')).toBeNull();
+    expect(getCachedAisle('gochujang')).toBe('spices');
+    expect(localStorage.getItem('fa_aisle_cache_v')).toBe('2');
+    expect(JSON.parse(localStorage.getItem('fa_aisle_cache'))).toEqual({ gochujang: 'spices' });
   });
 });

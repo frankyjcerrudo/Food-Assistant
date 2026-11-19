@@ -1604,16 +1604,18 @@ function buildAllergenAuditDecisionsQuestions(preferences = (typeof state !== 'u
 }
 
 const AISLE_DECISION_MIN_CONFIDENCE = 0.75;
+const AISLE_DECISION_FOOD_MIN_CONFIDENCE = 0.50;
+const AISLE_DECISION_OTHER_MIN_CONFIDENCE = 0.85;
 const AISLE_DECISION_CRITERIA = {
-  produce: 'Frutas, verduras, hortalizas y hierbas frescas.',
-  meat: 'Carnes, aves, pescados y mariscos.',
-  dairy: 'Lácteos, quesos, yogures y huevos.',
-  bakery: 'Panadería, masas, bollería y harinas de panificación.',
-  pantry: 'Despensa seca, conservas, legumbres, arroz, pasta y frutos secos.',
-  spices: 'Especias, condimentos, salsas, aceites y vinagres.',
-  frozen: 'Productos congelados o helados.',
-  beverages: 'Bebidas, aguas, zumos, cafés, tés o vinos.',
-  other: 'Otros productos no clasificables en las categorías anteriores.'
+  produce: 'Frutas, verduras, hortalizas, hierbas frescas, setas, brotes, vainas y vegetales frescos o refrigerados (ej. edamame fresco, espinacas).',
+  meat: 'Carnes, aves, pescados, mariscos, embutidos y proteínas refrigeradas (ej. tofu, tempeh, seitán).',
+  dairy: 'Lácteos, quesos, yogures, mantequilla, nata, ghee y huevos.',
+  bakery: 'Panadería, masas, bollería, tortitas, panko y harinas de panificación.',
+  pantry: 'Despensa, conservas, encurtidos y fermentados en tarro (ej. kimchi, chucrut, alcaparras), legumbres, arroz, pasta, frutos secos y comida internacional.',
+  spices: 'Especias, hierbas secas, condimentos, pastas aromáticas y salsas de aderezo (ej. gochujang, miso, tahini, soja, curry), aceites y vinagres.',
+  frozen: 'Productos congelados (verduras o edamame congelado, pescados congelados, pizzas) y helados.',
+  beverages: 'Bebidas, aguas, zumos, bebidas vegetales, cafés, tés, kombucha o vinos.',
+  other: 'SOLO artículos NO alimentarios de hogar, limpieza o higiene (ej. servilletas, detergente, perfumador de ropa, papel de aluminio, bolsas). Nunca usar para alimentos comestibles.'
 };
 
 function buildAisleDecisionPayload(ingredientName) {
@@ -1728,13 +1730,51 @@ function pickRecipeDecisionTopChoice(answer = {}) {
 function parseAisleDecisionResult(decisionData, minConfidence = AISLE_DECISION_MIN_CONFIDENCE) {
   const ans = decisionData?.answers?.aisle;
   if (!ans || typeof ans !== 'object') return null;
+  const probs = ans.probabilities && typeof ans.probabilities === 'object' ? ans.probabilities : null;
   const { choice, probability } = pickRecipeDecisionTopChoice(ans);
   const rawConf = Number(ans.confidence);
-  const confidence = Number.isFinite(rawConf) ? rawConf : probability;
-  if (!choice || !AISLE_METADATA[choice] || !Number.isFinite(confidence) || confidence < minConfidence) {
+  const confidence = Math.max(
+    Number.isFinite(rawConf) ? rawConf : 0,
+    Number.isFinite(probability) ? probability : 0
+  );
+  const otherProb = probs && Number.isFinite(Number(probs.other)) ? Number(probs.other) : null;
+  if (!choice || !AISLE_METADATA[choice] || !Number.isFinite(confidence)) {
     return null;
   }
-  return { aisle: choice, confidence };
+
+  if (choice === 'other') {
+    if (confidence >= AISLE_DECISION_OTHER_MIN_CONFIDENCE) {
+      return { aisle: 'other', confidence, shouldCache: true };
+    }
+    if (probs) {
+      let bestFoodChoice = null;
+      let bestFoodProb = 0;
+      for (const [k, v] of Object.entries(probs)) {
+        if (k === 'other' || !AISLE_METADATA[k]) continue;
+        const p = Number(v);
+        if (Number.isFinite(p) && p > bestFoodProb) {
+          bestFoodProb = p;
+          bestFoodChoice = k;
+        }
+      }
+      if (bestFoodChoice && bestFoodProb >= 0.35 && bestFoodProb >= (otherProb ?? 0) * 0.8) {
+        return { aisle: bestFoodChoice, confidence: bestFoodProb, shouldCache: false };
+      }
+    }
+    return null;
+  }
+
+  if (confidence >= minConfidence) {
+    return { aisle: choice, confidence, shouldCache: true };
+  }
+  if (confidence >= AISLE_DECISION_FOOD_MIN_CONFIDENCE && otherProb !== null && otherProb < 0.30) {
+    return {
+      aisle: choice,
+      confidence,
+      shouldCache: confidence >= 0.55 && otherProb < 0.15
+    };
+  }
+  return null;
 }
 
 function applyRecipeDecisionsResult(recipe = {}, decisionData = {}, minConfidence = 0.75) {
@@ -1790,16 +1830,15 @@ function applyRecipeDecisionsResult(recipe = {}, decisionData = {}, minConfidenc
   const updatedIngredients = (Array.isArray(recipe?.ingredients) ? recipe.ingredients : []).map((ing, idx) => {
     const ans = answers[`aisle_${idx}`];
     if (!ans) return typeof ing === 'object' ? { ...ing } : ing;
-    const { choice, probability } = pickRecipeDecisionTopChoice(ans);
-    const conf = Number(ans.confidence) || probability;
-    if (choice && choice !== 'other' && AISLE_METADATA[choice] && conf >= minConfidence) {
+    const parsed = parseAisleDecisionResult({ answers: { aisle: ans } }, minConfidence);
+    if (parsed && parsed.aisle !== 'other') {
       const ingName = typeof ing === 'string' ? ing : (ing?.name || '');
-      if (ingName && typeof setCachedAisle === 'function') {
-        setCachedAisle(ingName, choice);
+      if (parsed.shouldCache && ingName && typeof setCachedAisle === 'function') {
+        setCachedAisle(ingName, parsed.aisle);
       }
       return typeof ing === 'string'
-        ? { name: ing, aisle: choice }
-        : { ...ing, aisle: choice };
+        ? { name: ing, aisle: parsed.aisle }
+        : { ...ing, aisle: parsed.aisle };
     }
     return typeof ing === 'object' ? { ...ing } : ing;
   });
@@ -2819,6 +2858,8 @@ function categorizeIngredientAisle(ingredientName) {
 
 // US-90: Caché local persistente y clasificación inteligente con Gemini Decisions API
 const AISLE_CACHE_KEY = 'fa_aisle_cache';
+const AISLE_CACHE_VERSION_KEY = 'fa_aisle_cache_v';
+const AISLE_CACHE_VERSION = '2';
 const AISLE_CACHE_MAX_ENTRIES = 500;
 const _aisleInFlightPromises = new Map();
 
@@ -2835,7 +2876,21 @@ function normalizeAisleCacheKey(rawName) {
 function getAisleCache() {
   try {
     if (typeof localStorage === 'undefined') return {};
-    return JSON.parse(localStorage.getItem(AISLE_CACHE_KEY)) || {};
+    const cache = JSON.parse(localStorage.getItem(AISLE_CACHE_KEY)) || {};
+    if (localStorage.getItem(AISLE_CACHE_VERSION_KEY) !== AISLE_CACHE_VERSION) {
+      let mutated = false;
+      Object.keys(cache).forEach(k => {
+        if (cache[k] === 'other') {
+          delete cache[k];
+          mutated = true;
+        }
+      });
+      if (mutated) {
+        localStorage.setItem(AISLE_CACHE_KEY, JSON.stringify(cache));
+      }
+      localStorage.setItem(AISLE_CACHE_VERSION_KEY, AISLE_CACHE_VERSION);
+    }
+    return cache;
   } catch (e) {
     return {};
   }
@@ -2918,7 +2973,9 @@ function resolveAisleOnline(rawName, callback, options = {}) {
           if (!res?.ok || !res?.data?.answers) return null;
           const parsed = parseAisleDecisionResult(res.data, minConfidence);
           if (parsed?.aisle) {
-            setCachedAisle(cacheKey, parsed.aisle);
+            if (parsed.shouldCache !== false) {
+              setCachedAisle(cacheKey, parsed.aisle);
+            }
             return parsed.aisle;
           }
           return null;
@@ -6167,7 +6224,7 @@ if (typeof window !== 'undefined') {
   window.RecipeParser = RecipeParser;
   window.getCookbookDisplayName = getCookbookDisplayName;
   window.getCookbookDisplayDescription = getCookbookDisplayDescription;
-  window.APP_VERSION = 'v2.29';
+  window.APP_VERSION = 'v2.30';
   window.cleanRecipeImageUrl = cleanRecipeImageUrl;
   window.getRecipeTheme = getRecipeTheme;
   window.getRecipePlaceholderSvg = getRecipePlaceholderSvg;
@@ -6189,6 +6246,8 @@ if (typeof window !== 'undefined') {
   window.getIngredientSuggestions = getIngredientSuggestions;
   window.extractTimerFromStepText = extractTimerFromStepText;
   window.AISLE_DECISION_MIN_CONFIDENCE = AISLE_DECISION_MIN_CONFIDENCE;
+  window.AISLE_DECISION_FOOD_MIN_CONFIDENCE = AISLE_DECISION_FOOD_MIN_CONFIDENCE;
+  window.AISLE_DECISION_OTHER_MIN_CONFIDENCE = AISLE_DECISION_OTHER_MIN_CONFIDENCE;
   window.AISLE_DECISION_CRITERIA = AISLE_DECISION_CRITERIA;
   window.normalizeAisleCacheKey = normalizeAisleCacheKey;
   window.buildAisleDecisionPayload = buildAisleDecisionPayload;
@@ -6233,7 +6292,7 @@ class FoodAssistantApp {
   constructor() {
     if (typeof window !== 'undefined') window.app = this;
     this.clientId = 'client-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-    this.appVersion = window.APP_VERSION || 'v2.29';
+    this.appVersion = window.APP_VERSION || 'v2.30';
     this.isMobileDevice = this.detectMobileDevice();
     this.applyDeviceMode(this.isMobileDevice);
     this.activeView = 'view-today';
@@ -25478,6 +25537,8 @@ if (typeof window !== 'undefined') {
   window.consolidateShoppingList = consolidateShoppingList;
   window.categorizeIngredientAisle = categorizeIngredientAisle;
   window.AISLE_DECISION_MIN_CONFIDENCE = AISLE_DECISION_MIN_CONFIDENCE;
+  window.AISLE_DECISION_FOOD_MIN_CONFIDENCE = AISLE_DECISION_FOOD_MIN_CONFIDENCE;
+  window.AISLE_DECISION_OTHER_MIN_CONFIDENCE = AISLE_DECISION_OTHER_MIN_CONFIDENCE;
   window.AISLE_DECISION_CRITERIA = AISLE_DECISION_CRITERIA;
   window.normalizeAisleCacheKey = normalizeAisleCacheKey;
   window.buildAisleDecisionPayload = buildAisleDecisionPayload;
@@ -25546,6 +25607,8 @@ if (typeof module !== 'undefined' && module.exports) {
     consolidateShoppingList,
     categorizeIngredientAisle,
     AISLE_DECISION_MIN_CONFIDENCE,
+    AISLE_DECISION_FOOD_MIN_CONFIDENCE,
+    AISLE_DECISION_OTHER_MIN_CONFIDENCE,
     AISLE_DECISION_CRITERIA,
     normalizeAisleCacheKey,
     buildAisleDecisionPayload,
