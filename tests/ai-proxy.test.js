@@ -245,5 +245,19 @@ describe('US-79a: ai-proxy core', () => {
       expect(lowConfPro.routedToLite).toBe(false);
       expect(lowConfPro.models).toEqual(['gemini-3.8-flash', 'gemini-3.5-flash-lite']);
     });
+
+    it('evaluateRoutingDecision v2.28 mantiene gemini-3.8-flash para recipe_creation incluso si complexity_tier es lite con alta confianza', () => {
+      const recipeCreationPro = evaluateRoutingDecision({
+        answers: {
+          is_prompt_injection: { type: 'noul', noul: 0.01, confidence: 0.99 },
+          is_culinary_domain: { type: 'noul', noul: 0.99, confidence: 0.99 },
+          complexity_tier: { type: 'choice', choice: 'lite', probabilities: { lite: 0.95, full: 0.05 }, confidence: 0.95 },
+          intent_scope: { type: 'choice', choice: 'recipe_creation', probabilities: { recipe_creation: 0.94 }, confidence: 0.94 }
+        }
+      }, 'pro', 'chat');
+      expect(recipeCreationPro.blockedByGuardrail).toBe(false);
+      expect(recipeCreationPro.routedToLite).toBe(false);
+      expect(recipeCreationPro.models).toEqual(['gemini-3.8-flash', 'gemini-3.5-flash-lite']);
+    });
   });
 });

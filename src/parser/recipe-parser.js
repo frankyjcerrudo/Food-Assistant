@@ -3,7 +3,10 @@ import {
   generateId,
   cleanRecipeImageUrl,
   sanitizeUrl,
+  NUTRITION_ENGINE_VERSION,
   estimateRecipeNutrition,
+  computeCanonicalRecipeNutrition,
+  analyzeAndInferRecipeTags,
   categorizeIngredientAisle
 } from '../core/utils.js';
 
@@ -826,11 +829,12 @@ const RecipeParser = {
       prepTimeMinutes: prepMinutes,
       cookTimeMinutes: cookMinutes,
       servings: parsedServings,
-      nutrition: parsedNutrition || estimateRecipeNutrition({
+      nutrition: computeCanonicalRecipeNutrition({
         title: schema.name,
         ingredients: ingredients,
         servings: parsedServings
-      }),
+      }, parsedNutrition),
+      nutritionEngineVersion: NUTRITION_ENGINE_VERSION,
       tags: tags.slice(0, 4),
       ingredients: ingredients,
       instructions: instructions,
@@ -841,20 +845,32 @@ const RecipeParser = {
     return recipe;
   },
 
-  parseNutritionNumber(val) {
+  parseNutritionNumber(val, isCalories = false) {
     if (val === null || val === undefined) return 0;
     if (typeof val === 'number') return isNaN(val) ? 0 : Math.round(val);
-    const str = String(val).replace(',', '.');
+    const str = String(val).replace(/,/g, '.');
+    if (isCalories) {
+      const kcalMatch = str.match(/(\d+(?:\.\d+)?)\s*kcal\b/i);
+      if (kcalMatch) return Math.round(parseFloat(kcalMatch[1]));
+      const kjMatch = str.match(/(\d+(?:\.\d+)?)\s*kj\b/i);
+      if (kjMatch && !/kcal|cal/i.test(str)) {
+        return Math.round(parseFloat(kjMatch[1]) / 4.184);
+      }
+    }
     const match = str.match(/\d+(?:\.\d+)?/);
     return match ? Math.round(parseFloat(match[0])) : 0;
   },
 
   parseNutrition(schemaNutrition) {
     if (!schemaNutrition || typeof schemaNutrition !== 'object') return null;
-    const calories = this.parseNutritionNumber(schemaNutrition.calories);
+    const calories = this.parseNutritionNumber(schemaNutrition.calories, true);
     const protein = this.parseNutritionNumber(schemaNutrition.proteinContent || schemaNutrition.protein);
     const carbs = this.parseNutritionNumber(schemaNutrition.carbohydrateContent || schemaNutrition.carbs);
     const fat = this.parseNutritionNumber(schemaNutrition.fatContent || schemaNutrition.fat);
+
+    if (calories > 50 && protein === 0 && carbs === 0 && fat === 0) {
+      return null;
+    }
 
     if (calories > 0 || protein > 0 || carbs > 0 || fat > 0) {
       return { calories, protein, carbs, fat };
@@ -1181,7 +1197,8 @@ const RecipeParser = {
       prepTimeMinutes: prepTimeMinutes,
       cookTimeMinutes: cookTimeMinutes,
       servings: servings,
-      nutrition: estimateRecipeNutrition({ title, ingredients, servings }),
+      nutrition: computeCanonicalRecipeNutrition({ title, ingredients, servings }),
+      nutritionEngineVersion: NUTRITION_ENGINE_VERSION,
       tags: [],
       ingredients: ingredients,
       instructions: instructions,
@@ -1490,18 +1507,23 @@ const RecipeParser = {
       }
 
       // Nutrition
-      let nutrition = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+      let rawCandNut = null;
       if (cand.nutrition && typeof cand.nutrition === 'object') {
-        nutrition = {
-          calories: parseInt(cand.nutrition.calories, 10) || 0,
-          protein: parseInt(cand.nutrition.protein, 10) || 0,
-          carbs: parseInt(cand.nutrition.carbs, 10) || 0,
-          fat: parseInt(cand.nutrition.fat, 10) || 0
+        rawCandNut = {
+          calories: Number(cand.nutrition.calories) || 0,
+          protein: Number(cand.nutrition.protein) || 0,
+          carbs: Number(cand.nutrition.carbs) || 0,
+          fat: Number(cand.nutrition.fat) || 0
         };
       }
-      if (nutrition.calories === 0 && ingredients.length > 0 && typeof estimateRecipeNutrition === 'function') {
-        nutrition = estimateRecipeNutrition({ title, ingredients, servings });
-      }
+      const isExplicitNutrition = Boolean(cand.isExplicitNutrition);
+      const nutrition = computeCanonicalRecipeNutrition({
+        title,
+        ingredients,
+        servings,
+        nutrition: rawCandNut,
+        isExplicitNutrition
+      }, rawCandNut);
 
       const recipe = {
         id: cand.id || generateId('rec-'),
@@ -1512,6 +1534,8 @@ const RecipeParser = {
         cookTimeMinutes: cookTimeMinutes,
         servings: servings,
         nutrition: nutrition,
+        nutritionEngineVersion: NUTRITION_ENGINE_VERSION,
+        ...(isExplicitNutrition ? { isExplicitNutrition: true } : {}),
         tags: tags,
         ingredients: ingredients,
         instructions: instructions,
@@ -1639,12 +1663,12 @@ const RecipeParser = {
       });
     }
 
-    if ((!finalRecipe.nutrition || finalRecipe.nutrition.calories === 0) && typeof estimateRecipeNutrition === 'function') {
-      finalRecipe.nutrition = estimateRecipeNutrition({
-        title: finalRecipe.title,
-        ingredients: finalRecipe.ingredients,
-        servings: finalRecipe.servings
-      });
+    if (!finalRecipe.isExplicitNutrition && (Number(finalRecipe.nutritionEngineVersion) || 0) < NUTRITION_ENGINE_VERSION) {
+      finalRecipe.nutrition = computeCanonicalRecipeNutrition(finalRecipe, finalRecipe.nutrition);
+      finalRecipe.nutritionEngineVersion = NUTRITION_ENGINE_VERSION;
+    } else if (!finalRecipe.nutrition || (finalRecipe.nutrition.calories === 0 && (finalRecipe.nutrition.protein || 0) === 0)) {
+      finalRecipe.nutrition = computeCanonicalRecipeNutrition(finalRecipe, finalRecipe.nutrition);
+      finalRecipe.nutritionEngineVersion = NUTRITION_ENGINE_VERSION;
     }
 
     return finalRecipe;

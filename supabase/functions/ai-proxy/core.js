@@ -286,7 +286,8 @@ export function evaluateRoutingDecision(decisionData = {}, plan = 'free', featur
     && ROUTING_FEATURES.includes(feature)
     && topTier === 'lite'
     && tierConfidence >= DECISION_CONFIDENCE_THRESHOLD
-    && topIntent !== 'weekly_plan';
+    && topIntent !== 'weekly_plan'
+    && topIntent !== 'recipe_creation';
 
   const models = canRouteToLite
     ? ['gemini-3.5-flash-lite', 'gemini-3.8-flash']

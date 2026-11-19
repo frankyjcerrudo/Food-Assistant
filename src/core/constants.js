@@ -1,6 +1,8 @@
 // Food Assistant - Core Constants (US-42)
 const DAYS_OF_WEEK_ES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const MONTHS_SHORT_ES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const NUTRITION_ENGINE_VERSION = 2;
+
 const SEED_RECIPES = [
   {
     id: "rec-pesto-pasta",
@@ -10,7 +12,8 @@ const SEED_RECIPES = [
     prepTimeMinutes: 10,
     cookTimeMinutes: 12,
     servings: 2,
-    nutrition: { calories: 540, protein: 18, carbs: 62, fat: 24 },
+    nutrition: { calories: 835, protein: 23.9, carbs: 77.8, fat: 48.7 },
+    nutritionEngineVersion: NUTRITION_ENGINE_VERSION,
     tags: ["Pasta", "Rápida", "Cena", "Saludable", "Vegetariano"],
     ingredients: [
       { id: "i1", name: "Espaguetis o Tagliatelle", amount: 200, unit: "g", aisle: "pantry" },
@@ -37,7 +40,8 @@ const SEED_RECIPES = [
     prepTimeMinutes: 15,
     cookTimeMinutes: 30,
     servings: 2,
-    nutrition: { calories: 420, protein: 46, carbs: 28, fat: 12 },
+    nutrition: { calories: 667, protein: 67.6, carbs: 55.9, fat: 21.4 },
+    nutritionEngineVersion: NUTRITION_ENGINE_VERSION,
     tags: ["Pollo", "Almuerzo", "Cena", "Saludable", "Sin Gluten"],
     ingredients: [
       { id: "i8", name: "Pechugas de pollo", amount: 400, unit: "g", aisle: "meat" },
@@ -61,7 +65,8 @@ const SEED_RECIPES = [
     prepTimeMinutes: 10,
     cookTimeMinutes: 15,
     servings: 2,
-    nutrition: { calories: 510, protein: 38, carbs: 32, fat: 22 },
+    nutrition: { calories: 581, protein: 42, carbs: 61.5, fat: 17.8 },
+    nutritionEngineVersion: NUTRITION_ENGINE_VERSION,
     tags: ["Pescado", "Cena", "Saludable", "Rápida", "Sin Gluten", "Keto"],
     ingredients: [
       { id: "i13", name: "Lomos de salmón fresco", amount: 300, unit: "g", aisle: "meat" },
@@ -84,7 +89,8 @@ const SEED_RECIPES = [
     prepTimeMinutes: 12,
     cookTimeMinutes: 0,
     servings: 2,
-    nutrition: { calories: 380, protein: 16, carbs: 42, fat: 14 },
+    nutrition: { calories: 518, protein: 28.3, carbs: 52.8, fat: 23.1 },
+    nutritionEngineVersion: NUTRITION_ENGINE_VERSION,
     tags: ["Saludable", "Rápida", "Almuerzo", "Cena", "Vegetariano", "Sin Gluten"],
     ingredients: [
       { id: "i17", name: "Garbanzos cocidos en conserva", amount: 400, unit: "g", aisle: "pantry" },
@@ -108,7 +114,8 @@ const SEED_RECIPES = [
     prepTimeMinutes: 5,
     cookTimeMinutes: 6,
     servings: 2,
-    nutrition: { calories: 340, protein: 15, carbs: 26, fat: 19 },
+    nutrition: { calories: 373, protein: 13.4, carbs: 25.2, fat: 25.9 },
+    nutritionEngineVersion: NUTRITION_ENGINE_VERSION,
     tags: ["Desayuno", "Rápida", "Saludable", "Vegetariano"],
     ingredients: [
       { id: "i22", name: "Pan integral de masa madre", amount: 2, unit: "rebanadas", aisle: "bakery" },
@@ -132,7 +139,8 @@ const SEED_RECIPES = [
     prepTimeMinutes: 3,
     cookTimeMinutes: 7,
     servings: 2,
-    nutrition: { calories: 360, protein: 12, carbs: 58, fat: 8 },
+    nutrition: { calories: 442, protein: 13.3, carbs: 71.3, fat: 12.3 },
+    nutritionEngineVersion: NUTRITION_ENGINE_VERSION,
     tags: ["Desayuno", "Saludable", "Vegetariano"],
     ingredients: [
       { id: "i27", name: "Copos de avena integral", amount: 100, unit: "g", aisle: "pantry" },
@@ -156,7 +164,8 @@ const SEED_RECIPES = [
     prepTimeMinutes: 5,
     cookTimeMinutes: 0,
     servings: 2,
-    nutrition: { calories: 290, protein: 11, carbs: 36, fat: 10 },
+    nutrition: { calories: 388, protein: 12, carbs: 42.5, fat: 18.6 },
+    nutritionEngineVersion: NUTRITION_ENGINE_VERSION,
     tags: ["Merienda", "Saludable", "Rápida", "Vegano", "Vegetariano"],
     ingredients: [
       { id: "i33", name: "Tostadas de espelta o centeno", amount: 4, unit: "ud", aisle: "bakery" },
@@ -179,7 +188,8 @@ const SEED_RECIPES = [
     prepTimeMinutes: 5,
     cookTimeMinutes: 0,
     servings: 2,
-    nutrition: { calories: 310, protein: 22, carbs: 38, fat: 6 },
+    nutrition: { calories: 347, protein: 17.2, carbs: 40.4, fat: 13.1 },
+    nutritionEngineVersion: NUTRITION_ENGINE_VERSION,
     tags: ["Desayuno", "Merienda", "Saludable", "Rápida", "Vegetariano", "Sin Gluten"],
     ingredients: [
       { id: "i38", name: "Yogur griego natural sin azúcar", amount: 300, unit: "g", aisle: "dairy" },
@@ -206,6 +216,423 @@ const STANDARD_SLOTS = [
 // ==========================================================================
 // US-01: GESTIÓN NUTRICIONAL, MACRONUTRIENTES Y ESTIMADOR (Kcal, P, C, G)
 // ==========================================================================
+function isValidExternalNutrition(nut) {
+  if (!nut || typeof nut !== 'object') return false;
+  const calories = Number(nut.calories);
+  const protein = Number(nut.protein);
+  const carbs = Number(nut.carbs);
+  const fat = Number(nut.fat);
+  if (![calories, protein, carbs, fat].every(v => Number.isFinite(v) && v >= 0)) return false;
+  if (calories <= 0 && protein <= 0 && carbs <= 0 && fat <= 0) return false;
+  if (calories > 50 && protein === 0 && carbs === 0 && fat === 0) return false;
+  const isFakeDefault =
+    (Math.round(calories) === 450 && Math.round(protein) === 28 && Math.round(carbs) === 45 && Math.round(fat) === 15) ||
+    (Math.round(calories) === 350 && Math.round(protein) === 14 && Math.round(carbs) === 48 && Math.round(fat) === 10) ||
+    (Math.round(calories) === 280 && Math.round(protein) === 12 && Math.round(carbs) === 35 && Math.round(fat) === 8);
+  if (isFakeDefault) return false;
+  const atwater = protein * 4 + carbs * 4 + fat * 9;
+  if (calories > 0 && atwater > 0) {
+    const ratio = calories / atwater;
+    if (ratio < 0.60 || ratio > 1.50) return false;
+  }
+  return true;
+}
+
+function classifyIngredientNutritionProfile(normName, aisle = '') {
+  const hasCalorieBearer = /\b(coco|leche|milk|nata|cream|azucar|sugar|miel|honey|sirope|syrup|balsamico|balsamic|aceite|oil|mantequilla|butter|cacao|cocoa|chocolate|arroz|rice|avena|oats|almendra|almond|soja|soy|panela|licor|vino|cerveza)\b/.test(normName);
+
+  // 1. Líquidos 0 kcal (solo si empiezan por agua/hielo/café/té/infusión/vinagre sin ingredientes calóricos)
+  if (
+    !hasCalorieBearer &&
+    /^(agua|water|hielo|ice|cafe|espresso|te|tea|infusion|vinagre|vinegar)\b/.test(normName) &&
+    !/\b(crema|reduccion|glaseado)\b/.test(normName)
+  ) {
+    return { c100: 0, p100: 0, cb100: 0, f100: 0, category: 'liquid', isPureOilOrFat: false, isZeroCal: true };
+  }
+
+  // 2. Caldos y consomés
+  if (/\b(caldos?|broths?|stocks?|consomes?)\b/.test(normName)) {
+    return { c100: 10, p100: 1, cb100: 0.8, f100: 0.3, category: 'liquid', isPureOilOrFat: false, isZeroCal: false };
+  }
+
+  // 3. Salsas y condimentos específicos (antes de soja, aceite, tomate y sal)
+  if (/\b(salsa\s+de\s+soja|soy\s+sauce|tamari)\b/.test(normName)) {
+    return { c100: 53, p100: 8, cb100: 5, f100: 0, category: 'liquid', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(vinagre\s+balsamico|crema\s+balsamica|glaseado\s+balsamico|reduccion\s+(?:de\s+)?(?:modena|balsamico)|balsamic\s+glaze)\b/.test(normName)) {
+    return { c100: 88, p100: 0.5, cb100: 17, f100: 0, category: 'sauce', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(mayonesas?|aliolis?|mayonnaise|mayo)\b/.test(normName)) {
+    return { c100: 680, p100: 1, cb100: 1, f100: 75, category: 'sauce', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(pestos?)\b/.test(normName)) {
+    return { c100: 450, p100: 5, cb100: 6, f100: 45, category: 'sauce', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(salsa\s+(?:barbacoa|bbq|teriyaki|agridulce)|ketchups?|catsup)\b/.test(normName)) {
+    return { c100: 115, p100: 1.5, cb100: 26, f100: 0.3, category: 'sauce', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(mostazas?|mustards?)\b/.test(normName)) {
+    return { c100: 66, p100: 4, cb100: 6, f100: 3.5, category: 'sauce', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(tomate\s+frito|salsa\s+de\s+tomate|tomato\s+sauce|marinara)\b/.test(normName)) {
+    return { c100: 75, p100: 1.5, cb100: 9, f100: 3.5, category: 'sauce', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(tomate\s+(?:triturado|natural|tamizado|rallado|pelado)|passata|crushed\s+tomatoes?)\b/.test(normName)) {
+    return { c100: 30, p100: 1.4, cb100: 5, f100: 0.2, category: 'sauce', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(bechamel)\b/.test(normName)) {
+    return { c100: 130, p100: 4, cb100: 11, f100: 8, category: 'sauce', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(guacamole)\b/.test(normName)) {
+    return { c100: 155, p100: 2, cb100: 8, f100: 14, category: 'sauce', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(vinagretas?|vinaigrette)\b/.test(normName)) {
+    return { c100: 350, p100: 0.5, cb100: 4, f100: 37, category: 'sauce', isPureOilOrFat: false, isZeroCal: false };
+  }
+
+  // 4. Carnes, embutidos, pescados, mariscos, huevos y proteínas (antes de grasas/aceites)
+  if (/\b(jamon\s+(?:cocido|york|dulce)|pechuga\s+de\s+pavo\s+(?:en\s+lonchas|cocida|braseada|fiambre)|fiambre\s+de\s+(?:pavo|pollo)|cooked\s+ham)\b/.test(normName)) {
+    return { c100: 110, p100: 19, cb100: 1.5, f100: 3, category: 'meat', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(jamon\s+(?:serrano|iberico|curado)|prosciutto|cecina)\b/.test(normName)) {
+    return { c100: 245, p100: 31, cb100: 0, f100: 13, category: 'meat', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(bacons?|beicons?|pancetas?|tocinos?|guanciale)\b/.test(normName)) {
+    return { c100: 420, p100: 15, cb100: 0, f100: 40, category: 'meat', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(lomo\s+(?:embuchado|curado|iberico))\b/.test(normName)) {
+    return { c100: 200, p100: 32, cb100: 1, f100: 8, category: 'meat', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(chorizos?|salchichon(?:es)?|fuets?|salamis?|chistorras?|sobrasadas?|morcillas?|pepperoni)\b/.test(normName)) {
+    return { c100: 380, p100: 22, cb100: 2, f100: 32, category: 'meat', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(salchichas?|frankfurts?|sausages?)\b/.test(normName)) {
+    return { c100: 260, p100: 14, cb100: 2, f100: 22, category: 'meat', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b((?:muslos?|contramuslos?|alitas?)\s+de\s+pollo|chicken\s+(?:thighs?|wings?|drumsticks?))\b/.test(normName)) {
+    return { c100: 180, p100: 24, cb100: 0, f100: 9, category: 'meat', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(pollos?|pechugas?|pavos?|conejos?|chickens?|turkeys?|rabbits?)\b/.test(normName)) {
+    return { c100: 145, p100: 31, cb100: 0, f100: 3, category: 'meat', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(salmon(?:es)?|atun(?:es)?|bonitos?|emperadores?|pez\s+espada|peces\s+espada|sardinas?|boqueron(?:es)?|caballas?|arenques?|anchoas?|tuna|mackerels?|anchov(?:y|ies)|sardines?)\b/.test(normName)) {
+    return { c100: 190, p100: 22, cb100: 0, f100: 11, category: 'fish', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(doradas?|lubinas?|truchas?|merluzas?|bacalaos?|lenguados?|rodaballos?|corvinas?|rapes?|pescadillas?|gallos?|pescados?\s+blancos?|pescados?|cod|hake|sea\s+bass|tilapia|halibut|sole|trout|white\s+fish|fish)\b/.test(normName)) {
+    return { c100: 105, p100: 20, cb100: 0, f100: 2.5, category: 'fish', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(gambas?|langostinos?|camarones?|calamar(?:es)?|chipiron(?:es)?|sepias?|pulpos?|mejillon(?:es)?|almejas?|berberechos?|chirlas?|vieiras?|cangrejos?|surimi|mariscos?|shrimps?|prawns?|squids?|octopus|mussels?|clams?|crabs?|seafood)\b/.test(normName)) {
+    return { c100: 90, p100: 18, cb100: 1, f100: 1, category: 'seafood', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(terneras?|solomillos?|buey(?:es)?|entrecots?|chuleton(?:es)?|cerdos?|carnes?|lomos?|corderos?|hamburguesas?|albondigas?|patos?|beef|steaks?|pork|lamb|veal|duck)\b/.test(normName)) {
+    return { c100: 210, p100: 25, cb100: 0, f100: 12, category: 'meat', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(claras?(?:\s+de\s+huevo)?|egg\s+whites?)\b/.test(normName)) {
+    return { c100: 50, p100: 11, cb100: 0.7, f100: 0.2, category: 'egg', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(huevos?|eggs?)\b/.test(normName)) {
+    return { c100: 145, p100: 13, cb100: 1, f100: 10, category: 'egg', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(proteinas?|whey|polvos?\s+de\s+proteina|caseinas?|protein\s+powder)\b/.test(normName)) {
+    return { c100: 380, p100: 75, cb100: 6, f100: 4, category: 'protein_powder', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(seitan)\b/.test(normName)) {
+    return { c100: 140, p100: 24, cb100: 6, f100: 2, category: 'meat', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(soja\s+texturizada|textured\s+soy)\b/.test(normName)) {
+    return { c100: 335, p100: 50, cb100: 30, f100: 1.5, category: 'dry_grain', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(edamame)\b/.test(normName)) {
+    return { c100: 122, p100: 11, cb100: 10, f100: 5, category: 'legume', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(tofus?|tempeh)\b/.test(normName)) {
+    return { c100: 125, p100: 14, cb100: 3, f100: 6.5, category: 'dairy', isPureOilOrFat: false, isZeroCal: false };
+  }
+
+  // 5. Lácteos, quesos y bebidas vegetales
+  if (/\b(queso\s+(?:fresco|de\s+burgos|batido|quark)|requeson|ricottas?|cottages?|quarks?|skyrs?)\b/.test(normName)) {
+    return { c100: 98, p100: 11, cb100: 3.5, f100: 4.5, category: 'dairy', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(queso\s+(?:crema|de\s+untar|philadelphia)|philadelphia|mascarpone|cream\s+cheese)\b/.test(normName)) {
+    return { c100: 280, p100: 6, cb100: 4, f100: 27, category: 'dairy', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(parmesanos?|parmesan|cheddars?|manchegos?|quesos?\s+curados?|emmentals?|gruyeres?|goudas?|pecorinos?|queso\s+azul|roqueforts?|gorgonzolas?|bries?|camemberts?)\b/.test(normName)) {
+    return { c100: 375, p100: 26, cb100: 1.5, f100: 29, category: 'dairy', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(quesos?|mozzarellas?|fetas?|burratas?|halloumis?|provolones?|cheeses?)\b/.test(normName)) {
+    return { c100: 270, p100: 20, cb100: 2.5, f100: 20, category: 'dairy', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(nata\s+(?:ligera|para\s+cocinar|de\s+cocinar)|light\s+cream)\b/.test(normName)) {
+    return { c100: 180, p100: 2.5, cb100: 4, f100: 17, category: 'liquid', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(natas?|crema\s+de\s+leche|heavy\s+cream|whipping\s+cream|double\s+cream)\b/.test(normName)) {
+    return { c100: 310, p100: 2, cb100: 3, f100: 32, category: 'liquid', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(leche\s+de\s+coco|crema\s+de\s+coco|coconut\s+milk|coconut\s+cream)\b/.test(normName)) {
+    return { c100: 185, p100: 2, cb100: 3, f100: 19, category: 'liquid', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(leche\s+condensada|condensed\s+milk)\b/.test(normName)) {
+    return { c100: 320, p100: 8, cb100: 55, f100: 8, category: 'liquid', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(yogur(?:es)?\s+griegos?|greek\s+yogurts?)\b/.test(normName)) {
+    return { c100: 97, p100: 9, cb100: 4, f100: 5, category: 'dairy', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(yogur(?:es)?|yogurts?|kefirs?)\b/.test(normName)) {
+    return { c100: 62, p100: 4.5, cb100: 5, f100: 2.5, category: 'dairy', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b((?:bebida|leche)\s+de\s+almendras?|almond\s+milk)\b/.test(normName)) {
+    return { c100: 24, p100: 0.6, cb100: 2.5, f100: 1.2, category: 'liquid', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b((?:bebida|leche)\s+(?:vegetal|de\s+avena|de\s+soja|de\s+arroz)|bebidas?\s+vegetales?|oat\s+milk|soy\s+milk)\b/.test(normName)) {
+    return { c100: 45, p100: 2, cb100: 6, f100: 1.5, category: 'liquid', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(leche\s+desnatada|skim\s+milk)\b/.test(normName)) {
+    return { c100: 35, p100: 3.4, cb100: 5, f100: 0.2, category: 'liquid', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(leches?|milk)\b/.test(normName)) {
+    return { c100: 52, p100: 3.3, cb100: 4.8, f100: 2.2, category: 'liquid', isPureOilOrFat: false, isZeroCal: false };
+  }
+
+  // 6a. Cremas de frutos secos (antes de mantequillas puras)
+  if (/\b((?:crema|mantequilla)\s+de\s+(?:cacahuete|mani|almendras?|avellanas?|anacardos?|pistachos?)|tahinis?|peanut\s+butter|almond\s+butter)\b/.test(normName)) {
+    return { c100: 590, p100: 24, cb100: 16, f100: 50, category: 'nuts', isPureOilOrFat: false, isZeroCal: false };
+  }
+
+  // 6b. Mantequilla, aceites y grasas puras (antes de sal/especias)
+  if (/\b(mantequillas?|margarinas?|butters?|margarines?)\b/.test(normName)) {
+    return { c100: 717, p100: 0.8, cb100: 0.1, f100: 81, category: 'fat', isPureOilOrFat: true, isZeroCal: false };
+  }
+  if (/\b(aceites?|ghee|mantecas?|oils?|lard)\b/.test(normName)) {
+    return { c100: 884, p100: 0, cb100: 0, f100: 100, category: 'fat', isPureOilOrFat: true, isZeroCal: false };
+  }
+
+  // 7. Frutos secos y semillas
+  if (/\b(nueces|nuez(?!\s+moscada)|almendras?|avellanas?|pistachos?|anacardos?|cacahuetes?|manis?|pinones?|chias?|sesamos?|linos?|pipas?|semillas?|frutos?\s+secos?|walnuts?|almonds?|hazelnuts?|pistachios?|cashews?|peanuts?|pine\s+nuts?|seeds?)\b/.test(normName)) {
+    return { c100: 590, p100: 18, cb100: 15, f100: 52, category: 'nuts', isPureOilOrFat: false, isZeroCal: false };
+  }
+
+  // 8. Cereales, pastas, panes, tubérculos y legumbres
+  if (/\b(gnocchis?|noquis?)\b/.test(normName)) {
+    return { c100: 160, p100: 4, cb100: 34, f100: 0.8, category: 'grain', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(pasta\s+fresca|raviolis?|tortellinis?)\b/.test(normName)) {
+    return { c100: 270, p100: 10, cb100: 46, f100: 5, category: 'grain', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(pastas?|espaguetis?|macarrones?|tallarines?|fideos?|lasanas?|canelones?|pennes?|fusillis?|tagliatelles?|spaghettis?|noodles?|ramen|udon)\b/.test(normName)) {
+    return { c100: 350, p100: 12, cb100: 72, f100: 2, category: 'dry_grain', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(arroz|arroces|basmati|risotto|quinoas?|cuscus|couscous|bulgur|mijo|polenta|rice)\b/.test(normName)) {
+    return { c100: 355, p100: 8.5, cb100: 76, f100: 1.5, category: 'dry_grain', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(granolas?|mueslis?)\b/.test(normName)) {
+    return { c100: 450, p100: 10, cb100: 60, f100: 18, category: 'dry_grain', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(avenas?|copos\s+de\s+avena|harinas?|maicenas?|pan\s+rallado|panko|semolas?|oats?|oatmeal|flours?|breadcrumbs?)\b/.test(normName)) {
+    return { c100: 365, p100: 12, cb100: 66, f100: 5, category: 'dry_grain', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(hojaldres?|masa\s+quebrada|puff\s+pastry)\b/.test(normName)) {
+    return { c100: 410, p100: 6, cb100: 40, f100: 25, category: 'bakery', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(croissants?|brioches?|magdalenas?|bollos?)\b/.test(normName)) {
+    return { c100: 390, p100: 8, cb100: 46, f100: 19, category: 'bakery', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(pan|panes|tostadas?|tostas?|panecillos?|baguettes?|pitas?|wraps?|fajitas?|tortillas?\s+de\s+(?:trigo|maiz|harina)|masas?|breads?|toasts?|buns?)\b/.test(normName)) {
+    return { c100: 265, p100: 9, cb100: 50, f100: 3, category: 'bakery', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(boniatos?|batatas?|sweet\s+potatoes?)\b/.test(normName)) {
+    return { c100: 86, p100: 1.6, cb100: 20, f100: 0.1, category: 'tuber', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(patatas?|papas?|potatoes?)\b/.test(normName)) {
+    return { c100: 82, p100: 2, cb100: 18.5, f100: 0.1, category: 'tuber', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(yucas?|mandiocas?|platano\s+macho)\b/.test(normName)) {
+    return { c100: 145, p100: 1.3, cb100: 34, f100: 0.3, category: 'tuber', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(hummus)\b/.test(normName)) {
+    return { c100: 210, p100: 7, cb100: 15, f100: 13, category: 'legume', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (
+    !/\bgreen\s+beans?\b/.test(normName) &&
+    /\b(garbanzos?|lentejas?|alubias?|frijoles?|judias?\s+(?:pintas?|blancas?|negras?|rojas?)|habas?|legumbres?|chickpeas?|lentils?|beans?)\b/.test(normName)
+  ) {
+    if (/\b(sec[oa]s?|crud[oa]s?|dry|dried)\b/.test(normName)) {
+      return { c100: 340, p100: 22, cb100: 58, f100: 2, category: 'dry_grain', isPureOilOrFat: false, isZeroCal: false };
+    }
+    return { c100: 130, p100: 8.5, cb100: 20, f100: 1.8, category: 'legume', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(guisantes?|peas?)\b/.test(normName)) {
+    return { c100: 81, p100: 5.4, cb100: 14.5, f100: 0.4, category: 'veg', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(maiz(?:\s+dulce)?|sweetcorn|corn)\b/.test(normName)) {
+    return { c100: 86, p100: 3.2, cb100: 19, f100: 1.2, category: 'veg', isPureOilOrFat: false, isZeroCal: false };
+  }
+
+  // 9. Dulces, chocolate, azúcares, miel y repostería
+  if (/\b(cacao(?:\s+puro|\s+en\s+polvo)?|cocoa)\b/.test(normName)) {
+    return { c100: 340, p100: 20, cb100: 18, f100: 20, category: 'dry_grain', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(chocolates?|nutellas?|nocillas?)\b/.test(normName)) {
+    return { c100: 540, p100: 6, cb100: 52, f100: 34, category: 'sweet', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(galletas?|bizcochos?|cookies?|biscuits?)\b/.test(normName)) {
+    return { c100: 460, p100: 6, cb100: 68, f100: 18, category: 'bakery', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(azucar(?:es)?|panelas?|sugars?)\b/.test(normName)) {
+    return { c100: 390, p100: 0, cb100: 98, f100: 0, category: 'sweet', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(miel(?:es)?|siropes?|agave|arce|melazas?|honeys?|syrups?)\b/.test(normName)) {
+    return { c100: 310, p100: 0.3, cb100: 80, f100: 0, category: 'sweet', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(mermeladas?|confituras?|jams?)\b/.test(normName)) {
+    return { c100: 250, p100: 0.4, cb100: 62, f100: 0.1, category: 'sweet', isPureOilOrFat: false, isZeroCal: false };
+  }
+
+  // 10. Frutas, aguacate y aceitunas
+  if (/\b(aguacates?|avocados?)\b/.test(normName)) {
+    return { c100: 160, p100: 2, cb100: 8.5, f100: 15, category: 'fruit', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(aceitunas?|olivas?|olives?)\b/.test(normName)) {
+    return { c100: 145, p100: 1, cb100: 4, f100: 14, category: 'fruit', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(coco\s+(?:rallado|seco)|shredded\s+coconut)\b/.test(normName)) {
+    return { c100: 660, p100: 7, cb100: 24, f100: 64, category: 'nuts', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(datiles?|pasas?|orejones?|ciruelas?\s+pasas?|arandanos?\s+secos?|dates?|raisins?)\b/.test(normName)) {
+    return { c100: 295, p100: 2.5, cb100: 75, f100: 0.5, category: 'fruit', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(platanos?|bananas?)\b/.test(normName)) {
+    return { c100: 89, p100: 1.1, cb100: 23, f100: 0.3, category: 'fruit', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (!/\btomates?\b/.test(normName) && /\b(mangos?|uvas?|cerezas?|higos?|caquis?|granadas?|chirimoyas?|grapes?|cherr(?:y|ies)|figs?)\b/.test(normName)) {
+    return { c100: 65, p100: 0.8, cb100: 16, f100: 0.3, category: 'fruit', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(fresas?|arandanos?|frambuesas?|moras?|frutos?\s+rojos?|kiwis?|manzanas?|peras?|naranjas?|mandarinas?|melocotones?|nectarinas?|albaricoques?|ciruelas?|pinas?|sandias?|melones?|limon(?:es)?|limas?|pomelos?|strawberr(?:y|ies)|blueberr(?:y|ies)|raspberr(?:y|ies)|berr(?:y|ies)|apples?|pears?|oranges?|peaches?|pineapples?|watermelons?|lemons?|limes?)\b/.test(normName)) {
+    return { c100: 48, p100: 0.8, cb100: 11.5, f100: 0.2, category: 'fruit', isPureOilOrFat: false, isZeroCal: false };
+  }
+
+  // 11. Verduras, hortalizas y setas
+  if (/\b(remolachas?|beetroots?|beets?)\b/.test(normName)) {
+    return { c100: 43, p100: 1.6, cb100: 10, f100: 0.2, category: 'veg', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(zanahorias?|cebollas?|cebolletas?|chalotas?|puerros?|calabazas?|pimientos?|alcachofas?|coles?\s+de\s+bruselas|carrots?|onions?|leeks?|pumpkins?|squashes?|bell\s+peppers?|artichokes?)\b/.test(normName)) {
+    return { c100: 35, p100: 1.2, cb100: 7.5, f100: 0.2, category: 'veg', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(tomates?|cherrys?|pepinos?|ajos?|esparragos?|espinacas?|acelgas?|lechugas?|ruculas?|canonigos?|brocolis?|coliflores?|calabacin(?:es)?|berenjenas?|judias?\s+verdes?|judias?|champinon(?:es)?|setas?|apios?|repollos?|coles?|lombardas?|pepinillos?|rabanos?|endibias?|berros?|tomatoes?|cucumbers?|garlics?|asparagus|spinach|lettuces?|arugula|broccoli|cauliflower|zucchinis?|courgettes?|eggplants?|aubergines?|green\s+beans?|mushrooms?|celery|cabbage)\b/.test(normName)) {
+    return { c100: 24, p100: 1.8, cb100: 4, f100: 0.2, category: 'veg', isPureOilOrFat: false, isZeroCal: false };
+  }
+
+  // 12. Zumos y bebidas de cocina
+  if (/\b(zumos?|jugos?|juices?)\b/.test(normName)) {
+    return { c100: 45, p100: 0.5, cb100: 10.5, f100: 0.1, category: 'liquid', isPureOilOrFat: false, isZeroCal: false };
+  }
+  if (/\b(vinos?|cervezas?|sidras?|brandys?|conacs?|ron|wines?|beers?)\b/.test(normName)) {
+    return { c100: 45, p100: 0.2, cb100: 3, f100: 0, category: 'liquid', isPureOilOrFat: false, isZeroCal: false };
+  }
+
+  // 13. Sal, especias, hierbas y aditivos 0 kcal (solo si nada anterior coincidió)
+  if (/\b(sal|salt|pimientas?|black\s+pepper|especias?|spices?|oreganos?|perejil(?:es)?|parsley|albahacas?|basil|romeros?|rosemary|tomillos?|thyme|pimenton(?:es)?|paprika|currys?|curcumas?|turmeric|canelas?|cinnamon|laurel(?:es)?|bay\s+lea(?:f|ves)|cominos?|cumin|nuez\s+moscada|nutmeg|jengibres?|ginger|clavos?|cilantros?|coriander|eneldos?|dill|mentas?|hierbabuenas?|mint|azafran(?:es)?|saffron|cayenas?|guindillas?|chiles?\s+en\s+polvo|hierbas?\s+provenzales?|sazonador(?:es)?|vainillas?|vanilla|edulcorantes?|stevias?|eritritol|sacarinas?|levaduras?|yeast|bicarbonato|baking\s+(?:powder|soda))\b/.test(normName)) {
+    return { c100: 0, p100: 0, cb100: 0, f100: 0, category: 'spice', isPureOilOrFat: false, isZeroCal: true };
+  }
+
+  // 14. Fallback inteligente por pasillo (aisle)
+  const normAisle = String(aisle || '').toLowerCase().trim();
+  if (normAisle === 'spices') return { c100: 0, p100: 0, cb100: 0, f100: 0, category: 'spice', isPureOilOrFat: false, isZeroCal: true };
+  if (normAisle === 'produce') return { c100: 35, p100: 1.5, cb100: 7, f100: 0.3, category: 'veg', isPureOilOrFat: false, isZeroCal: false };
+  if (normAisle === 'meat') return { c100: 175, p100: 24, cb100: 0, f100: 8.5, category: 'meat', isPureOilOrFat: false, isZeroCal: false };
+  if (normAisle === 'dairy') return { c100: 130, p100: 8, cb100: 5, f100: 9, category: 'dairy', isPureOilOrFat: false, isZeroCal: false };
+  if (normAisle === 'bakery') return { c100: 265, p100: 9, cb100: 50, f100: 3, category: 'bakery', isPureOilOrFat: false, isZeroCal: false };
+  if (normAisle === 'beverages') return { c100: 30, p100: 0.3, cb100: 7, f100: 0, category: 'liquid', isPureOilOrFat: false, isZeroCal: false };
+
+  return { c100: 80, p100: 2, cb100: 10, f100: 1, category: 'other', isPureOilOrFat: false, isZeroCal: false };
+}
+
+function estimateIngredientGrams(normName, normUnit, amount, profile) {
+  const { category, isPureOilOrFat } = profile;
+
+  if (/^(g|gr|gramo|gramos)$/.test(normUnit)) return amount;
+  if (/^(kg|kilo|kilos|kilogramo|kilogramos)$/.test(normUnit)) return amount * 1000;
+  if (/^mg$/.test(normUnit)) return amount / 1000;
+  if (/^(oz|onza|onzas)$/.test(normUnit)) return amount * 28.35;
+  if (/^(lb|libra|libras)$/.test(normUnit)) return amount * 453.6;
+
+  if (/^(ml|cc|mililitro|mililitros)$/.test(normUnit)) return amount;
+  if (/^(cl|centilitro|centilitros)$/.test(normUnit)) return amount * 10;
+  if (/^(dl|decilitro|decilitros)$/.test(normUnit)) return amount * 100;
+  if (/^(l|litro|litros)$/.test(normUnit)) return amount * 1000;
+
+  if (/^(cda|cdas|cucharada|cucharadas|tbsp|tablespoon|tablespoons)$/.test(normUnit)) {
+    return isPureOilOrFat ? amount * 10 : amount * 15;
+  }
+  if (/^(cdta|cdtas|cucharadita|cucharaditas|tsp|teaspoon|teaspoons|chorro|chorrito|chorritos|pelin)$/.test(normUnit)) {
+    return amount * 5;
+  }
+  if (/^(pizca|pizcas|pinch|pinches|dash|dashes|pellizco|pellizcos|gota|gotas|toque|spray)$/.test(normUnit)) {
+    return isPureOilOrFat ? amount * 5 : amount * 1;
+  }
+
+  if (/^(taza|tazas|cup|cups)$/.test(normUnit)) {
+    if (category === 'dry_grain' || category === 'nuts') return amount * 130;
+    if (category === 'veg') return amount * 70;
+    return amount * 220;
+  }
+  if (/^(vaso|vasos|glass|glasses)$/.test(normUnit)) return amount * 220;
+  if (/^(copita|copitas|copa|copas)$/.test(normUnit)) return amount * 100;
+
+  if (/^(rebanada|rebanadas|tostada|tostadas|slice|slices)$/.test(normUnit)) return amount * 35;
+  if (/^(loncha|lonchas)$/.test(normUnit)) return amount * 25;
+  if (/^(filete|filetes)$/.test(normUnit)) return amount * 160;
+  if (/^(rodaja|rodajas)$/.test(normUnit)) {
+    return (category === 'fish' || category === 'meat') ? amount * 180 : amount * 30;
+  }
+  if (/^(diente|dientes|clove|cloves)$/.test(normUnit)) return amount * 5;
+  if (/^(rama|ramas|ramita|ramitas|hoja|hojas|sprig|sprigs|stalk|stalks|leaf|leaves)$/.test(normUnit)) {
+    return /\b(apio|celery)\b/.test(normName) ? amount * 40 : amount * 3;
+  }
+  if (/^(manojo|manojos|bunch|bunches)$/.test(normUnit)) return amount * 200;
+  if (/^(punado|punados|handful|handfuls)$/.test(normUnit)) return amount * 30;
+  if (/^(lata|latas|can|cans)$/.test(normUnit)) {
+    if (category === 'fish') return amount * 80;
+    if (category === 'legume' || category === 'sauce' || /\bcoco\b/.test(normName)) return amount * 400;
+    return amount * 150;
+  }
+  if (/^(bote|botes|tarro|tarros|jar|jars)$/.test(normUnit)) {
+    return (category === 'legume' || category === 'sauce') ? amount * 400 : amount * 200;
+  }
+  if (/^(paquete|paquetes|pack|packs)$/.test(normUnit)) return amount * 250;
+  if (/^(sobre|sobres|packet|packets)$/.test(normUnit)) {
+    return category === 'protein_powder' ? amount * 30 : amount * 10;
+  }
+  if (/^(cazo|cazos|scoop|scoops)$/.test(normUnit)) {
+    return category === 'protein_powder' ? amount * 30 : amount * 120;
+  }
+
+  // Unidades estándar ('ud', piezas enteras)
+  if (isPureOilOrFat) return Math.min(25, amount * 10);
+  if (/\bcabezas?\s+de\s+ajo\b/.test(normName)) return amount * 45;
+  if (/\bdientes?\s+de\s+ajo\b|\bajo\b/.test(normName)) return amount * 5;
+  if (/\b(tomates?\s+cherry|cherrys?)\b/.test(normName)) return amount * 15;
+  if (/\b(tostadas?|tostas?|rebanadas?)\b/.test(normName)) return amount * 30;
+  if (/\b(tortillas?|wraps?|fajitas?|pitas?)\b/.test(normName)) return amount * 55;
+  if (/\b(doradas?|lubinas?|truchas?|lenguados?|rodaballos?|corvinas?|rapes?)\b/.test(normName)) return amount * 250;
+  if (/\b(pechugas?|filetes?|lomos?|rodajas?|merluzas?|bacalaos?|pescadillas?|gallos?|salmones?|muslos?|contramuslos?|hamburguesas?|solomillos?)\b/.test(normName)) return amount * 180;
+  if (/\b(gambas?|langostinos?|camarones?)\b/.test(normName)) return amount * 25;
+  if (/\b(fresas?|arandanos?|frambuesas?|moras?|cerezas?|uvas?)\b/.test(normName)) return amount * 15;
+  if (/\b(nueces|almendras?|avellanas?|datiles?|aceitunas?|olivas?)\b/.test(normName)) return amount * 10;
+  if (/\b(claras?)\b/.test(normName)) return amount * 35;
+  if (/\b(huevos?|eggs?)\b/.test(normName)) return amount * 60;
+  if (/\b(yogures?|yogurs?|yogurts?)\b/.test(normName)) return amount * 125;
+  if (/\b(aguacates?|avocados?)\b/.test(normName)) return amount * 150;
+  if (/\b(brocolis?|coliflores?|broccoli|cauliflower)\b/.test(normName)) return amount * 350;
+  if (/\b(calabacin(?:es)?|berenjenas?|lechugas?|zucchinis?|eggplants?|lettuces?)\b/.test(normName)) return amount * 220;
+  if (/\b(platanos?|bananas?)\b/.test(normName)) return amount * 120;
+  if (/\b(patatas?|papas?|boniatos?|batatas?|manzanas?|peras?|naranjas?|pepinos?|mangos?|potatoes?|apples?|pears?|oranges?|cucumbers?)\b/.test(normName)) return amount * 160;
+  if (/\b(cebollas?|onions?)\b/.test(normName)) return amount * 120;
+  if (/\b(limon(?:es)?|limas?|tomates?|pimientos?|lemons?|limes?|tomatoes?|peppers?)\b/.test(normName)) return amount * 100;
+  if (/\b(zanahorias?|kiwis?|mandarinas?|albaricoques?|ciruelas?|carrots?)\b/.test(normName)) return amount * 80;
+
+  return amount * 80;
+}
+
 function estimateRecipeNutrition(recipe) {
   if (!recipe) {
     return { calories: 0, protein: 0, carbs: 0, fat: 0 };
@@ -225,133 +652,86 @@ function estimateRecipeNutrition(recipe) {
 
   ingredients.forEach(ing => {
     if (!ing || !ing.name) return;
-    const name = ing.name.toLowerCase().trim();
-    const amount = Number(ing.amount) || 1;
-    const unit = (ing.unit || 'ud').toLowerCase().trim();
+    const normName = String(ing.name)
+      .toLowerCase()
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    if (!normName) return;
 
-    // 0. Especias, sal, hierbas y condimentos secos: aporte calórico y de macros prácticamente nulo
-    if (/\b(sal|pimienta|especias?|or[eé]gano|perejil|albahaca|romero|tomillo|piment[oó]n|curry|canela|laurel|comino|nuez\s+moscada)\b/i.test(name)) {
-      return;
-    }
-
-    // 1. Estimación de peso en gramos
-    let grams = 100;
-    const isOilOrFat = /\b(aceite|oliva|girasol|mantequilla|ghee|manteca)\b/i.test(name);
-
-    if (unit === 'g' || unit === 'gr' || unit === 'gramo' || unit === 'gramos') {
-      grams = amount;
-    } else if (unit === 'kg' || unit === 'kilo' || unit === 'kilos') {
-      grams = amount * 1000;
-    } else if (unit === 'ml' || unit === 'cl' || unit === 'l') {
-      const ml = unit === 'l' ? amount * 1000 : (unit === 'cl' ? amount * 10 : amount);
-      grams = ml;
-    } else if (unit === 'cda' || unit === 'cucharada' || unit === 'cucharadas') {
-      grams = isOilOrFat ? amount * 10 : amount * 15;
-    } else if (unit === 'cdta' || unit === 'cucharadita' || unit === 'cucharaditas' || /\b(pel[ií]n|chorrito|chorro|gota|gotas|toque|pizca|spray)\b/i.test(unit)) {
-      grams = amount * 5;
-    } else if (unit === 'rebanada' || unit === 'rebanadas' || unit === 'loncha' || unit === 'lonchas' || unit === 'tostada' || unit === 'tostadas') {
-      grams = amount * 35;
-    } else if (unit === 'taza' || unit === 'tazas' || unit === 'vaso' || unit === 'vasos') {
-      grams = amount * 200;
-    } else if (unit === 'diente' || unit === 'dientes') {
-      grams = amount * 5;
-    } else {
-      // Unidades estándar ('ud', piezas enteras)
-      if (isOilOrFat) {
-        // En aceite, "1 ud" o sin unidad equivale a 1 cucharada culinaria (~10g), nunca 80g o 100g
-        grams = Math.min(25, amount * 10);
-      } else if (/\b(doradas?|lubinas?|truchas?|lenguados?|rodaballos?|corvinas?|rapes?)\b/i.test(name)) {
-        // Pescado entero (dorada, doradas, lubinas...): ración limpia media ~250g
-        grams = amount * 250;
-      } else if (/\b(pechugas?|filetes?|lomos?|rodajas?|merluzas?|bacalaos?|pescadillas?|gallos?)\b/i.test(name)) {
-        grams = amount * 180;
-      } else if (/\b(gambas?|langostinos?|camarones?)\b/i.test(name)) {
-        grams = amount * 25;
-      } else if (/\b(huevos?)\b/i.test(name)) {
-        grams = amount * 60;
-      } else if (/\b(aguacates?)\b/i.test(name)) {
-        grams = amount * 150;
-      } else if (/\b(patatas?|papas?|manzanas?|peras?|pl[aá]tanos?|bananas?|naranjas?|pepinos?)\b/i.test(name)) {
-        grams = amount * 160;
-      } else if (/\b(lim[oó]n|limones|tomates?)\b/i.test(name)) {
-        grams = amount * 100;
-      } else if (/\b(cebollas?)\b/i.test(name)) {
-        grams = amount * 120;
-      } else {
-        grams = amount * 80;
+    const rawAmount = ing.amount;
+    let amount = 1;
+    if (rawAmount !== null && rawAmount !== undefined && String(rawAmount).trim() !== '') {
+      const parsedAmt = Number(String(rawAmount).replace(',', '.').trim());
+      if (Number.isFinite(parsedAmt)) {
+        if (parsedAmt <= 0) return;
+        amount = parsedAmt;
       }
     }
 
-    // 2. Densidad nutricional por 100g (kcal, proteína, carbohidratos, grasa)
-    let c100 = 80, p100 = 2, cb100 = 10, f100 = 1;
+    const normUnit = String(ing.unit || 'ud')
+      .toLowerCase()
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\.$/, '');
 
-    if (/\b(pollos?|pechugas?|pavos?|conejos?)\b/i.test(name)) {
-      c100 = 145; p100 = 31; cb100 = 0; f100 = 3;
-    } else if (/\b(terneras?|solomillos?|buey|bueyes|cerdos?|carnes?|lomos?|corderos?)\b/i.test(name)) {
-      c100 = 215; p100 = 26; cb100 = 0; f100 = 12;
-    } else if (/\b(salm[oó]n|salmones|at[uú]n|atunes|bonitos?|emperadores?|pez\s+espada|peces\s+espada|sardinas?|boquer[oó]n|boquerones|caballas?|arenques?)\b/i.test(name)) {
-      c100 = 190; p100 = 22; cb100 = 0; f100 = 11;
-    } else if (/\b(doradas?|lubinas?|truchas?|merluzas?|bacalaos?|lenguados?|rodaballos?|corvinas?|rapes?|pescadillas?|gallos?|pescados?\s+blancos?|pescados?)\b/i.test(name)) {
-      // Pescado blanco magro (dorada, doradas, merluza, merluzas, lubina...): rico en proteína y 0g hidratos
-      c100 = 105; p100 = 20; cb100 = 0; f100 = 2.5;
-    } else if (/\b(gambas?|langostinos?|camarones?|calamare?s?|chipir[oó]n|chipirones|sepias?|pulpos?|mejill[oó]n|mejillones|almejas?|berberechos?|chirlas?|mariscos?)\b/i.test(name)) {
-      c100 = 90; p100 = 18; cb100 = 1; f100 = 1;
-    } else if (/\b(claras?)\b/i.test(name)) {
-      c100 = 50; p100 = 11; cb100 = 0.7; f100 = 0.2;
-    } else if (/\b(huevos?)\b/i.test(name)) {
-      c100 = 145; p100 = 13; cb100 = 1; f100 = 10;
-    } else if (/\b(prote[ií]nas?|whey|polvos?\s+de\s+prote[ií]na|case[ií]nas?)\b/i.test(name)) {
-      c100 = 380; p100 = 75; cb100 = 6; f100 = 4;
-    } else if (/\b(tofus?|tempeh|sojas?)\b/i.test(name)) {
-      c100 = 120; p100 = 14; cb100 = 3; f100 = 6;
-    } else if (/\b(pastas?|espaguetis?|macarrones?|tallarines?|fideos?|lasa[ñn]as?)\b/i.test(name)) {
-      c100 = 350; p100 = 12; cb100 = 72; f100 = 2;
-    } else if (/\b(arroz|arroces|basmati|quinoa|cusc[uú]s)\b/i.test(name)) {
-      c100 = 360; p100 = 8; cb100 = 78; f100 = 1;
-    } else if (/\b(avena|copos\s+de\s+avena|harinas?)\b/i.test(name)) {
-      c100 = 370; p100 = 13; cb100 = 60; f100 = 7;
-    } else if (/\b(pan|panes|tostadas?|panecillos?|masas?)\b/i.test(name)) {
-      c100 = 260; p100 = 9; cb100 = 50; f100 = 3;
-    } else if (/\b(garbanzos?|lentejas?|alubias?|frijoles?|hummus)\b/i.test(name)) {
-      c100 = 140; p100 = 9; cb100 = 20; f100 = 3;
-    } else if (isOilOrFat) {
-      c100 = 884; p100 = 0; cb100 = 0; f100 = 100;
-    } else if (/\b(aguacates?)\b/i.test(name)) {
-      c100 = 160; p100 = 2; cb100 = 8; f100 = 15;
-    } else if (/\b(quesos?|parmesanos?|fetas?|mozzarellas?|cheddars?|cottage)\b/i.test(name)) {
-      c100 = 280; p100 = 20; cb100 = 3; f100 = 20;
-    } else if (/\b(yogures?|yogurs?|leches?|bebidas?\s+vegetales?)\b/i.test(name)) {
-      c100 = 80; p100 = 7; cb100 = 5; f100 = 4;
-    } else if (/\b(nueces|almendras?|pi[ñn]ones?|ch[ií]a|semillas?|cacahuetes?|frutos?\s+secos?)\b/i.test(name)) {
-      c100 = 590; p100 = 18; cb100 = 15; f100 = 52;
-    } else if (/\b(pl[aá]tanos?|bananas?|miel|mieles|az[uú]car|azucares|siropes?)\b/i.test(name)) {
-      c100 = 120; p100 = 1; cb100 = 30; f100 = 0;
-    } else if (/\b(fresas?|ar[aá]ndanos?|frutos?\s+rojos?|kiwis?|manzanas?|peras?|naranjas?|lim[oó]n|limones)\b/i.test(name)) {
-      c100 = 50; p100 = 1; cb100 = 12; f100 = 0;
-    } else if (/\b(patatas?|papas?)\b/i.test(name)) {
-      c100 = 85; p100 = 2; cb100 = 19; f100 = 0;
-    } else if (/\b(tomates?|cherrys?|pepinos?|cebollas?|cebolletas?|ajos?|esp[aá]rragos?|espinacas?|calabac[ií]n|calabacines|lechugas?|br[oó]colis?|jud[ií]as?)\b/i.test(name)) {
-      c100 = 25; p100 = 1.5; cb100 = 4; f100 = 0.2;
-    }
+    const profile = classifyIngredientNutritionProfile(normName, ing.aisle || '');
+    if (profile.isZeroCal) return;
+
+    const grams = estimateIngredientGrams(normName, normUnit, amount, profile);
+    if (!Number.isFinite(grams) || grams <= 0) return;
 
     const factor = grams / 100;
-    totalCal += c100 * factor;
-    totalProt += p100 * factor;
-    totalCarbs += cb100 * factor;
-    totalFat += f100 * factor;
+    totalCal += profile.c100 * factor;
+    totalProt += profile.p100 * factor;
+    totalCarbs += profile.cb100 * factor;
+    totalFat += profile.f100 * factor;
   });
 
-  const perServingCalories = Math.max(20, Math.round(totalCal / servings));
-  const perServingProtein = Math.max(0, Math.round((totalProt / servings) * 10) / 10);
-  const perServingCarbs = Math.max(0, Math.round((totalCarbs / servings) * 10) / 10);
-  const perServingFat = Math.max(0, Math.round((totalFat / servings) * 10) / 10);
+  if (totalCal <= 0 && totalProt <= 0 && totalCarbs <= 0 && totalFat <= 0) {
+    return { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  }
 
   return {
-    calories: perServingCalories,
-    protein: perServingProtein,
-    carbs: perServingCarbs,
-    fat: perServingFat
+    calories: Math.max(5, Math.round(totalCal / servings)),
+    protein: Math.max(0, Math.round((totalProt / servings) * 10) / 10),
+    carbs: Math.max(0, Math.round((totalCarbs / servings) * 10) / 10),
+    fat: Math.max(0, Math.round((totalFat / servings) * 10) / 10)
   };
+}
+
+function computeCanonicalRecipeNutrition(recipe, externalNutrition = null) {
+  const normalizeNut = (n) => ({
+    calories: Math.max(0, Math.round(Number(n.calories) || 0)),
+    protein: Math.max(0, Math.round((Number(n.protein) || 0) * 10) / 10),
+    carbs: Math.max(0, Math.round((Number(n.carbs) || 0) * 10) / 10),
+    fat: Math.max(0, Math.round((Number(n.fat) || 0) * 10) / 10)
+  });
+
+  const hasIngs = Boolean(
+    recipe &&
+    Array.isArray(recipe.ingredients) &&
+    recipe.ingredients.some(i => i && (typeof i === 'string' ? i.trim().length > 0 : (i.name && String(i.name).trim().length > 0)))
+  );
+
+  if (recipe?.isExplicitNutrition === true && recipe.nutrition && typeof recipe.nutrition === 'object') {
+    const n = normalizeNut(recipe.nutrition);
+    if (n.calories > 0 || n.protein > 0 || n.carbs > 0 || n.fat > 0) {
+      return n;
+    }
+  }
+
+  if (hasIngs) {
+    return estimateRecipeNutrition(recipe);
+  }
+
+  const candidateExternal = externalNutrition || recipe?.nutrition || recipe?.nutritionSummary || null;
+  if (isValidExternalNutrition(candidateExternal)) {
+    return normalizeNut(candidateExternal);
+  }
+
+  return { calories: 0, protein: 0, carbs: 0, fat: 0 };
 }
 
 function setRecipeNutritionCache(recipe, nutrition, cacheKey = null) {
@@ -401,7 +781,9 @@ function getRecipeNutrition(recipe) {
       return res;
     }
   }
-  const cacheKey = `${recipe.servings || 2}:${Array.isArray(recipe.ingredients) ? recipe.ingredients.length : 0}`;
+  const ings = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
+  const ingsSig = ings.map(i => (typeof i === 'string' ? i : `${i?.name || ''}:${i?.amount ?? ''}:${i?.unit || ''}`)).join('|');
+  const cacheKey = `${recipe.servings || 2}:${ingsSig}:${recipe.nutritionEngineVersion || 0}`;
   if (recipe._cachedNutrition && recipe._cachedNutritionKey === cacheKey) {
     return recipe._cachedNutrition;
   }
@@ -995,6 +1377,7 @@ const AISLE_METADATA = {
 // ==========================================================================
 
 export {
+  NUTRITION_ENGINE_VERSION,
   SEED_RECIPES,
   STANDARD_SLOTS,
   AISLE_METADATA,
@@ -1011,5 +1394,10 @@ export {
   isCustomAllergenPreference,
   normalizeCustomAllergenPreference,
   isStrictAllergenPreference,
-  auditRecipeIngredientsForPreference
+  auditRecipeIngredientsForPreference,
+  isValidExternalNutrition,
+  estimateRecipeNutrition,
+  computeCanonicalRecipeNutrition,
+  getRecipeNutrition,
+  analyzeAndInferRecipeTags
 };

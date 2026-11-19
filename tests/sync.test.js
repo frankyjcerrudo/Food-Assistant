@@ -803,6 +803,123 @@ describe('US-35 & Bugs Bloqueantes: Sincronización Supabase, IDs Únicos y Esqu
       expect(updatedRecipe.instructions[0].text).toBe('Cortar pechuga en tiras');
     });
 
+    it('v2.28: pushToCloud y pullFromCloud sincronizan y restauran nutritionEngineVersion e isExplicitNutrition limpiando metadatos de instructions[0]', async () => {
+      let upsertedRecipes = [];
+      let cloudPullMode = false;
+
+      const mockSupabase = {
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: 'test-user-sync-v228', user_metadata: {} } },
+            error: null
+          }),
+          updateUser: vi.fn().mockResolvedValue({
+            data: { user: { id: 'test-user-sync-v228', user_metadata: {} } },
+            error: null
+          })
+        },
+        from: vi.fn().mockImplementation((table) => {
+          if (table === 'recipes') {
+            return {
+              upsert: vi.fn().mockImplementation((rows) => {
+                upsertedRecipes = JSON.parse(JSON.stringify(rows));
+                return Promise.resolve({ data: rows, error: null });
+              }),
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockImplementation(() => Promise.resolve({
+                  data: cloudPullMode ? upsertedRecipes : [],
+                  error: null
+                }))
+              })
+            };
+          }
+          if (table === 'user_settings') {
+            return {
+              upsert: vi.fn().mockResolvedValue({ data: null, error: null }),
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null })
+                })
+              })
+            };
+          }
+          return {
+            upsert: vi.fn().mockResolvedValue({ data: null, error: null }),
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null })
+            })
+          };
+        })
+      };
+
+      state.cloudUser = { id: 'test-user-sync-v228' };
+      state.recipes = [
+        {
+          id: 'rec-sync-explicit',
+          title: 'Receta Manual Etiqueta',
+          servings: 2,
+          ingredients: [{ id: 'ing-e1', name: 'Pollo', amount: 250, unit: 'g', aisle: 'carniceria' }],
+          instructions: [{ step: 1, text: 'Asar el pollo con hierbas' }],
+          nutrition: { calories: 650, protein: 42, carbs: 55, fat: 24 },
+          nutritionEngineVersion: 2,
+          isExplicitNutrition: true,
+          tags: ['Cena'],
+          updatedAt: '2026-11-19T10:00:00Z'
+        },
+        {
+          id: 'rec-sync-auto',
+          title: 'Receta Calculada Motor',
+          servings: 2,
+          ingredients: [{ id: 'ing-a1', name: 'Salmón fresco', amount: 200, unit: 'g', aisle: 'pescaderia' }],
+          instructions: [{ step: 1, text: 'Hornear salmón 15 minutos' }],
+          nutrition: { calories: 208, protein: 20, carbs: 0, fat: 13.5 },
+          nutritionEngineVersion: 2,
+          isExplicitNutrition: false,
+          tags: ['Cena'],
+          updatedAt: '2026-11-19T10:00:00Z'
+        }
+      ];
+
+      appInstance.supabaseClient = mockSupabase;
+      const pushRes = await appInstance.pushToCloud(true);
+      expect(pushRes.success).toBe(true);
+      expect(upsertedRecipes).toHaveLength(2);
+
+      const pushedExplicit = upsertedRecipes.find(r => r.id === 'rec-sync-explicit');
+      const pushedAuto = upsertedRecipes.find(r => r.id === 'rec-sync-auto');
+      expect(pushedExplicit.instructions[0]._nutritionEngineVersion).toBe(2);
+      expect(pushedExplicit.instructions[0]._isExplicitNutrition).toBe(true);
+      expect(pushedAuto.instructions[0]._nutritionEngineVersion).toBe(2);
+      expect(pushedAuto.instructions[0]._isExplicitNutrition).toBe(false);
+
+      // Reset local recipes and pull from cloud
+      state.recipes = [];
+      cloudPullMode = true;
+      const pullRes = await appInstance.pullFromCloud();
+      expect(pullRes.success).toBe(true);
+
+      const restoredExplicit = state.recipes.find(r => r.id === 'rec-sync-explicit');
+      const restoredAuto = state.recipes.find(r => r.id === 'rec-sync-auto');
+
+      expect(restoredExplicit).toBeDefined();
+      expect(restoredExplicit.nutritionEngineVersion).toBe(2);
+      expect(restoredExplicit.isExplicitNutrition).toBe(true);
+      expect(restoredExplicit.nutrition).toEqual({ calories: 650, protein: 42, carbs: 55, fat: 24 });
+      expect(restoredExplicit.instructions[0]._nutritionEngineVersion).toBeUndefined();
+      expect(restoredExplicit.instructions[0]._isExplicitNutrition).toBeUndefined();
+      expect(restoredExplicit.instructions[0]._nutrition).toBeUndefined();
+      expect(restoredExplicit.instructions[0].text).toBe('Asar el pollo con hierbas');
+
+      expect(restoredAuto).toBeDefined();
+      expect(restoredAuto.nutritionEngineVersion).toBe(2);
+      expect(restoredAuto.isExplicitNutrition).toBe(false);
+      expect(restoredAuto.nutrition).toEqual({ calories: 208, protein: 20, carbs: 0, fat: 13.5 });
+      expect(restoredAuto.instructions[0]._nutritionEngineVersion).toBeUndefined();
+      expect(restoredAuto.instructions[0]._isExplicitNutrition).toBeUndefined();
+      expect(restoredAuto.instructions[0]._nutrition).toBeUndefined();
+      expect(restoredAuto.instructions[0].text).toBe('Hornear salmón 15 minutos');
+    });
+
     it('v0.93: upsertWithSchemaFallback fragmenta lotes grandes (>50) en trozos seguros para evitar errores Kong/PostgREST PGRST102', async () => {
       let callCount = 0;
       let batchSizes = [];

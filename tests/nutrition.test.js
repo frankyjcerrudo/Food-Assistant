@@ -754,4 +754,385 @@ describe('US-01: Contador de Calorías y Macronutrientes por plato y resumen dia
       expect(localStorage.getItem('fa_recipes')).not.toContain('_cachedNutrition');
     });
   });
+
+  describe('Motor unificado de nutrición v2.28 (fuente única de verdad y recálculo)', () => {
+    it('todas las SEED_RECIPES tienen nutritionEngineVersion === 2 y coinciden exactamente con estimateRecipeNutrition', () => {
+      expect(SEED_RECIPES.length).toBeGreaterThanOrEqual(8);
+      SEED_RECIPES.forEach(seed => {
+        expect(seed.nutritionEngineVersion).toBe(window.NUTRITION_ENGINE_VERSION);
+        expect(seed.isExplicitNutrition).not.toBe(true);
+        const computed = estimateRecipeNutrition(seed);
+        expect(seed.nutrition).toEqual(computed);
+      });
+    });
+
+    it('agua y caldos no inflan calorías y las bebidas proteicas con agua dan macros realistas', () => {
+      const onlyWater = estimateRecipeNutrition({
+        servings: 1,
+        ingredients: [{ name: 'Agua', amount: 500, unit: 'ml', aisle: 'bebidas' }]
+      });
+      expect(onlyWater).toEqual({ calories: 0, protein: 0, carbs: 0, fat: 0 });
+
+      const broth = estimateRecipeNutrition({
+        servings: 1,
+        ingredients: [{ name: 'Caldo de verduras', amount: 1000, unit: 'ml', aisle: 'pantry' }]
+      });
+      expect(broth.calories).toBeLessThanOrEqual(120);
+
+      const shake = estimateRecipeNutrition({
+        servings: 1,
+        ingredients: [
+          { name: 'Proteína whey en polvo', amount: 30, unit: 'g', aisle: 'despensa' },
+          { name: 'Agua', amount: 250, unit: 'ml', aisle: 'bebidas' }
+        ]
+      });
+      expect(shake.calories).toBeGreaterThanOrEqual(95);
+      expect(shake.calories).toBeLessThanOrEqual(135);
+      expect(shake.protein).toBeGreaterThanOrEqual(20);
+      expect(shake.protein).toBeLessThanOrEqual(27);
+    });
+
+    it('compuestos con sal, especias o aceite conservan sus macros y el atún en aceite usa peso pescado', () => {
+      const saltedButter = estimateRecipeNutrition({
+        servings: 1,
+        ingredients: [{ name: 'Mantequilla con sal', amount: 30, unit: 'g', aisle: 'lacteos' }]
+      });
+      expect(saltedButter.calories).toBeGreaterThan(180);
+      expect(saltedButter.fat).toBeGreaterThan(20);
+
+      const saltedPeanuts = estimateRecipeNutrition({
+        servings: 1,
+        ingredients: [{ name: 'Cacahuetes con sal', amount: 40, unit: 'g', aisle: 'pantry' }]
+      });
+      expect(saltedPeanuts.calories).toBeGreaterThan(200);
+      expect(saltedPeanuts.protein).toBeGreaterThanOrEqual(7);
+      expect(saltedPeanuts.fat).toBeGreaterThan(15);
+
+      const lowSaltSoy = estimateRecipeNutrition({
+        servings: 1,
+        ingredients: [{ name: 'Salsa de soja baja en sal', amount: 15, unit: 'ml', aisle: 'despensa' }]
+      });
+      expect(lowSaltSoy.calories).toBeLessThan(25);
+
+      const honeyCinnamon = estimateRecipeNutrition({
+        servings: 1,
+        ingredients: [{ name: 'Miel pura y canela', amount: 20, unit: 'g', aisle: 'despensa' }]
+      });
+      expect(honeyCinnamon.calories).toBeGreaterThan(50);
+      expect(honeyCinnamon.carbs).toBeGreaterThan(13);
+
+      const cannedTunaInOil = estimateRecipeNutrition({
+        servings: 1,
+        ingredients: [{ name: 'Atún en aceite de oliva', amount: 1, unit: 'lata', aisle: 'conservas' }]
+      });
+      expect(cannedTunaInOil.calories).toBeGreaterThanOrEqual(120);
+      expect(cannedTunaInOil.protein).toBeGreaterThanOrEqual(14);
+      expect(cannedTunaInOil.protein).toBeLessThanOrEqual(24);
+    });
+
+    it('precedencia correcta: Lomos de salmón fresco como pescado azul y Tomates cherry como verdura', () => {
+      const salmon = estimateRecipeNutrition({
+        servings: 1,
+        ingredients: [{ name: 'Lomos de salmón fresco', amount: 200, unit: 'g', aisle: 'pescaderia' }]
+      });
+      expect(salmon.protein).toBeGreaterThanOrEqual(38);
+      expect(salmon.fat).toBeGreaterThanOrEqual(20);
+
+      const cherryTomatoes = estimateRecipeNutrition({
+        servings: 1,
+        ingredients: [{ name: 'Tomates cherry', amount: 200, unit: 'g', aisle: 'verduras' }]
+      });
+      expect(cherryTomatoes.calories).toBeLessThan(55);
+      expect(cherryTomatoes.carbs).toBeLessThan(12);
+    });
+
+    it('soporta unidades (lata, bote, puñado, manojo, dl, oz, lb, cazo), inglés y fallback por aisle', () => {
+      const unitSamples = [
+        { name: 'Garbanzos cocidos', amount: 1, unit: 'lata', aisle: 'legumbres' },
+        { name: 'Tomate triturado', amount: 1, unit: 'bote', aisle: 'conservas' },
+        { name: 'Nueces peladas', amount: 1, unit: 'puñado', aisle: 'frutos_secos' },
+        { name: 'Espinacas frescas', amount: 1, unit: 'manojo', aisle: 'verduras' },
+        { name: 'Leche entera', amount: 2, unit: 'dl', aisle: 'lacteos' },
+        { name: 'Pechuga de pollo', amount: 4, unit: 'oz', aisle: 'carniceria' },
+        { name: 'Ternera picada', amount: 0.5, unit: 'lb', aisle: 'carniceria' },
+        { name: 'Proteína whey', amount: 1, unit: 'cazo', aisle: 'despensa' }
+      ];
+      unitSamples.forEach(ing => {
+        const res = estimateRecipeNutrition({ servings: 1, ingredients: [ing] });
+        expect(res.calories).toBeGreaterThan(0);
+      });
+
+      const enChicken = estimateRecipeNutrition({
+        servings: 1,
+        ingredients: [{ name: 'Chicken breast', amount: 200, unit: 'g' }]
+      });
+      expect(enChicken.protein).toBeGreaterThanOrEqual(40);
+
+      const enSalmon = estimateRecipeNutrition({
+        servings: 1,
+        ingredients: [{ name: 'Salmon', amount: 200, unit: 'g' }]
+      });
+      expect(enSalmon.fat).toBeGreaterThanOrEqual(20);
+
+      const enOats = estimateRecipeNutrition({
+        servings: 1,
+        ingredients: [{ name: 'Oats', amount: 60, unit: 'g' }]
+      });
+      expect(enOats.carbs).toBeGreaterThanOrEqual(30);
+
+      const enOil = estimateRecipeNutrition({
+        servings: 1,
+        ingredients: [{ name: 'Olive oil', amount: 10, unit: 'ml' }]
+      });
+      expect(enOil.fat).toBeGreaterThanOrEqual(9);
+
+      const enWater = estimateRecipeNutrition({
+        servings: 1,
+        ingredients: [{ name: 'Water', amount: 300, unit: 'ml' }]
+      });
+      expect(enWater.calories).toBe(0);
+
+      const unknownMeat = estimateRecipeNutrition({
+        servings: 1,
+        ingredients: [{ name: 'Corte especial Xyz', amount: 200, unit: 'g', aisle: 'meat' }]
+      });
+      const unknownVeg = estimateRecipeNutrition({
+        servings: 1,
+        ingredients: [{ name: 'Brote especial Xyz', amount: 200, unit: 'g', aisle: 'produce' }]
+      });
+      expect(unknownMeat.protein).toBeGreaterThan(25);
+      expect(unknownVeg.calories).toBeLessThan(unknownMeat.calories);
+      expect(unknownVeg.calories).toBeGreaterThan(15);
+    });
+
+    it('RecipeParser.parseNutrition convierte kJ a kcal, prioriza kcal en formatos mixtos y rechaza solo-calorías', () => {
+      const kjOnly = RecipeParser.parseNutrition({
+        calories: '1850 kJ',
+        proteinContent: '20 g',
+        carbohydrateContent: '30 g',
+        fatContent: '10 g'
+      });
+      expect(kjOnly).toEqual({ calories: 442, protein: 20, carbs: 30, fat: 10 });
+
+      const mixed = RecipeParser.parseNutrition({
+        calories: '2100 kJ / 500 kcal',
+        proteinContent: '25 g',
+        carbohydrateContent: '50 g',
+        fatContent: '15 g'
+      });
+      expect(mixed).toEqual({ calories: 500, protein: 25, carbs: 50, fat: 15 });
+
+      const caloriesOnly = RecipeParser.parseNutrition({
+        calories: '450 kcal'
+      });
+      expect(caloriesOnly).toBeNull();
+    });
+
+    it('consistencia unificada: Schema.org, texto, normalizeAiExtractedRecipe, executeAiToolCall y Recalcular devuelven macros idénticos', () => {
+      state.recipes = [];
+
+      const schemaRecipe = RecipeParser.parseSchemaRecipe({
+        '@type': 'Recipe',
+        name: 'Pollo Arroz Consistencia Schema',
+        recipeYield: '2 raciones',
+        recipeIngredient: [
+          '200 g Pechuga de pollo',
+          '150 g Arroz',
+          '10 ml Aceite de oliva virgen extra',
+          '200 ml Agua'
+        ],
+        recipeInstructions: ['Cocinar el pollo con arroz'],
+        nutrition: {
+          '@type': 'NutritionInformation',
+          calories: '999 kcal',
+          proteinContent: '2 g',
+          carbohydrateContent: '3 g',
+          fatContent: '4 g'
+        }
+      }, 'https://ejemplo.test/pollo');
+
+      const textRecipe = RecipeParser.parseRecipeText([
+        'Pollo Arroz Consistencia Texto',
+        'Porciones: 2',
+        'Ingredientes:',
+        '- 200 g Pechuga de pollo',
+        '- 150 g Arroz',
+        '- 10 ml Aceite de oliva virgen extra',
+        '- 200 ml Agua',
+        'Preparación:',
+        '1. Cocinar el pollo con arroz.'
+      ].join('\n'));
+
+      const aiExtracted = app.normalizeAiExtractedRecipe({
+        title: 'Pollo Arroz Consistencia IA',
+        servings: 2,
+        ingredients: [
+          { name: 'Pechuga de pollo', amount: 200, unit: 'g', aisle: 'carniceria' },
+          { name: 'Arroz', amount: 150, unit: 'g', aisle: 'despensa' },
+          { name: 'Aceite de oliva virgen extra', amount: 10, unit: 'ml', aisle: 'despensa' },
+          { name: 'Agua', amount: 200, unit: 'ml', aisle: 'bebidas' }
+        ],
+        instructions: ['Cocinar todo'],
+        nutrition: { calories: 111, protein: 99, carbs: 1, fat: 1 }
+      });
+
+      const toolRes = app.executeAiToolCall({
+        name: 'create_and_save_recipe',
+        args: {
+          title: 'Pollo Arroz Consistencia Tool',
+          servings: 2,
+          ingredients: [
+            { name: 'Pechuga de pollo', amount: 200, unit: 'g', aisle: 'carniceria' },
+            { name: 'Arroz', amount: 150, unit: 'g', aisle: 'despensa' },
+            { name: 'Aceite de oliva virgen extra', amount: 10, unit: 'ml', aisle: 'despensa' },
+            { name: 'Agua', amount: 200, unit: 'ml', aisle: 'bebidas' }
+          ],
+          instructions: ['Cocinar todo'],
+          nutrition: { calories: 888, protein: 5, carbs: 120, fat: 40 }
+        }
+      });
+
+      state.recipes.push(schemaRecipe);
+      app.openEditRecipeModal(schemaRecipe.id);
+      app.recalculateEditorNutrition();
+      const editorNutrition = {
+        calories: parseFloat(document.getElementById('edit-recipe-calories').value),
+        protein: parseFloat(document.getElementById('edit-recipe-protein').value),
+        carbs: parseFloat(document.getElementById('edit-recipe-carbs').value),
+        fat: parseFloat(document.getElementById('edit-recipe-fat').value)
+      };
+
+      expect(schemaRecipe.nutrition).toEqual(editorNutrition);
+      expect(textRecipe.nutrition).toEqual(editorNutrition);
+      expect(aiExtracted.nutrition).toEqual(editorNutrition);
+      expect(toolRes.recipe.nutrition).toEqual(editorNutrition);
+      expect(schemaRecipe.nutritionEngineVersion).toBe(2);
+      expect(textRecipe.nutritionEngineVersion).toBe(2);
+      expect(aiExtracted.nutritionEngineVersion).toBe(2);
+      expect(toolRes.recipe.nutritionEngineVersion).toBe(2);
+    });
+
+    it('el editor recalcula automáticamente al cambiar porciones o ingredientes sin pulsar Recalcular, y respeta edición manual', () => {
+      const baseRecipe = {
+        id: 'rec-auto-recalc',
+        title: 'Pollo con Arroz Editable',
+        servings: 2,
+        tags: [],
+        ingredients: [
+          { id: 'ing-a', name: 'Pechuga de pollo', amount: 300, unit: 'g', aisle: 'carniceria' },
+          { id: 'ing-b', name: 'Arroz', amount: 150, unit: 'g', aisle: 'despensa' }
+        ],
+        instructions: [{ step: 1, text: 'Cocinar todo' }],
+        nutrition: estimateRecipeNutrition({
+          servings: 2,
+          ingredients: [
+            { name: 'Pechuga de pollo', amount: 300, unit: 'g', aisle: 'carniceria' },
+            { name: 'Arroz', amount: 150, unit: 'g', aisle: 'despensa' }
+          ]
+        }),
+        nutritionEngineVersion: 2,
+        isExplicitNutrition: false
+      };
+      state.recipes = [baseRecipe];
+
+      // 1. Cambiar porciones sin pulsar Recalcular y guardar
+      app.openEditRecipeModal('rec-auto-recalc');
+      document.getElementById('edit-recipe-servings').value = '4';
+      app.saveRecipeEdit();
+
+      let updated = state.recipes.find(r => r.id === 'rec-auto-recalc');
+      expect(updated.servings).toBe(4);
+      expect(updated.isExplicitNutrition).toBe(false);
+      expect(updated.nutritionEngineVersion).toBe(2);
+      expect(updated.nutrition).toEqual(estimateRecipeNutrition(updated));
+      expect(updated.nutrition.calories).toBeLessThan(baseRecipe.nutrition.calories);
+
+      // 2. Cambiar cantidad de ingrediente sin pulsar Recalcular y guardar
+      app.openEditRecipeModal('rec-auto-recalc');
+      const amountInputs = document.querySelectorAll('#edit-ingredients-container .ing-amount');
+      amountInputs[1].value = '450';
+      app.saveRecipeEdit();
+
+      updated = state.recipes.find(r => r.id === 'rec-auto-recalc');
+      expect(updated.isExplicitNutrition).toBe(false);
+      expect(updated.nutrition).toEqual(estimateRecipeNutrition(updated));
+      expect(updated.nutrition.carbs).toBeGreaterThan(40);
+
+      // 3. Editar manualmente las calorías/proteínas y guardar -> respeta edición manual
+      app.openEditRecipeModal('rec-auto-recalc');
+      document.getElementById('edit-recipe-calories').value = '777';
+      document.getElementById('edit-recipe-protein').value = '55.5';
+      app.saveRecipeEdit();
+
+      updated = state.recipes.find(r => r.id === 'rec-auto-recalc');
+      expect(updated.isExplicitNutrition).toBe(true);
+      expect(updated.nutrition.calories).toBe(777);
+      expect(updated.nutrition.protein).toBe(55.5);
+    });
+
+    it('migrateRecipesNutritionToUnifiedEngine recalcula recetas heredadas, respeta isExplicitNutrition, omite sin ingredientes y es idempotente', () => {
+      const legacyTimestamp = '2025-01-01T00:00:00.000Z';
+      const expectedForLegacy = estimateRecipeNutrition({
+        servings: 1,
+        ingredients: [
+          { name: 'Proteína whey', amount: 30, unit: 'g', aisle: 'despensa' },
+          { name: 'Agua', amount: 250, unit: 'ml', aisle: 'bebidas' }
+        ]
+      });
+
+      state.recipes = [
+        {
+          id: 'rec-mig-legacy',
+          title: 'Batido Proteico Antiguo',
+          servings: 1,
+          ingredients: [
+            { id: 'i1', name: 'Proteína whey', amount: 30, unit: 'g', aisle: 'despensa' },
+            { id: 'i2', name: 'Agua', amount: 250, unit: 'ml', aisle: 'bebidas' }
+          ],
+          instructions: [{ step: 1, text: 'Mezclar' }],
+          nutrition: { calories: 320, protein: 24, carbs: 10, fat: 8 },
+          updatedAt: legacyTimestamp
+        },
+        {
+          id: 'rec-mig-explicit',
+          title: 'Receta Etiquetada Manual',
+          servings: 1,
+          ingredients: [{ id: 'i3', name: 'Avena', amount: 50, unit: 'g', aisle: 'despensa' }],
+          instructions: [{ step: 1, text: 'Servir' }],
+          nutrition: { calories: 777, protein: 44, carbs: 55, fat: 22 },
+          isExplicitNutrition: true,
+          updatedAt: legacyTimestamp
+        },
+        {
+          id: 'rec-mig-empty',
+          title: 'Receta Sin Ingredientes',
+          servings: 2,
+          ingredients: [],
+          instructions: [{ step: 1, text: 'Nota libre' }],
+          nutrition: null,
+          updatedAt: legacyTimestamp
+        }
+      ];
+
+      const firstRun = app.migrateRecipesNutritionToUnifiedEngine({ syncCloud: false });
+      expect(firstRun.updatedCount).toBe(1);
+
+      const migratedLegacy = state.recipes.find(r => r.id === 'rec-mig-legacy');
+      expect(migratedLegacy.nutrition).toEqual(expectedForLegacy);
+      expect(migratedLegacy.nutritionEngineVersion).toBe(2);
+      expect(migratedLegacy.updatedAt).not.toBe(legacyTimestamp);
+
+      const preservedExplicit = state.recipes.find(r => r.id === 'rec-mig-explicit');
+      expect(preservedExplicit.nutrition).toEqual({ calories: 777, protein: 44, carbs: 55, fat: 22 });
+      expect(preservedExplicit.isExplicitNutrition).toBe(true);
+      expect(preservedExplicit.updatedAt).toBe(legacyTimestamp);
+
+      const skippedEmpty = state.recipes.find(r => r.id === 'rec-mig-empty');
+      expect(skippedEmpty.nutrition).toBeNull();
+      expect(skippedEmpty.updatedAt).toBe(legacyTimestamp);
+
+      const secondRun = app.migrateRecipesNutritionToUnifiedEngine({ syncCloud: false });
+      expect(secondRun).toEqual({ updatedCount: 0, stampedCount: 0 });
+    });
+  });
 });
